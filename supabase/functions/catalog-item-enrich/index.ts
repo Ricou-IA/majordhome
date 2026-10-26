@@ -3,7 +3,7 @@
 // catalog-item-enrich — enrichissement web d'un article Majord'home (décision d'Eric, 2026-10-25 : « l'enrichissement
 // IA WEB doit se faire sur l'article pour pouvoir récupérer les photos etc »)
 // ============================================================================
-// verify_jwt:true + requireOrgMembership(org_admin). Deux actions, rien n'est écrit sans validation humaine :
+// verify_jwt:true + requireOrgMembership + user_can(articles, edit). Deux actions, rien n'est écrit sans validation humaine :
 //   - propose : Claude + recherche web cherche photo, fiche technique PDF, page source et les caractéristiques du
 //     schéma de la catégorie (champs envoyés par l'écran). Lecture tolérante (module pur _shared/catalogue/
 //     enrichissement.js) ; la photo et la fiche sont vérifiées (image / PDF réellement servis) avant d'être proposées.
@@ -11,7 +11,7 @@
 //   - apply : télécharge ce que l'admin a coché — photo ⇒ bucket product-images, fiche (PDF vérifié) ⇒ document de
 //     l'article dans product-documents/${org}/articles/${item}/ — et fusionne les caractéristiques acceptées.
 //     Body { action:'apply', org_id, item_id, photo_url?, fiche_url?, specs? }.
-// Toutes les écritures passent par le JETON DE L'UTILISATEUR (RLS org_admin des articles, policies storage par org) :
+// Toutes les écritures passent par le JETON DE L'UTILISATEUR (RLS articles.edit des articles, policies storage par org) :
 // le rôle serveur n'a d'ailleurs pas le droit de modifier majordhome.catalog_items. Téléchargements bornés : URL
 // publiques seulement (pas d'IP, pas de nom local), redirections revérifiées, taille plafonnée.
 // Env : ANTHROPIC_API_KEY, ANTHROPIC_ENRICH_MODEL (défaut claude-sonnet-5-5 : ~0,29 $ par recherche mesuré en Opus 5.5, décision Eric 2026-10-25), SUPABASE_URL, SUPABASE_ANON_KEY.
@@ -171,14 +171,18 @@ Deno.serve(async (req) => {
   const action = body.action === "apply" ? "apply" : body.action === "propose" ? "propose" : "";
   if (!orgId || !UUID.test(itemId) || !action) return jsonResponse({ error: "org_id, item_id et action (propose | apply) requis" }, 400, req);
 
-  const auth = await requireOrgMembership(req, { orgId, requiredRole: "org_admin" });
+  const auth = await requireOrgMembership(req, { orgId });
   if (!auth.ok) return auth.response;
 
-  // client au jeton de l'utilisateur : la RLS (org_admin) protège toutes les lectures et écritures
+  // client au jeton de l'utilisateur : la RLS (articles.edit) protège toutes les lectures et écritures
   const user = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: req.headers.get("Authorization") || "" } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // droit articles.edit (registre de permissions, surcharges de l'org comprises) pour propose ET apply ; garde positive
+  const { data: autorise, error: errDroit } = await user.rpc("user_can", { p_org_id: orgId, p_resource: "articles", p_action: "edit" });
+  if (errDroit || autorise !== true) return jsonResponse({ error: "Forbidden: articles.edit" }, 403, req);
 
   try {
     const { data: item, error: errItem } = await user.from("majordhome_catalog_items")

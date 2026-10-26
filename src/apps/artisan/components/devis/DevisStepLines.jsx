@@ -22,7 +22,7 @@ import { lignesCaracteristiques } from '@/lib/devisCaracteristiques.js';
 import { canonicalFieldsForCategory } from '@/shared/specs';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
-import { useAuth } from '@contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
 import { useCatalogItemOffers, useCatalogItemMutations } from '@hooks/useCatalogItems';
 import { deplacerLigne, deplacerChapitre } from '@/lib/devisOrdre.js';
 import { articleDepuisLigne, lignesSansArticle } from '@/lib/catalogue/natures.js';
@@ -231,8 +231,9 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     setLines((prev) => deplacerLigne(prev, { deBloc, deRang: source.index, versBloc, versRang: destination.index }));
   }, [setLines]);
 
-  // Créer l'article de la base depuis une ligne libre (org_admin) : la ligne reste telle quelle et pointe vers l'article
-  const { isOrgAdmin } = useAuth();
+  // Créer l'article de la base depuis une ligne libre (articles.create) : la ligne reste telle quelle et pointe vers l'article
+  const { can } = useCanAccess();
+  const peutCreerArticles = can('articles', 'create');
   const { createItem } = useCatalogItemMutations(orgId);
   const [creationIndex, setCreationIndex] = useState(null);
   const typeDeLigne = useCallback((index) => {
@@ -254,7 +255,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     catch (err) { toast.error(err?.message || 'Création refusée'); }
     finally { setCreationIndex(null); }
   }, [creerUnArticle]);
-  const aCreer = useMemo(() => (isOrgAdmin ? lignesSansArticle(lines) : []), [isOrgAdmin, lines]);
+  const aCreer = useMemo(() => (peutCreerArticles ? lignesSansArticle(lines) : []), [peutCreerArticles, lines]);
   const creerTousLesArticles = useCallback(async () => {
     let faits = 0;
     const echecs = [];
@@ -391,7 +392,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
             {/* lignes avant le premier chapitre (bloc sans titre, toujours en tête) */}
             {sections[0] && !sections[0].section && (
               <ListeLignes droppableId="bloc-0" childLines={sections[0].children} type="libre" onUpdate={updateLine} onRemove={removeLine}
-                marquesParItem={marquesParItem} nbParItem={nbParItem} onMarque={changerMarque} onCreerArticle={isOrgAdmin ? creerArticle : undefined} creationIndex={creationIndex} />
+                marquesParItem={marquesParItem} nbParItem={nbParItem} onMarque={changerMarque} onCreerArticle={peutCreerArticles ? creerArticle : undefined} creationIndex={creationIndex} />
             )}
             <Droppable droppableId="chapitres" type="CHAPITRE">
               {(drop) => (
@@ -418,7 +419,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
                               marquesParItem={marquesParItem}
                               nbParItem={nbParItem}
                               onMarque={changerMarque}
-                              onCreerArticle={isOrgAdmin ? creerArticle : undefined}
+                              onCreerArticle={peutCreerArticles ? creerArticle : undefined}
                               creationIndex={creationIndex}
                             />
                           </div>

@@ -16,7 +16,7 @@
 import { useMemo, useState } from 'react';
 import { X, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
 import { useSuppliers } from '@hooks/useSuppliers';
 import { useOffreFournisseurMutations, useOffreRapprochement } from '@hooks/useOffresFournisseur';
 import { useCatalogItemMutations } from '@hooks/useCatalogItems';
@@ -66,7 +66,8 @@ function NouvelArticle({ ligne, rap, nature, onNature, existant, onExistant }) {
  * @param {{ orgId: string, tva: number, onInsert: (nouvelles: Array<{ line: object, nature: string }>, titreSecours: string) => void, onClose: () => void }} p
  */
 export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose }) {
-  const { isOrgAdmin } = useAuth();
+  const { can } = useCanAccess();
+  const peutEditerArticles = can('articles', 'edit');
   const { suppliers = [] } = useSuppliers(orgId);
   const { appliquer, isApplying, articles } = useOffreFournisseurMutations(orgId);
   const { attach } = useCatalogItemMutations(orgId);
@@ -78,7 +79,7 @@ export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose })
   const lignes = useMemo(() => lecture?.offre?.lignes || [], [lecture]);
   const { rapprochements, isLoading, error } = useOffreRapprochement(orgId, fournisseurId || null, lignes);
   const fournisseur = suppliers.find((s) => s.id === fournisseurId) || null;
-  const peutEcrire = isOrgAdmin && !!fournisseur;
+  const peutEcrire = peutEditerArticles && !!fournisseur;
 
   const surLecture = (l) => {
     setLecture(l);
@@ -202,7 +203,7 @@ export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose })
                     <div className="space-y-1.5">
                       <p className="text-sm font-medium text-secondary-800">
                         {nouvelles.length} nouvel{nouvelles.length > 1 ? 's' : ''} article{nouvelles.length > 1 ? 's' : ''}
-                        {!isOrgAdmin && <span className="ml-2 text-xs font-normal text-amber-600">ajoutés en lignes libres : la création d&apos;articles est réservée à l&apos;administrateur</span>}
+                        {!peutEditerArticles && <span className="ml-2 text-xs font-normal text-amber-600">ajoutés en lignes libres : la création d&apos;articles est réservée aux responsables</span>}
                       </p>
                       <div className={`${GRILLE} px-3 text-[10px] font-medium uppercase tracking-wider text-secondary-400`}>
                         <span>Ligne de l&apos;offre</span><span>Nature</span><span>Article</span><span className="text-right">Vente HT</span>

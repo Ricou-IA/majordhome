@@ -1,5 +1,5 @@
 /**
- * ImportOffreCatalogueModal.jsx — « Importer une offre » sur la fiche d'un fournisseur (org_admin)
+ * ImportOffreCatalogueModal.jsx — « Importer une offre » sur la fiche d'un fournisseur (page Fournisseurs ; l'écriture exige articles.edit côté edge)
  * ============================================================================
  * Demande d'Eric (2026-10-25) : mettre à jour la base d'articles depuis une offre de prix PDF — références nouvelles
  * créées, prix d'achat des existantes mis à jour — avec un écran de validation avant écriture. Écriture par l'écrivain

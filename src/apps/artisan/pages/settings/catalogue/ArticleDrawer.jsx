@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Save, Loader2, Link2, Image as ImageIcon, Upload, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
 import { useCatalogItem, useCatalogItemOffers, useCatalogItemMutations } from '@hooks/useCatalogItems';
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from '@services/suppliers.service';
 import { supportsEnrichment, getSchemaForCategory } from '@/shared/specs';
@@ -38,7 +38,7 @@ function formDepuis(item) {
  * @param {{ orgId: string, itemId: string, onClose: () => void }} p
  */
 export default function ArticleDrawer({ orgId, itemId, onClose }) {
-  const { isOrgAdmin } = useAuth();
+  const { can } = useCanAccess();
   const { item, isLoading } = useCatalogItem(orgId, itemId);
   const { offers } = useCatalogItemOffers(orgId, itemId ? [itemId] : []);
   const { updateItem, uploadImage, attach, detach, isSaving, isLinking, proposeEnrichment, applyEnrichment, isApplyingEnrichment } = useCatalogItemMutations(orgId);
@@ -57,7 +57,7 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
   }, [item]);
 
   const setField = (k, v) => { setForm((f) => ({ ...f, [k]: v })); setDirty(true); };
-  const canEdit = isOrgAdmin;
+  const canEdit = can('articles', 'edit');
   const photosOffres = useMemo(() => [...new Set(offers.map((o) => o.image_url).filter(Boolean))], [offers]);
   const offresActives = offers.filter((o) => o.is_active);
   // champs demandés à l'IA : ceux du formulaire de caractéristiques de la catégorie (sans combustible, comme lui)
@@ -131,7 +131,7 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
           <div className="flex-1 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary-600" /></div>
         ) : (
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-            {!canEdit && <p className="text-xs text-secondary-500 bg-secondary-50 rounded px-3 py-2">Lecture seule : la correction d&apos;un article est réservée à l&apos;administrateur.</p>}
+            {!canEdit && <p className="text-xs text-secondary-500 bg-secondary-50 rounded px-3 py-2">Lecture seule : la correction d&apos;un article est réservée aux responsables.</p>}
 
             {/* Identité */}
             <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">

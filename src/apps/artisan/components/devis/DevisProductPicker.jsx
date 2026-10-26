@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from 'react';
 import { Package, X, Loader2, Search, Minus, Plus, ShoppingCart } from 'lucide-react';
-import { useAuth } from '@contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
 import { useDebounce } from '@hooks/useDebounce';
 import { useCatalogItems, useCatalogBrands, useCatalogGammes } from '@hooks/useCatalogItems';
 import { formatEuro } from '@/lib/utils';
@@ -49,7 +49,7 @@ const NATURE_PAR_TYPE = { equipement: 'main', option: 'accessory', stock: 'stock
  *   onAddLines: (lines: object[]) => void, onClose: () => void }} p
  */
 export default function DevisProductPicker({ orgId, categories = [], typeChapitre = 'libre', tvaDevis = 20, onAddLines, onClose }) {
-  const { isOrgAdmin } = useAuth();
+  const { can } = useCanAccess();
   const filtres = FILTRES[typeChapitre] || FILTRES.libre;
   const [filtreKey, setFiltreKey] = useState(filtres[0].key);
   const filtre = filtres.find((f) => f.key === filtreKey) || filtres[0];
@@ -218,7 +218,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-t bg-secondary-50 rounded-b-xl">
           <div className="flex items-center gap-3">
             <span className="text-sm text-secondary-600">{totalSelected > 0 ? `${totalSelected} article${totalSelected > 1 ? 's' : ''} sélectionné${totalSelected > 1 ? 's' : ''}` : 'Aucune sélection'}</span>
-            {isOrgAdmin && !creation && (
+            {can('articles', 'create') && !creation && (
               <button type="button" onClick={() => setCreation(true)} className="text-xs text-primary-700 hover:underline flex items-center gap-1"><Plus className="w-3 h-3" /> Créer un article</button>
             )}
           </div>

@@ -1,15 +1,15 @@
 // src/apps/artisan/pages/settings/product-detail/ProductArticleBlock.jsx
 // Bloc « Article Majord'home » du drawer d'une ligne fournisseur : l'article auquel la ligne est rattachée, ses
 // offres, le lien vers la fiche article (où se corrigent libellé, catégorie, prix de vente, photo) — et, pour une
-// ligne sans article (saisie à la main, variante, fournisseur sans relevé), le bouton qui le crée (org_admin).
+// ligne sans article (saisie à la main, variante, fournisseur sans relevé), le bouton qui le crée (articles.create).
 import { Link } from 'react-router-dom';
 import { Boxes, ExternalLink, Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
 import { useCatalogItem, useCatalogItemMutations } from '@hooks/useCatalogItems';
 
 export default function ProductArticleBlock({ product, orgId }) {
-  const { isOrgAdmin } = useAuth();
+  const { can } = useCanAccess();
   const itemId = product?.catalog_item_id || null;
   const { item, isLoading } = useCatalogItem(orgId, itemId);
   const { createForProduct, isLinking } = useCatalogItemMutations(orgId);
@@ -31,7 +31,7 @@ export default function ProductArticleBlock({ product, orgId }) {
             Cette ligne n&apos;a pas d&apos;article : elle n&apos;apparaît pas dans le devis.
             {sansPrix ? ' Les lignes sans prix d’achat n’en reçoivent pas automatiquement.' : ' Un relevé fournisseur en crée un ; sans relevé, créez-le ici.'}
           </p>
-          {isOrgAdmin && (
+          {can('articles', 'create') && (
             <button type="button" onClick={handleCreate} disabled={isLinking || !product?.id} className="btn-secondary btn-sm">
               {isLinking ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Plus className="w-3.5 h-3.5 mr-1" />} Créer l&apos;article Majord&apos;home
             </button>

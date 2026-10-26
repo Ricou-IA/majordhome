@@ -8,7 +8,7 @@
 //     (bloc document : texte ET image des pages, un scan passe aussi) avec un format de sortie STRICT
 //     (structured outputs, SCHEMA_OFFRE) ; la réponse est relue de façon tolérante et contrôlée (montants, total)
 //     par le module pur _shared/catalogue/offreFournisseur.js (copie de src/lib/catalogue). N'écrit RIEN.
-//   - apply : { org_id, supplier_id, offre: { numero, date }, lignes } — org_admin. Lignes validées à l'écran →
+//   - apply : { org_id, supplier_id, offre: { numero, date }, lignes } — droit articles.edit (RPC user_can). Lignes validées à l'écran →
 //     public.supplier_catalog_upsert (écrivain unique, service_role) avec p_meta.desactiver_absents = false (une
 //     offre ne liste que quelques articles) : références nouvelles créées (article Majord'home posé par
 //     catalog_items_ensure), prix d'achat des existantes mis à jour, champs humains jamais touchés. Répond les
@@ -54,8 +54,19 @@ Deno.serve(async (req) => {
   const action = body.action === "apply" ? "apply" : body.action === "extract" ? "extract" : "";
   if (!UUID.test(orgId) || !action) return jsonResponse({ error: "org_id et action (extract | apply) requis" }, 400, req);
 
-  const auth = await requireOrgMembership(req, { orgId, ...(action === "apply" ? { requiredRole: "org_admin" } : {}) });
+  const auth = await requireOrgMembership(req, { orgId });
   if (!auth.ok) return auth.response;
+
+  // apply écrit au catalogue : droit articles.edit (registre de permissions, surcharges de l'org comprises), garde positive.
+  // extract reste ouvert à tout membre (il n'écrit rien).
+  if (action === "apply") {
+    const user = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: req.headers.get("Authorization") || "" } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: autorise, error: errDroit } = await user.rpc("user_can", { p_org_id: orgId, p_resource: "articles", p_action: "edit" });
+    if (errDroit || autorise !== true) return jsonResponse({ error: "Forbidden: articles.edit" }, 403, req);
+  }
 
   try {
     if (action === "extract") {

@@ -20,6 +20,16 @@ function dateSeuilFraicheur(now = new Date()) {
   return new Date(now.getTime() - SEUIL_FRAICHEUR_JOURS * 86400000).toISOString();
 }
 
+/**
+ * Refus de droits (RPC `articles_edit_required` / `articles_create_required` / `org_admin_required`, RLS 42501,
+ * 403 « Forbidden: articles.* » d'une edge) → message d'écran unique. Autre erreur : inchangée.
+ */
+export function erreurDroitsArticle(error) {
+  const texte = `${error?.code || ''} ${error?.message || ''}`;
+  if (/42501|articles_(edit|create)_required|org_admin_required|Forbidden: articles[.]/.test(texte)) return new Error('Action réservée aux responsables');
+  return error;
+}
+
 /** Appel de l'edge catalog-item-enrich ; le message d'erreur de l'edge (« recherche trop longue »…) remonte tel quel. */
 async function appelEnrichissement(body, etape) {
   try {
@@ -33,7 +43,7 @@ async function appelEnrichissement(body, etape) {
     return { data, error: null };
   } catch (error) {
     logger.error(`[catalogItemsService] ${etape}:`, error);
-    return { data: null, error };
+    return { data: null, error: erreurDroitsArticle(error) };
   }
 }
 
@@ -172,7 +182,7 @@ export const catalogItemsService = {
         description: description?.trim() || null, code: this.normalizeCode(code), origin: 'manuel', default_tva_rate: 20,
       }).select('id').single();
       if (error) {
-        if (error.code === '42501') throw new Error('Création réservée à l\'administrateur');
+        if (error.code === '42501') throw erreurDroitsArticle(error);
         throw this.codeConflict(error) || error;
       }
       const { data: item, error: errItem } = await this.getItem(orgId, data.id);
@@ -205,7 +215,7 @@ export const catalogItemsService = {
       if (row.name === '') throw new Error('Le libellé est requis');
       const { data, error } = await supabase.from('majordhome_catalog_items').update(row).eq('id', itemId).eq('org_id', orgId).select().maybeSingle();
       if (error) throw this.codeConflict(error) || error;
-      if (!data) throw new Error('Modification refusée (réservée à l\'administrateur)');
+      if (!data) throw new Error('Modification refusée (réservée aux responsables)');
       return { data, error: null };
     } catch (error) {
       logger.error('[catalogItemsService] updateItem:', error);
@@ -451,7 +461,7 @@ export const catalogItemsService = {
       return { data: true, error: null };
     } catch (error) {
       logger.error('[catalogItemsService] attach:', error);
-      return { data: null, error };
+      return { data: null, error: erreurDroitsArticle(error) };
     }
   },
 
@@ -464,7 +474,7 @@ export const catalogItemsService = {
       return { data, error: null };
     } catch (error) {
       logger.error('[catalogItemsService] createForProduct:', error);
-      return { data: null, error };
+      return { data: null, error: erreurDroitsArticle(error) };
     }
   },
 
@@ -497,7 +507,7 @@ export const catalogItemsService = {
       return { data, error: null };
     } catch (error) {
       logger.error('[catalogItemsService] detach:', error);
-      return { data: null, error };
+      return { data: null, error: erreurDroitsArticle(error) };
     }
   },
 };

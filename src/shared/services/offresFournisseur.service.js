@@ -11,7 +11,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@lib/logger';
 import { calculerModelKey } from '@/lib/catalogue/modelKey.js';
-import { catalogItemsService } from '@services/catalogItems.service';
+import { catalogItemsService, erreurDroitsArticle } from '@services/catalogItems.service';
 
 const PDF_MAX = 8 * 1024 * 1024;
 const COLONNES_ARTICLE = 'id, name, brand, model_key, product_kind, unit, selling_price_ht, meilleur_prix_achat, fournisseurs';
@@ -36,7 +36,7 @@ async function appel(body, etape) {
     return { data, error: null };
   } catch (error) {
     logger.error(`[offresFournisseurService] ${etape}:`, error);
-    return { data: null, error };
+    return { data: null, error: erreurDroitsArticle(error) };
   }
 }
 
