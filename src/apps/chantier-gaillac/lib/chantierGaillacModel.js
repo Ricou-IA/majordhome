@@ -293,10 +293,11 @@ export function formatDateLongue(iso) {
 const slug = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 /**
- * Programmes imprimables (PDF) : UNE page par journée DATÉE (code de planning avec `date_prevue`),
- * dans l'ordre des dates puis des codes, limitée au technicien / au code choisis dans les filtres.
- * Hors périmètre et codes non datés exclus (un programme est une journée programmée).
- * Les lignes d'une journée sont réparties par site (un passage), dans l'ordre du tableau.
+ * Programmes imprimables (PDF) : UNE page par code de planning (journée ou demi-journée, datée
+ * ou non — Eric 2026-10-26 : « il faut que je puisse imprimer l'ensemble »), dans l'ordre du
+ * planning, limitée au technicien / au code choisis dans les filtres. Un code sans date sort avec
+ * son libellé et la mention « à programmer ». Hors périmètre exclu (rien à exécuter).
+ * Les lignes d'un code sont réparties par site (un passage), dans l'ordre du tableau.
  * Le PDF ne calcule ni ne formate rien : tout est prêt ici.
  *
  * @param {object} p
@@ -314,14 +315,14 @@ export function buildProgrammesModel({ taches, planning, techniciens, techId = '
     const t = techs.find((x) => x.id === id);
     return t?.first_name || t?.display_name || '';
   };
-  const dated = (planning || [])
-    .filter((p) => p.date_prevue && (!planningCode || p.code === planningCode))
-    .sort((a, b) => a.date_prevue.localeCompare(b.date_prevue) || a.ordre - b.ordre);
+  const codes = (planning || [])
+    .filter((p) => !planningCode || p.code === planningCode)
+    .sort((a, b) => a.ordre - b.ordre);
 
   const filtered = filterTaches(taches, { techId, hideDone: false, q: '' }).filter((t) => !isHorsPerimetre(t));
   const groups = groupTaches(filtered, 'planning', planning);
 
-  const pages = dated.map((p) => {
+  const pages = codes.map((p) => {
     const g = groups.find((x) => x.key === p.code);
     if (!g || !g.rows.length) return null;
     const sites = [];
@@ -345,13 +346,17 @@ export function buildProgrammesModel({ taches, planning, techniciens, techId = '
       });
     }
     const ids = [...new Set(g.rows.map((t) => t.technicien_id).filter(Boolean))];
+    const tech = ids.map(techName).filter(Boolean).join(' et ') || techName(p.technicien_id);
     return {
       key: p.code,
       code: p.code,
       label: p.libelle,
-      date: p.date_prevue,
+      date: p.date_prevue || null,
       dateLabel: formatDateLongue(p.date_prevue),
-      techName: ids.map(techName).filter(Boolean).join(' et ') || techName(p.technicien_id),
+      // Titre de la page : la date si le code est programmé, sinon le libellé du code
+      title: p.date_prevue ? `${formatDateLongue(p.date_prevue)}${tech ? ` – ${tech}` : ''}` : p.libelle,
+      statut: p.date_prevue ? 'programmé' : 'à programmer',
+      techName: tech,
       totalLabel: formatDuree(g.totalMin),
       count: g.count,
       done: g.done,
@@ -359,7 +364,7 @@ export function buildProgrammesModel({ taches, planning, techniciens, techId = '
     };
   }).filter(Boolean);
 
-  const suffix = planningCode && dated.length === 1 ? dated[0].date_prevue : techId ? slug(techName(techId)) : '';
+  const suffix = planningCode && codes.length === 1 ? (codes[0].date_prevue || slug(codes[0].code)) : techId ? slug(techName(techId)) : '';
   const d = editedAt || new Date();
   const editedLabel = `Édité le ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
   return {

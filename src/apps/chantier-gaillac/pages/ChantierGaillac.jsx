@@ -90,7 +90,7 @@ export default function ChantierGaillac() {
       const pages = await telechargerProgrammes({
         taches: data.taches, planning: data.planning, techniciens, techId, planningCode, settings,
       });
-      if (!pages) toast.info('Aucune journée datée à imprimer avec ces filtres : programmez d’abord une date.');
+      if (!pages) toast.info('Aucune tâche à imprimer avec ces filtres.');
     } catch (e) {
       toast.error(`Export PDF impossible : ${e?.message || 'erreur inconnue'}`);
     }

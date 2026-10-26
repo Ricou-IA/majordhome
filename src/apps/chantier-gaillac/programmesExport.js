@@ -7,7 +7,7 @@ import { downloadBlob } from '@lib/utils';
 import { buildProgrammesModel } from './lib/chantierGaillacModel';
 
 /**
- * Construit les programmes (une page par journée datée, selon les filtres) et déclenche le téléchargement.
+ * Construit les programmes (une page par code de planning, selon les filtres) et déclenche le téléchargement.
  * @returns {Promise<number>} nombre de pages produites (0 = rien téléchargé)
  */
 export async function telechargerProgrammes({ taches, planning, techniciens, techId, planningCode, settings }) {

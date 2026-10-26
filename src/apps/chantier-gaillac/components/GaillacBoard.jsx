@@ -34,7 +34,7 @@ export default function GaillacBoard({
     writeStored(storageKey, { ...next, q: '' });
   }, [storageKey]);
 
-  // Export PDF des programmes : journées datées du technicien / du code filtrés
+  // Export PDF des programmes : tous les codes (journées et demi-journées) du technicien / du code filtrés
   const handlePrint = useCallback(async () => {
     setPrinting(true);
     try {

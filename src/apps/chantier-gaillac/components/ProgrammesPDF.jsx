@@ -1,9 +1,9 @@
 /* eslint-disable react-refresh/only-export-components -- module de rendu PDF (blob), jamais monté
    dans l'arbre React : Fast Refresh ne s'applique pas. */
 /**
- * ProgrammesPDF.jsx — Programmes du chantier Gaillac (A4 portrait, une page par journée datée)
+ * ProgrammesPDF.jsx — Programmes du chantier Gaillac (A4 portrait, une page par code de planning)
  * ============================================================================
- * Feuille papier du technicien pour sa journée : site par site, chaque tâche avec son n°,
+ * Feuille papier du technicien pour sa journée ou demi-journée : site par site, chaque tâche avec son n°,
  * l'action, les observations, la durée, Stock / Achat, et une case à cocher à la main.
  *
  * Le document n'effectue AUCUN calcul ni tri : tout vient de `buildProgrammesModel`.
@@ -110,8 +110,11 @@ export function ProgrammesDocument({ model, company }) {
           <CompanyHeader company={company} />
           <View style={s.titleRow}>
             <View>
-              <Text style={[s.title, { color: accent }]}>{p.dateLabel}{p.techName ? ` – ${p.techName}` : ''}</Text>
-              <Text style={s.subtitle}>Chantier Gaillac – Préconisations P2 · Mayer Énergie pour Veolia</Text>
+              <Text style={[s.title, { color: accent }]}>{p.title}</Text>
+              <Text style={s.subtitle}>
+                Chantier Gaillac – Préconisations P2 · Mayer Énergie pour Veolia
+                {p.date ? '' : ` · ${p.techName ? `${p.techName}, ` : ''}à programmer`}
+              </Text>
             </View>
             <Text style={[s.badge, { backgroundColor: accent }]}>{p.code}</Text>
           </View>
