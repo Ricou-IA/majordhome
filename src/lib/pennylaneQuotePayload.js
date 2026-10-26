@@ -4,7 +4,7 @@
 // une propriété en trop refuse le devis entier (incident 2026-10-25 : sections envoyées en { label }).
 //   - section : { title, rank } — rank entier unique, de 1 en 1 ; une ligne s'y range par section_rank = rank
 //   - ligne standard : label, quantity (NOMBRE), raw_currency_unit_price (chaîne HT avant remise), unit, vat_rate,
-//     ledger_account_id?, description?, section_rank?, discount? { type: 'relative' | 'absolute', value }
+//     ledger_account_id?, description? (= description libre + caractéristiques, une par ligne), section_rank?, discount? { type: 'relative' | 'absolute', value }
 //   - remise globale : discount { type, value }
 // Un chapitre sans ligne n'est pas envoyé (même règle que le PDF).
 
@@ -16,13 +16,19 @@ export const UNIT_MAPPING = Object.freeze({ 'pièce': 'piece', h: 'hour', forfai
 
 const montant = (v) => String((Number(v) || 0).toFixed(2));
 
+/** Description Pennylane d'une ligne : texte libre puis caractéristiques figées, une par ligne ; '' si rien. */
+function descriptionPennylane(line) {
+  const caracs = Array.isArray(line.caracteristiques) ? line.caracteristiques : [];
+  return [line.description, ...caracs].filter(Boolean).join('\n');
+}
+
 function dateIso(d) {
   return d.toISOString().split('T')[0];
 }
 
 /**
  * @param {{ id: string, subject?: string, validity_days?: number, global_discount_percent?: number }} quote
- * @param {Array<{ line_type: string, designation: string, description?: string, quantity: unknown, unit?: string,
+ * @param {Array<{ line_type: string, designation: string, description?: string, caracteristiques?: string[], quantity: unknown, unit?: string,
  *   unit_price_ht: unknown, tva_rate: unknown, discount_percent?: unknown, ledger_account_pl_id?: number | null }>} lines
  *   lignes ordonnées (sort_order), titres de chapitre compris
  * @param {number} customerId id du client Pennylane
@@ -54,7 +60,8 @@ export function buildPennylaneQuotePayload(quote, lines, customerId, now = new D
       vat_rate: TVA_MAPPING[Number(line.tva_rate)] || 'FR_200',
     };
     if (line.ledger_account_pl_id) l.ledger_account_id = Number(line.ledger_account_pl_id);
-    if (line.description) l.description = line.description;
+    const description = descriptionPennylane(line);
+    if (description) l.description = description;
     if (rangCourant != null) l.section_rank = rangCourant;
     const remise = Number(line.discount_percent) || 0;
     if (remise > 0) l.discount = { type: 'relative', value: montant(remise) };
@@ -110,7 +117,8 @@ export function buildPennylaneQuoteUpdatePayload(quote, lines, customerId, exist
       vat_rate: TVA_MAPPING[Number(line.tva_rate)] || 'FR_200',
     };
     if (line.ledger_account_pl_id) l.ledger_account_id = Number(line.ledger_account_pl_id);
-    if (line.description) l.description = line.description;
+    const description = descriptionPennylane(line);
+    if (description) l.description = description;
     if (titre != null) {
       const rang = rangs.get(cleTitre(titre));
       if (rang) l.section_rank = rang;

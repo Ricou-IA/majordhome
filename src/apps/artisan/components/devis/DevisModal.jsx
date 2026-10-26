@@ -104,6 +104,10 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   };
 
   const handlePush = async () => {
+    // Pennylane n'a pas de « prix masqués » par chapitre : le dire avant l'envoi, sans bloquer
+    if ((lines || []).some((l) => l.line_type === 'section_title' && l.hide_prices === true)) {
+      toast.info('Pennylane affichera les prix de tous les chapitres');
+    }
     try {
       const res = await pushToPennylane({ quote, lines, client });
       toast.success(res?.renvoi

@@ -83,3 +83,27 @@ test('modification (PUT) : anciennes lignes supprimées, nouvelles créées dans
   const permis = ['date', 'deadline', 'customer_id', 'currency', 'language', 'pdf_invoice_subject', 'discount', 'external_reference', 'invoice_lines'];
   for (const k of Object.keys(payload)) assert.ok(permis.includes(k), `propriété hors schéma : ${k}`);
 });
+
+test('description Pennylane = description libre puis caractéristiques, une par ligne ; clé absente si les deux sont vides', async () => {
+  const { buildPennylaneQuoteUpdatePayload } = await import('../src/lib/pennylaneQuotePayload.js');
+  const base = { line_type: 'product', quantity: 1, unit: 'pièce', unit_price_ht: 10, tva_rate: 20 };
+  const entree = [
+    { ...base, designation: 'A', description: 'Pose incluse', caracteristiques: ['Puissance : 8 kW'] },
+    { ...base, designation: 'B', caracteristiques: ['Puissance : 8 kW', 'Garantie : 5 ans'] },
+    { ...base, designation: 'C', description: 'Texte seul' },
+    { ...base, designation: 'D' },
+    { ...base, designation: 'E', description: '', caracteristiques: [] },
+    { ...base, designation: 'F', description: null, caracteristiques: ['', 'Poids : 40 kg'] },
+  ];
+  const attendu = ['Pose incluse\nPuissance : 8 kW', 'Puissance : 8 kW\nGarantie : 5 ans', 'Texte seul', undefined, undefined, 'Poids : 40 kg'];
+  const post = buildPennylaneQuotePayload(quote, entree, 42, NOW).invoice_lines;
+  assert.deepEqual(post.map((l) => l.description), attendu);
+  assert.equal('description' in post[3], false);
+  assert.equal('description' in post[4], false);
+  // renvoi (PUT) : même règle, sinon un devis renvoyé perdrait ses caractéristiques
+  const put = buildPennylaneQuoteUpdatePayload(quote, entree, 42, { lineIds: [], sections: [] }, NOW).payload.invoice_lines.create;
+  assert.deepEqual(put.map((l) => l.description), attendu);
+  // aucune clé hors schéma : les caractéristiques n'ouvrent pas de propriété
+  const permis = ['label', 'quantity', 'raw_currency_unit_price', 'unit', 'vat_rate', 'ledger_account_id', 'description', 'section_rank', 'discount'];
+  for (const l of [...post, ...put]) for (const k of Object.keys(l)) assert.ok(permis.includes(k), `propriété hors schéma : ${k}`);
+});
