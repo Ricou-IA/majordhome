@@ -100,6 +100,14 @@ const FUNCTIONS = [
   // 20261026_1 : articles Majord'home — apply_mapping v3 remplace la v2, les RPC des rapprochements sont droppées par 20261026_2
   'public.supplier_catalog_apply_mapping(uuid)',
   'majordhome.catalog_item_merge_impl(uuid, uuid)', // 20261028_2 : recréée avec la reprise du code (dernière définition : 20261027_2)
+  // 20261028_3 : garde des RPC d'article passée de catalog_item_require_admin à role_can(articles) — les trois RPC
+  // sont recréées ; leurs dépendances (new_for_product, deactivate_if_empty) sont appelées par l'assertion.
+  'public.catalog_item_create_for_product(uuid)',
+  'public.catalog_item_attach(uuid, uuid)',
+  'public.catalog_item_detach(uuid)',
+  'majordhome.catalog_item_require_admin(uuid)',
+  'majordhome.catalog_item_new_for_product(uuid)',
+  'majordhome.catalog_item_deactivate_if_empty(uuid)',
   'public.get_distinct_brands(uuid)',
   'public.org_secret_set(uuid, text, text)',
   'public.org_secret_delete(uuid, text)',
@@ -251,7 +259,8 @@ const POLICY_TABLES = [
   // 20260930_14 : purge des surcharges (lecture org / écriture org_admin)
   'role_permissions', 'app_role_permissions',
   'org_roles', 'member_org_roles', // 20261006_1
-  'product_documents', // 20261027_6 : documents d'article réservés à l'org_admin
+  'product_documents', // 20261027_6 : documents d'article réservés à l'org_admin ; 20261028_3 : sous role_can(articles)
+  'catalog_items', // 20261028_3 : écritures org_admin → role_can(articles)
   'webshop_delivery_slots', 'webshop_orders', // 20261013_2
   'webshop_products', 'webshop_categories', // 20261014_1
   // 20261018_1 : écritures directes retirées (policy FOR ALL membres → SELECT membres)
