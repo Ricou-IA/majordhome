@@ -3,7 +3,9 @@ import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { chantierGaillacVisible } from '../config';
+import { telechargerProgrammes } from '../programmesExport';
 import { useChantierGaillac, useChantierGaillacMutations } from '../useChantierGaillac';
 import { defaultPlanningCode, DEFAULT_FILTERS } from '../lib/chantierGaillacModel';
 import GaillacBoard from '../components/GaillacBoard';
@@ -29,6 +31,7 @@ function readStored(key) {
  */
 export default function ChantierGaillac() {
   const { organization, user, isOrgAdmin } = useAuth();
+  const { settings } = useOrgSettings();
   const orgId = organization?.id;
   const userId = user?.id;
   const data = useChantierGaillac(orgId);
@@ -82,6 +85,17 @@ export default function ChantierGaillac() {
     }
   }, [setCommentaire]);
 
+  const handlePrint = useCallback(async ({ techId, planningCode }) => {
+    try {
+      const pages = await telechargerProgrammes({
+        taches: data.taches, planning: data.planning, techniciens, techId, planningCode, settings,
+      });
+      if (!pages) toast.info('Aucune journée datée à imprimer avec ces filtres : programmez d’abord une date.');
+    } catch (e) {
+      toast.error(`Export PDF impossible : ${e?.message || 'erreur inconnue'}`);
+    }
+  }, [data.taches, data.planning, techniciens, settings]);
+
   const handleDatePrevue = useCallback(async (code, date) => {
     try {
       await setDatePrevue.mutateAsync({ code, date });
@@ -124,6 +138,7 @@ export default function ChantierGaillac() {
           onToggle={handleToggle}
           onComment={handleComment}
           onDatePrevue={handleDatePrevue}
+          onPrint={handlePrint}
           isFetching={data.isFetching}
           dataUpdatedAt={data.dataUpdatedAt}
         />

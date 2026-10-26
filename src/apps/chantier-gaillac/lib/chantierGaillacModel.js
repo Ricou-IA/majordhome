@@ -281,3 +281,90 @@ export function mapsUrl(t) {
   const q = [t.adresse, '81600 Gaillac'].filter(Boolean).join(', ');
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${t.site}, ${q}`)}`;
 }
+
+/** « 2026-10-21 » → « Mercredi 21 octobre 2026 » (date construite à midi : insensible au fuseau). */
+export function formatDateLongue(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  const s = new Date(y, m - 1, d, 12).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+const slug = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/**
+ * Programmes imprimables (PDF) : UNE page par journée DATÉE (code de planning avec `date_prevue`),
+ * dans l'ordre des dates puis des codes, limitée au technicien / au code choisis dans les filtres.
+ * Hors périmètre et codes non datés exclus (un programme est une journée programmée).
+ * Les lignes d'une journée sont réparties par site (un passage), dans l'ordre du tableau.
+ * Le PDF ne calcule ni ne formate rien : tout est prêt ici.
+ *
+ * @param {object} p
+ * @param {Array<object>} p.taches
+ * @param {Array<object>} p.planning
+ * @param {Array<{ id: string, display_name?: string, first_name?: string|null }>} p.techniciens
+ * @param {string} [p.techId]        filtre technicien ('' = tous)
+ * @param {string} [p.planningCode]  filtre journée ('' = toutes)
+ * @param {Date} p.editedAt          date d'édition (pied de page)
+ * @returns {{ pages: Array<object>, filename: string, editedLabel: string }}
+ */
+export function buildProgrammesModel({ taches, planning, techniciens, techId = '', planningCode = '', editedAt }) {
+  const techs = techniciens || [];
+  const techName = (id) => {
+    const t = techs.find((x) => x.id === id);
+    return t?.first_name || t?.display_name || '';
+  };
+  const dated = (planning || [])
+    .filter((p) => p.date_prevue && (!planningCode || p.code === planningCode))
+    .sort((a, b) => a.date_prevue.localeCompare(b.date_prevue) || a.ordre - b.ordre);
+
+  const filtered = filterTaches(taches, { techId, hideDone: false, q: '' }).filter((t) => !isHorsPerimetre(t));
+  const groups = groupTaches(filtered, 'planning', planning);
+
+  const pages = dated.map((p) => {
+    const g = groups.find((x) => x.key === p.code);
+    if (!g || !g.rows.length) return null;
+    const sites = [];
+    for (const t of g.rows) {
+      let site = sites[sites.length - 1];
+      if (!site || site.site !== t.site) {
+        site = { site: t.site, adresse: t.adresse || '', zone: t.zone || '', rows: [] };
+        sites.push(site);
+      }
+      site.rows.push({
+        numero: String(t.numero),
+        action: t.action,
+        observations: t.observations || '',
+        theme: t.theme || '',
+        dureeLabel: formatDuree(t.duree_min),
+        achat: t.achat_requis ? 'Achat' : 'Stock',
+        securite: isSecurite(t),
+        releve: isReleve(t),
+        fait: !!t.fait,
+        commentaire: t.commentaire_terrain || '',
+      });
+    }
+    const ids = [...new Set(g.rows.map((t) => t.technicien_id).filter(Boolean))];
+    return {
+      key: p.code,
+      code: p.code,
+      label: p.libelle,
+      date: p.date_prevue,
+      dateLabel: formatDateLongue(p.date_prevue),
+      techName: ids.map(techName).filter(Boolean).join(' et ') || techName(p.technicien_id),
+      totalLabel: formatDuree(g.totalMin),
+      count: g.count,
+      done: g.done,
+      sites,
+    };
+  }).filter(Boolean);
+
+  const suffix = planningCode && dated.length === 1 ? dated[0].date_prevue : techId ? slug(techName(techId)) : '';
+  const d = editedAt || new Date();
+  const editedLabel = `Édité le ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+  return {
+    pages,
+    filename: `programmes-chantier-gaillac${suffix ? `-${suffix}` : ''}.pdf`,
+    editedLabel,
+  };
+}

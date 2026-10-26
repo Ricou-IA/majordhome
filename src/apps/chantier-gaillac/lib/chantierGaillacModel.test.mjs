@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import {
   totalMinutes, formatDuree, filterTaches, groupTaches, planningOptions,
   defaultPlanningCode, techSummary, isSecurite, splitReferences, HORS_PERIMETRE_KEY,
+  formatDateLongue, buildProgrammesModel,
 } from './chantierGaillacModel.js';
 
 const SQL = readFileSync(new URL('../../../../supabase/migrations/20261017_1_chantier_gaillac.sql', import.meta.url), 'utf8');
@@ -175,4 +176,48 @@ test('références de tâches dans le texte', () => {
 
 test('badge sécurité sur 23 et 41 uniquement', () => {
   assert.deepEqual(TACHES.filter(isSecurite).map((t) => t.numero).sort(), ['23', '41']);
+});
+
+test('formatDateLongue', () => {
+  assert.equal(formatDateLongue('2026-10-21'), 'Mercredi 21 octobre 2026');
+  assert.equal(formatDateLongue(null), '');
+});
+
+test('buildProgrammesModel : une page par journée datée, dans l’ordre des dates', () => {
+  const techniciens = [{ id: A, display_name: 'Antoine Dupont', first_name: 'Antoine' }, { id: L, display_name: 'Ludovic Martin', first_name: 'Ludovic' }];
+  const m = buildProgrammesModel({ taches: TACHES, planning: PLANNING, techniciens, editedAt: new Date(2026, 9, 26, 14, 12) });
+  const dated = PLANNING.filter((p) => p.date_prevue);
+  assert.equal(m.pages.length, dated.length);
+  const dates = m.pages.map((p) => p.date);
+  assert.deepEqual(dates, [...dates].sort());
+  const mer = m.pages.find((p) => p.code === 'MER21');
+  assert.equal(mer.techName, 'Antoine');
+  assert.equal(mer.dateLabel, 'Mercredi 21 octobre 2026');
+  assert.equal(mer.totalLabel, '7 h 10');
+  assert.equal(mer.count, 13);
+  assert.equal(mer.done, 0);
+  // Toutes les lignes de la journée sont réparties par site, aucune perdue, aucun hors périmètre
+  const rows = mer.sites.flatMap((s) => s.rows);
+  assert.equal(rows.length, 13);
+  assert.ok(mer.sites.every((s) => s.site && s.rows.length));
+  assert.ok(rows.every((r) => r.numero && r.action && ['Achat', 'Stock'].includes(r.achat)));
+  assert.ok(m.pages.every((p) => p.sites.flatMap((s) => s.rows).every((r) => r.theme !== 'Hors périmètre')));
+  assert.equal(m.editedLabel, 'Édité le 26/10/2026 à 14:12');
+  assert.equal(m.filename, 'programmes-chantier-gaillac.pdf');
+});
+
+test('buildProgrammesModel : filtre technicien et journée, nom de fichier', () => {
+  const techniciens = [{ id: A, display_name: 'Antoine Dupont', first_name: 'Antoine' }, { id: L, display_name: 'Ludovic Martin', first_name: 'Ludovic' }];
+  const seulAntoine = buildProgrammesModel({ taches: TACHES, planning: PLANNING, techniciens, techId: A, editedAt: new Date(2026, 9, 26) });
+  assert.ok(seulAntoine.pages.length > 0);
+  assert.ok(seulAntoine.pages.every((p) => p.techName === 'Antoine'));
+  assert.equal(seulAntoine.filename, 'programmes-chantier-gaillac-antoine.pdf');
+
+  const uneJournee = buildProgrammesModel({ taches: TACHES, planning: PLANNING, techniciens, planningCode: 'MER21', editedAt: new Date(2026, 9, 26) });
+  assert.equal(uneJournee.pages.length, 1);
+  assert.equal(uneJournee.filename, 'programmes-chantier-gaillac-2026-10-21.pdf');
+
+  // Un code sans date ne donne aucune page
+  const nonDate = PLANNING.find((p) => !p.date_prevue);
+  assert.equal(buildProgrammesModel({ taches: TACHES, planning: PLANNING, techniciens, planningCode: nonDate.code, editedAt: new Date() }).pages.length, 0);
 });
