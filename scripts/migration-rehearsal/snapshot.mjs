@@ -33,7 +33,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'supplier_products', columns: null, data: false }, // 20260929_1 : FK fum_article_attrs + vue majordhome_fum_articles
   { schema: 'majordhome', table: 'product_documents', columns: null, data: false }, // 20261025_2 : action `document` de l'edge supplier-catalog-sync (fiche technique rangée)
   { schema: 'majordhome', table: 'quotes', columns: null, data: false }, // 20260929_1 : FK fum_metres
-  { schema: 'majordhome', table: 'quote_lines', columns: null, data: false }, // 20261026_1 : articles Majord'home (catalog_item_id, vues quote_lines en fin)
+  { schema: 'majordhome', table: 'quote_lines', columns: null, data: false }, // 20261026_1 : articles Majord'home (catalog_item_id, vues quote_lines en fin) ; 20261028_1 : hide_prices / show_specs / caracteristiques
   // catalog_matches : droppée en prod par 20261026_2 (2026-10-24) — retirée de la photo le 2026-10-25 ; la chaîne
   // 20261025_2 → 20261027_5 étant jouée en prod, la photo part désormais de l'état « articles »
   { schema: 'majordhome', table: 'catalog_items', columns: null, data: false }, // 20261027_6 : documents d'article (FK product_documents.catalog_item_id)
