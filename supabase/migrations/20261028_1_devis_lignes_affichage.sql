@@ -1,10 +1,11 @@
 -- 20261028_1_devis_lignes_affichage.sql
 -- Devis : affichage par ligne (spec docs/superpowers/specs/ — référence interne, caractéristiques et description par ligne,
--- détail des prix par chapitre, 2026-10-26). Trois colonnes sur majordhome.quote_lines :
---   hide_prices      : masque prix unitaire / total de CETTE ligne dans le document client (le total du chapitre reste porté
---                      par la ligne « détail » ou le sous-total, la ligne ne disparaît jamais du calcul) ;
---   show_specs       : affiche les caractéristiques de la ligne sous sa désignation dans le document client ;
---   caracteristiques : liste de lignes de texte libres (« Puissance : 8 kW »), vide par défaut.
+-- détail des prix par chapitre, 2026-10-26, § 6). Trois colonnes sur majordhome.quote_lines :
+--   hide_prices      : porté par la ligne section_title (titre de chapitre) ; masque les prix de TOUT le chapitre dans le
+--                      document client (le sous-total du chapitre reste imprimé) ;
+--   show_specs       : imprime les caractéristiques de l'article sous la désignation de la ligne ;
+--   caracteristiques : lignes de texte figées à l'enregistrement du devis (calculées depuis les specs de l'article,
+--                      jamais relues à l'impression), vide par défaut.
 -- Colonnes ajoutées EN FIN des deux vues (CREATE OR REPLACE VIEW n'autorise l'ajout qu'en fin de liste) : après
 -- catalog_item_id, brand, discount_percent (20261027_8). Droits des vues inchangés (CREATE OR REPLACE les conserve).
 

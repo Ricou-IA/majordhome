@@ -1,7 +1,8 @@
 -- assert-devis-lignes-affichage.sql — vérifie 20261028_1_devis_lignes_affichage.sql (après 20261027_8).
--- Couvre : hide_prices / show_specs (boolean NOT NULL défaut false) et caracteristiques (text[] NOT NULL défaut '{}') sur
--- majordhome.quote_lines ; les trois EN FIN des deux vues, après discount_percent ; vue d'écriture toujours insérable ;
--- aller-retour d'un INSERT via la vue d'écriture (valeurs explicites puis défauts). Fixture nettoyée.
+-- Couvre : hide_prices (porté par la ligne section_title, masque les prix du chapitre) et show_specs (imprime les
+-- caractéristiques sous la désignation) boolean NOT NULL défaut false ; caracteristiques (lignes de texte figées à
+-- l'enregistrement du devis) text[] NOT NULL défaut '{}' ; les trois EN FIN des deux vues, après discount_percent ;
+-- vue d'écriture toujours insérable ; aller-retour d'un INSERT via la vue d'écriture. Fixture nettoyée.
 DO $$
 DECLARE
   v_mayer uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
