@@ -98,7 +98,7 @@ export default function ApercuDevis({ model: m, zoneActive, onZoneClick }) {
             )}
             {c.lignes.map((l, i) => (
               <div key={i} className={`flex px-2 py-1.5 border-b border-secondary-100 ${i % 2 === 1 ? 'bg-secondary-50/60' : ''}`}>
-                <div className="flex-[4]"><div>{l.designation}</div>{l.description && <div className="text-[9px] text-secondary-500">{l.description}</div>}</div>
+                <div className="flex-[4]"><div>{l.designation}</div>{l.description && <div className="text-[9px] text-secondary-500">{l.description}</div>}{l.caracteristiques.map((c, k) => <div key={k} className="text-[9px] text-secondary-500">{c}</div>)}</div>
                 {col.reference && <div className="flex-[1.5]">{l.reference}</div>}
                 <div className="flex-1 text-center">{l.quantite}</div>
                 {col.prix_unitaire && <div className="flex-[1.5] text-right">{l.prix_unitaire}</div>}

@@ -34,6 +34,7 @@ const s = StyleSheet.create({
   tableRowAlt: { backgroundColor: '#fafafa' },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', padding: '6 8', backgroundColor: '#f3f4f6', fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', color: '#6b7280', letterSpacing: 0.5 },
   lineDescription: { fontSize: 7.5, color: '#6b7280', marginTop: 1 },
+  lineSpec: { fontSize: 7, color: '#6b7280', marginTop: 0.5 },
   colDesignation: { flex: 4 },
   colRef: { flex: 1.5 },
   colQty: { flex: 1, textAlign: 'center' },
@@ -125,6 +126,7 @@ function DevisDocument({ model: m }) {
                 <View style={s.colDesignation}>
                   <Text>{l.designation}</Text>
                   {l.description ? <Text style={s.lineDescription}>{l.description}</Text> : null}
+                  {l.caracteristiques.map((c, k) => <Text key={k} style={s.lineSpec}>{c}</Text>)}
                 </View>
                 {col.reference ? <Text style={s.colRef}>{l.reference}</Text> : null}
                 <Text style={s.colQty}>{l.quantite}</Text>

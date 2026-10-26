@@ -231,3 +231,20 @@ test('chapitres() : prix_masques porté par la ligne de titre, faux pour le chap
   ]);
   assert.deepEqual(r.map((c) => c.prix_masques), [false, true, false]);
 });
+
+test('caractéristiques figées de la ligne reprises dans le tableau, jamais recalculées', () => {
+  const lines = [{ line_type: 'product', designation: 'Poêle', quantity: 1, unit_price_ht: 1, tva_rate: 5.5, total_ht: 1, caracteristiques: ['Puissance nominale : 8 kW', ''] }];
+  const m = buildDevisDocumentModel({ quote: {}, lines, totals: computeQuoteTotals(lines, 0), company: {} });
+  assert.deepEqual(m.tableau.chapitres[0].lignes[0].caracteristiques, ['Puissance nominale : 8 kW']);
+});
+
+test('caractéristiques : absentes ou non tableau => liste vide', () => {
+  const l = [{ line_type: 'product', designation: 'A', quantity: 1, unit_price_ht: 1, tva_rate: 5.5, total_ht: 1 }, { line_type: 'product', designation: 'B', quantity: 1, unit_price_ht: 1, tva_rate: 5.5, total_ht: 1, caracteristiques: null }];
+  const m = buildDevisDocumentModel({ quote: {}, lines: l, totals: computeQuoteTotals(l, 0), company: {} });
+  assert.deepEqual(m.tableau.chapitres[0].lignes.map((x) => x.caracteristiques), [[], []]);
+});
+
+test('exempleDevis : la ligne d\'équipement porte deux caractéristiques', () => {
+  const { lines } = exempleDevis(null);
+  assert.equal(lines.find((x) => x.designation.startsWith('Équipement')).caracteristiques.length, 2);
+});

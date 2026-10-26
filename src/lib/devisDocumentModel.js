@@ -113,6 +113,8 @@ export function buildDevisDocumentModel({ quote, lines, totals, company, config,
       quantite: fmtQte(l.quantity), unite: l.unit || '', prix_unitaire: cfg.affichage.prix_unitaires && !c.prix_masques ? fmtEur(l.unit_price_ht) : '',
       remise: colRemise && !c.prix_masques && remiseLigne(l) > 0 ? `${fmtTaux(remiseLigne(l))}` : '',
       tva: cfg.affichage.tva_par_ligne ? fmtTaux(l.tva_rate) : '', total: c.prix_masques ? '' : fmtEur(ligneTotalHt(l)),
+      // Chaînes déjà mises en forme et figées à l'enregistrement (devisCaracteristiques) : reprises telles quelles, jamais recalculées
+      caracteristiques: Array.isArray(l.caracteristiques) ? l.caracteristiques.filter((x) => typeof x === 'string' && x.trim()) : [],
     })) : [],
   }));
 
@@ -167,7 +169,7 @@ export function exempleDevis(config, { aujourdhui = new Date() } = {}) {
   sections.forEach((titre, i) => {
     lines.push({ line_type: 'section_title', designation: titre, quantity: 0, unit_price_ht: 0, tva_rate: 0 });
     if (i === 0) {
-      lines.push({ line_type: 'product', designation: 'Équipement principal (exemple)', description: 'Modèle, puissance, finition', reference: 'REF-001', quantity: 1, unit: 'pièce', unit_price_ht: 2500, tva_rate: 5.5, total_ht: 2500 });
+      lines.push({ line_type: 'product', designation: 'Équipement principal (exemple)', description: 'Modèle, puissance, finition', reference: 'REF-001', quantity: 1, unit: 'pièce', unit_price_ht: 2500, tva_rate: 5.5, total_ht: 2500, caracteristiques: ['Puissance nominale : 8 kW', 'Rendement : 90 %'] });
       lines.push({ line_type: 'product', designation: 'Accessoire (exemple)', description: '', reference: 'REF-002', quantity: 2, unit: 'pièce', unit_price_ht: 120, tva_rate: 5.5, total_ht: 240 });
     }
     if (i === sections.length - 1 && sections.length > 1) {
