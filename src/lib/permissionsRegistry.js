@@ -70,6 +70,13 @@ export const REGISTRY = {
     edit:   { sql: 'UPDATE', default: d([1, 1, 0]) },
     delete: { sql: 'DELETE', default: d([0, 0, 0]) }, // delta Eric : delete = admin only
   } },
+  // Articles = base du devis (majordhome.catalog_items). Pas de `delete` : un article se
+  // désactive ou se fusionne, il ne se supprime pas. Édition au niveau team_leader (Eric 2026-10-26).
+  articles: { label: 'Articles (base du devis)', tables: { catalog_items: 'org' }, actions: {
+    view:   { sql: 'SELECT', default: d([1, 1, 1]) },
+    create: { sql: 'INSERT', default: d([1, 0, 0]) },
+    edit:   { sql: 'UPDATE', default: d([1, 0, 0]) },
+  } },
   tasks: { label: 'Tâches', tables: { tasks: 'org', task_notes: 'parent:tasks' }, actions: {
     view:     { sql: 'SELECT', default: d([1, 1, 1]) },
     create:   { sql: 'INSERT', default: d([1, 1, 1]) },

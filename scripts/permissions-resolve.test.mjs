@@ -37,3 +37,9 @@ test('code maison null / vide = pas de profil', () => {
   assert.equal(resolvePermission({ 'secretaire:pipeline:view': true }, 'technicien', 'pipeline', 'view', null), false);
   assert.equal(resolvePermission({ 'secretaire:pipeline:view': true }, 'technicien', 'pipeline', 'view', ''), false);
 });
+
+test('ressource articles : responsable édite, commercial non, tout le monde voit', () => {
+  assert.equal(resolvePermission(new Map(), 'team_leader', 'articles', 'edit'), true);
+  assert.equal(resolvePermission(new Map(), 'commercial', 'articles', 'edit'), false);
+  assert.equal(resolvePermission(new Map(), 'technicien', 'articles', 'view'), true);
+});

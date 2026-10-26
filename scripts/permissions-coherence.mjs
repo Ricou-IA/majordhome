@@ -25,7 +25,7 @@ import { spawnSync } from 'node:child_process';
 import { REGISTRY, iterAppDefaults } from '../src/lib/permissionsRegistry.js';
 
 // Tables dont les écritures passent par role_can. Étendre à chaque bascule.
-const GOVERNED = ['clients', 'equipments', 'interventions', 'contracts', 'leads', 'quotes', 'tasks'];
+const GOVERNED = ['clients', 'equipments', 'interventions', 'contracts', 'leads', 'quotes', 'tasks', 'catalog_items'];
 // Resource réellement citée par les policies quand elle diffère du registre.
 // interventions : le registre (spec § 9) la range sous `entretiens` (double propriétaire
 // entretiens|chantiers), la phase 3 de juin l'a branchée sur `clients` (edit = tous, delete =
