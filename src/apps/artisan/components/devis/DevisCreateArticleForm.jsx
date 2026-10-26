@@ -22,7 +22,7 @@ const INPUT = 'w-full px-2.5 py-1.5 border border-secondary-300 rounded-md text-
 export default function DevisCreateArticleForm({ orgId, defaultKind = 'main', defaultCategory = null, defaultName = '', submitLabel = 'Créer et ajouter au devis', onCreated, onCancel }) {
   const { createItem, isCreating } = useCatalogItemMutations(orgId);
   const [form, setForm] = useState({
-    name: defaultName, brand: '', category: defaultCategory || '', productKind: defaultKind,
+    code: '', name: defaultName, brand: '', category: defaultCategory || '', productKind: defaultKind,
     unit: defaultKind === 'main_oeuvre' ? 'forfait' : 'pièce', sellingPriceHt: '',
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -41,6 +41,7 @@ export default function DevisCreateArticleForm({ orgId, defaultKind = 'main', de
     <form onSubmit={submit} className="rounded-lg border border-primary-200 bg-primary-50/40 p-3 space-y-2">
       <p className="text-xs font-semibold text-secondary-700">Nouvel article Majord&apos;home</p>
       <input autoFocus value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Libellé (ce que voit le client) *" className={INPUT} />
+      <input value={form.code} onChange={(e) => set('code', e.target.value)} placeholder="Référence interne (ex. ME-POE-0042)" className={INPUT} aria-label="Référence interne" />
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <select value={form.productKind} onChange={(e) => set('productKind', e.target.value)} className={INPUT} aria-label="Nature">
           {NATURES_ARTICLE.map((n) => <option key={n.value} value={n.value}>{n.label}</option>)}

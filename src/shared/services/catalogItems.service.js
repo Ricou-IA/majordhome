@@ -104,7 +104,7 @@ export const catalogItemsService = {
   async getItemsSpecs(orgId, ids = []) {
     try {
       if (!orgId || !ids.length) return { data: [], error: null };
-      const { data, error } = await supabase.from('majordhome_catalog_items').select('id, name, unit, selling_price_ht, category, specs, updated_at')
+      const { data, error } = await supabase.from('majordhome_catalog_items').select('id, name, code, unit, selling_price_ht, category, specs, updated_at')
         .eq('org_id', orgId).in('id', ids.slice(0, 150));
       if (error) throw error;
       return { data: data || [], error: null };
@@ -142,10 +142,26 @@ export const catalogItemsService = {
   },
 
   /**
+   * Référence interne normalisée : l'index d'unicité porte sur lower(code) SANS btrim, donc on rogne ici
+   * (' ME-001 ' et 'ME-001' seraient sinon deux références distinctes). Vide => null.
+   */
+  normalizeCode(code) {
+    return String(code || '').trim() || null;
+  },
+
+  /** Conflit sur l'index d'unicité de la référence interne => message métier ; tout autre 23505 reste tel quel. */
+  codeConflict(error) {
+    if (error?.code !== '23505') return null;
+    const texte = `${error.message || ''} ${error.details || ''}`;
+    // PostgREST renvoie le nom de l'index dans message/details ; absent => on ne devine pas
+    return texte.includes('catalog_items_code_org_unique') ? new Error('Cette référence interne est déjà portée par un autre article') : null;
+  },
+
+  /**
    * Crée un article à la main (org_admin via RLS) : depuis le devis ou la page Articles. `productKind` : main
    * (équipement), accessory (option), stock, main_oeuvre. Résout avec la ligne de la vue liste.
    */
-  async createItem(orgId, { name, brand = null, category = null, gamme = null, productKind = 'main', unit = 'pièce', sellingPriceHt = 0, description = null } = {}) {
+  async createItem(orgId, { name, brand = null, category = null, gamme = null, productKind = 'main', unit = 'pièce', sellingPriceHt = 0, description = null, code = null } = {}) {
     try {
       if (!orgId) throw new Error('[catalogItemsService] orgId requis');
       const libelle = String(name || '').trim();
@@ -153,11 +169,11 @@ export const catalogItemsService = {
       const { data, error } = await supabase.from('majordhome_catalog_items').insert({
         org_id: orgId, name: libelle, brand: brand?.trim() || null, category: category || null, gamme: gamme?.trim() || null,
         product_kind: productKind || 'main', unit: unit || 'pièce', selling_price_ht: Number(sellingPriceHt) || 0,
-        description: description?.trim() || null, origin: 'manuel', default_tva_rate: 20,
+        description: description?.trim() || null, code: this.normalizeCode(code), origin: 'manuel', default_tva_rate: 20,
       }).select('id').single();
       if (error) {
         if (error.code === '42501') throw new Error('Création réservée à l\'administrateur');
-        throw error;
+        throw this.codeConflict(error) || error;
       }
       const { data: item, error: errItem } = await this.getItem(orgId, data.id);
       if (errItem) throw errItem;
@@ -174,6 +190,7 @@ export const catalogItemsService = {
       if (!orgId || !itemId) throw new Error('[catalogItemsService] orgId et itemId requis');
       const row = { updated_at: new Date().toISOString() };
       if (updates.name !== undefined) row.name = String(updates.name || '').trim();
+      if (updates.code !== undefined) row.code = this.normalizeCode(updates.code);
       if (updates.brand !== undefined) row.brand = updates.brand || null;
       if (updates.category !== undefined) row.category = updates.category || null;
       if (updates.gamme !== undefined) row.gamme = updates.gamme || null;
@@ -187,7 +204,7 @@ export const catalogItemsService = {
       if (updates.isActive !== undefined) row.is_active = !!updates.isActive;
       if (row.name === '') throw new Error('Le libellé est requis');
       const { data, error } = await supabase.from('majordhome_catalog_items').update(row).eq('id', itemId).eq('org_id', orgId).select().maybeSingle();
-      if (error) throw error;
+      if (error) throw this.codeConflict(error) || error;
       if (!data) throw new Error('Modification refusée (réservée à l\'administrateur)');
       return { data, error: null };
     } catch (error) {

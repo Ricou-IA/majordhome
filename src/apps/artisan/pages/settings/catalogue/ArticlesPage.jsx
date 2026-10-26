@@ -132,7 +132,7 @@ export default function ArticlesPage() {
                     : <div className="w-10 h-10 rounded bg-secondary-100 flex items-center justify-center flex-shrink-0"><Package className="w-4 h-4 text-secondary-400" /></div>}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm font-medium text-secondary-900 truncate">{it.name}</span>
+                      <span className="text-sm font-medium text-secondary-900 truncate">{it.code && <span className="font-mono text-[11px] text-secondary-500 mr-1">{it.code}</span>}{it.name}</span>
                       {it.brand && <span className="px-1 py-0.5 text-[10px] bg-secondary-100 text-secondary-600 rounded">{it.brand}</span>}
                       {it.category ? <span className="px-1 py-0.5 text-[10px] bg-primary-50 text-primary-700 rounded">{CATEGORIE_LABELS[it.category] || it.category}</span>
                         : <span className="px-1 py-0.5 text-[10px] bg-amber-50 text-amber-700 rounded">sans catégorie</span>}

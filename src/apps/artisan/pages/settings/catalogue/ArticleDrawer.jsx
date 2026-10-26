@@ -21,6 +21,7 @@ import { NATURES_FICHE } from '@/lib/catalogue/natures.js';
 
 function formDepuis(item) {
   return {
+    code: item?.code || '',
     name: item?.name || '',
     brand: item?.brand || '',
     category: item?.category || '',
@@ -66,7 +67,7 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
     if (!form.name.trim()) { toast.error('Le libellé est requis'); return; }
     try {
       await updateItem(itemId, {
-        name: form.name, brand: form.brand, category: form.category, gamme: form.gamme, productKind: form.productKind,
+        code: form.code, name: form.name, brand: form.brand, category: form.category, gamme: form.gamme, productKind: form.productKind,
         unit: form.unit, sellingPriceHt: form.sellingPriceHt, description: form.description,
         imageUrl: form.imageUrl, specs: { ...(item?.specs || {}), canonical: specs.canonical || {}, extras: specs.extras || [] },
       });
@@ -134,6 +135,11 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
 
             {/* Identité */}
             <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <FormField label="Référence interne">
+                  <TextInput value={form.code} onChange={(v) => setField('code', v)} disabled={!canEdit} placeholder="ex. ME-POE-0042" />
+                </FormField>
+              </div>
               <div className="sm:col-span-2">
                 <FormField label="Libellé (ce que voit le client)" required>
                   <TextInput value={form.name} onChange={(v) => setField('name', v)} disabled={!canEdit} />

@@ -86,7 +86,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
     supplier_name: null,
     designation: it.name,
     description: it.description || '',
-    reference: '',
+    reference: it.code || '',
     quantity,
     unit: it.unit || 'pièce',
     // marge estimée : le prix d'achat le plus bas connu chez les fournisseurs de l'article (null sans offre)
@@ -186,7 +186,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
                     {it.image_url ? <img src={it.image_url} alt="" className="w-9 h-9 object-contain rounded border border-secondary-100 bg-white flex-shrink-0" />
                       : <div className="w-9 h-9 rounded bg-secondary-100 flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-secondary-900 break-words">{it.name}</p>
+                      <p className="text-sm font-medium text-secondary-900 break-words">{it.code && <span className="font-mono text-[11px] text-secondary-500 mr-1">{it.code}</span>}{it.name}</p>
                       <p className="text-xs text-secondary-400 break-words">
                         {[it.brand, it.gamme].filter(Boolean).join(' · ')}
                         {it.fournisseurs?.length ? ` · ${it.fournisseurs.join(', ')}` : ''}
