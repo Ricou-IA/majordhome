@@ -106,6 +106,8 @@ const FUNCTIONS = [
   'public.catalog_item_attach(uuid, uuid)',
   'public.catalog_item_detach(uuid)',
   'majordhome.catalog_item_require_admin(uuid)',
+  'majordhome.catalog_item_require_edit(uuid, text)', // 20261028_3 : garde role_can(articles) des trois RPC (prod depuis le 2026-10-26)
+  'public.user_can(uuid, text, text)', // 20261028_3 : verdict de l'arbitre pour les edges, appelée par assert-articles-droits.sql
   'majordhome.catalog_item_new_for_product(uuid)',
   'majordhome.catalog_item_deactivate_if_empty(uuid)',
   'public.get_distinct_brands(uuid)',

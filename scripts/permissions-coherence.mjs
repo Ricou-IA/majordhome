@@ -26,6 +26,7 @@ import { REGISTRY, iterAppDefaults } from '../src/lib/permissionsRegistry.js';
 
 // Tables dont les écritures passent par role_can. Étendre à chaque bascule.
 const GOVERNED = ['clients', 'equipments', 'interventions', 'contracts', 'leads', 'quotes', 'tasks', 'catalog_items'];
+// § 5 : catalog_items porte en plus des privilèges PAR COLONNE (20261028_4).
 // Resource réellement citée par les policies quand elle diffère du registre.
 // interventions : le registre (spec § 9) la range sous `entretiens` (double propriétaire
 // entretiens|chantiers), la phase 3 de juin l'a branchée sur `clients` (edit = tous, delete =
@@ -158,6 +159,22 @@ async function main() {
     if (p[0]?.anon) erreurs.push(`anon a EXECUTE sur ${f}`);
   }
   console.log(`${orgRoles.length} profil(s) maison, ${overrides.length} surcharge(s) sur profil maison`);
+
+  // 5. Privilèges PAR COLONNE (20261028_4) : sur catalog_items, authenticated n'a UPDATE que sur les champs humains.
+  //    Un `GRANT UPDATE ON <table|vue>` de table entière (boilerplate d'une migration qui recrée la vue) rouvrirait
+  //    merged_into / source_product_id / origin / org_id à PostgREST : has_table_privilege(UPDATE) doit rester faux.
+  for (const rel of ['majordhome.catalog_items', 'public.majordhome_catalog_items']) {
+    const r = await sql(`SELECT has_table_privilege('authenticated', '${rel}', 'UPDATE') AS entier,
+      has_column_privilege('authenticated', '${rel}', 'name', 'UPDATE') AS humaine,
+      has_column_privilege('authenticated', '${rel}', 'merged_into', 'UPDATE') AS merged_into,
+      has_column_privilege('authenticated', '${rel}', 'org_id', 'UPDATE') AS org_id,
+      has_column_privilege('authenticated', '${rel}', 'origin', 'UPDATE') AS origin,
+      has_column_privilege('authenticated', '${rel}', 'source_product_id', 'UPDATE') AS source_product_id`);
+    const x = r[0] || {};
+    if (x.entier) erreurs.push(`${rel} : authenticated a UPDATE sur TOUTE la relation (attendu : par colonne, 20261028_4)`);
+    if (!x.humaine) erreurs.push(`${rel} : authenticated sans UPDATE sur name (champs humains)`);
+    for (const c of ['merged_into', 'org_id', 'origin', 'source_product_id']) if (x[c]) erreurs.push(`${rel} : colonne ${c} modifiable par authenticated`);
+  }
 
   for (const a of avertissements) console.log('⚠️ ', a);
   for (const e of erreurs) console.error('❌', e);

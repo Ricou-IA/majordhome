@@ -135,9 +135,13 @@ BEGIN
   PERFORM public.catalog_item_attach(v_prod3, v_item);
   v_new2 := public.catalog_item_detach(v_prod3);
   IF v_new2 IS NULL THEN RAISE EXCEPTION 'team_leader : catalog_item_detach sans résultat'; END IF;
-  -- pas de suppression d'article (aucune policy DELETE)
-  DELETE FROM majordhome.catalog_items WHERE id = v_item;
-  GET DIAGNOSTICS v_n = ROW_COUNT;
+  -- pas de suppression d'article : 0 ligne (aucune policy DELETE, 20261028_3) ou refus de privilège (DELETE retiré du GRANT, 20261028_4)
+  v_n := 0;
+  BEGIN
+    DELETE FROM majordhome.catalog_items WHERE id = v_item;
+    GET DIAGNOSTICS v_n = ROW_COUNT;
+  EXCEPTION WHEN insufficient_privilege THEN v_n := 0;
+  END;
   IF v_n <> 0 THEN RAISE EXCEPTION 'team_leader : un article a été supprimé'; END IF;
   -- cross-org : article d'une autre org ni modifiable, ni créable, RPC refusée
   UPDATE majordhome.catalog_items SET name = 'pirate' WHERE id = v_item_autre;
