@@ -7,6 +7,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Variables Supabase manquantes!');
 }
 
+// Clé localStorage de la session (voir le commentaire `storageKey` ci-dessous).
+export const AUTH_STORAGE_KEY = 'majordhome-auth-v2';
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: { enabled: false },
   auth: {
@@ -26,11 +29,29 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     // gestion d'erreur demanderait de deviner l'événement émis par supabase-js.
     // ⚠️ Ne pas re-changer cette clé sans raison : chaque changement déconnecte
     // tout le monde.
-    storageKey: 'majordhome-auth-v2',
+    storageKey: AUTH_STORAGE_KEY,
   },
   global: {
     headers: { 'x-app-name': 'majordhome-artisan' },
   },
 });
+
+/**
+ * Efface la session locale SANS passer par le serveur.
+ *
+ * `supabase.auth.signOut()` ne vide le localStorage que si le serveur accepte
+ * le logout. Quand la session a déjà été révoquée côté serveur (mot de passe
+ * changé par un admin, session supprimée, jeton mort), GoTrue répond 403
+ * `session_not_found`, qu'auth-js classe en `AuthSessionMissingError` — pas
+ * une `AuthApiError`, donc hors de sa liste d'erreurs tolérées (401/403/404) :
+ * il rend l'erreur et GARDE la session locale. L'utilisateur ne peut plus se
+ * déconnecter (vécu le 2026-10-26 sur le compte de Lucas). Même liste de clés
+ * que `GoTrueClient._removeSession`.
+ */
+export function purgeLocalAuthSession() {
+  for (const suffix of ['', '-code-verifier', '-user']) {
+    localStorage.removeItem(`${AUTH_STORAGE_KEY}${suffix}`);
+  }
+}
 
 export default supabase;

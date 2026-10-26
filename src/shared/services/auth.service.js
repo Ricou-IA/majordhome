@@ -1,4 +1,5 @@
-import { supabase } from '@lib/supabaseClient';
+import { supabase, purgeLocalAuthSession } from '@lib/supabaseClient';
+import { logger } from '@lib/logger';
 
 // =============================================================================
 // HELPERS INTERNES
@@ -115,12 +116,15 @@ export const authService = {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-
-      return { error: null };
     } catch (error) {
-      console.error('[authService] signOut error:', error);
-      return { error };
+      // Le serveur a refusé (session déjà révoquée → 403 session_not_found,
+      // ou injoignable) : la session locale reste en place sinon, et
+      // l'utilisateur ne peut plus se déconnecter. Se déconnecter est un
+      // geste qui doit toujours aboutir côté client.
+      logger.warn('[authService] signOut refusé par le serveur, session locale purgée :', error?.message || error);
+      purgeLocalAuthSession();
     }
+    return { error: null };
   },
 
   // ===========================================================================
