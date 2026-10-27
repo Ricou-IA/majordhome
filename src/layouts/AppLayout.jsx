@@ -5,7 +5,7 @@ import { useCanAccess } from '@hooks/usePermissions';
 import { useOrgMembers } from '@hooks/usePermissions';
 import { useTaskMutations } from '@hooks/useTasks';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { moduleActif, crmActif } from '@/lib/modules';
+import { moduleActif, crmActif, peutOuvrirParametres } from '@/lib/modules';
 import { vocabulaire } from '@/lib/maintenance/vocabulaire';
 import TaskCreateModal from '@apps/artisan/components/tasks/TaskCreateModal';
 import {
@@ -85,6 +85,8 @@ export default function AppLayout() {
   const { user, profile, organization, effectiveRole, signOut } = useAuth();
   const { can } = useCanAccess();
   const { settings: orgSettings } = useOrgSettings();
+  // Paramètres : admins, ou un rôle qui a une tuile à droit (team_leader → Fournisseurs & catalogue, Eric 2026-10-27)
+  const peutOuvrirReglages = can('settings', 'view') || peutOuvrirParametres(orgSettings, { isOrgAdmin: false, can });
 
   // État sidebar mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -214,8 +216,8 @@ export default function AppLayout() {
         ))}
       </nav>
 
-      {/* Footer sidebar */}
-      {can('settings', 'view') && (
+      {/* Footer sidebar : admins (settings.view) ou tout rôle qui a au moins une tuile de Paramètres (Fournisseurs & catalogue → articles.edit) */}
+      {peutOuvrirReglages && (
         <div className="px-4 py-4 border-t border-secondary-800">
           <NavLink
             to="/settings"
@@ -352,14 +354,16 @@ export default function AppLayout() {
                       Mon profil
                     </NavLink>
 
-                    <NavLink
-                      to="/settings"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-50"
-                    >
-                      <Settings className="w-4 h-4" />
-                      Paramètres
-                    </NavLink>
+                    {peutOuvrirReglages && (
+                      <NavLink
+                        to="/settings"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-50"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Paramètres
+                      </NavLink>
+                    )}
 
                     <div className="border-t border-secondary-100 mt-1 pt-1">
                       <button

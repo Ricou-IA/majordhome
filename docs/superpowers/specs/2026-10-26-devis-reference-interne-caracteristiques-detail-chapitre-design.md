@@ -1,6 +1,6 @@
 # Devis — référence interne, caractéristiques imprimées, détail des prix par chapitre, éditer l'article depuis la ligne
 
-**Date** : 2026-10-26 · **Demandeur** : Eric · **Statut** : LIVRÉ le 2026-10-26 (plan exécuté par sous-agents, migrations `20261028_1..3` en prod). Écarts constatés : pages Réglages (Articles, Fournisseurs) restées org_admin, le team_leader édite depuis la ligne de devis ; longueur de description Pennylane non testée sur un brouillon réel ; GRANT UPDATE par colonne sur `catalog_items` et contrôle d'org de `product_documents.catalog_item_id` reportés à un durcissement dédié.
+**Date** : 2026-10-26 · **Demandeur** : Eric · **Statut** : LIVRÉ le 2026-10-26 (plan exécuté par sous-agents, migrations `20261028_1..3` en prod). Écarts constatés : pages Réglages (Articles, Fournisseurs) d'abord restées org_admin, puis ouvertes au rôle `articles.edit` le 2026-10-27 sur décision d'Eric (tuile `acces`, `SettingsPage acces`, hub `/settings` sous `RouteGuard anyOf`) ; longueur de description Pennylane non testée sur un brouillon réel ; GRANT UPDATE par colonne sur `catalog_items` et contrôle d'org de `product_documents.catalog_item_id` reportés à un durcissement dédié.
 **Dépend de** : articles Majord'home (`docs/superpowers/specs/2026-10-24-articles-majordhome-matrice-fournisseurs-design.md`, migrations `20261026_1..3`, `20261027_1..8`) et du modèle de document (`2026-10-06-parametrage-devis-modele-document-design.md`).
 
 ## 1. Intention

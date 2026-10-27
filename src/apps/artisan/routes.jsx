@@ -131,7 +131,11 @@ function SuspenseWrapper({ children }) {
  * @param {string} resource - Resource à vérifier (ex: 'pipeline', 'settings')
  * @param {string} [action='view'] - Action à vérifier
  */
-function RouteGuard({ resource, action = 'view', children }) {
+/**
+ * @param {{ resource?: string, action?: string, anyOf?: Array<[string, string]>, children: React.ReactNode }} p
+ *   `anyOf` = liste de couples [resource, action] dont UN suffit (hub Paramètres : `settings.view` OU une tuile à droit).
+ */
+function RouteGuard({ resource, action = 'view', anyOf, children }) {
   const { can, permissionsLoading } = useCanAccess();
 
   // Pendant le chargement des permissions, afficher le loader
@@ -139,7 +143,8 @@ function RouteGuard({ resource, action = 'view', children }) {
     return <PageLoader />;
   }
 
-  if (!can(resource, action)) {
+  const droits = anyOf || [[resource, action]];
+  if (!droits.some(([r, a]) => can(r, a) === true)) {
     return <Navigate to="/" replace />;
   }
 
@@ -279,7 +284,8 @@ export const artisanRoutes = [
     path: 'settings',
     element: (
       <SuspenseWrapper>
-        <RouteGuard resource="settings">
+        {/* hub : admins (settings.view) ou tout rôle qui a une tuile à droit (Fournisseurs & catalogue → articles.edit) */}
+        <RouteGuard anyOf={[['settings', 'view'], ['articles', 'edit']]}>
           <Settings />
         </RouteGuard>
       </SuspenseWrapper>
@@ -319,7 +325,8 @@ export const artisanRoutes = [
     path: 'settings/suppliers',
     element: (
       <SuspenseWrapper>
-        <RouteGuard resource="settings">
+        {/* Fournisseurs & catalogue et Articles : ouverts au rôle qui a articles.edit (team_leader par défaut, Eric 2026-10-27) ; Harmoniser reste admin */}
+        <RouteGuard resource="articles" action="edit">
           <SupplierManagement />
         </RouteGuard>
       </SuspenseWrapper>
@@ -329,7 +336,7 @@ export const artisanRoutes = [
     path: 'settings/suppliers/articles',
     element: (
       <SuspenseWrapper>
-        <RouteGuard resource="settings">
+        <RouteGuard resource="articles" action="edit">
           <ArticlesPage />
         </RouteGuard>
       </SuspenseWrapper>

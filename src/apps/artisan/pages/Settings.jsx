@@ -3,6 +3,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { ROLE_LABELS } from '@lib/permissions';
 import { modulesVisibles } from '@/lib/modules';
 import { useOrgSettings } from '@hooks/useOrgSettings';
+import { useCanAccess } from '@hooks/usePermissions';
 import {
   Building2,
   Users,
@@ -38,11 +39,13 @@ const ICONS = { Building2, Users, Shield, Wrench, Truck, Calculator, Route, Mail
 export default function Settings() {
   const { organization, effectiveRole, orgRole, isOrgAdmin } = useAuth();
   const { settings } = useOrgSettings();
+  const { can } = useCanAccess();
 
   // Socle en tête, puis les modules ; un module sans tuile visible pour ce rôle
   // n'affiche pas son en-tête. Modules opt-in (Maintenance) seulement s'ils sont
-  // activés ; une org sans CRM ne voit que les tuiles `horsCrm`.
-  const groupes = modulesVisibles(settings, { isOrgAdmin });
+  // activés ; une org sans CRM ne voit que les tuiles `horsCrm`. Une tuile `acces`
+  // (Fournisseurs & catalogue → articles.edit) s'ouvre au rôle qui a ce droit.
+  const groupes = modulesVisibles(settings, { isOrgAdmin, can });
 
   return (
     <div className="space-y-6">

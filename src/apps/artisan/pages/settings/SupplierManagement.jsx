@@ -2,7 +2,8 @@
  * SupplierManagement.jsx — Gestion fournisseurs et catalogue produits
  * ============================================================================
  * Page paramètres : CRUD fournisseurs + catalogue produits par fournisseur.
- * Accessible aux org_admin uniquement.
+ * Accessible au rôle qui a `articles.edit` (team_leader par défaut, org_admin compris — Eric 2026-10-27) ; le connecteur
+ * (identifiants Vault, correspondance des rayons) et l'harmonisation restent réservés à l'org_admin.
  * ============================================================================
  */
 

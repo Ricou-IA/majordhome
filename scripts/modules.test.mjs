@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  MODULES, CATALOGUE, tuilesParametrage, moduleActif, modulesVisibles, crmActif,
+  MODULES, CATALOGUE, tuilesParametrage, moduleActif, modulesVisibles, peutOuvrirParametres, crmActif,
   modulesEffectifs, validerModules, accueilSansCrm, moduleDeRoute,
 } from '../src/lib/modules.js';
 
@@ -82,6 +82,18 @@ test('modulesVisibles : un module fermé disparaît des Paramètres ; sans CRM s
   const tuiles = modulesVisibles(s, { isOrgAdmin: true }).flatMap((m) => m.tiles.map((t) => t.key));
   assert.deepEqual(tuiles.sort(), ['emails', 'maintenance', 'organization']);
   assert.deepEqual(modulesVisibles(s, { isOrgAdmin: false }), []);
+});
+
+test('modulesVisibles : la tuile Fournisseurs & catalogue suit le droit articles.edit (team_leader), le hub s’ouvre avec elle', () => {
+  const canTeamLeader = (r, a) => r === 'articles' && (a === 'edit' || a === 'view');
+  const canCommercial = (r, a) => r === 'articles' && a === 'view';
+  const tuiles = (ctx) => modulesVisibles({}, ctx).flatMap((m) => m.tiles.map((t) => t.key));
+  assert.deepEqual(tuiles({ isOrgAdmin: false, can: canTeamLeader }), ['suppliers'], 'un team_leader ne voit que la tuile gouvernée par articles.edit');
+  assert.deepEqual(tuiles({ isOrgAdmin: false, can: canCommercial }), [], 'articles.view ne suffit pas');
+  assert.deepEqual(tuiles({ isOrgAdmin: false }), [], 'sans `can`, une tuile à droit reste réservée à l’admin');
+  assert.ok(tuiles({ isOrgAdmin: true }).includes('suppliers'));
+  assert.equal(peutOuvrirParametres({}, { isOrgAdmin: false, can: canTeamLeader }), true);
+  assert.equal(peutOuvrirParametres({}, { isOrgAdmin: false, can: canCommercial }), false);
 });
 
 test('modulesEffectifs : état de chaque module du catalogue, défauts appliqués', () => {

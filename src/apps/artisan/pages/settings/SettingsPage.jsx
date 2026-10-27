@@ -10,24 +10,31 @@ import { useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
 
 /**
  * @param {object} p
  * @param {string} p.title
  * @param {string} p.description
+ * @param {{ resource: string, action: string }} [p.acces]  droit qui ouvre la page à un non-admin (ex. `articles.edit`
+ *   pour Fournisseurs & catalogue, Eric 2026-10-27) ; absent = org_admin seul
  * @param {Array<{ key: string, label: string, icon: React.ComponentType }>} [p.tabs]
  * @param {string} [p.tab]  onglet actif
  * @param {(key: string) => void} [p.onTabChange]
  * @param {React.ReactNode} p.children
  */
-export default function SettingsPage({ title, description, tabs, tab, onTabChange, children }) {
+export default function SettingsPage({ title, description, acces, tabs, tab, onTabChange, children }) {
   const { isOrgAdmin } = useAuth();
+  const { can, permissionsLoading } = useCanAccess();
+  const autorise = isOrgAdmin || (!!acces && can(acces.resource, acces.action) === true);
+  const refuse = !permissionsLoading && !autorise;
 
   useEffect(() => {
-    if (!isOrgAdmin) toast.error("Accès réservé à l'administrateur de l'organisation");
-  }, [isOrgAdmin]);
+    if (refuse) toast.error(acces ? 'Accès réservé aux responsables' : "Accès réservé à l'administrateur de l'organisation");
+  }, [refuse, acces]);
 
-  if (!isOrgAdmin) return <Navigate to="/settings" replace />;
+  if (refuse) return <Navigate to="/settings" replace />;
+  if (!autorise) return null; // non-admin : on attend le verdict des droits avant d'afficher ou de rediriger
 
   return (
     <div className="space-y-6">

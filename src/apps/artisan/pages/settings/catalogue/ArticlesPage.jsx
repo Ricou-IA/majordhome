@@ -1,7 +1,8 @@
 // src/apps/artisan/pages/settings/catalogue/ArticlesPage.jsx
 // Settings → Fournisseurs → Articles Majord'home : la base du devis de l'org (un article par ligne fournisseur,
 // fusionnés quand ils sont communs). Liste filtrée (recherche, catégorie, marque, gamme, sans offre fraîche),
-// paginée ; `?item=<id>` ouvre la fiche (ArticleDrawer). Édition réservée à l'org_admin (SettingsPage).
+// paginée ; `?item=<id>` ouvre la fiche (ArticleDrawer). Page ouverte au rôle qui a `articles.edit` (team_leader par
+// défaut, org_admin compris — Eric 2026-10-27) via `SettingsPage acces` ; l'harmonisation reste réservée à l'org_admin.
 // Spec docs/superpowers/specs/2026-10-24-articles-majordhome-matrice-fournisseurs-design.md § 5.6.
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -65,7 +66,7 @@ export default function ArticlesPage() {
   const ouvrir = (id) => setSearchParams(id ? { item: id } : {});
 
   return (
-    <SettingsPage title="Articles Majord'home" description="La base du devis : un article par ligne fournisseur, fusionnés quand ils sont communs. Au devis, la marge est estimée sur le prix d'achat le plus bas en base ; l'âge du prix est indicatif.">
+    <SettingsPage title="Articles Majord'home" acces={{ resource: 'articles', action: 'edit' }} description="La base du devis : un article par ligne fournisseur, fusionnés quand ils sont communs. Au devis, la marge est estimée sur le prix d'achat le plus bas en base ; l'âge du prix est indicatif.">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Link to="/settings/suppliers" className="text-primary-700 hover:underline">← Fournisseurs</Link>
         {/* créer un article = articles.create (la base refuse aussi) ; le stock rattache aussi des lignes = articles.edit */}
