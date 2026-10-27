@@ -36,10 +36,8 @@ import {
   MoreVertical,
   Link2,
   Unlink,
-  FileText,
-  Download,
 } from 'lucide-react';
-import { storageService } from '@services/storage.service';
+import { EquipmentDocumentsSection } from './EquipmentDocumentsSection';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { indexReferentiel, libelleEquipement } from '@/lib/equipmentReferential';
 import { formatDateShortFR } from '@/lib/utils';
@@ -196,6 +194,11 @@ const EquipmentCard = ({
   hasContract = false,
   isLinkedToContract = false,
   productDocuments = [],
+  modelDocuments = [],
+  canUploadDocument = false,
+  canDeleteDocument = false,
+  onUploadDocument,
+  onDeleteDocument,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -355,6 +358,17 @@ const EquipmentCard = ({
 
         </div>
 
+        {/* Documents du modèle (notice, vue éclatée) + documentation fournisseur */}
+        <EquipmentDocumentsSection
+          equipment={equipment}
+          modelDocuments={modelDocuments}
+          productDocuments={productDocuments}
+          canUpload={canUploadDocument}
+          canDelete={canDeleteDocument}
+          onUpload={onUploadDocument}
+          onDelete={onDeleteDocument}
+        />
+
         {/* Bouton détails */}
         <button
           onClick={onToggleExpand}
@@ -423,29 +437,6 @@ const EquipmentCard = ({
             </div>
           )}
 
-          {/* Documentation produit */}
-          {productDocuments.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              <span className="text-sm text-gray-500">Documentation</span>
-              <div className="mt-2 space-y-1.5">
-                {productDocuments.map(doc => (
-                  <button
-                    key={doc.id}
-                    onClick={async () => {
-                      const { url, error } = await storageService.getSignedUrl('product-documents', doc.storage_path, 3600);
-                      if (!error && url) window.open(url, '_blank');
-                    }}
-                    className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-white transition-colors text-left group"
-                  >
-                    <FileText className="w-4 h-4 text-red-400 flex-shrink-0" />
-                    <span className="text-sm text-gray-700 group-hover:text-indigo-600 truncate flex-1">{doc.file_name}</span>
-                    <span className="text-xs text-gray-400 flex-shrink-0">{doc.document_type}</span>
-                    <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-indigo-500 flex-shrink-0" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -478,6 +469,11 @@ export function EquipmentList({
   hasContract = false,
   contractEquipmentIds = new Set(),
   productDocumentsMap = {},
+  modelDocumentsMap = {},
+  canUploadDocument = false,
+  canDeleteDocument = false,
+  onUploadDocument,
+  onDeleteDocument,
   readOnly = false,
 }) {
   const [expandedId, setExpandedId] = useState(null);
@@ -561,6 +557,11 @@ export function EquipmentList({
           onToggleExpand={() => toggleExpand(equipment.id)}
           referentiel={referentiel}
           productDocuments={productDocumentsMap[equipment.supplier_product_id] || []}
+          modelDocuments={modelDocumentsMap[equipment.id] || []}
+          canUploadDocument={!readOnly && canUploadDocument}
+          canDeleteDocument={!readOnly && canDeleteDocument}
+          onUploadDocument={readOnly ? undefined : onUploadDocument}
+          onDeleteDocument={readOnly ? undefined : onDeleteDocument}
         />
       ))}
     </div>

@@ -5,6 +5,8 @@ import { useAuth } from '@contexts/AuthContext';
 import { useClientEquipments, usePricingEquipmentTypes, clientKeys } from '@hooks/useClients';
 import { useClientContract, useContractEquipments, contractKeys } from '@hooks/useContracts';
 import { useProductDocumentsByProductIds } from '@hooks/useSuppliers';
+import { useEquipmentModelDocuments, useEquipmentDocumentMutations } from '@hooks/useEquipmentDocuments';
+import { useCanAccess } from '@hooks/usePermissions';
 import { contractsService } from '@services/contracts.service';
 import { equipmentsService } from '@services/equipments.service';
 import { reduireImage } from '@/lib/imageResize';
@@ -13,8 +15,9 @@ import { EquipmentFormModal } from '@/apps/artisan/components/clients/EquipmentF
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed }) => {
-  const { organization } = useAuth();
+  const { organization, effectiveRole } = useAuth();
   const orgId = organization?.id;
+  const { can } = useCanAccess();
   const [showModal, setShowModal] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState(null);
   const [isUploadingNameplate, setIsUploadingNameplate] = useState(false);
@@ -67,6 +70,13 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
     }
     return map;
   }, [allProductDocs]);
+
+  // Documents du modèle (notice, vue éclatée) : partagés par marque + modèle, lus par equipment_id.
+  // Dépôt = droit clients.edit (le technicien peut) ; retrait = org_admin seul (comme toute suppression).
+  const equipmentIds = useMemo(() => equipments.map((e) => e.id), [equipments]);
+  const { documentsByEquipmentId: modelDocumentsMap } = useEquipmentModelDocuments(equipmentIds);
+  const { upload: uploadModelDocument, remove: removeModelDocument } = useEquipmentDocumentMutations();
+  const handleUploadDocument = (equipment, payload) => uploadModelDocument({ equipment, ...payload });
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
@@ -292,6 +302,11 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
         hasContract={hasContract}
         contractEquipmentIds={contractEquipmentIds}
         productDocumentsMap={productDocumentsMap}
+        modelDocumentsMap={modelDocumentsMap}
+        canUploadDocument={can('clients', 'edit')}
+        canDeleteDocument={effectiveRole === 'org_admin'}
+        onUploadDocument={handleUploadDocument}
+        onDeleteDocument={removeModelDocument}
       />
       <EquipmentFormModal
         isOpen={showModal}

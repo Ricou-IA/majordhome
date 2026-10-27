@@ -232,6 +232,19 @@ EXISTS (SELECT 1 FROM majordhome.contracts c WHERE c.client_id = clients.id AND 
 | `status` | ENUM equipment_status | active, maintenance_due, under_repair, decommissioned |
 | `notes` | text | |
 
+### majordhome.equipment_documents
+Documents du **modèle** d'appareil (notice technique, vue éclatée, autre), partagés par tous les équipements de l'org de même marque + modèle (migration `20261028_5`, 2026-10-28). Déposés depuis la carte équipement de la fiche client, visibles sur toutes les fiches qui ont le même appareil.
+
+| Colonne clé | Type | Notes |
+|-------------|------|-------|
+| `org_id` | uuid → core.organizations | Org CORE |
+| `brand`, `model` | text | Tels que saisis sur l'équipement d'origine |
+| `brand_key`, `model_key` | text | Dérivées par trigger de `majordhome.equipment_model_key(text)` (minuscules, sans accents, `[a-z0-9]`, placeholders « À renseigner » / « Inconnu » / « NC » ⇒ NULL ⇒ dépôt refusé `22023`). **Source unique** de la normalisation : le front ne calcule jamais de clé |
+| `document_type` | text | `notice` \| `vue_eclatee` \| `autre` |
+| `label`, `file_name`, `storage_path` | text | Bucket `product-documents`, chemin `${orgId}/equipment-models/…` (CHECK) |
+
+RLS : lecture tout membre ; INSERT/UPDATE `role_can(org, 'clients', 'edit')` ; DELETE `role_can(org, 'clients', 'delete')` (org_admin seul). Vues : `majordhome_equipment_documents` (miroir updatable, écriture front) et `majordhome_equipment_model_documents` (lecture par `equipment_id`, jointure par clés + `project_org_id`). Service `equipmentDocuments.service.js`, hook `useEquipmentDocuments.js`, UI `EquipmentDocumentsSection` (carte équipement).
+
 ### majordhome.interventions
 2411 rows. RLS activé. Historique interventions techniciens + interventions chantier (Sprint 6).
 

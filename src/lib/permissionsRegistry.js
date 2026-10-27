@@ -19,6 +19,7 @@ export const REGISTRY = {
   clients: { label: 'Clients', tables: {
     clients: 'org', client_activities: 'org', equipments: 'project',
     contracts: 'org', contract_equipments: 'parent:contracts', contract_pricing_items: 'parent:contracts',
+    equipment_documents: 'org', // documents du modèle d'appareil (20261028_5) : dépôt = edit, retrait = delete
   }, actions: {
     view:   { sql: 'SELECT', default: d([1, 1, 1]) },
     create: { sql: 'INSERT', default: d([1, 1, 0]) },
