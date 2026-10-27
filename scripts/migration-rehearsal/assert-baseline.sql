@@ -136,10 +136,13 @@ BEGIN
    WHERE attrelid = 'majordhome.team_members'::regclass AND attname = 'display_name' AND attgenerated = 's';
   IF NOT FOUND THEN RAISE EXCEPTION 'team_members.display_name devrait être GENERATED'; END IF;
 
-  -- ACL par défaut reproduite (bootstrap-pre.sql) : anon a des droits sur une table majordhome
-  -- existante, service_role a SELECT sur equipments (GRANT explicite d'une migration passée)
-  IF NOT has_table_privilege('anon', 'majordhome.pricing_equipment_types', 'SELECT') THEN
-    RAISE EXCEPTION 'ACL baseline : anon devrait avoir SELECT sur pricing_equipment_types';
+  -- ACL par défaut reproduite (bootstrap-pre.sql) : anon n'a plus rien sur majordhome (20261029_1), authenticated
+  -- garde arwd, service_role a SELECT sur equipments (GRANT explicite d'une migration passée)
+  IF has_table_privilege('anon', 'majordhome.pricing_equipment_types', 'SELECT') THEN
+    RAISE EXCEPTION 'ACL baseline : anon ne doit plus avoir SELECT sur pricing_equipment_types (20261029_1)';
+  END IF;
+  IF NOT has_table_privilege('authenticated', 'majordhome.pricing_equipment_types', 'SELECT') THEN
+    RAISE EXCEPTION 'ACL baseline : authenticated devrait avoir SELECT sur pricing_equipment_types';
   END IF;
   IF NOT has_table_privilege('service_role', 'majordhome.equipments', 'SELECT') THEN
     RAISE EXCEPTION 'ACL baseline : service_role devrait avoir SELECT sur equipments';

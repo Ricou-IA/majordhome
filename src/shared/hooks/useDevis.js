@@ -14,7 +14,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { devisService, hasUnpricedLines, UNPRICED_LINES_MESSAGE } from '@services/devis.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { pennylaneService } from '@services/pennylane.service';
-import { devisKeys, leadKeys, kanbanCardKeys } from '@hooks/cacheKeys';
+import { leadsService } from '@services/leads.service';
+import { clientsService } from '@services/clients.service';
+import { devisKeys, leadKeys, kanbanCardKeys, clientKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -133,7 +135,7 @@ export function useDevisLines(quoteId) {
  */
 export function useDevisMutations(leadId) {
   const queryClient = useQueryClient();
-  const { organization } = useAuth();
+  const { organization, user } = useAuth();
   const orgId = organization?.id;
 
   const invalidateAll = () => {
@@ -215,16 +217,29 @@ export function useDevisMutations(leadId) {
   // les trois n'ont pas réussi. Un push réussi suivi d'un attach en échec se
   // rejoue sans doublon : pushQuote relit le mapping pennylane_sync et fait un
   // PUT sur le devis PL existant au lieu d'un second POST.
+  // Devis d'un lead sans fiche client : la fiche est créée depuis le lead AVANT l'envoi
+  // (Pennylane a besoin d'un customer), comme le fait déjà le rattachement d'un devis PL
+  // (ensureClientForLeadFromPennylane) ; le devis reprend le client_id. Un lead rattaché à
+  // un client après la création du devis est relu plutôt que converti une seconde fois.
   const pushMutation = useMutation({
     mutationFn: async ({ quote, lines, client }) => {
-      if (!client) throw new Error('Le devis doit être lié à un client pour partir dans Pennylane');
       if (hasUnpricedLines(lines)) throw new Error(UNPRICED_LINES_MESSAGE);
-      const pushed = await unwrapResult(pennylaneService.pushQuote(quote, lines, client, orgId));
+      let clientFinal = client;
+      let clientCree = false;
+      if (!clientFinal && quote.lead_id) {
+        const conv = await unwrapResult(leadsService.convertLeadToClient(quote.lead_id, orgId, user?.id));
+        if (conv?.client) { clientFinal = conv.client; clientCree = true; }
+        else if (conv?.lead?.client_id) clientFinal = await unwrapResult(clientsService.getClientById(conv.lead.client_id));
+        if (!clientFinal) throw new Error('Impossible de créer la fiche client depuis le lead');
+        await unwrapResult(devisService.updateQuote(quote.id, { clientId: clientFinal.id }));
+      }
+      if (!clientFinal) throw new Error('Le devis doit être lié à un client pour partir dans Pennylane');
+      const pushed = await unwrapResult(pennylaneService.pushQuote(quote, lines, clientFinal, orgId));
       if (!pushed?.pennylane_id) throw new Error('Pennylane n\'a pas renvoyé d\'identifiant de devis');
 
       // Renvoi d'un devis déjà envoyé et rattaché : le devis Pennylane est modifié en place (même numéro) ; le
       // rattachement au lead existe déjà et le montant se resynchronise depuis Pennylane (miroir, PL fait foi).
-      if (pushed.renvoi && quote.status === 'envoye') return { ...pushed, attached: 0 };
+      if (pushed.renvoi && quote.status === 'envoye') return { ...pushed, attached: 0, clientCree };
 
       let attached = 0;
       if (quote.lead_id) {
@@ -246,11 +261,12 @@ export function useDevisMutations(leadId) {
         pennylaneQuoteId: pushed.pennylane_id,
         pennylaneNumber: pushed.pennylane_number,
       }));
-      return { ...pushed, attached };
+      return { ...pushed, attached, clientCree };
     },
-    onSuccess: (_, { quote }) => {
+    onSuccess: (res, { quote }) => {
       queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quote.id) });
       if (quote.lead_id) queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+      if (res?.clientCree) queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
       invalidateAll();
     },

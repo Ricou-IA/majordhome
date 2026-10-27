@@ -292,6 +292,8 @@ export const devisService = {
       if (updates.totalHt !== undefined) updateData.total_ht = parseFloat(updates.totalHt) || 0;
       if (updates.totalTva !== undefined) updateData.total_tva = parseFloat(updates.totalTva) || 0;
       if (updates.totalTtc !== undefined) updateData.total_ttc = parseFloat(updates.totalTtc) || 0;
+      // client rattaché après coup (ex. fiche client créée depuis le lead à l'envoi Pennylane)
+      if (updates.clientId !== undefined) updateData.client_id = updates.clientId || null;
 
       const { data, error } = await supabase
         .from('majordhome_quotes_write')

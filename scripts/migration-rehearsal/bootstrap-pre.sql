@@ -31,11 +31,11 @@ $$;
 GRANT EXECUTE ON FUNCTION auth.uid() TO PUBLIC;
 
 -- ACL par défaut observées en prod (pg_default_acl, 2026-09-12) :
---   majordhome : anon=arwd, authenticated=arwd, baikal_reader=r — PAS service_role
+--   majordhome : authenticated=arwd, baikal_reader=r — PAS service_role, PLUS d'anon (20261029_1, 2026-10-27 ; avant : anon=arwd)
 --   public     : anon/authenticated/service_role = tous privilèges
 -- Les migrations doivent donc REVOKE anon et GRANT service_role explicitement :
 -- c'est précisément ce que la répétition vérifie.
-ALTER DEFAULT PRIVILEGES IN SCHEMA majordhome GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA majordhome GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated; -- plus d'anon depuis 20261029_1 (2026-10-27)
 ALTER DEFAULT PRIVILEGES IN SCHEMA majordhome GRANT SELECT ON TABLES TO baikal_reader;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;

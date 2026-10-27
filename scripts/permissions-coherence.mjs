@@ -176,6 +176,22 @@ async function main() {
     for (const c of ['merged_into', 'org_id', 'origin', 'source_product_id']) if (x[c]) erreurs.push(`${rel} : colonne ${c} modifiable par authenticated`);
   }
 
+  // 6. anon (20261029_1) : plus aucun privilège sur majordhome.* (tables, vues, séquences, ACL par défaut) ni sur les
+  //    vues public.majordhome_*. Une vue créée sans `REVOKE ALL … FROM PUBLIC, anon` (ACL par défaut de public) ressort ici.
+  const anonRel = await sql(`SELECT n.nspname || '.' || c.relname AS rel FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE ((n.nspname = 'majordhome' AND c.relkind IN ('r', 'v', 'm', 'p')) OR (n.nspname = 'public' AND c.relkind IN ('v', 'm') AND c.relname LIKE 'majordhome\\_%'))
+      AND (has_any_column_privilege('anon', c.oid, 'SELECT') OR has_any_column_privilege('anon', c.oid, 'INSERT')
+           OR has_any_column_privilege('anon', c.oid, 'UPDATE') OR has_table_privilege('anon', c.oid, 'DELETE'))
+    ORDER BY 1`);
+  for (const r of anonRel) erreurs.push(`anon a un privilège sur ${r.rel} (REVOKE ALL … FROM PUBLIC, anon manquant)`);
+  const anonSeq = await sql(`SELECT c.relname FROM (SELECT c.oid, c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'majordhome' AND c.relkind = 'S') c WHERE has_sequence_privilege('anon', c.oid, 'USAGE') OR has_sequence_privilege('anon', c.oid, 'UPDATE')`);
+  for (const r of anonSeq) erreurs.push(`anon a un privilège sur la séquence majordhome.${r.relname}`);
+  const anonDef = await sql(`SELECT d.defaclobjtype::text AS objtype FROM pg_default_acl d JOIN pg_namespace n ON n.oid = d.defaclnamespace
+    WHERE n.nspname = 'majordhome' AND d.defaclacl::text ~ '(^|[{,])anon='`);
+  for (const r of anonDef) erreurs.push(`pg_default_acl du schéma majordhome accorde encore anon (type ${r.objtype})`);
+  console.log(`anon : ${anonRel.length} relation(s), ${anonSeq.length} séquence(s), ${anonDef.length} défaut(s) encore ouverts`);
+
   for (const a of avertissements) console.log('⚠️ ', a);
   for (const e of erreurs) console.error('❌', e);
   console.log(`\n${reg.size} défauts app, ${GOVERNED.length} tables gouvernées, ${avertissements.length} à basculer, ${erreurs.length} erreur(s)`);

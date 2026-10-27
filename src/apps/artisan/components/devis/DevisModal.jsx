@@ -65,6 +65,8 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const unpriced = hasUnpricedLines(lines);
   const isBrouillon = quote.status === 'brouillon';
   const isEnvoye = quote.status === 'envoye';
+  // un devis de lead sans fiche client part quand même : la fiche est créée depuis le lead à l'envoi (useDevisMutations)
+  const sansClient = !client && !quote.lead_id;
 
   const handleAccept = async () => {
     try {
@@ -110,6 +112,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
     }
     try {
       const res = await pushToPennylane({ quote, lines, client });
+      if (res?.clientCree) toast.success('Fiche client créée depuis le lead');
       toast.success(res?.renvoi
         ? `Devis ${res?.pennylane_number || ''} mis à jour dans Pennylane`
         : `Devis ${res?.pennylane_number || ''} créé dans Pennylane${res?.attached ? ' et rattaché au lead' : ''}`);
@@ -307,12 +310,24 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
                 if (line.line_type === 'section_title') {
                   // chapitre sans ligne : masqué, comme dans le PDF et l'envoi Pennylane
                   if (!lines[i + 1] || lines[i + 1].line_type === 'section_title') return null;
+                  // « prix masqués » : comme sur le document, les lignes s'affichent sans prix et le chapitre garde son sous-total
+                  const sousTotalHt = line.hide_prices === true
+                    ? lines.slice(i + 1).reduce((acc, l) => (l.line_type === 'section_title' ? acc : acc + (Number(l.total_ht) || 0)), 0)
+                    : null;
                   return (
-                    <div key={line.id} className="py-1.5 px-2 bg-secondary-100 rounded text-xs font-semibold text-secondary-600 uppercase tracking-wider">
-                      {line.designation}
+                    <div key={line.id} className="flex items-center justify-between py-1.5 px-2 bg-secondary-100 rounded text-xs font-semibold text-secondary-600 uppercase tracking-wider">
+                      <span>{line.designation}</span>
+                      {sousTotalHt !== null && (
+                        <span className="normal-case tracking-normal text-secondary-500" title="Les prix de ce chapitre ne sont pas détaillés sur le document">
+                          Prix masqués · sous-total {formatEuro(sousTotalHt)} HT
+                        </span>
+                      )}
                     </div>
                   );
                 }
+                // la ligne appartient au dernier chapitre rencontré avant elle
+                const chapitre = [...lines.slice(0, i)].reverse().find((l) => l.line_type === 'section_title');
+                const prixMasques = chapitre?.hide_prices === true;
                 return (
                   <div key={line.id} className="flex items-center justify-between py-1.5 px-2 text-sm border-b border-secondary-100">
                     <div className="flex-1 min-w-0">
@@ -322,8 +337,14 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
                       )}
                     </div>
                     <div className="flex items-center gap-4 flex-shrink-0 text-secondary-600">
-                      <span>{line.quantity} × {formatEuro(line.unit_price_ht)}{Number(line.discount_percent) > 0 ? ` − ${String(Number(line.discount_percent)).replace(".", ",")} %` : ""}</span>
-                      <span className="font-medium text-secondary-900 w-24 text-right">{formatEuro(line.total_ht)}</span>
+                      {prixMasques ? (
+                        <span>{line.quantity} {line.unit || ''}</span>
+                      ) : (
+                        <>
+                          <span>{line.quantity} × {formatEuro(line.unit_price_ht)}{Number(line.discount_percent) > 0 ? ` − ${String(Number(line.discount_percent)).replace(".", ",")} %` : ""}</span>
+                          <span className="font-medium text-secondary-900 w-24 text-right">{formatEuro(line.total_ht)}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -434,9 +455,9 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
             {pennylaneEnabled && isBrouillon && !quote.pennylane_quote_id && (
               <button
                 onClick={handlePush}
-                disabled={isPushing || !client || unpriced}
+                disabled={isPushing || sansClient || unpriced}
                 className="btn-primary btn-sm"
-                title={!client ? 'Lier un client au lead avant l\'envoi' : unpriced ? UNPRICED_LINES_MESSAGE : 'Créer le devis dans Pennylane et le rattacher au lead'}
+                title={sansClient ? 'Lier un client au devis avant l\'envoi' : unpriced ? UNPRICED_LINES_MESSAGE : client ? 'Créer le devis dans Pennylane et le rattacher au lead' : 'Créer la fiche client depuis le lead, puis le devis dans Pennylane'}
               >
                 {isPushing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Send className="w-4 h-4 mr-1" />}
                 Envoyer dans Pennylane
@@ -447,7 +468,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
             {pennylaneEnabled && quote.pennylane_quote_id && (isBrouillon || isEnvoye) && (
               <button
                 onClick={handlePush}
-                disabled={isPushing || !client || unpriced}
+                disabled={isPushing || sansClient || unpriced}
                 className="btn-secondary btn-sm"
                 title={unpriced ? UNPRICED_LINES_MESSAGE : 'Mettre à jour le devis dans Pennylane avec les lignes actuelles'}
               >

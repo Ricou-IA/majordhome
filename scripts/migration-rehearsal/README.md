@@ -22,8 +22,11 @@ node scripts/migration-rehearsal/run.mjs --assert scripts/migration-rehearsal/as
   le DDL est régénéré depuis les catalogues (`format_type`, `pg_get_constraintdef`,
   `pg_get_functiondef`, `pg_get_viewdef`, `pg_policies`) : ce qui est répété est ce qui est en prod.
 - `bootstrap-pre.sql` reproduit rôles Supabase, `auth.uid()` (lit `request.jwt.claim.sub`) et les
-  **ACL par défaut** observées (`majordhome` : `anon`/`authenticated` = arwd, pas de `service_role`) —
-  c'est ce qui rend testables les `REVOKE … FROM anon` et `GRANT … TO service_role` d'une migration.
+  **ACL par défaut** observées (`majordhome` : `authenticated` = arwd, pas de `service_role`, plus d'`anon`
+  depuis `20261029_1` ; `public` : tout à `anon`/`authenticated`/`service_role`, mais `bootstrap-post.sql` retire
+  `anon` des vues `majordhome_*` comme en prod) — c'est ce qui rend testables les `REVOKE … FROM anon` et
+  `GRANT … TO service_role` d'une migration. Les ACL **par objet** ne sont pas photographiées : une assertion qui
+  dépend d'un GRANT/REVOKE d'une migration passée doit rejouer cette migration dans la chaîne.
 - Les assertions sont des blocs `DO $$ … RAISE EXCEPTION … $$` : un écart fait échouer le run.
 - `scratch/` (données, cluster, logs) est ignoré par git.
 
