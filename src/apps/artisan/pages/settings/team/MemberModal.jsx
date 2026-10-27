@@ -21,6 +21,7 @@ import { MemberColorPicker } from './MemberColorPicker';
 import { AvailabilityForm } from './AvailabilityForm';
 import { SkillsForm } from './SkillsForm';
 import { EndpointsForm } from './EndpointsForm';
+import { PasswordResetSection } from './PasswordResetSection';
 import {
   getRoleColor, getInitials, PLANIFICATION_OPTIONS, PLANIFICATION_HELP, planificationDe,
   DAILY_WORK_MINUTES_HELP, formatBudget,
@@ -118,6 +119,8 @@ function PlanningPending() {
  * @param {Function} props.onIncludeInRoutingChange (teamMemberId, include)
  * @param {Function} props.onEndpointsChange (teamMemberId, patch) — départ / retour
  * @param {boolean} props.isRoutingSaving
+ * @param {Function} props.onPasswordReset (member, password) → Promise — mot de passe provisoire (org_admin)
+ * @param {boolean} props.isResettingPassword
  * @param {Map<string,string>} props.colorOwners hex → nom (autres membres)
  * @param {Function} props.onClose
  */
@@ -125,6 +128,7 @@ export function MemberModal({
   member, teamMember, orgRole, roleOptions, canEdit, isCurrentUser, isUpdatingRole,
   onRoleChangeRequest, isCommercial, onCommercialChange, isCommercialSaving,
   onColorChange, isColorSaving, onDailyBudgetChange, onIncludeInRoutingChange, onEndpointsChange, isRoutingSaving,
+  onPasswordReset, isResettingPassword,
   colorOwners, onClose,
 }) {
   const name = member.profile?.full_name || member.profile?.email || 'Utilisateur';
@@ -216,6 +220,16 @@ export function MemberModal({
                   <p className="text-sm text-secondary-700">{roleDisplay.label}</p>
                 )}
               </Section>
+
+              {canEdit && !isCurrentUser && (
+                <Section title="Mot de passe" help="Pose un mot de passe provisoire à transmettre de vive voix (les e-mails des membres ne reçoivent pas toujours le lien « Mot de passe oublié »).">
+                  <PasswordResetSection
+                    memberName={name}
+                    onReset={(password) => onPasswordReset(member, password)}
+                    isResetting={isResettingPassword}
+                  />
+                </Section>
+              )}
 
               <Section title="Commercial" help="Figure dans la liste « Commercial assigné » des leads. Retirer ne désassigne rien : les leads déjà attribués gardent leur commercial.">
                 <label className="inline-flex items-center gap-2 text-sm text-secondary-800">

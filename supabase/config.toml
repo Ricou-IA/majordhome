@@ -216,3 +216,9 @@ verify_jwt = true
 # du fournisseur par supplier_catalog_upsert (apply, org_admin). JWT user. 2026-10-25.
 [functions.supplier-offer-import]
 verify_jwt = true
+
+# member-reset-password : mot de passe provisoire posé par un org_admin sur un membre de SA propre org
+# (Settings → Équipe → fiche membre). JWT user + requireOrgMembership(org_admin) + cible recoupée dans
+# core.organization_members ; auth.admin.updateUserById. Jamais stocké ni journalisé. 2026-10-27.
+[functions.member-reset-password]
+verify_jwt = true

@@ -338,6 +338,7 @@ export default function TeamManagement() {
     members, isLoading, error,
     updateRole, isUpdatingRole,
     inviteMember, isInviting,
+    resetMemberPassword, isResettingPassword,
   } = useOrgMembers(orgId);
 
   // Couleurs planning : team_members reliés aux membres par user_id.
@@ -791,6 +792,8 @@ export default function TeamManagement() {
           onIncludeInRoutingChange={handleIncludeInRoutingChange}
           onEndpointsChange={handleEndpointsChange}
           isRoutingSaving={!!editingTeamMember && savingRoutingId === editingTeamMember.id}
+          onPasswordReset={(member, password) => resetMemberPassword({ userId: member.user_id, password })}
+          isResettingPassword={isResettingPassword}
           colorOwners={colorOwners}
           onClose={() => setEditingUserId(null)}
         />

@@ -145,6 +145,27 @@ export const permissionsService = {
   },
 
   /**
+   * Pose un mot de passe provisoire sur un membre de l'org (edge `member-reset-password`,
+   * org_admin only, cible recoupée dans core.organization_members côté serveur).
+   * Le mot de passe transite une fois vers l'edge : jamais stocké, jamais journalisé.
+   * @param {Object} params
+   * @param {string} params.orgId - core.organizations.id
+   * @param {string} params.userId - auth user id du membre
+   * @param {string} params.password
+   * @returns {Promise<{data: {success: boolean}|null, error: Error|null}>}
+   */
+  async resetMemberPassword({ orgId, userId, password }) {
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase.functions.invoke('member-reset-password', {
+        body: { org_id: orgId, user_id: userId, password },
+      });
+      if (error) throw new Error(await edgeFunctionErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
+      return data;
+    }, 'permissions.resetMemberPassword');
+  },
+
+  /**
    * Change le rôle d'un membre via la RPC sécurisée
    * @param {string} orgId
    * @param {string} userId

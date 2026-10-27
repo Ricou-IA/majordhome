@@ -15,6 +15,7 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { permissionsService } from '@services/permissions.service';
+import { unwrapResult } from '@lib/serviceHelpers';
 import { buildPermissionMap, hasPermission } from '@lib/permissions';
 import { permissionKeys, appointmentKeys } from '@hooks/cacheKeys';
 
@@ -150,6 +151,12 @@ export function useOrgMembers(orgId) {
     },
   });
 
+  // Mot de passe provisoire (org_admin) : rien à invalider, aucune donnée lue ne change.
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ userId, password }) =>
+      unwrapResult(permissionsService.resetMemberPassword({ orgId, userId, password })),
+  });
+
   return {
     members: data || [],
     isLoading,
@@ -159,6 +166,8 @@ export function useOrgMembers(orgId) {
     isUpdatingRole: updateRoleMutation.isPending,
     inviteMember: inviteMemberMutation.mutateAsync,
     isInviting: inviteMemberMutation.isPending,
+    resetMemberPassword: resetPasswordMutation.mutateAsync,
+    isResettingPassword: resetPasswordMutation.isPending,
   };
 }
 
