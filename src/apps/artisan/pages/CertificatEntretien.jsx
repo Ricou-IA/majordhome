@@ -22,6 +22,7 @@ import { useIntervention } from '@hooks/useInterventions';
 import { useCertificat } from '@hooks/useCertificats';
 import { certificatsService } from '@services/certificats.service';
 import { CertificatWizard } from '../components/certificat/CertificatWizard';
+import { EquipmentModelDocuments } from '../components/interventions/EquipmentModelDocuments';
 import { supabase } from '@/lib/supabaseClient';
 import { useState, useEffect } from 'react';
 
@@ -255,6 +256,9 @@ export default function CertificatEntretien() {
           </p>
         </div>
       </div>
+
+      {/* Notice / vue éclatée du modèle (lecture) : le technicien les a sous la main devant l'appareil */}
+      <EquipmentModelDocuments equipment={equipment} />
 
       {/* Wizard */}
       <CertificatWizard

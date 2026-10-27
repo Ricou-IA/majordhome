@@ -16,10 +16,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { FileText, BookOpen, Layers, Upload, Trash2, Loader2, X, Download } from 'lucide-react';
-import { storageService } from '@services/storage.service';
-import {
-  EQUIPMENT_DOCUMENT_BUCKET, EQUIPMENT_DOCUMENT_TYPES, equipmentDocumentTypeLabel, equipmentHasModel,
-} from '@services/equipmentDocuments.service';
+import { EQUIPMENT_DOCUMENT_TYPES, equipmentDocumentTypeLabel, equipmentHasModel } from '@services/equipmentDocuments.service';
+import { openEquipmentDocument } from '@hooks/useEquipmentDocuments';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 
@@ -28,11 +26,6 @@ const MAX_SIZE = 20 * 1024 * 1024; // limite du bucket product-documents
 
 const TYPE_ICON = { notice: BookOpen, vue_eclatee: Layers, autre: FileText };
 
-async function ouvrir(doc) {
-  const { url, error } = await storageService.getSignedUrl(EQUIPMENT_DOCUMENT_BUCKET, doc.storage_path, 3600);
-  if (error || !url) { toast.error('Le document n\'a pas pu être ouvert'); return; }
-  window.open(url, '_blank', 'noopener');
-}
 
 function DocumentRow({ doc, badge, canDelete, onDelete }) {
   const Icon = TYPE_ICON[doc.document_type] || FileText;
@@ -41,7 +34,7 @@ function DocumentRow({ doc, badge, canDelete, onDelete }) {
     <div className="flex items-center gap-2 rounded-lg hover:bg-gray-50 group">
       <button
         type="button"
-        onClick={() => ouvrir(doc)}
+        onClick={() => openEquipmentDocument(doc)}
         className="flex-1 min-w-0 flex items-center gap-2.5 p-2 text-left"
         title={doc.file_name}
       >

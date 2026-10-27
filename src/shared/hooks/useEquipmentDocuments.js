@@ -10,6 +10,7 @@
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
+import { toast } from 'sonner';
 import { equipmentDocumentsService } from '@services/equipmentDocuments.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { equipmentDocumentKeys } from '@hooks/cacheKeys';
@@ -61,4 +62,11 @@ export function useEquipmentDocumentMutations() {
     remove: removeMutation.mutateAsync,
     isRemoving: removeMutation.isPending,
   };
+}
+
+/** Ouvre un document du modèle (URL signée 1 h) dans un nouvel onglet — fiche client et fiche d'intervention. */
+export async function openEquipmentDocument(doc) {
+  const { data: url, error } = await equipmentDocumentsService.getSignedUrl(doc);
+  if (error || !url) { toast.error("Le document n'a pas pu être ouvert"); return; }
+  window.open(url, '_blank', 'noopener');
 }

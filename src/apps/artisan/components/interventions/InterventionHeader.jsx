@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AdresseItineraire } from '@/apps/artisan/components/shared/AdresseItineraire';
 import { formaterAdresse } from '@/lib/itineraire';
+import { EquipmentModelDocuments } from './EquipmentModelDocuments';
 import {
   getInterventionTypeConfig,
   getInterventionStatusConfig,
@@ -153,6 +154,8 @@ export function InterventionHeader({
               <span className="text-gray-500"> — N° {equipment.serial_number}</span>
             )}
           </p>
+          {/* Notice / vue éclatée du modèle : partagées par marque + modèle, déposées depuis la fiche client */}
+          <EquipmentModelDocuments equipment={equipment} className="mt-3" />
         </div>
       )}
 
