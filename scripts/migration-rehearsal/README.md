@@ -48,3 +48,13 @@ Il faut l'éditer quand, et seulement quand :
 Un simple snapshot plus récent ne doit **jamais** exiger de le toucher : si c'est le cas, c'est
 un compte volumétrique qui s'est glissé dedans, à retirer. Les `assert-m*.sql` / `assert-<sujet>.sql`
 restent, eux, figés sur la prod du jour où la migration a été répétée (chiffres de reprise).
+
+## Pièges vécus (2026-10-26, migrations de droits `20261028_3` / `_4`)
+
+- Le stub `storage.objects` de `bootstrap-pre.sql` a RLS et `foldername`, donc une policy Storage se
+  répète ; mais les policies Storage existantes (`20260809_2`) ne sont **pas** photographiées : une
+  assertion fonctionnelle doit recréer `product_documents_org_select` si elle manque — sans SELECT policy,
+  un `DELETE … WHERE` touche 0 ligne pour tout le monde (faux positif vécu).
+- Un snapshot pris **après** la mise en prod d'une migration exige que ses nouvelles fonctions soient
+  listées dans `FUNCTIONS` (vécu : `user_can` absente ⇒ l'assertion `20261028_3` échouait sur un snapshot
+  frais). Étendre la liste, ne pas contourner.
