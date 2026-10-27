@@ -13,6 +13,8 @@ import { computeQuoteTotals, devisService, hasUnpricedLines, UNPRICED_LINES_MESS
 import DevisStatusBadge from './DevisStatusBadge';
 import DevisTvaSummary from './DevisTvaSummary';
 import CreateDevisModal from './CreateDevisModal';
+import CompleterClientPennylaneModal from './CompleterClientPennylaneModal';
+import { champsClientManquantsPourPennylane } from '@/lib/pennylaneCustomerRequirements.js';
 import { formatEuro, formatDateFR } from '@/lib/utils';
 import {
   X, CheckCircle, XCircle, Copy, Trash2, Pencil,
@@ -34,7 +36,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const { quote, isLoading: loadingQuote } = useDevisDetail(quoteId);
   const { lines, isLoading: loadingLines } = useDevisLines(quoteId);
   const {
-    acceptQuote, refuseQuote, duplicateQuote, deleteQuote, pushToPennylane,
+    acceptQuote, refuseQuote, duplicateQuote, deleteQuote, ensureQuoteClient, pushToPennylane,
     isDeleting, isPushing,
   } = useDevisMutations(leadId);
   const { client } = useClient(quote?.client_id);
@@ -48,6 +50,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const [templateFamily, setTemplateFamily] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [edition, setEdition] = useState(false); // fenêtre de devis en mode édition, ouverte par « Modifier »
+  const [completion, setCompletion] = useState(null); // { client, champs } : fiche client à compléter avant l'envoi Pennylane
 
   if (loadingQuote || loadingLines) {
     return (
@@ -105,14 +108,29 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
     }
   };
 
+  // Envoi dans Pennylane : (1) fiche client assurée (créée depuis le lead si besoin), (2) champs
+  // exigés par Pennylane vérifiés — s'il en manque, la fenêtre de complétion les demande et
+  // relance l'envoi avec la fiche à jour —, (3) push.
   const handlePush = async () => {
+    try {
+      const { client: clientDevis, clientCree } = await ensureQuoteClient({ quote, client });
+      if (clientCree) toast.success('Fiche client créée depuis le lead');
+      const manquants = champsClientManquantsPourPennylane(clientDevis);
+      if (manquants.length > 0) { setCompletion({ client: clientDevis, champs: manquants }); return; }
+      await envoyerDansPennylane(clientDevis);
+    } catch (err) {
+      logger.error('[DevisModal] push Pennylane', err);
+      toast.error(err?.message || 'Envoi Pennylane impossible');
+    }
+  };
+
+  const envoyerDansPennylane = async (clientDevis) => {
     // Pennylane n'a pas de « prix masqués » par chapitre : le dire avant l'envoi, sans bloquer
     if ((lines || []).some((l) => l.line_type === 'section_title' && l.hide_prices === true)) {
       toast.info('Pennylane affichera les prix de tous les chapitres');
     }
     try {
-      const res = await pushToPennylane({ quote, lines, client });
-      if (res?.clientCree) toast.success('Fiche client créée depuis le lead');
+      const res = await pushToPennylane({ quote, lines, client: clientDevis });
       toast.success(res?.renvoi
         ? `Devis ${res?.pennylane_number || ''} mis à jour dans Pennylane`
         : `Devis ${res?.pennylane_number || ''} créé dans Pennylane${res?.attached ? ' et rattaché au lead' : ''}`);
@@ -513,6 +531,16 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
           devisAModifier={{ quote, lines }}
           onClose={() => setEdition(false)}
           onCreated={() => onStatusChange?.()}
+        />
+      )}
+
+      {/* Fiche client incomplète pour Pennylane : on demande les champs manquants, puis l'envoi repart avec la fiche à jour */}
+      {completion && (
+        <CompleterClientPennylaneModal
+          client={completion.client}
+          champs={completion.champs}
+          onClose={() => setCompletion(null)}
+          onComplete={(clientComplet) => { setCompletion(null); envoyerDansPennylane(clientComplet); }}
         />
       )}
 

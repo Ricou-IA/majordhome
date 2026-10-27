@@ -26,6 +26,7 @@ import { withErrorHandling } from '@/lib/serviceHelpers';
 import { cleanPhone } from '@/lib/phoneUtils';
 import { logger } from '@/lib/logger';
 import { buildPennylaneQuotePayload, buildPennylaneQuoteUpdatePayload, TVA_MAPPING, UNIT_MAPPING } from '@/lib/pennylaneQuotePayload.js';
+import { champsClientManquantsPourPennylane, messageClientIncompletPennylane } from '@/lib/pennylaneCustomerRequirements.js';
 import { clientsService } from '@services/clients.service';
 
 // ============================================================================
@@ -193,20 +194,12 @@ async function upsertSyncRecord(record) {
  * Throw en clair si une donnée obligatoire manque (échec bruyant, pas un 400 opaque).
  */
 function buildPennylaneCustomer(client) {
+  // même règle que la fenêtre de complétion du devis (CompleterClientPennylaneModal) : source unique
+  const missing = champsClientManquantsPourPennylane(client);
+  if (missing.length > 0) throw new Error(messageClientIncompletPennylane(missing));
   const address = [client.address, client.address_complement].filter(Boolean).join(', ');
-  const missing = [];
-  if (!address) missing.push('adresse');
-  if (!client.postal_code) missing.push('code postal');
-  if (!client.city) missing.push('ville');
-
   const isCompany = client.client_category === 'entreprise';
   const companyName = client.display_name || `${client.first_name || ''} ${client.last_name || ''}`.trim();
-  if (isCompany && !companyName) missing.push('raison sociale');
-  if (!isCompany && !client.first_name) missing.push('prénom');
-  if (!isCompany && !client.last_name) missing.push('nom');
-  if (missing.length > 0) {
-    throw new Error(`Fiche client incomplète pour Pennylane : ${missing.join(', ')} manquant(s)`);
-  }
 
   const common = {
     emails: client.email ? [client.email] : [],
