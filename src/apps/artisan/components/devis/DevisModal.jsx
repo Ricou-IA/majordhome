@@ -128,9 +128,11 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   };
 
   const envoyerDansPennylane = async (clientDevis) => {
-    // Pennylane n'a pas de « prix masqués » par chapitre : le dire avant l'envoi, sans bloquer
-    if ((lines || []).some((l) => l.line_type === 'section_title' && l.hide_prices === true)) {
-      toast.info('Pennylane affichera les prix de tous les chapitres');
+    // Pennylane n'a pas de « prix masqués » par chapitre : un tel chapitre part en UNE ligne au montant du chapitre,
+    // articles en description (regrouperChapitresPrixMasques) — le dire, sans bloquer
+    const regroupes = (lines || []).filter((l) => l.line_type === 'section_title' && l.hide_prices === true).map((l) => l.designation).filter(Boolean);
+    if (regroupes.length > 0) {
+      toast.info(`Envoyé en une ligne dans Pennylane (articles en description) : ${regroupes.join(', ')}`);
     }
     try {
       const res = await pushToPennylane({ quote, lines, client: clientDevis });

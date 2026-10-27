@@ -7,6 +7,10 @@
 //     ledger_account_id?, description? (= description libre + caractéristiques, une par ligne), section_rank?, discount? { type: 'relative' | 'absolute', value }
 //   - remise globale : discount { type, value }
 // Un chapitre sans ligne n'est pas envoyé (même règle que le PDF).
+// Un chapitre à prix masqués (hide_prices sur son titre) part en UNE ligne : libellé = titre du chapitre, quantité 1,
+// prix = total HT du chapitre (remises de ligne comprises), articles listés en description « désignation ·
+// fournisseur · référence » (Eric, 2026-10-27 — Pennylane n'a pas de prix masqués par chapitre). Une ligne par taux
+// de TVA si le chapitre en mélange plusieurs.
 
 /** Taux de TVA Majord'home → code Pennylane. */
 export const TVA_MAPPING = Object.freeze({ 20: 'FR_200', 10: 'FR_100', 5.5: 'FR_55', 0: 'exempt' });
@@ -26,6 +30,73 @@ function dateIso(d) {
   return d.toISOString().split('T')[0];
 }
 
+const r2 = (v) => Math.round(v * 100) / 100;
+const fmtQte = (q) => String(Number.isInteger(q) ? q : r2(q)).replace('.', ',');
+
+/** Total HT d'une ligne après sa remise, même arrondi que computeLineTotals (devisCalculs). */
+function ligneTotalHt(l) {
+  const remise = Math.min(100, Math.max(0, Number(l.discount_percent) || 0));
+  return r2((parseFloat(l.quantity) || 0) * (parseFloat(l.unit_price_ht) || 0) * (1 - remise / 100));
+}
+
+/** Une ligne d'article dans la description du chapitre regroupé : « 7 × DÉSIGNATION · fournisseur · référence ». */
+function ligneDetail(l) {
+  const qte = parseFloat(l.quantity) || 0;
+  const unite = l.unit || 'pièce';
+  const prefixe = qte === 1 ? '' : unite === 'pièce' ? `${fmtQte(qte)} × ` : `${fmtQte(qte)} ${unite} · `;
+  return [prefixe + String(l.designation || '').trim(), l.supplier_name, l.reference].filter((x) => x && String(x).trim()).join(' · ');
+}
+
+/**
+ * Regroupe chaque chapitre à prix masqués en une ligne (par taux de TVA) ; les autres lignes sont rendues telles
+ * quelles, dans l'ordre. Exportée pour les tests et pour l'écran (dire quels chapitres partent regroupés).
+ * @param {Array<object>} lines lignes ordonnées, titres de chapitre compris
+ * @returns {Array<object>}
+ */
+export function regrouperChapitresPrixMasques(lines) {
+  const out = [];
+  let groupe = null; // { titre, lignes[] } du chapitre à prix masqués en cours
+
+  const fermer = () => {
+    if (!groupe) return;
+    const parTaux = new Map();
+    for (const l of groupe.lignes) {
+      const taux = Number(l.tva_rate) || 0;
+      if (!parTaux.has(taux)) parTaux.set(taux, []);
+      parTaux.get(taux).push(l);
+    }
+    for (const [taux, ls] of parTaux) {
+      const comptes = new Set(ls.map((l) => l.ledger_account_pl_id || null));
+      out.push({
+        line_type: 'product',
+        designation: parTaux.size > 1 ? `${groupe.titre} (TVA ${fmtQte(taux)} %)` : groupe.titre,
+        description: ls.map(ligneDetail).join('\n'),
+        caracteristiques: [],
+        quantity: 1,
+        unit: 'pièce',
+        unit_price_ht: r2(ls.reduce((acc, l) => acc + ligneTotalHt(l), 0)),
+        tva_rate: taux,
+        discount_percent: 0,
+        ledger_account_pl_id: comptes.size === 1 ? [...comptes][0] : null,
+      });
+    }
+    groupe = null;
+  };
+
+  for (const line of lines || []) {
+    if (line.line_type === 'section_title') {
+      fermer();
+      out.push(line);
+      if (line.hide_prices === true) groupe = { titre: String(line.designation || '').trim(), lignes: [] };
+      continue;
+    }
+    if (groupe) groupe.lignes.push(line);
+    else out.push(line);
+  }
+  fermer();
+  return out;
+}
+
 /**
  * @param {{ id: string, subject?: string, validity_days?: number, global_discount_percent?: number }} quote
  * @param {Array<{ line_type: string, designation: string, description?: string, caracteristiques?: string[], quantity: unknown, unit?: string,
@@ -42,7 +113,7 @@ export function buildPennylaneQuotePayload(quote, lines, customerId, now = new D
   let titreEnAttente = null; // titre rencontré, pas encore de ligne dessous
   let rangCourant = null;
 
-  for (const line of lines || []) {
+  for (const line of regrouperChapitresPrixMasques(lines)) {
     if (line.line_type === 'section_title') {
       titreEnAttente = String(line.designation || '').trim();
       rangCourant = null;
@@ -107,7 +178,7 @@ export function buildPennylaneQuoteUpdatePayload(quote, lines, customerId, exist
   const sansSection = [];
   const create = [];
   let titre = null;
-  for (const line of lines || []) {
+  for (const line of regrouperChapitresPrixMasques(lines)) {
     if (line.line_type === 'section_title') { titre = String(line.designation || '').trim(); continue; }
     const l = {
       label: line.designation,

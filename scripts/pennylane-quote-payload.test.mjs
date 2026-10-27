@@ -5,7 +5,7 @@
 // Run : node --test scripts/pennylane-quote-payload.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPennylaneQuotePayload } from '../src/lib/pennylaneQuotePayload.js';
+import { buildPennylaneQuotePayload, buildPennylaneQuoteUpdatePayload, regrouperChapitresPrixMasques } from '../src/lib/pennylaneQuotePayload.js';
 
 const quote = { id: 'q-1', subject: 'Fourniture et pose d\'une borne V2C', validity_days: 30, global_discount_percent: 0 };
 const lignes = [
@@ -106,4 +106,83 @@ test('description Pennylane = description libre puis caractéristiques, une par 
   // aucune clé hors schéma : les caractéristiques n'ouvrent pas de propriété
   const permis = ['label', 'quantity', 'raw_currency_unit_price', 'unit', 'vat_rate', 'ledger_account_id', 'description', 'section_rank', 'discount'];
   for (const l of [...post, ...put]) for (const k of Object.keys(l)) assert.ok(permis.includes(k), `propriété hors schéma : ${k}`);
+});
+
+// ---------------------------------------------------------------------------
+// Chapitre à prix masqués → une ligne par chapitre, articles en description (Eric, 2026-10-27)
+// ---------------------------------------------------------------------------
+const fumisterie = [
+  { line_type: 'section_title', designation: 'POÊLE' },
+  { line_type: 'product', designation: 'Poêle Rika', quantity: 1, unit: 'pièce', unit_price_ht: 3000, tva_rate: 5.5 },
+  { line_type: 'section_title', designation: 'FUMISTERIE', hide_prices: true },
+  { line_type: 'product', designation: 'FLEXIBLE - CHAPEAU P/GAINE - D 150', supplier_name: 'MODINOX / ALTEMA', reference: '2FLECHSI150', quantity: '1', unit: 'pièce', unit_price_ht: 75.3, tva_rate: 20, ledger_account_pl_id: 77, description: 'quantité provisoire' },
+  { line_type: 'product', designation: 'PTR30+ LAQ - ELT DROIT - D 80 - LG 1000', supplier_name: 'MODINOX / ALTEMA', reference: '2PTRELD80', quantity: 7, unit: 'pièce', unit_price_ht: 186.2, tva_rate: 20, ledger_account_pl_id: 77, discount_percent: 10 },
+  { line_type: 'product', designation: 'FLEXIBLE - POLYLISSE XT 316L - COUPE', supplier_name: 'MODINOX / ALTEMA', reference: '2FLEPOLIXT10150C', quantity: 6.5, unit: 'ml', unit_price_ht: 104.9, tva_rate: 20, ledger_account_pl_id: 77 },
+  { line_type: 'product', designation: 'Support mural de départ', quantity: 1, unit: 'pièce', unit_price_ht: 200, tva_rate: 20 },
+  { line_type: 'section_title', designation: 'POSE ET MISE EN SERVICE' },
+  { line_type: 'labor', designation: 'Pose', quantity: 2, unit: 'h', unit_price_ht: 55, tva_rate: 10 },
+];
+
+test('chapitre à prix masqués : une seule ligne au titre du chapitre, quantité 1, total HT du chapitre remises comprises', () => {
+  const p = buildPennylaneQuotePayload(quote, fumisterie, 42, NOW);
+  assert.deepEqual(p.invoice_line_sections.map((s) => s.title), ['POÊLE', 'FUMISTERIE', 'POSE ET MISE EN SERVICE']);
+  assert.equal(p.invoice_lines.length, 3);
+  const fum = p.invoice_lines[1];
+  assert.equal(fum.label, 'FUMISTERIE');
+  assert.equal(fum.quantity, 1);
+  assert.equal(fum.unit, 'piece');
+  assert.equal(fum.section_rank, 2);
+  // 75,30 + 7 × 186,20 × 0,9 (= 1 173,06) + 6,5 × 104,90 (= 681,85) + 200
+  assert.equal(fum.raw_currency_unit_price, '2130.21');
+  assert.equal(fum.vat_rate, 'FR_200');
+  assert.equal(fum.discount, undefined);
+  // compte de vente non unanime (le support n'en a pas) → aucun compte imposé
+  assert.equal(fum.ledger_account_id, undefined);
+});
+
+test('chapitre à prix masqués : chaque article en description « qté × désignation · fournisseur · référence », sans prix ni mentions du métré', () => {
+  const p = buildPennylaneQuotePayload(quote, fumisterie, 42, NOW);
+  assert.equal(p.invoice_lines[1].description, [
+    'FLEXIBLE - CHAPEAU P/GAINE - D 150 · MODINOX / ALTEMA · 2FLECHSI150',
+    '7 × PTR30+ LAQ - ELT DROIT - D 80 - LG 1000 · MODINOX / ALTEMA · 2PTRELD80',
+    '6,5 ml · FLEXIBLE - POLYLISSE XT 316L - COUPE · MODINOX / ALTEMA · 2FLEPOLIXT10150C',
+    'Support mural de départ',
+  ].join('\n'));
+  assert.ok(!p.invoice_lines[1].description.includes('quantité provisoire'));
+  assert.ok(!p.invoice_lines[1].description.includes('€'));
+});
+
+test('chapitre à prix masqués : les autres chapitres restent ligne à ligne', () => {
+  const p = buildPennylaneQuotePayload(quote, fumisterie, 42, NOW);
+  assert.equal(p.invoice_lines[0].label, 'Poêle Rika');
+  assert.equal(p.invoice_lines[2].label, 'Pose');
+  assert.equal(p.invoice_lines[2].section_rank, 3);
+});
+
+test('chapitre à prix masqués mélangeant deux taux de TVA : une ligne par taux, libellé suffixé', () => {
+  const lignes = [
+    { line_type: 'section_title', designation: 'FUMISTERIE', hide_prices: true },
+    { line_type: 'product', designation: 'A', quantity: 1, unit: 'pièce', unit_price_ht: 100, tva_rate: 20, ledger_account_pl_id: 5 },
+    { line_type: 'product', designation: 'B', quantity: 2, unit: 'pièce', unit_price_ht: 50, tva_rate: 10 },
+    { line_type: 'product', designation: 'C', quantity: 1, unit: 'pièce', unit_price_ht: 10, tva_rate: 20, ledger_account_pl_id: 5 },
+  ];
+  const p = buildPennylaneQuotePayload(quote, lignes, 42, NOW);
+  assert.deepEqual(p.invoice_lines.map((l) => [l.label, l.raw_currency_unit_price, l.vat_rate, l.ledger_account_id]), [
+    ['FUMISTERIE (TVA 20 %)', '110.00', 'FR_200', 5],
+    ['FUMISTERIE (TVA 10 %)', '100.00', 'FR_100', undefined],
+  ]);
+});
+
+test('regrouperChapitresPrixMasques : sans chapitre masqué, les lignes ressortent telles quelles', () => {
+  assert.deepEqual(regrouperChapitresPrixMasques(lignes), lignes);
+  assert.deepEqual(regrouperChapitresPrixMasques([]), []);
+});
+
+test('renvoi (PUT) : le chapitre à prix masqués part aussi en une ligne, rangé dans la section existante', () => {
+  const { payload, sansSection } = buildPennylaneQuoteUpdatePayload(quote, fumisterie, 42, {
+    lineIds: [1, 2], sections: [{ rank: 1, title: 'Poêle' }, { rank: 2, title: 'Fumisterie' }, { rank: 3, title: 'Pose et mise en service' }],
+  }, NOW);
+  assert.deepEqual(sansSection, []);
+  assert.deepEqual(payload.invoice_lines.create.map((l) => [l.label, l.section_rank]), [['Poêle Rika', 1], ['FUMISTERIE', 2], ['Pose', 3]]);
+  assert.equal(payload.invoice_lines.create[1].raw_currency_unit_price, '2130.21');
 });
