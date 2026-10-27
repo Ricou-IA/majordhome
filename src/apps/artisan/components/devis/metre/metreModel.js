@@ -92,11 +92,13 @@ export function releveInitial(gabarit, reglages, criteres = null) {
 /**
  * Lignes de devis (shape de DevisStepLines) depuis les lignes du moteur. Une ligne sans article
  * est injectée à 0 € avec « À CHIFFRER » dans la description — jamais écartée.
+ * Le repère de la coupe cotée reste sur le dessin : il n'est pas repris dans la description
+ * (la description s'imprime sur le devis client — Eric, 2026-10-27).
  */
 export function versLignesDevis(lignes, supplierId, supplierName) {
   return lignes.map((l) => ({
     line_type: 'product', supplier_product_id: l.article_id, supplier_id: l.article_id ? supplierId : null, supplier_name: l.article_id ? supplierName : null,
-    designation: l.libelle, description: [`Rep. ${l.repere}`, l.sous_libelle, l.statut === 'provisoire' ? 'quantité provisoire' : null, l.article_id ? null : 'À CHIFFRER'].filter(Boolean).join(' · '),
+    designation: l.libelle, description: [l.sous_libelle, l.statut === 'provisoire' ? 'quantité provisoire' : null, l.article_id ? null : 'À CHIFFRER'].filter(Boolean).join(' · '),
     reference: l.reference || '', quantity: l.quantite, unit: l.unite || 'pièce',
     purchase_price_ht: l.prix_achat_ht, unit_price_ht: l.prix_vente_ht ?? 0, tva_rate: l.tva,
   }));
