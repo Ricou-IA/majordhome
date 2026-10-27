@@ -35,6 +35,8 @@ BEGIN
 
   -- ACL table / vues
   IF has_table_privilege('anon', 'majordhome.equipment_documents', 'SELECT') THEN RAISE EXCEPTION 'anon lit equipment_documents'; END IF;
+  IF has_table_privilege('anon', 'public.majordhome_equipment_documents', 'SELECT') THEN RAISE EXCEPTION 'anon a SELECT sur la vue majordhome_equipment_documents'; END IF;
+  IF has_table_privilege('anon', 'public.majordhome_equipment_model_documents', 'SELECT') THEN RAISE EXCEPTION 'anon a SELECT sur la vue majordhome_equipment_model_documents'; END IF;
   IF NOT has_table_privilege('service_role', 'majordhome.equipment_documents', 'SELECT') THEN RAISE EXCEPTION 'service_role sans SELECT sur equipment_documents'; END IF;
   IF has_table_privilege('service_role', 'majordhome.equipment_documents', 'INSERT') THEN RAISE EXCEPTION 'service_role avec INSERT sur equipment_documents'; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace='public'::regnamespace AND c.relname='majordhome_equipment_documents' AND c.reloptions::text LIKE '%security_invoker=true%') THEN

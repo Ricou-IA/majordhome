@@ -117,6 +117,7 @@ CREATE OR REPLACE VIEW public.majordhome_equipment_documents WITH (security_invo
   SELECT id, org_id, brand, model, brand_key, model_key, document_type, label, file_name, storage_path, file_size,
          mime_type, uploaded_by, created_at
   FROM majordhome.equipment_documents;
+REVOKE ALL ON public.majordhome_equipment_documents FROM PUBLIC, anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.majordhome_equipment_documents TO authenticated;
 GRANT SELECT ON public.majordhome_equipment_documents TO service_role;
 
@@ -129,4 +130,5 @@ CREATE OR REPLACE VIEW public.majordhome_equipment_model_documents WITH (securit
     ON d.org_id = majordhome.project_org_id(e.project_id)
    AND d.brand_key = majordhome.equipment_model_key(e.brand)
    AND d.model_key = majordhome.equipment_model_key(e.model);
+REVOKE ALL ON public.majordhome_equipment_model_documents FROM PUBLIC, anon;
 GRANT SELECT ON public.majordhome_equipment_model_documents TO authenticated, service_role;
