@@ -66,6 +66,9 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
 
   const totals = computeQuoteTotals(lines, quote.global_discount_percent);
   const unpriced = hasUnpricedLines(lines);
+  // lignes produit à 0 € : bloquent l'envoi Pennylane, à montrer en clair (le motif n'était que dans l'infobulle,
+  // et un chapitre à prix masqués cachait le 0 € — « Support mural de départ », 2026-10-27)
+  const lignesAChiffrer = (lines || []).filter((l) => l.line_type === 'product' && !(Number(l.unit_price_ht) > 0));
   const isBrouillon = quote.status === 'brouillon';
   const isEnvoye = quote.status === 'envoye';
   // un devis de lead sans fiche client part quand même : la fiche est créée depuis le lead à l'envoi (useDevisMutations)
@@ -346,12 +349,16 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
                 // la ligne appartient au dernier chapitre rencontré avant elle
                 const chapitre = [...lines.slice(0, i)].reverse().find((l) => l.line_type === 'section_title');
                 const prixMasques = chapitre?.hide_prices === true;
+                const aChiffrer = line.line_type === 'product' && !(Number(line.unit_price_ht) > 0);
                 return (
                   <div key={line.id} className="flex items-center justify-between py-1.5 px-2 text-sm border-b border-secondary-100">
                     <div className="flex-1 min-w-0">
                       <span className="text-secondary-900">{line.designation}</span>
                       {line.supplier_name && (
                         <span className="text-secondary-400 text-xs ml-2">{line.supplier_name}</span>
+                      )}
+                      {aChiffrer && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[11px] font-medium" title="Ligne à 0 € : à chiffrer avant l'envoi dans Pennylane">À chiffrer</span>
                       )}
                     </div>
                     <div className="flex items-center gap-4 flex-shrink-0 text-secondary-600">
@@ -434,6 +441,13 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
                 Enregistrer
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Motif d'un envoi Pennylane impossible, en clair (pas seulement dans l'infobulle du bouton grisé) */}
+        {pennylaneEnabled && (isBrouillon || isEnvoye) && lignesAChiffrer.length > 0 && (
+          <div className="px-6 py-2 border-t bg-amber-50 text-sm text-amber-800">
+            {`${lignesAChiffrer.length > 1 ? `${lignesAChiffrer.length} lignes à chiffrer` : '1 ligne à chiffrer'} avant l'envoi dans Pennylane : ${lignesAChiffrer.map((l) => l.designation).join(', ')} — « Modifier » pour saisir le prix.`}
           </div>
         )}
 
