@@ -52,7 +52,7 @@ function summarize(map) {
   };
 }
 
-export function readInvestigationTally(userId) {
+function readInvestigationTally(userId) {
   return summarize(readRaw(userId));
 }
 

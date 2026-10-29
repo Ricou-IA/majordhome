@@ -9,7 +9,7 @@ export const MAPBOX_STYLE_STREETS = 'mapbox/streets-v12';
 export const MAPBOX_STYLE_SATELLITE = 'mapbox/satellite-v9';
 
 /** URL Static Images (image @2x, sans logo/attribution incrustés — mention au cartouche). */
-export function mapboxStaticUrl({ style, lon, lat, zoom, wPx, hPx }) {
+function mapboxStaticUrl({ style, lon, lat, zoom, wPx, hPx }) {
   const token = MAPBOX_CONFIG.accessToken;
   if (!token) throw new Error('Token Mapbox absent (VITE_MAPBOX_TOKEN)');
   const z = Math.round(zoom * 100) / 100;

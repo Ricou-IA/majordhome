@@ -30,9 +30,6 @@ export const LEAD_WELCOME_MAX_AGE_HOURS = 72;
 /** Au-delà de ce nombre d'échecs Resend pour un lead, on cesse de réessayer. */
 export const LEAD_WELCOME_MAX_ECHECS = 3;
 
-/** Placeholders propres au gabarit (en plus du branding). */
-export const LEAD_WELCOME_PLACEHOLDERS = Object.freeze(['{{PRENOM}}', '{{NOM}}']);
-
 export const DEFAULT_LEAD_WELCOME_EMAIL = Object.freeze({
   key: LEAD_WELCOME_TEMPLATE_KEY,
   label: 'Accueil lead Meta — confirmation de la demande',

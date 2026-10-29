@@ -160,7 +160,7 @@ export function planCatalogueDevis(rows, dateOffre) {
 // ---------------------------------------------------------------------------------------------------------------
 
 /** Type de chapitre (devisConfig.TYPES_CHAPITRE) où ranger un article d'une nature donnée. */
-export const TYPE_PAR_NATURE = Object.freeze({
+const TYPE_PAR_NATURE = Object.freeze({
   main: 'equipement', accessory: 'option', consumable: 'option', stock: 'stock', main_oeuvre: 'main_oeuvre',
 });
 /** Chapitres acceptables, dans l'ordre, quand le devis n'a pas de chapitre du type voulu. */

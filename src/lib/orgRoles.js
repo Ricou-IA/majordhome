@@ -7,7 +7,7 @@
 // Testé : node --test scripts/org-roles.test.mjs
 // ============================================================================
 
-export const ORG_ROLE_PREFIX = 'org:';
+const ORG_ROLE_PREFIX = 'org:';
 export const BASE_ROLES = ['team_leader', 'commercial', 'technicien'];
 
 /** Ce que le modèle emporte HORS grille (gestes testés en dur dans le code). */

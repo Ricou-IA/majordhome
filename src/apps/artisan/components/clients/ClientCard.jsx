@@ -15,7 +15,6 @@
  */
 
 import {
-  User,
   Users,
   Building2,
   Landmark,
@@ -225,51 +224,6 @@ export function ClientCard({
           <ChevronRight className="w-5 h-5 text-gray-400" />
         </div>
       )}
-    </div>
-  );
-}
-
-// ============================================================================
-// VARIANTE : CARTE COMPACTE (pour sélection rapide)
-// ============================================================================
-
-/**
- * Version compacte de la carte client (pour autocomplete, sélection)
- */
-export function ClientCardCompact({ client, onClick, selected = false }) {
-  if (!client) return null;
-
-  const { display_name, name, city, postal_code, has_active_contract } = client;
-  const hasContract = has_active_contract === true;
-  const clientName = display_name || name || 'Client sans nom';
-
-  return (
-    <div
-      onClick={() => onClick?.(client)}
-      className={`
-        flex items-center justify-between gap-3 p-3 rounded-lg border cursor-pointer
-        transition-colors duration-150
-        ${selected 
-          ? 'border-blue-500 bg-blue-50' 
-          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-        }
-      `}
-    >
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-          <User className="w-4 h-4 text-gray-600" />
-        </div>
-        <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">{clientName}</p>
-          {(city || postal_code) && (
-            <p className="text-sm text-gray-500 truncate">
-              {[postal_code, city].filter(Boolean).join(' ')}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {hasContract && <ContractIcon hasContract />}
     </div>
   );
 }

@@ -45,4 +45,4 @@ export async function generateRapportThermiquePdfBlob({ rapport, company }) {
   return pdf(<RapportDocument rapport={rapport} company={company} />).toBlob();
 }
 
-export { RapportDocument };
+

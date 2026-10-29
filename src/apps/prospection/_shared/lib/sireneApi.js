@@ -171,4 +171,4 @@ function formatTrancheEffectif(code) {
 }
 
 // Re-export les lookups pour usage dans les composants
-export { TRANCHE_EFFECTIF, NATURE_JURIDIQUE };
+

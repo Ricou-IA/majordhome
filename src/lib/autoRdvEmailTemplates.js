@@ -11,16 +11,6 @@
 export const AUTO_RDV_TEMPLATE_KEY = 'auto_rdv';
 export const AUTO_RDV_CONFIRMATION_TEMPLATE_KEY = 'auto_rdv_confirmation';
 
-/** Placeholders propres à l'invitation (en plus du branding). */
-export const AUTO_RDV_PLACEHOLDERS = Object.freeze([
-  '{{PRENOM}}', '{{NOM}}', '{{EQUIPEMENTS}}', '{{MOIS}}', '{{LIEN_RDV}}',
-]);
-
-/** Placeholders propres à la confirmation (en plus du branding). */
-export const AUTO_RDV_CONFIRMATION_PLACEHOLDERS = Object.freeze([
-  '{{PRENOM}}', '{{DATE_RDV}}', '{{DEMI_JOURNEE}}', '{{TECHNICIEN}}',
-]);
-
 export const DEFAULT_AUTO_RDV_EMAIL = Object.freeze({
   key: AUTO_RDV_TEMPLATE_KEY,
   label: 'Auto-RDV — invitation mensuelle',
@@ -51,6 +41,3 @@ export const DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL = Object.freeze({
   ].join(''),
   is_transactional: true,
 });
-
-/** Les gabarits transactionnels à proposer dans Settings → Communication → Emails. */
-export const AUTO_RDV_EMAIL_TEMPLATES = Object.freeze([DEFAULT_AUTO_RDV_EMAIL, DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL]);

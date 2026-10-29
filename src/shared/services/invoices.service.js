@@ -48,7 +48,7 @@ async function getById(orgId, invoiceId) {
 }
 
 /** Chemin canonique du PDF archivé. */
-export function invoicePdfPath(orgId, invoice) {
+function invoicePdfPath(orgId, invoice) {
   return `${orgId}/${invoice.year}/${invoice.number}.pdf`;
 }
 

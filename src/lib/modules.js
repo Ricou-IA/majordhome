@@ -209,7 +209,7 @@ export function moduleDeRoute(chemin) {
  * Une tuile est visible pour l'org_admin ; une tuile `acces: { resource, action }` l'est aussi pour tout rôle qui a
  * ce droit (`can` = useCanAccess().can, absent ⇒ admin seul) ; une tuile sans `adminOnly` ni `acces` l'est pour tous.
  */
-export function tuileVisible(t, { isOrgAdmin, can }) {
+function tuileVisible(t, { isOrgAdmin, can }) {
   if (isOrgAdmin) return true;
   if (t.acces) return typeof can === 'function' && can(t.acces.resource, t.acces.action) === true;
   return !t.adminOnly;

@@ -8,7 +8,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Clé localStorage de la session (voir le commentaire `storageKey` ci-dessous).
-export const AUTH_STORAGE_KEY = 'majordhome-auth-v2';
+const AUTH_STORAGE_KEY = 'majordhome-auth-v2';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: { enabled: false },

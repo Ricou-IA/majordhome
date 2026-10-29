@@ -34,10 +34,10 @@ import {
 } from './dpeApi.js';
 
 /** Postes de déperdition sur lesquels Mayer n'a rien à proposer. */
-export const OUT_OF_SCOPE_POSTS = ['walls', 'windows', 'doors'];
+const OUT_OF_SCOPE_POSTS = ['walls', 'windows', 'doors'];
 
 /** Au-delà de cette part des pertes, le renouvellement d'air justifie une VMC. */
-export const AIR_RENEWAL_VMC_THRESHOLD = 15;
+const AIR_RENEWAL_VMC_THRESHOLD = 15;
 
 const has = (value, re) => re.test(String(value || ''));
 

@@ -162,7 +162,7 @@ export async function setClientLocation({ clientId, lat, lng, precision }) {
  * @param {number} lat
  * @param {number} lng
  */
-export async function updateClientCoordinates(clientId, lat, lng) {
+async function updateClientCoordinates(clientId, lat, lng) {
   try {
     const { error } = await supabase
       .from('majordhome_clients')
@@ -180,20 +180,6 @@ export async function updateClientCoordinates(clientId, lat, lng) {
     console.error('[geocoding] Erreur updateClientCoordinates:', error);
     return { success: false, error };
   }
-}
-
-/**
- * Géocode et met à jour un client en une opération
- * @param {string} clientId - UUID majordhome.clients
- * @param {string} address
- * @param {string} postalCode
- * @param {string} city
- */
-export async function geocodeAndUpdateClient(clientId, address, postalCode, city) {
-  const result = await geocodeAddress(address, postalCode, city);
-  if (!result) return { success: false, error: 'Géocodage impossible' };
-
-  return updateClientCoordinates(clientId, result.lat, result.lng);
 }
 
 /**
@@ -382,7 +368,7 @@ function parseCSVLine(line) {
  * @param {string} postalCode
  * @returns {{ lat: number, lng: number, score: number, label: string } | null}
  */
-export async function geocodeByPostalCode(postalCode) {
+async function geocodeByPostalCode(postalCode) {
   try {
     if (!postalCode || postalCode.length < 4) return null;
 
@@ -430,7 +416,7 @@ export async function geocodeByPostalCode(postalCode) {
  * @param {string|null} city
  * @returns {{ lat: number, lng: number, score: number, label: string } | null}
  */
-export async function geocodeLeadAddress(address, postalCode, city) {
+async function geocodeLeadAddress(address, postalCode, city) {
   // Si adresse rue présente → géocodage précis
   if (address && address.trim().length > 3) {
     const result = await geocodeAddress(address, postalCode, city);
@@ -456,7 +442,7 @@ export async function geocodeLeadAddress(address, postalCode, city) {
  * @param {string} [orgId] - UUID de l'org pour lookup ciblé du cache
  * @returns {'gaillac' | 'pechbonnieu' | null}
  */
-export function detectLeadZone(lat, lng, orgId) {
+function detectLeadZone(lat, lng, orgId) {
   try {
     let cached = null;
     if (orgId) {
@@ -503,7 +489,7 @@ export function detectLeadZone(lat, lng, orgId) {
  * @param {number} lng
  * @param {string|null} zone
  */
-export async function updateLeadCoordinates(leadId, lat, lng, zone) {
+async function updateLeadCoordinates(leadId, lat, lng, zone) {
   try {
     const { error } = await supabase.rpc('update_majordhome_lead', {
       p_lead_id: leadId,
@@ -532,7 +518,7 @@ const _commercialZoneCache = {};
  * @param {string} zone - Nom de zone ('gaillac', 'pechbonnieu', etc.)
  * @returns {{ id: string, full_name: string } | null}
  */
-export async function resolveCommercialByZone(zone) {
+async function resolveCommercialByZone(zone) {
   if (!zone) return null;
   if (_commercialZoneCache[zone]) return _commercialZoneCache[zone];
 
@@ -693,7 +679,6 @@ export const geocodingService = {
   geocodeAndAssignLead,
   detectLeadZone,
   updateClientCoordinates,
-  geocodeAndUpdateClient,
   batchGeocodeClients,
   batchGeocodeLeads,
 };

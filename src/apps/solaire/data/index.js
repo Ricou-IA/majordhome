@@ -4,7 +4,7 @@ import enedisRes1 from './enedis-res1-base-normalized.json';
 import enedisRes2 from './enedis-res2-base-normalized.json';
 
 export { default as pvgisExample } from './pvgis-gaillac-1kwc.json';
-export { enedisRes1, enedisRes2 };
+
 // Alias legacy : le talon par défaut = RES1 (foyer sans chauffage électrique).
 export const enedisProfile = enedisRes1;
 

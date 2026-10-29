@@ -181,7 +181,7 @@ export function libelleAction(action) {
 }
 
 /** Même seuil que `webshop_order_action_reserve` (pending périmée reprise après 10 min). */
-export const PENDING_STALE_MINUTES = 10;
+const PENDING_STALE_MINUTES = 10;
 
 /**
  * Action `pending` dont la dernière mise à jour date de plus de 10 min : envoi bloqué

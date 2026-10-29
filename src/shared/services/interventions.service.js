@@ -37,7 +37,7 @@ export const INTERVENTION_TYPES = [
 /**
  * Statuts d'intervention (ENUM majordhome.intervention_status)
  */
-export const INTERVENTION_STATUSES = [
+const INTERVENTION_STATUSES = [
   { value: 'scheduled', label: 'Planifiée', color: 'bg-blue-100 text-blue-700' },
   { value: 'in_progress', label: 'En cours', color: 'bg-amber-100 text-amber-700' },
   { value: 'completed', label: 'Terminée', color: 'bg-emerald-100 text-emerald-700' },

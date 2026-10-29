@@ -101,7 +101,7 @@ function Site({ site, accent }) {
   );
 }
 
-export function ProgrammesDocument({ model, company }) {
+function ProgrammesDocument({ model, company }) {
   const accent = accentOf(company);
   return (
     <Document title="Programmes – Chantier Gaillac" author={company?.name || ''}>

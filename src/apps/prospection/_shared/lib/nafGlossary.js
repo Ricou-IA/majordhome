@@ -185,7 +185,7 @@ export const NAF_SECTIONS = [
 // ============================================================================
 
 /** Liste plate de tous les codes NAF avec leur libellé */
-export const NAF_FLAT_LIST = NAF_SECTIONS.flatMap((section) =>
+const NAF_FLAT_LIST = NAF_SECTIONS.flatMap((section) =>
   section.groups.flatMap((group) =>
     group.codes.map((c) => ({
       code: c.code,

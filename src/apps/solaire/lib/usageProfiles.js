@@ -18,7 +18,7 @@ export function hoursMask(hours) {
 }
 
 export const ECS_NIGHT_HOURS = [22, 23, 0, 1, 2, 3, 4, 5];
-export const ECS_SOLAR_HOURS = [11, 12, 13, 14, 15];
+const ECS_SOLAR_HOURS = [11, 12, 13, 14, 15];
 export const VE_NIGHT_HOURS = [23, 0, 1, 2, 3, 4, 5];
 export const POOL_HOURS = [11, 12, 13, 14, 15, 16, 17];
 export const PAC_HEATING_HOURS = [6, 7, 8, 9, 18, 19, 20, 21, 22];

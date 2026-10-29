@@ -16,7 +16,7 @@ import { buildDpeReportModel } from '@/lib/dpeReportModel';
  * strippés (nom de fichier portable Windows/macOS). `date` est injectée par le
  * caller : testable, pas d'horloge implicite.
  */
-export function buildSyntheseFilename(nom, date = new Date()) {
+function buildSyntheseFilename(nom, date = new Date()) {
   const slug = (nom || 'logement')
     .toLowerCase()
     .normalize('NFD')

@@ -5,7 +5,7 @@
 import { Text, Svg, Path, Rect } from '@react-pdf/renderer';
 import { C } from './pdfShared';
 
-export const FLOW_W = 531; // largeur utile A4 portrait
+const FLOW_W = 531; // largeur utile A4 portrait
 const DIAG_H = 118;
 const BOX_W = 150;
 const BOX_H = 46;

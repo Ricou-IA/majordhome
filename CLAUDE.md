@@ -53,10 +53,9 @@ L'app cohabite avec d'autres sur une **instance Supabase partagée** → toute f
 - Supabase (PostgreSQL + Auth + Storage)
 - Tailwind CSS 3.4 + Radix UI
 - TanStack React Query v5
-- React Hook Form + Zod
 - FullCalendar 6 (planning)
 - Recharts (graphiques)
-- Mapbox GL JS + react-map-gl + @turf/turf (carte territoire)
+- Mapbox GL JS + @turf/turf (carte territoire)
 - Sonner (toasts), Lucide React (icons)
 - N8N (webhooks, automatisations)
 
@@ -304,8 +303,8 @@ Pour les entités où un soft-delete + restauration ne suffisent pas (planning f
   - `formatRelativeFR` (→ « il y a 2 heures », « dans 3 jours » via `Intl.RelativeTimeFormat` ; fallback `formatDateShortFR` au-delà d'une semaine ; `null` si invalide)
 - **Branding multi-tenant** : `src/lib/orgBranding.js` — `buildCompanyInfo(settings)` construit l'objet `company` (nom, SIRET, adresse, RGE, etc.) depuis `core.organizations.settings`, avec **fallback neutre** (`"Votre entreprise"`, champs vides, couleur slate, pas de logo — refacto 2026-05-22, plus de fallback Mayer). Helpers `formatFullAddress(company)` + `buildLegalFooter(company)` filtrent les champs vides. Consommé par les PDFs (`generateContractPdfBlob(data, company)`, idem Certificat/Devis/PvReception) et le wizard mailing.
 - **Siège org pour trajets** (P0.19, 2026-05-21) : `src/lib/territoire-config.js` — `getOrgHeadquarters(settings)` retourne `{ lat, lng, label }` du 1ᵉʳ centre de `settings.territoire_centers` ou `null`. Passé en `hqCoords` à `getDrivingDuration` / `getDrivingFromAddress` / `detectZoneForAddress` (`zoneDetection.js`). Si null → calcul de trajet skip, l'UI doit cacher l'affichage "depuis X".
-- **Départements couverts par l'org** (P0.13 follow-up) : `src/lib/territoire-config.js` — `getCoverageDepartments(settings)` retourne `string[]` (codes département) depuis `settings.geogrid_target_department` (singleton, itération 1). Fallback neutre = `[]` (UI doit prompter la config). Liste statique 95 + 2A/2B + DOM-TOM dans `src/lib/departments.js` (`FRENCH_DEPARTMENTS`, `getDepartmentByCode`, `getDepartmentLabel`).
-- **Constantes** : `src/lib/constants.js` — `DEFAULT_PAGE_SIZE`, `LARGE_PAGE_SIZE`, `KANBAN_PAGE_SIZE`
+- **Département principal de l'org** (P0.13 follow-up) : `settings.geogrid_target_department` (singleton, itération 1), lu directement par GeoGrid / `DepartmentSelect`. Liste statique 95 + 2A/2B + DOM-TOM dans `src/lib/departments.js` (`FRENCH_DEPARTMENTS`).
+- **Constantes** : `src/lib/constants.js` — `DEFAULT_PAGE_SIZE`, `PIPELINE_MIN_AMOUNT_HT` (défaut du réglage d'org)
 - **Logger** : `src/lib/logger.js` (P1.7, 2026-05-21) — `logger.error/warn/info/log/debug/table/group/groupEnd`. En prod (`import.meta.env.PROD`), tout est no-op sauf `logger.error` (Sentry-like). Variant `logger.silent.error` pour muter aussi les erreurs. Migrer les nouveaux `console.*` vers `logger.*` au fil de l'eau.
 - **Viewport adaptatif tablette** : `src/lib/deviceViewport.js` — `initDeviceViewport()` (appelé dans `main.jsx` avant le render React) réécrit `<meta viewport>` pour forcer `TABLET_VIEWPORT_WIDTH=1024` sur les tablettes durcies (écran <1024px logique + pointeur tactile) → dézoom natif du navigateur → bascule en vue bureau (sidebar + colonnes). PC et grands écrans tactiles inchangés. Détection sur `screen.width/height` (stable, pas `innerWidth`). Hook DOM `html[data-device-class]`. Point d'extension unique pour un cas « phone » : `getDeviceClass()`.
 - **Branche `phone`** (2026-10-11) : UA `Mobi` ou bord court < 480 px (`classifyDevice`, pur, testé `scripts/device-viewport.test.mjs`) → viewport natif, `html[data-device-class="phone"]` (CSS : champs à 16 px, calendrier dense), hook `useDeviceClass()` (`isPhone`, `isMobileDevice`). Tablette inchangée (1024 px forcés, donc jamais sous `sm`). Sur appareil tenu en main, le Planning ouvre en vue Jour sur la personne connectée. Calibration du seuil à vérifier sur l'Oukitel.
@@ -489,7 +488,7 @@ Configuration multi-tenant de l'identité de l'org (livraison Task 1-15, 2026-05
   - **Coordonnées** (`organization/ContactTab.jsx`) : `address`, `postal_code`, `city`, `phone` (auto-format FR), `website_url` (auto-prefix https au save). `domain` calculé auto depuis `from_email` (édité dans Communication → Emails), `portal_url` = constante app (singleton)
   - **Territoire** (`organization/TerritoryTab.jsx`) : siège unique obligatoire (label + recherche adresse Mapbox + couleur + emoji) + référence Google Business (`google_place_id` + bouton "Trouver" vers Place ID Finder FR) + département principal (`geogrid_target_department` via `DepartmentSelect`, 95 dépts + DOM-TOM, bouton "Détecter depuis siège" via Mapbox reverse geocoding) + N antennes commerciales optionnelles (même `CenterEditor` que le siège, expandable inline)
 - **Composants partagés** : `pages/settings/organization/components/` — `RgeCertificationsInput.jsx`, `AddressSearch.jsx`, `DepartmentSelect.jsx`, `CenterEditor.jsx`
-- **Source de vérité** : `core.organizations.settings` (JSONB) — consommé par `buildCompanyInfo(settings)`, `getOrgHeadquarters(settings)`, `getMapDefaultCenter(settings)`, `getCoverageDepartments(settings)`, `getResources(settings)` (mailing)
+- **Source de vérité** : `core.organizations.settings` (JSONB) — consommé par `buildCompanyInfo(settings)`, `getOrgHeadquarters(settings)`, `getMapDefaultCenter(settings)`, `getResources(settings)` (mailing)
 - **Hook** : `useOrgSettings()` — canal canonique read/write (cf. section Hooks)
 - **RPC** : `public.org_update_settings(p_org_id, p_patch jsonb)` SECURITY DEFINER, REVOKE anon, GRANT authenticated. Check `auth.uid() ∈ org_members WHERE role='org_admin'` côté DB. Raise `42501` si non-admin, `P0002` si org inexistante. Shallow merge JSONB (`||`).
 - **Save par onglet** (pas global) : chaque onglet a son `{ form, initial }` local + `isDirty` calculé via `JSON.stringify` diff. Bouton "Enregistrer" disabled si `!isDirty || !isValid || isSaving`.

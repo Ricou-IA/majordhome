@@ -357,37 +357,6 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
 }
 
 // ============================================================================
-// HOOK - useAppointment (détail)
-// ============================================================================
-
-/**
- * Hook pour un RDV spécifique
- */
-export function useAppointment(appointmentId) {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-  const {
-    data: appointment,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: appointmentKeys.detail(orgId, appointmentId),
-    queryFn: () => appointmentsService.getAppointmentById(appointmentId),
-    enabled: !!orgId && !!appointmentId,
-    staleTime: 30_000,
-    select: (result) => result?.data || null,
-  });
-
-  return {
-    appointment,
-    isLoading,
-    error,
-    refresh: refetch,
-  };
-}
-
-// ============================================================================
 // HOOK - useAppointmentAuditTrail (mouchard : écritures sur un RDV)
 // ============================================================================
 

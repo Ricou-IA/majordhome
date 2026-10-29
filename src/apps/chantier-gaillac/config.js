@@ -11,7 +11,7 @@
 export const CHANTIER_GAILLAC_ACTIF = true;
 
 /** Org CORE Mayer Énergie (useAuth().organization.id). */
-export const CHANTIER_GAILLAC_CORE_ORG_ID = '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+const CHANTIER_GAILLAC_CORE_ORG_ID = '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
 
 /** Le module est-il visible pour cette organisation ? */
 export function chantierGaillacVisible(organization) {

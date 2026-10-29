@@ -90,7 +90,7 @@ export function pennylanePipelineMinAmountHt(settings) {
   return Number.isFinite(n) && n >= 0 ? n : PIPELINE_MIN_AMOUNT_HT;
 }
 
-export const PENNYLANE_INVOICE_DEFAULTS = Object.freeze({ deadlineDays: 30, mode: 'draft' });
+const PENNYLANE_INVOICE_DEFAULTS = Object.freeze({ deadlineDays: 30, mode: 'draft' });
 
 /**
  * Réglages des factures créées depuis les cartes entretien (push MDH → PL,

@@ -165,7 +165,7 @@ export const WEBSHOP_EMAIL_DEFAULTS = Object.freeze({
 // ----------------------------------------------------------------------------
 
 /** Chemins du site (identiques à l'ancienne confirmation du site Mayer). */
-export const WEBSHOP_SITE_CHEMINS = Object.freeze({ cgv: '/boutique/cgv', charte: '/boutique/livraison/charte' });
+const WEBSHOP_SITE_CHEMINS = Object.freeze({ cgv: '/boutique/cgv', charte: '/boutique/livraison/charte' });
 
 /** Phrases client par défaut de la confirmation. @type {Readonly<Record<string, string>>} */
 export const WEBSHOP_CONFIRMATION_TEXTES = Object.freeze({

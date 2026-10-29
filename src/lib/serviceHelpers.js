@@ -121,7 +121,7 @@ export function extractRpcResult(data) {
 // ORG ID MAPPING (core → majordhome)
 // ============================================================================
 
-let orgIdCache = {};
+const orgIdCache = {};
 
 /**
  * Résout core.organizations.id → majordhome.organizations.id
@@ -149,11 +149,4 @@ export async function getMajordhomeOrgId(coreOrgId) {
 
   orgIdCache[coreOrgId] = data.id;
   return data.id;
-}
-
-/**
- * Vide le cache org_id (utile en test ou après changement d'org)
- */
-export function clearOrgIdCache() {
-  orgIdCache = {};
 }

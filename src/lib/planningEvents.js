@@ -16,7 +16,7 @@ import { toleranceDe } from './tournee/arrets.js';
 export const COMMERCIAL_TYPES = ['rdv_agency', 'rdv_technical', 'rdv_closing'];
 export const TECHNICIAN_TYPES = ['installation', 'maintenance', 'service'];
 // RDV R1 (visite technique sur place ou en agence).
-export const VT_R1_TYPES = ['rdv_technical', 'rdv_agency'];
+const VT_R1_TYPES = ['rdv_technical', 'rdv_agency'];
 // Pas de pose d'un R1 sans numéro du client.
 export const PHONE_REQUIRED_TYPES = VT_R1_TYPES;
 // Une visite technique se pose en bloc d'une heure, comme un entretien prend la durée

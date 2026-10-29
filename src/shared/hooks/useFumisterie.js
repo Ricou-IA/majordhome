@@ -24,9 +24,6 @@ export function useFumArticles(orgId, supplierId, gammesTarif, diametre, gammesS
     placeholderData: keepPreviousData,
   });
 }
-export function useFumMetreByQuote(orgId, quoteId) {
-  return useQuery({ queryKey: fumisterieKeys.metreByQuote(orgId, quoteId), queryFn: () => unwrapResult(fumisterieService.getMetreByQuote(orgId, quoteId)), enabled: !!orgId && !!quoteId });
-}
 export function useFumMetreMutations(orgId) {
   const qc = useQueryClient();
   const save = useMutation({

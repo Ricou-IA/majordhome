@@ -113,7 +113,7 @@ export function photoPlaqueRequise(cert) {
   return doitCreerSav(cert);
 }
 
-export const MOTIF_ABSENCE_PHOTO_DEFAUT = 'Non précisé';
+const MOTIF_ABSENCE_PHOTO_DEFAUT = 'Non précisé';
 
 /** Motif d'absence saisi par le technicien, nettoyé ; vide ou non textuel ⇒ « Non précisé ». */
 export function motifAbsencePhoto(saisie) {

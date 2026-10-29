@@ -122,28 +122,6 @@ export default function ProtectedRoute({
 // =============================================================================
 
 /**
- * Route réservée aux admins de l'organisation
- */
-export function AdminRoute({ children }) {
-  return (
-    <ProtectedRoute allowedRoles={['org_admin']}>
-      {children}
-    </ProtectedRoute>
-  );
-}
-
-/**
- * Route réservée aux team leaders et admins
- */
-export function TeamLeaderRoute({ children }) {
-  return (
-    <ProtectedRoute allowedRoles={['org_admin', 'team_leader']}>
-      {children}
-    </ProtectedRoute>
-  );
-}
-
-/**
  * Route réservée aux clients du portail
  */
 export function ClientRoute({ children }) {

@@ -54,7 +54,7 @@ function Paragraphe({ segments }) {
 /**
  * @param {{ lettre: object, company: object, logoSrc?: string|null, signatureSrc?: string|null }} p
  */
-export function AttestationEntretienDocument({ lettre, company, logoSrc = null, signatureSrc = null }) {
+function AttestationEntretienDocument({ lettre, company, logoSrc = null, signatureSrc = null }) {
   const accent = company.accentColor || '#64748b';
   const adresse = [company.address, [company.postalCode, company.city].filter(Boolean).join(' ')].filter(Boolean).join(' - ');
   return (

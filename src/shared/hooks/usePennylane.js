@@ -9,14 +9,14 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pennylaneService } from '@services/pennylane.service';
 import { pennylaneQuotesService } from '@services/pennylaneQuotes.service';
 import { pennylaneCustomerDuplicatesService } from '@services/pennylaneCustomerDuplicates.service';
 import { leadsService } from '@services/leads.service';
 import { quoteDismissalsService } from '@services/quoteDismissals.service';
 import { savService } from '@services/sav.service';
-import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys, entretienSavKeys, chantierKeys } from '@hooks/cacheKeys';
+import { pennylaneKeys, leadKeys, clientKeys, kanbanCardKeys, entretienSavKeys, chantierKeys } from '@hooks/cacheKeys';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { useDebounce } from '@hooks/useDebounce';
 import { useAuth } from '@contexts/AuthContext';
@@ -33,66 +33,6 @@ export { pennylaneKeys } from '@hooks/cacheKeys';
 // qui le prend en dépendance (vécu 2026-09-23 — cf. `useLedgerAccounts` : l'éditeur de
 // la modale Facturer se réinitialisait tout seul à chaque re-render).
 const EMPTY_LEDGER_ACCOUNTS = Object.freeze([]);
-
-// ============================================================================
-// SYNC DEVIS
-// ============================================================================
-
-/**
- * Hook pour gérer la synchronisation Pennylane d'un devis.
- *
- * @param {string} quoteId — ID du devis Majordhome
- * @param {string} orgId — org_id core
- * @returns {{ syncRecord, isLoading, isPushing, pushQuote, syncStatus, pennylaneUrl }}
- */
-export function usePennylaneSync(quoteId, orgId) {
-  const queryClient = useQueryClient();
-
-  // Query : état sync du devis
-  const {
-    data: syncRecord,
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: pennylaneKeys.sync(orgId, 'quote', quoteId),
-    queryFn: async () => {
-      const { data, error } = await pennylaneService.getSyncRecord(orgId, 'quote', quoteId);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!quoteId && !!orgId,
-    staleTime: 60_000,
-  });
-
-  // Mutation : push devis vers Pennylane
-  const pushMutation = useMutation({
-    mutationFn: async ({ quote, lines, client }) => {
-      const { data, error } = await pennylaneService.pushQuote(quote, lines, client, orgId);
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: pennylaneKeys.sync(orgId, 'quote', quoteId) });
-      queryClient.invalidateQueries({ queryKey: pennylaneKeys.all(orgId) });
-      queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
-    },
-  });
-
-  return {
-    syncRecord,
-    isLoading,
-    isPushing: pushMutation.isPending,
-    pushError: pushMutation.error,
-    pushQuote: useCallback(
-      async (quote, lines, client) => pushMutation.mutateAsync({ quote, lines, client }),
-      [pushMutation]
-    ),
-    refreshSync: refetch,
-    syncStatus: syncRecord?.sync_status || null,
-    pennylaneUrl: syncRecord?.metadata?.public_url || null,
-    pennylaneNumber: syncRecord?.pennylane_number || null,
-  };
-}
 
 // ============================================================================
 // COMPTES COMPTABLES (LEDGER ACCOUNTS)
@@ -221,108 +161,6 @@ export function usePennylaneQuotes(clientId, orgId) {
   });
 
   return { quotes: quotes || [], isLoading, error, refetch };
-}
-
-// ============================================================================
-// LIGNES D'UN DEVIS PL
-// ============================================================================
-
-/**
- * Hook pour récupérer les lignes d'un devis Pennylane (par pennylane_id du devis).
- * Retourne { quote, sections, lines } — voir pennylane.service.getQuoteLines.
- *
- * @param {number|string|null} pennylaneQuoteId
- */
-export function usePennylaneQuoteLines(pennylaneQuoteId) {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-  const {
-    data,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: pennylaneKeys.quoteLines(orgId, pennylaneQuoteId),
-    queryFn: async () => {
-      const { data, error } = await pennylaneService.getQuoteLines(pennylaneQuoteId);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgId && !!pennylaneQuoteId,
-    // Lignes d'un devis signé = quasi-immuables. Cache long pour éviter les
-    // refetch inutiles quand on enchaîne les réceptions sur plusieurs chantiers.
-    staleTime: 60 * 60_000,  // 1h : pas de refetch pendant ce délai
-    gcTime: 60 * 60_000,     // 1h : garde en cache même après unmount du composant
-  });
-
-  return {
-    quote: data?.quote || null,
-    sections: data?.sections || [],
-    lines: data?.lines || [],
-    isLoading,
-    error,
-    refetch,
-  };
-}
-
-// ============================================================================
-// LIGNES DE PLUSIEURS DEVIS PL (multi-devis par chantier)
-// ============================================================================
-
-/**
- * Hook pour charger en parallèle les lignes de N devis Pennylane.
- * Utilise useQueries → réutilise le cache de usePennylaneQuoteLines (même queryKey).
- *
- * @param {Array<number|string>} pennylaneQuoteIds
- * @returns {{
- *   resultsById: Record<id, { quote, lines, sections, isLoading, error }>,
- *   isLoading: boolean,
- *   isError: boolean,
- *   allLines: Array — concat de toutes les lignes (utile pour recompute statut)
- * }}
- */
-export function useMultiplePennylaneQuoteLines(pennylaneQuoteIds) {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-  const ids = Array.isArray(pennylaneQuoteIds) ? pennylaneQuoteIds.filter(Boolean) : [];
-
-  const queries = useQueries({
-    queries: ids.map((id) => ({
-      queryKey: pennylaneKeys.quoteLines(orgId, id),
-      queryFn: async () => {
-        const { data, error } = await pennylaneService.getQuoteLines(id);
-        if (error) throw error;
-        return data;
-      },
-      enabled: !!orgId && !!id,
-      staleTime: 60 * 60_000,
-      gcTime: 60 * 60_000,
-    })),
-  });
-
-  const resultsById = {};
-  let isLoading = false;
-  let isError = false;
-  const allLines = [];
-
-  ids.forEach((id, idx) => {
-    const q = queries[idx];
-    const data = q?.data;
-    resultsById[id] = {
-      quote: data?.quote || null,
-      sections: data?.sections || [],
-      lines: data?.lines || [],
-      isLoading: q?.isLoading || false,
-      error: q?.error || null,
-    };
-    if (q?.isLoading) isLoading = true;
-    if (q?.isError) isError = true;
-    if (data?.lines?.length) {
-      allLines.push(...data.lines.map((l) => ({ ...l, _quote_pl_id: id })));
-    }
-  });
-
-  return { resultsById, isLoading, isError, allLines };
 }
 
 // ============================================================================

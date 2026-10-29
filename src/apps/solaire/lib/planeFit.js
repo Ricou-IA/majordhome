@@ -35,7 +35,7 @@ function norm360(d) { return ((d % 360) + 360) % 360; }
  * Le gradient (a,b) pointe vers le HAUT ; la pente descend vers -(a,b) = l'orientation du pan.
  * Boussole 0=N,90=E,180=S,270=O ; PVGIS aspect S=0,E=-90,O=+90,N=±180.
  */
-export function planeToOrientation({ a, b }) {
+function planeToOrientation({ a, b }) {
   const pitchDeg = Math.atan(Math.hypot(a, b)) * DEG;
   const azimuthCompass = norm360(Math.atan2(-a, -b) * DEG); // atan2(Est, Nord) de la descente
   const aspectPvgis = googleAzimuthToPvgisAspect(azimuthCompass); // = normalizeDeg(azimuth - 180)

@@ -25,7 +25,7 @@
 export const KIND_ORDER = ['buche', 'flamme', 'flocon'];
 
 /** Labels génériques (tooltip de secours quand le type précis manque) */
-export const KIND_LABELS = {
+const KIND_LABELS = {
   buche: 'Bois bûches',
   flamme: 'Granulés',
   flocon: 'Climatisation / PAC',

@@ -44,7 +44,7 @@ function Th({ children, style }) { return <Text style={[sharedStyles.th, style]}
 function Td({ children, style }) { return <Text style={[sharedStyles.td, style]}>{children}</Text>; }
 
 /** @param {{ model: ReturnType<import('@/lib/invoiceDocumentModel').buildInvoicePdfModel>, company: object }} p */
-export function InvoiceDocument({ model, company }) {
+function InvoiceDocument({ model, company }) {
   const accent = accentOf(company);
   return (
     <Document title={`${model.title} ${model.number}`} author={company.name}>

@@ -23,7 +23,7 @@ export const COMPANY_DOCUMENT_KINDS = [
 
 export const COMPANY_DOCUMENT_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 export const COMPANY_DOCUMENT_MAX_BYTES = 5 * 1024 * 1024;
-export const EXPIRY_SOON_DAYS = 30;
+const EXPIRY_SOON_DAYS = 30;
 
 /**
  * Ramène le réglage brut à `{ [kind]: Document[] }` pour toutes les natures connues.

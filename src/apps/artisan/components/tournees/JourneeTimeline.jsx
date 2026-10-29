@@ -45,7 +45,7 @@ import { minutesEnHHMM, formatDuree } from './tourneesPanelUtils';
 import { BlocRdvCard } from './BlocRdvCard';
 
 /** Pas d'ajustement. Au pixel près, on écrirait « 09:07 » à un client. */
-export const PAS_AJUSTEMENT_MINUTES = 15;
+const PAS_AJUSTEMENT_MINUTES = 15;
 
 /**
  * Largeur minimale (% de la barre) pour écrire l'heure dans un bloc. En dessous,

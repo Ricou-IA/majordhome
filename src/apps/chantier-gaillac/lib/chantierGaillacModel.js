@@ -10,11 +10,10 @@
  * site visité sur deux codes compte deux accès.
  */
 
-export const ACCESS_MIN = 20;
+const ACCESS_MIN = 20;
 export const HORS_PERIMETRE = 'hors_perimetre';
 export const HORS_PERIMETRE_KEY = '__hors_perimetre__';
-export const HORS_PERIMETRE_LABEL = 'Hors périmètre Mayer Énergie';
-export const GROUP_MODES = ['planning', 'site', 'theme'];
+const HORS_PERIMETRE_LABEL = 'Hors périmètre Mayer Énergie';
 /** État de filtres de la page (forme lue telle quelle par filterTaches). */
 export const DEFAULT_FILTERS = { group: 'planning', techId: '', planningCode: '', hideDone: false, q: '' };
 

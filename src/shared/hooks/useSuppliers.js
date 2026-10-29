@@ -47,24 +47,6 @@ export function useSuppliers(orgId) {
 }
 
 /**
- * Détail d'un fournisseur
- */
-export function useSupplierDetail(supplierId) {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-  return useQuery({
-    queryKey: supplierKeys.detail(orgId, supplierId),
-    queryFn: async () => {
-      const { data, error } = await suppliersService.getSupplierById(supplierId);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgId && !!supplierId,
-    staleTime: 60_000,
-  });
-}
-
-/**
  * Mutations CRUD fournisseurs
  */
 export function useSupplierMutations(orgId) {
@@ -282,27 +264,6 @@ export function useProductsByCategory(orgId, category) {
     staleTime: 60_000,
   });
   return { products: data || [], isLoading, error };
-}
-
-/**
- * Recherche produits (debounced côté composant)
- */
-export function useProductSearch(orgId, query) {
-  const {
-    data: results,
-    isLoading,
-  } = useQuery({
-    queryKey: supplierKeys.searchProducts(orgId, query),
-    queryFn: async () => {
-      const { data, error } = await suppliersService.searchProducts(orgId, query);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgId && !!query && query.length >= 2,
-    staleTime: 10_000,
-  });
-
-  return { results: results || [], isLoading };
 }
 
 /**

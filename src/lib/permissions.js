@@ -145,19 +145,3 @@ export function hasPermission(permissionMap, role, resource, action, orgRoleCode
   // puis surcharge per-org du rôle standard, puis défaut app-level.
   return resolvePermission(permissionMap, role, resource, action, orgRoleCode);
 }
-
-/**
- * Récupère les actions autorisées pour un rôle sur une resource.
- *
- * @param {Object} permissionMap - Map issue de buildPermissionMap
- * @param {string} role - Rôle effectif
- * @param {string} resource - Ex: 'pipeline'
- * @returns {Object} - Ex: { view: true, create: false, edit: false, ... }
- */
-export function getResourcePermissions(permissionMap, role, resource, orgRoleCode = null) {
-  const result = {};
-  for (const a of ACTIONS) {
-    result[a.key] = resolvePermission(permissionMap, role, resource, a.key, orgRoleCode);
-  }
-  return result;
-}

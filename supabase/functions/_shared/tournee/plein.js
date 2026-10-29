@@ -54,7 +54,7 @@ export function evaluerRemplissage({
 }
 
 /** Même lecture que souplesseEffective (souplesse.js) : type concerné, pas figé, souplesse > 0. */
-export function rdvAdaptable(rdv, flexDefaut) {
+function rdvAdaptable(rdv, flexDefaut) {
   if (!TYPES_ADAPTABLES.includes(rdv?.appointment_type)) return false;
   if (rdv?.hour_confirmed_at) return false;
   return (rdv?.time_flex_minutes ?? flexDefaut) > 0;

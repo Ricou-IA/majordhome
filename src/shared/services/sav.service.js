@@ -75,7 +75,7 @@ async function annulerDecalages(appointmentsService, faits) {
 // CONSTANTES — STATUTS & TRANSITIONS
 // ============================================================================
 
-export const ENTRETIEN_STATUSES = [
+const ENTRETIEN_STATUSES = [
   { value: 'demande_contrat', label: 'Demande de contrat', color: '#06B6D4', display_order: 0 },
   { value: 'a_planifier', label: 'À planifier', color: '#3B82F6', display_order: 1 },
   { value: 'planifie',    label: 'Planifié',    color: '#8B5CF6', display_order: 2 },
@@ -83,7 +83,7 @@ export const ENTRETIEN_STATUSES = [
   { value: 'facture',     label: 'Facturé',     color: '#6366F1', display_order: 4 },
 ];
 
-export const SAV_STATUSES = [
+const SAV_STATUSES = [
   { value: 'demande',            label: 'Demande',           color: '#EF4444', display_order: 1 },
   { value: 'pieces_commandees',  label: 'Pièces commandées', color: '#F59E0B', display_order: 2 },
   { value: 'devis_envoye',       label: 'Devis envoyé',      color: '#3B82F6', display_order: 3 },
@@ -106,7 +106,7 @@ export const KANBAN_COLUMNS = [
   { value: 'realise',           label: 'Réalisé',           color: '#10B981', types: ['entretien', 'sav'] },
 ];
 
-export const ENTRETIEN_TRANSITIONS = {
+const ENTRETIEN_TRANSITIONS = {
   // demande_contrat : carte en attente de contrat signé — non planifiable.
   // Bascule auto vers a_planifier quand le contrat passe active (trigger DB
   // trg_contract_activation_promote_cards), ou manuelle (drag / bouton modale).
@@ -117,7 +117,7 @@ export const ENTRETIEN_TRANSITIONS = {
   facture:     ['realise'],
 };
 
-export const SAV_TRANSITIONS = {
+const SAV_TRANSITIONS = {
   demande:           ['devis_envoye', 'pieces_commandees', 'a_planifier'],
   devis_envoye:      ['pieces_commandees', 'demande'],
   pieces_commandees: ['a_planifier', 'devis_envoye'],
@@ -149,10 +149,6 @@ export function getStatusConfig(type, status) {
 export function getTransitions(type, currentStatus) {
   const map = type === 'sav' ? SAV_TRANSITIONS : ENTRETIEN_TRANSITIONS;
   return map[currentStatus] || [];
-}
-
-export function getKanbanColumnConfig(columnValue) {
-  return KANBAN_COLUMNS.find(c => c.value === columnValue) || KANBAN_COLUMNS[0];
 }
 
 // ============================================================================

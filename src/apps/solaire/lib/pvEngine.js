@@ -150,7 +150,7 @@ export function optimize({ eM1kwc, consoMonthly, threshold, maxKwc, stepKwc }) {
 }
 
 /** Incrément des paliers commerciaux (kWc) : on installe par multiples de 3 (3, 6, 9). */
-export const OFFER_INCREMENT_KWC = 3;
+const OFFER_INCREMENT_KWC = 3;
 
 /**
  * Scénarios proposés (spec révisée 2026-06-18) : les paliers commerciaux réels

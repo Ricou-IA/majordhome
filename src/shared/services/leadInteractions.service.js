@@ -13,14 +13,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 
-export const INTERACTION_CHANNELS = [
-  { value: 'phone', label: 'Téléphone', icon: 'Phone' },
-  { value: 'email', label: 'Email', icon: 'Mail' },
-  { value: 'sms', label: 'SMS', icon: 'MessageSquare' },
-  { value: 'meeting', label: 'Rendez-vous', icon: 'Users' },
-  { value: 'note', label: 'Note', icon: 'StickyNote' },
-];
-
 export const leadInteractionsService = {
   async getByLeadId(leadId) {
     if (!leadId) return { data: [], error: null };

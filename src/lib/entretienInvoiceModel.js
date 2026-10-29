@@ -29,8 +29,8 @@
 export const VAT_CODES = { 20: 'FR_200', 10: 'FR_100', 5.5: 'FR_55', 0: 'exempt' };
 const VALID_VATS = new Set(Object.keys(VAT_CODES).map(Number));
 
-export const DEFAULT_VAT_PERCENT = 20;
-export const DEFAULT_DEADLINE_DAYS = 30;
+const DEFAULT_VAT_PERCENT = 20;
+const DEFAULT_DEADLINE_DAYS = 30;
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const round4 = (n) => Math.round((Number(n) || 0) * 10000) / 10000;
@@ -89,7 +89,7 @@ const clean = (v) => {
  * Les textes de remplissage (« À renseigner »…) sont ignorés — vu sur le brouillon
  * FERNANDEZ du 2026-09-22 : « Entretien de votre poêle : À renseigner · À renseigner ».
  */
-export function referenceEquipement(eq) {
+function referenceEquipement(eq) {
   if (!eq) return null;
   const serial = clean(eq.serial_number);
   const parts = [clean(eq.brand), clean(eq.model), serial ? `N° ${serial}` : null].filter(Boolean);

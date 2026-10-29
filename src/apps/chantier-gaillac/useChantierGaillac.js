@@ -10,7 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMajordhomeOrgId, unwrapResult } from '@/lib/serviceHelpers';
 import { chantierGaillacService } from './chantierGaillac.service';
 
-export const chantierGaillacKeys = {
+const chantierGaillacKeys = {
   all: (orgId) => ['chantier-gaillac', orgId],
   mdhOrg: (orgId) => ['chantier-gaillac', orgId, 'mdh-org'],
   taches: (orgId) => ['chantier-gaillac', orgId, 'taches'],

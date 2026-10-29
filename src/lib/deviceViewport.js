@@ -91,7 +91,7 @@ export function getDeviceClass() {
  * Applique le viewport adapté à la catégorie courante. Idempotent : ne réécrit
  * la balise que si le contenu change (pas de boucle resize).
  */
-export function applyDeviceViewport() {
+function applyDeviceViewport() {
   if (typeof document === 'undefined') return;
   const meta = document.querySelector('meta[name="viewport"]');
   if (!meta) return;

@@ -25,8 +25,8 @@
  * ============================================================================
  */
 
-export const BAN_SEARCH_URL = 'https://api-adresse.data.gouv.fr/search/';
-export const ADEME_DPE_URL =
+const BAN_SEARCH_URL = 'https://api-adresse.data.gouv.fr/search/';
+const ADEME_DPE_URL =
   'https://data.ademe.fr/data-fair/api/v1/datasets/meg-83tjwtg8dyz4vv7h1dqe/lines';
 
 /** En dessous de ce score BAN, l'adresse est affichée avec un avertissement. */
@@ -55,7 +55,7 @@ export const PROXIMITY_RADIUS_M = NEARBY_RADII_M[0];
  * Le seuil ne DISQUALIFIE rien : il déclenche un avertissement. Le juge final
  * reste l'humain, qui compare `rawAddress` à l'adresse de la fiche.
  */
-export const BAN_MATCH_LOW_SCORE = 0.5;
+const BAN_MATCH_LOW_SCORE = 0.5;
 
 /** Nombre max de logements remontés pour une adresse exacte (immeubles). */
 export const MAX_RECORDS = 12;
@@ -74,7 +74,7 @@ export const MAX_NEARBY_RECORDS = 40;
  * simplement absente. Toute modification doit être revérifiée contre
  * `GET https://data.ademe.fr/data-fair/api/v1/datasets/meg-83tjwtg8dyz4vv7h1dqe`.
  */
-export const DPE_FIELDS = [
+const DPE_FIELDS = [
   'numero_dpe',
   'adresse_ban',
   'identifiant_ban',
@@ -140,7 +140,7 @@ export const DPE_FIELDS = [
  * document client (« s'échappe par les murs ») — sans lui on produit des
  * « par murs » qui font amateur sur un document remis en main propre.
  */
-export const HEAT_LOSS_POSTS = [
+const HEAT_LOSS_POSTS = [
   ['walls', 'Murs', 'les murs'],
   ['thermalBridges', 'Ponts thermiques', 'les ponts thermiques'],
   ['airRenewal', "Renouvellement d'air", "le renouvellement d'air"],
@@ -457,7 +457,7 @@ export function isAgingGenerator(label, refYear) {
  *
  * `null` = aucune catégorie sûre, on n'invente pas d'équipement.
  */
-export function equipmentCategoryFromGenerator(label) {
+function equipmentCategoryFromGenerator(label) {
   const s = String(label || '');
   if (!s) return null;
   const has = (re) => re.test(s);
@@ -570,7 +570,7 @@ export function buildEquipmentDrafts(record) {
  * types de la fiche (`local_commercial`, `autre`) n'ont pas d'équivalent et
  * ne doivent donc jamais être devinés.
  */
-export const HOUSING_TYPE_FROM_DPE = {
+const HOUSING_TYPE_FROM_DPE = {
   maison: 'maison',
   appartement: 'appartement',
   immeuble: 'immeuble',
@@ -623,7 +623,7 @@ async function getJson(url, fetchImpl, signal) {
  * Géocode une adresse via la BAN et retourne son identifiant.
  * @returns {Promise<object|null>} `null` si aucune adresse ne correspond
  */
-export async function lookupBanAddress(
+async function lookupBanAddress(
   { address, postalCode, city },
   { fetchImpl = fetch, signal } = {}
 ) {

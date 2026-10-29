@@ -15,7 +15,7 @@ src/
 │   ├── supabaseClient.js                 # createClient Supabase
 │   ├── utils.js                          # cn(), formatDateFR, formatEuro, formatPhoneNumber, etc.
 │   ├── permissions.js                    # computeEffectiveRole, buildPermissionMap, hasPermission
-│   ├── constants.js                      # DEFAULT_PAGE_SIZE (25), LARGE_PAGE_SIZE (50), KANBAN_PAGE_SIZE (200)
+│   ├── constants.js                      # DEFAULT_PAGE_SIZE (25), PIPELINE_MIN_AMOUNT_HT
 │   ├── serviceHelpers.js                 # withErrorHandling, extractRpcResult, getMajordhomeOrgId
 │   └── phoneUtils.js                     # cleanPhone, formatPhoneForSearch
 │

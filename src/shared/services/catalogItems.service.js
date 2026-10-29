@@ -53,7 +53,7 @@ async function appelEnrichissement(body, etape) {
  * @param {string} search
  * @returns {string[]}
  */
-export function motsDeRecherche(search) {
+function motsDeRecherche(search) {
   return String(search || '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .split(/\s+/)

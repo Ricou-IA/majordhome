@@ -72,7 +72,7 @@ function Stop({ stop, accent }) {
   );
 }
 
-export function RouteSheetDocument({ sheet, company }) {
+function RouteSheetDocument({ sheet, company }) {
   const accent = accentOf(company);
   const km = sheet.kmEstimated !== null
     ? `${sheet.kmEstimated} km estimés${sheet.maxKm ? ` (plafond ${sheet.maxKm} km)` : ''}`

@@ -15,7 +15,7 @@ const DATA_RAPPORT = { climat, uDefauts, coefficientsB, ventilation };
 
 /** `rapport-thermique-<slug>-<AAAA-MM-JJ>.pdf` — accents et ponctuation strippés (nom de fichier
  * portable Windows/macOS). `date` est injectée par le caller (testable, pas d'horloge implicite). */
-export function buildRapportFilename(nom, date = new Date()) {
+function buildRapportFilename(nom, date = new Date()) {
   const slug = (nom || 'etude')
     .toLowerCase()
     .normalize('NFD')

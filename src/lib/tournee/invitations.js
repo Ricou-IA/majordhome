@@ -8,11 +8,6 @@ import { retardStatus } from './eligibilite.js';
 
 const RAISONS_EXCLUSION = ['deja_planifie', 'deja_invite', 'archive', 'optout', 'desinscrit', 'sans_email', 'hors_periode'];
 
-/** `YYYY-MM` d'une date ISO. */
-function moisDe(iso) {
-  return String(iso || '').slice(0, 7);
-}
-
 /**
  * Contrats à inviter pour un mois : actifs, sans visite cette année, sans carte
  * d'entretien en cours, pas déjà invités ce mois, un par client, dont
@@ -98,4 +93,4 @@ export function etapeRelance(inv, aujourdhui, reglages) {
 }
 
 /** Mois d'une date ISO, exporté pour l'edge. */
-export { moisDe };
+

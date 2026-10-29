@@ -25,7 +25,7 @@ export const SLOT_STATUS = {
   cancelled: { label: 'Annulée', tone: 'amber' },
 };
 
-export const CLOSE_REASONS = {
+const CLOSE_REASONS = {
   capacity: 'pleine (emplacements)',
   stops: 'pleine (arrêts)',
   j_minus_2: 'délai de fermeture',

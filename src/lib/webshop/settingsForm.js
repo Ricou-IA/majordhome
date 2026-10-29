@@ -18,7 +18,7 @@ import { WEBSHOP_EMAIL_DEFAULTS } from './emailTemplates.js';
 // ---------------------------------------------------------------------------
 
 /** @param {string[]} liste @returns {string} */
-export function emailsVersTexte(liste) {
+function emailsVersTexte(liste) {
   return (Array.isArray(liste) ? liste : []).join(', ');
 }
 
@@ -60,7 +60,7 @@ function entier(v) {
 }
 
 /** @param {string} url @returns {string} */
-export function normaliserSiteUrl(url) {
+function normaliserSiteUrl(url) {
   return String(url ?? '').trim().replace(/\/+$/, '');
 }
 

@@ -294,7 +294,7 @@ function ActionPage({ model, company }) {
 
 // --- Document ---------------------------------------------------------------
 
-export function DpeSyntheseDocument({ model, company }) {
+function DpeSyntheseDocument({ model, company }) {
   return (
     <Document
       title={`Bilan énergétique — ${model.client.nom || 'logement'}`}

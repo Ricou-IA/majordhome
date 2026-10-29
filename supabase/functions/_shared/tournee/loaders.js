@@ -251,7 +251,7 @@ export async function chargerJournees({
  * @param {{ client: object, coreOrgId: string, rdvs: Array<object>, reglages?: object|null }} p
  * @returns {Promise<{ data: Map<string, number>, error: Error|null }>}  appointment id → minutes
  */
-export async function chargerDureesBareme({ client, coreOrgId, rdvs, reglages = null }) {
+async function chargerDureesBareme({ client, coreOrgId, rdvs, reglages = null }) {
   const data = new Map();
   const entretiens = (rdvs || []).filter((r) => r.appointment_type === 'maintenance' && r.intervention_id);
   if (entretiens.length === 0) return { data, error: null };

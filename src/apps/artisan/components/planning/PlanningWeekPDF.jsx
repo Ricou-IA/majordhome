@@ -91,7 +91,7 @@ function Day({ day, accent }) {
   );
 }
 
-export function PlanningWeekDocument({ model, company }) {
+function PlanningWeekDocument({ model, company }) {
   const accent = accentOf(company);
   return (
     <Document title={`Planning ${model.personName} — S${model.weekNumber}`} author={company?.name || ''}>

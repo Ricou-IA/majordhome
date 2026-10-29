@@ -17,7 +17,7 @@ import { withErrorHandling } from '@/lib/serviceHelpers';
 // CONSTANTES
 // ============================================================================
 
-export const CAMPAIGN_STATUS_CONFIG = {
+const CAMPAIGN_STATUS_CONFIG = {
   ACTIVE: { label: 'Active', color: 'bg-emerald-100 text-emerald-700 ring-emerald-200' },
   PAUSED: { label: 'Pause', color: 'bg-amber-100 text-amber-700 ring-amber-200' },
   DELETED: { label: 'Supprimée', color: 'bg-red-100 text-red-700 ring-red-200' },

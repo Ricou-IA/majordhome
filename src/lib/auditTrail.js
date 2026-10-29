@@ -138,7 +138,7 @@ export const AUDIT_FIELD_LABELS = {
  * Un chemin inconnu est montré tel quel : mieux vaut un nom technique qu'un
  * « via inconnu » qui masque l'information.
  */
-export const AUDIT_SOURCE_LABELS = {
+const AUDIT_SOURCE_LABELS = {
   update_majordhome_lead: 'fiche lead',
   create_majordhome_lead: 'création de lead',
   get_majordhome_lead_raw: 'fiche lead',
@@ -170,7 +170,7 @@ const SUBJECTS = { leads: 'Lead', appointments: 'RDV', chantiers: 'Chantier' };
  * À la création, seuls ces champs sont détaillés (la ligne entière noierait
  * l'information : 60 colonnes pour un RDV).
  */
-export const AUDIT_INSERT_HIGHLIGHTS = {
+const AUDIT_INSERT_HIGHLIGHTS = {
   leads: ['status_id', 'source_id', 'assigned_user_id', 'appointment_date', 'client_id'],
   appointments: ['appointment_type', 'scheduled_date', 'scheduled_start', 'assigned_commercial_id', 'status'],
 };
@@ -258,7 +258,7 @@ export function formatAuditValue(table, field, value, resolvers = {}) {
 }
 
 /** Libellé FR d'une colonne (nom technique si inconnue). */
-export function auditFieldLabel(table, field) {
+function auditFieldLabel(table, field) {
   return AUDIT_FIELD_LABELS[table]?.[field] || field;
 }
 
@@ -272,7 +272,7 @@ export function auditFieldLabel(table, field) {
  * apparaissent tous deux en « Automatisation » (Eric 2026-10-04 : savoir qui a posé le RDV,
  * humain ou agent, pour éviter les incompréhensions).
  */
-export const AUDIT_RDV_SOURCE_AUTHORS = {
+const AUDIT_RDV_SOURCE_AUTHORS = {
   'auto_rdv:agent': 'l’agent téléphonique',
   'auto_rdv:client': 'le client (prise de RDV en ligne)',
   'auto_rdv:operateur': 'la prise de RDV en ligne (lien opérateur)',

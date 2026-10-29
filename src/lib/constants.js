@@ -7,8 +7,6 @@
 
 // Pagination
 export const DEFAULT_PAGE_SIZE = 25;
-export const LARGE_PAGE_SIZE = 50;
-export const KANBAN_PAGE_SIZE = 200;
 
 // Pipeline commercial
 // DÉFAUT du seuil sous lequel un devis Pennylane n'est pas rattaché automatiquement

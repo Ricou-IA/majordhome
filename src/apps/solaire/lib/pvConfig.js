@@ -3,7 +3,7 @@
 // (édités via /settings/solaire). PUR : aucun import React/Supabase.
 import { DEMARCHES_DEFAULTS } from './demarches/parametres.js';
 
-export const PV_DEFAULTS = {
+const PV_DEFAULTS = {
   default_price_kwh: 0.20,      // €/kWh TTC — ⚠️ à ajuster au TRV en vigueur
   inflation_rate: 0.03,
   degradation_rate: 0.005,

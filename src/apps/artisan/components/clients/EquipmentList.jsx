@@ -569,68 +569,6 @@ export function EquipmentList({
 }
 
 // ============================================================================
-// VARIANTE : LISTE COMPACTE (pour modale)
-// ============================================================================
-
-/**
- * Version compacte de la liste (pour affichage dans modale)
- */
-export function EquipmentListCompact({ equipments = [], onSelect }) {
-  const { index: referentiel } = useEquipmentReferential();
-
-  if (equipments.length === 0) {
-    return (
-      <p className="text-sm text-gray-500 text-center py-4">
-        Aucun équipement
-      </p>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {equipments.map(equipment => {
-        const categoryCode = referentiel.categoriesById.get(equipment.category_id)?.code;
-        const Icon = getEquipmentIcon(categoryCode);
-        const iconColor = getEquipmentColor(categoryCode);
-
-        return (
-          <div
-            key={equipment.id}
-            onClick={() => onSelect?.(equipment)}
-            className={`
-              flex items-center gap-3 p-2 rounded-lg border border-gray-200
-              ${onSelect ? 'cursor-pointer hover:bg-gray-50' : ''}
-            `}
-          >
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconColor}`}>
-              <Icon className="w-4 h-4" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {libelleEquipement(equipment, referentiel)}
-                </p>
-                {(equipment.unit_count || 1) > 1 && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700 flex-shrink-0">
-                    {equipment.unit_count} {referentiel.typesById.get(equipment.equipment_type_id)?.unit_label || 'unité'}{equipment.unit_count > 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-              {(equipment.brand || equipment.model) && (
-                <p className="text-xs text-gray-500 truncate">
-                  {[equipment.brand, equipment.model].filter(Boolean).join(' ')}
-                </p>
-              )}
-            </div>
-            <ContractStatusBadge status={equipment.contract_status} />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ============================================================================
 // EXPORTS
 // ============================================================================
 

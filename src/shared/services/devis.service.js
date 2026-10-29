@@ -35,7 +35,6 @@ export const TVA_RATES = [
 // Settings → Socle → Devis). Les constantes ci-dessous sont les DÉFAUTS, gardées pour les lecteurs qui
 // n'ont pas la config sous la main (metreModel, devis types) ; tout écran passe la config de l'org.
 export const QUOTE_TEMPLATE_FAMILIES = DEFAULT_FAMILLES.map((f) => f.label);
-export const FAMILY_DEFAULT_SECTIONS = Object.fromEntries(DEFAULT_FAMILLES.map((f) => [f.label, [...f.sections]]));
 
 /**
  * Lignes « titre de chapitre » d'une famille (config de l'org, sinon défauts).
@@ -62,12 +61,6 @@ export function buildDefaultSections(family, config) {
 export function productCategoriesForSection(sectionName, family, config) {
   return categoriesPourSection(config || buildDevisConfig(null), sectionName, family);
 }
-
-export const LINE_TYPES = [
-  { value: 'product', label: 'Produit' },
-  { value: 'labor', label: 'Main d\'œuvre' },
-  { value: 'section_title', label: 'Titre de section' },
-];
 
 // Calculs (lignes, totaux, marge) : module pur src/lib/devisCalculs.js, ré-exporté pour les appelants historiques
 import { computeLineTotals, computeQuoteTotals, margeFournitures, remiseLigne } from '@/lib/devisCalculs.js';

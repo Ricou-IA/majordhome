@@ -8,11 +8,6 @@
 import { calculerModelKey } from './modelKey.js';
 import { categorieMajordhome, DEFAUTS_MAPPING, CLE_SANS_CATEGORIE } from './mapping.js';
 
-/** Slugs de catégorie Domos qui constituent le périmètre « stockage » (gammes de la tranche 1). */
-export const SLUGS_STOCKAGE = Object.freeze([
-  'systeme-de-stockage', 'batteries-ac', 'batteries-dc', 'accessoires-systeme-de-stockage', 'kits-de-stockage', 'kit-batterie',
-]);
-
 const RE_KWH = /(\d+(?:[.,]\d+)?)\s*kwh/i;
 const SLUGS_PRINCIPAUX = /^(panneaux-solaires|onduleur-central|micro-onduleur|onduleurs-micro-onduleurs|borne-de-recharge|batteries-ac|batteries-dc)$/;
 
@@ -30,7 +25,7 @@ function slugs(item) {
  * @param {{ prices?: { price?: string|number, currency_minor_unit?: number } }} item
  * @returns {number|null}
  */
-export function prixHt(item) {
+function prixHt(item) {
   const p = Number(item?.prices?.price);
   if (!Number.isFinite(p)) return null;
   const unite = Number.isFinite(Number(item.prices.currency_minor_unit)) ? Number(item.prices.currency_minor_unit) : 2;
@@ -42,7 +37,7 @@ export function prixHt(item) {
  * @param {{ name?: string }} item
  * @returns {string|null}
  */
-export function marqueDe(item) {
+function marqueDe(item) {
   const m = String(item?.name || '').trim().match(/^[A-Za-zÀ-ÿ0-9]+/);
   return m ? m[0].toUpperCase() : null;
 }

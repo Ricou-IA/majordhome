@@ -34,7 +34,7 @@ export function normaliserTelephone(brut) {
  * @param {string|null|undefined} s
  * @returns {string}
  */
-export function normaliserTexte(s) {
+function normaliserTexte(s) {
   return String(s || '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase()
@@ -48,7 +48,7 @@ export function normaliserTexte(s) {
  * @param {string} b
  * @returns {number}
  */
-export function levenshtein(a, b) {
+function levenshtein(a, b) {
   if (a === b) return 0;
   if (!a.length) return b.length;
   if (!b.length) return a.length;
@@ -83,7 +83,7 @@ export function correspondNom(dit, fiche) {
  * @param {string|null|undefined} s
  * @returns {string}
  */
-export function normaliserCommune(s) {
+function normaliserCommune(s) {
   return normaliserTexte(s)
     .replace(/\bste\b/g, 'sainte')
     .replace(/\bst\b/g, 'saint')

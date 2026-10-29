@@ -95,7 +95,7 @@ function Stop({ item, accent, estime }) {
   );
 }
 
-export function FeuilleDeRouteDocument({ model, company, carte }) {
+function FeuilleDeRouteDocument({ model, company, carte }) {
   const accent = accentOf(company);
   const n = model.items.length;
   return (

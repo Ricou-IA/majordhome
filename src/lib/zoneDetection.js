@@ -66,7 +66,7 @@ async function getCommuneCentroid(city, postalCode) {
  *   Si null (org sans territoire_centers configuré), retourne null.
  * @returns {Promise<{ durationMinutes: number, distanceKm: number } | null>}
  */
-export async function getDrivingDuration(lat, lng, hqCoords) {
+async function getDrivingDuration(lat, lng, hqCoords) {
   const token = MAPBOX_CONFIG.accessToken;
   if (!token) {
     console.warn('[zoneDetection] Mapbox token non configuré');

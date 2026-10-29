@@ -329,32 +329,6 @@ export function useClientEquipmentLabels() {
 }
 
 // ============================================================================
-// HOOK - useEquipmentBrands (marques d'équipements)
-// ============================================================================
-
-export function useEquipmentBrands() {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-
-  const {
-    data,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: clientKeys.brands(orgId),
-    queryFn: async () => {
-      const { data, error } = await clientsService.getBrands();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgId,
-    staleTime: 5 * 60 * 1000, // 5 min — données quasi-statiques
-  });
-
-  return { brands: data || [], isLoading, error };
-}
-
-// ============================================================================
 // HOOK - usePricingEquipmentTypes
 // ============================================================================
 

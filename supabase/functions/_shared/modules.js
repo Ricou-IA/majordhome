@@ -29,7 +29,8 @@ export const MODULES = [
       { key: 'team', title: 'Équipe', description: 'Membres, rôles, couleur planning, compétences', icon: 'Users', href: '/settings/team', adminOnly: true },
       { key: 'permissions', title: 'Droits d\'accès', description: 'Permissions par rôle', icon: 'Shield', href: '/settings/permissions', adminOnly: true },
       { key: 'equipements', title: 'Équipements', description: 'Catégories et types d\'équipement du parc client', icon: 'Wrench', href: '/settings/equipements', adminOnly: true },
-      { key: 'suppliers', title: 'Fournisseurs & catalogue', description: 'Fournisseurs et catalogues produits', icon: 'Truck', href: '/settings/suppliers', adminOnly: true },
+      // Ouverte au team_leader (Eric 2026-10-27) : visible dès que le rôle a le droit `articles.edit` (org_admin compris)
+      { key: 'suppliers', title: 'Fournisseurs & catalogue', description: 'Fournisseurs et catalogues produits', icon: 'Truck', href: '/settings/suppliers', acces: { resource: 'articles', action: 'edit' } },
       { key: 'pennylane', title: 'Facturation', description: 'Numérotation, mentions et coordonnées bancaires des factures ; lien Pennylane et comptes de vente', icon: 'Receipt', href: '/settings/pennylane', adminOnly: true },
       // L'expéditeur des e-mails sert à tous les modules qui écrivent (factures, e-mail du soir) :
       // socle, pas Communication.
@@ -205,13 +206,28 @@ export function moduleDeRoute(chemin) {
  * @param {object|null|undefined} settings
  * @param {{ isOrgAdmin: boolean }} ctx
  */
-export function modulesVisibles(settings, { isOrgAdmin }) {
+/**
+ * Une tuile est visible pour l'org_admin ; une tuile `acces: { resource, action }` l'est aussi pour tout rôle qui a
+ * ce droit (`can` = useCanAccess().can, absent ⇒ admin seul) ; une tuile sans `adminOnly` ni `acces` l'est pour tous.
+ */
+function tuileVisible(t, { isOrgAdmin, can }) {
+  if (isOrgAdmin) return true;
+  if (t.acces) return typeof can === 'function' && can(t.acces.resource, t.acces.action) === true;
+  return !t.adminOnly;
+}
+
+export function modulesVisibles(settings, { isOrgAdmin, can }) {
   const crm = crmActif(settings);
   return MODULES
     .filter((m) => moduleActif(settings, m.key))
     .map((m) => ({
       ...m,
-      tiles: m.tiles.filter((t) => (!t.adminOnly || isOrgAdmin) && (crm || m.key !== 'socle' || t.horsCrm)),
+      tiles: m.tiles.filter((t) => tuileVisible(t, { isOrgAdmin, can }) && (crm || m.key !== 'socle' || t.horsCrm)),
     }))
     .filter((m) => m.tiles.length > 0);
+}
+
+/** Le hub Paramètres s'ouvre dès qu'une tuile est visible pour ce rôle (lien du menu et route `/settings`). */
+export function peutOuvrirParametres(settings, ctx) {
+  return modulesVisibles(settings, ctx).length > 0;
 }

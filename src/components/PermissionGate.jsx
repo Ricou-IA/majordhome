@@ -36,21 +36,4 @@ export function PermissionGate({ resource, action, fallback = null, children }) 
   return children;
 }
 
-/**
- * Raccourci : affiche ou masque du contenu.
- * Identique à PermissionGate mais plus lisible dans certains cas.
- *
- * Usage :
- *   <IfCan resource="clients" action="create">
- *     <Button>Nouveau client</Button>
- *   </IfCan>
- */
-export function IfCan({ resource, action, children }) {
-  return (
-    <PermissionGate resource={resource} action={action}>
-      {children}
-    </PermissionGate>
-  );
-}
-
 export default PermissionGate;

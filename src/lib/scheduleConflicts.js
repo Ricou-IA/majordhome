@@ -11,7 +11,7 @@ export function timeToMinutes(hhmm) {
 }
 
 /** Deux plages [aStart,aEnd) [bStart,bEnd) (minutes) se chevauchent-elles ? */
-export function rangesOverlap(aStart, aEnd, bStart, bEnd) {
+function rangesOverlap(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;
 }
 
@@ -22,7 +22,7 @@ export function rangesOverlap(aStart, aEnd, bStart, bEnd) {
  * marquer une colonne occupée/en-conflit quel que soit le rôle du membre.
  * (Pour un technicien, `assigned_commercial_id` ne matchera jamais son id → reste correct.)
  */
-export function appointmentInvolvesMember(apt, memberId) {
+function appointmentInvolvesMember(apt, memberId) {
   if (!apt || !memberId) return false;
   return (apt.technician_ids || []).includes(memberId) || apt.assigned_commercial_id === memberId;
 }
@@ -45,15 +45,6 @@ export function findMemberConflicts({ date, startTime, endTime }, memberId, dayA
     if (as == null) return false;
     return rangesOverlap(s, e, as, ae);
   });
-}
-
-/**
- * Conflits d'un créneau pour un technicien donné.
- * Alias de `findMemberConflicts` (le prédicat unifié reste correct pour un tech :
- * `assigned_commercial_id` ne matchera jamais un id de technicien).
- */
-export function findTechnicianConflicts(slot, technicianId, dayAppointments) {
-  return findMemberConflicts(slot, technicianId, dayAppointments);
 }
 
 /** Plage de travail "active" d'un membre pour un jour JS (0=dim..6=sam) depuis default_availability. */

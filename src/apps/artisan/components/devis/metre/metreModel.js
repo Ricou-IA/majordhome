@@ -20,7 +20,7 @@ export const CRITERES = {
   prise_air: [['dans_piece', 'Air pris dans la pièce'], ['dans_conduit', 'Air pris dans le conduit (appareil étanche)']],
 };
 
-export const CRITERES_VIDES = { projet: null, appareil: null, combustible: null, zone: null, prise_air: null };
+const CRITERES_VIDES = { projet: null, appareil: null, combustible: null, zone: null, prise_air: null };
 
 /** La question de l'écran de qualification : [code, titre, sous-titre]. */
 export const PROJETS = [

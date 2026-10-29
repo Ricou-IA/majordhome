@@ -21,7 +21,7 @@
 import { normalizeEmailKey, normalizeNameKey, normalizePhoneKey } from './leadDuplicateMatch.js';
 
 /** Raisons « fortes » : une seule suffit à exiger une confirmation. */
-export const STRONG_REASONS = ['phone', 'email'];
+const STRONG_REASONS = ['phone', 'email'];
 
 /**
  * Clé téléphone comparable entre formats (+33 6…, 06…, 6… sans 0 de Pennylane) :

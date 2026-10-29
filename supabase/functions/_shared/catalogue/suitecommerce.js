@@ -26,7 +26,7 @@ export const LIBELLES_FR_TESLA = Object.freeze({
 });
 
 /** Gammes FR des familles du site hors stockage (cseg_itemcategory). */
-export const GAMMES_SUITECOMMERCE = Object.freeze({
+const GAMMES_SUITECOMMERCE = Object.freeze({
   PV: 'Modules PV',
   Inverters: 'Onduleurs',
   'Inverter Accessories': 'Accessoires onduleur',

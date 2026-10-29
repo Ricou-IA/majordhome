@@ -18,7 +18,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { storageService } from '@services/storage.service';
 
-export const EQUIPMENT_DOCUMENT_BUCKET = 'product-documents';
+const EQUIPMENT_DOCUMENT_BUCKET = 'product-documents';
 
 /** Types de document (valeurs du CHECK en base) — libellés affichés. */
 export const EQUIPMENT_DOCUMENT_TYPES = [

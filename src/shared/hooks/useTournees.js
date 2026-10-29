@@ -356,7 +356,7 @@ export function usePlanificationRuns(coreOrgId, job = 'tournees-figer') {
 }
 
 /** `YYYY-MM-01` du mois courant (heure locale du navigateur). */
-export function moisCourantIso(date = new Date()) {
+function moisCourantIso(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
 }
 

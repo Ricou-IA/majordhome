@@ -73,7 +73,7 @@ function Signature({ titre, sig, png }) {
 }
 
 /** Exporté pour le harnais de rendu hors navigateur (scripts) — l'app passe par generateMandatPdfBlob. */
-export function MandatDocument({ model, company, signatureMandantPng, signatureMandatairePng }) {
+function MandatDocument({ model, company, signatureMandantPng, signatureMandatairePng }) {
   const legal = buildLegalFooter(company);
   const PageFooter = () => (
     <>

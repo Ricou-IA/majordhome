@@ -11,7 +11,7 @@
 import { calculerModelKey } from './modelKey.js';
 
 /** Natures qu'une ligne d'offre peut porter (supplier_products.product_kind). */
-export const NATURES_OFFRE = Object.freeze(['main', 'accessory', 'consumable']);
+const NATURES_OFFRE = Object.freeze(['main', 'accessory', 'consumable']);
 
 const texteS = { type: 'string' };
 const nombreS = { type: 'number' };

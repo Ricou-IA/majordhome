@@ -24,7 +24,7 @@
  * @param {{diametre:number, longueur?:number|null, angle?:number|null, boisseau?:number|string|null}} c
  * @returns {RegExp}
  */
-export function compilerMotif(motif, c) {
+function compilerMotif(motif, c) {
   const val = (v) => (v == null || v === '' ? '\\d+' : String(v));
   const src = String(motif)
     .replace(/\{D([+-])(\d+)\}/g, (_, s, n) => (c.diametre == null ? '\\d+' : String(c.diametre + (s === '+' ? 1 : -1) * Number(n))))
@@ -38,7 +38,7 @@ export function compilerMotif(motif, c) {
 }
 
 /** Sections de boisseau (indice 1..6 du relevé) → 4 chiffres des références PLA (adaptateurs n°6 / n°7). */
-export const BOISSEAU_4CHIFFRES = Object.freeze({ 1: '2020', 2: '2525', 3: '3030', 4: '2040', 5: '4040', 6: '3050' });
+const BOISSEAU_4CHIFFRES = Object.freeze({ 1: '2020', 2: '2525', 3: '3030', 4: '2040', 5: '4040', 6: '3050' });
 
 /**
  * Un motif sans `{D}` désigne un article dont le diamètre NOMINAL n'est pas celui du relevé : kit

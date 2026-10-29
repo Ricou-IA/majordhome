@@ -198,8 +198,8 @@ export function smsNameForMember(member) {
 // L'heure H accepte aussi H+1 : la 2ᵉ passe retente ce qui a échoué (un envoi
 // réussi marque `appointments.client_notified_at`, donc jamais de doublon).
 
-export const RAPPEL_RDV_MODES = ['off', 'veille', 'hebdo'];
-export const RAPPEL_RDV_DEFAUTS = Object.freeze({ mode: 'off', jour: 1, heure: 8 });
+const RAPPEL_RDV_MODES = ['off', 'veille', 'hebdo'];
+const RAPPEL_RDV_DEFAUTS = Object.freeze({ mode: 'off', jour: 1, heure: 8 });
 export const RAPPEL_RDV_HEURE_MIN = 7;
 export const RAPPEL_RDV_HEURE_MAX = 20;
 /** ISO 8601 : 1 = lundi … 7 = dimanche. */

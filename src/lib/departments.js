@@ -109,13 +109,3 @@ export const FRENCH_DEPARTMENTS = [
   { code: '974', name: 'La Réunion' },
   { code: '976', name: 'Mayotte' },
 ];
-
-export function getDepartmentByCode(code) {
-  if (!code) return null;
-  return FRENCH_DEPARTMENTS.find((d) => d.code === code) ?? null;
-}
-
-export function getDepartmentLabel(code) {
-  const d = getDepartmentByCode(code);
-  return d ? `${d.code} — ${d.name}` : '';
-}

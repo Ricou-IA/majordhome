@@ -13,8 +13,8 @@ import { uDefauts } from '../../data';
 import { uDefautPour, resolvePeriode } from '../../lib/refDataResolvers';
 import ComposeurParoiModal from './ComposeurParoiModal';
 
-export const U_MIN = 0.05;
-export const U_MAX = 6;
+const U_MIN = 0.05;
+const U_MAX = 6;
 
 /**
  * Input U générique : draft local, commit au blur/Enter, borné [U_MIN, U_MAX] (toast + revert si
