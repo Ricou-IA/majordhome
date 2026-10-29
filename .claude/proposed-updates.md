@@ -21,7 +21,7 @@
 
 
 ## [2026-10-27 22:30] anon n'a plus aucun privilège sur majordhome.* ni sur les vues public.majordhome_* (migration 20261029_1)
-**Statut** : PENDING
+**Statut** : RESOLU
 **Commit** : 9584f4ee — migration `20261029_1_anon_revoke_majordhome.sql` (prod, `schema_migrations` 20261027210723), `assert-anon-revoke-majordhome.sql`, bootstrap du harnais aligné, `permissions-coherence.mjs` § 6
 **Contexte** : point 3 de la relecture du plan Devis du 26/10, décidé par Eric le 27/10. L'ACL par défaut du schéma majordhome accordait arwd à anon sur toute table créée ; 92 tables, 7 vues internes, 2 séquences et 102 des 143 vues public.majordhome_* le portaient encore. Rien ne fuyait (aucune policy anon, vues security_invoker, schéma non exposé) : la RLS était la seule serrure.
 **Proposition** : ajouter à CLAUDE.md § Multi-tenant & sécurité, sous la règle « REVOKE EXECUTE FROM PUBLIC, anon » :
