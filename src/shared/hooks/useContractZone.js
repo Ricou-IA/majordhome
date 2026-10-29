@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { detectZoneForAddress, detectZoneFromPostalCode } from '@services/pricing.service';
 import { useAuth } from '@contexts/AuthContext';
 import { getOrgHeadquarters } from '@/lib/territoire-config';
+import { logger } from '@lib/logger';
 
 export function useContractZone(client, contract, zones) {
   const { organization } = useAuth();
@@ -62,7 +63,7 @@ export function useContractZone(client, contract, zones) {
         setAsyncZone(result.zone);
         setDurationMinutes(result.durationMinutes);
       } catch (err) {
-        console.warn('[useContractZone] detection error:', err);
+        logger.warn('[useContractZone] detection error:', err);
       } finally {
         if (!cancelled) setIsDetecting(false);
       }

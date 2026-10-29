@@ -90,7 +90,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
             toast.success('Client CRM créé automatiquement');
           }
         } catch (convErr) {
-          console.warn('[DevisModal] Auto-conversion lead→client:', convErr);
+          logger.warn('[DevisModal] Auto-conversion lead→client:', convErr);
         }
       }
 
@@ -208,7 +208,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
 
       toast.success('PDF généré et sauvegardé');
     } catch (err) {
-      console.error('[DevisModal] PDF:', err);
+      logger.error('[DevisModal] PDF:', err);
       toast.error('Erreur lors de la génération du PDF');
     } finally {
       setPdfLoading(false);
@@ -257,7 +257,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
       setTemplateDesc('');
       setTemplateFamily('');
     } catch (err) {
-      console.error('[DevisModal] saveTemplate:', err);
+      logger.error('[DevisModal] saveTemplate:', err);
       toast.error(err?.message || 'Erreur lors de l\'enregistrement');
     } finally {
       setSavingTemplate(false);

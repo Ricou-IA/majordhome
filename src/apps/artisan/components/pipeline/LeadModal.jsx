@@ -327,7 +327,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         .single();
 
       if (error || !data) {
-        console.error('[LeadModal] fetch client error:', error);
+        logger.error('[LeadModal] fetch client error:', error);
         return;
       }
 
@@ -354,7 +354,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         source_id: clientExistantSource?.id || prev.source_id,
       }));
     } catch (err) {
-      console.error('[LeadModal] fetch client error:', err);
+      logger.error('[LeadModal] fetch client error:', err);
     }
   }, [clearClientSearch, sources]);
 
@@ -384,7 +384,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           : `Client importé depuis Pennylane (${client.display_name || 'sans nom'})`,
       );
     } catch (err) {
-      console.error('[LeadModal] import Pennylane error:', err);
+      logger.error('[LeadModal] import Pennylane error:', err);
       toast.error(err?.message || 'Erreur lors de l\'import du client Pennylane');
     }
   }, [importCustomer, handleSelectClient]);
@@ -408,7 +408,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       .update(clientPayload)
       .eq('id', linkedClient.id);
     if (error) {
-      console.error('[LeadModal] Erreur sync client:', error);
+      logger.error('[LeadModal] Erreur sync client:', error);
       toast.error('Erreur lors de la mise à jour de la fiche client');
       return false;
     }
@@ -510,7 +510,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       onSaved?.();
       onClose();
     } catch (err) {
-      console.error('[LeadModal] Erreur sauvegarde:', err);
+      logger.error('[LeadModal] Erreur sauvegarde:', err);
       toast.error('Erreur lors de la sauvegarde');
     }
   };
@@ -583,7 +583,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       onSaved?.();
       onClose();
     } catch (err) {
-      console.error('[LeadModal] Erreur statut:', err);
+      logger.error('[LeadModal] Erreur statut:', err);
       toast.error('Erreur lors du changement de statut');
     }
   };
@@ -605,7 +605,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       onSaved?.();
       onClose();
     } catch (err) {
-      console.error('[LeadModal] Erreur passage perdu:', err);
+      logger.error('[LeadModal] Erreur passage perdu:', err);
       toast.error('Erreur lors du changement de statut');
     }
   };
@@ -642,7 +642,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         subjectPrefix: 'Visite technique',
       });
       if (aptError) {
-        console.error('[LeadModal] Erreur création RDV:', aptError);
+        logger.error('[LeadModal] Erreur création RDV:', aptError);
         toast.error('Erreur lors de la création du RDV');
         setSchedulingLoading(false);
         return;
@@ -656,7 +656,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       onSaved?.();
       onClose();
     } catch (err) {
-      console.error('[LeadModal] Erreur planification RDV:', err);
+      logger.error('[LeadModal] Erreur planification RDV:', err);
       toast.error('Erreur lors de la planification du RDV');
     } finally {
       setSchedulingLoading(false);
@@ -680,7 +680,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       onSaved?.();
       onClose();
     } catch (err) {
-      console.error('[LeadModal] Erreur passage contacté:', err);
+      logger.error('[LeadModal] Erreur passage contacté:', err);
       toast.error('Erreur lors du changement de statut');
     } finally {
       setCallLoading(false);
@@ -709,7 +709,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       onSaved?.();
       onClose();
     } catch (err) {
-      console.error('[LeadModal] Erreur passage devis:', err);
+      logger.error('[LeadModal] Erreur passage devis:', err);
       toast.error('Erreur lors du changement de statut');
     } finally {
       setQuoteLoading(false);
@@ -753,7 +753,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       onSaved?.();
       onClose();
     } catch (err) {
-      console.error('[LeadModal] handleSendDevis:', err);
+      logger.error('[LeadModal] handleSendDevis:', err);
       toast.error('Erreur lors de l\'envoi du devis');
     }
   };
@@ -780,7 +780,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       toast.success('Appel enregistré');
       onSaved?.();
     } catch (err) {
-      console.error('[LeadModal] Erreur logCall:', err);
+      logger.error('[LeadModal] Erreur logCall:', err);
       toast.error('Erreur lors de l\'enregistrement de l\'appel');
     } finally {
       setCallLoading(false);
@@ -808,7 +808,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       toast.success('Relance enregistrée');
       onSaved?.();
     } catch (err) {
-      console.error('[LeadModal] Erreur logFollowup:', err);
+      logger.error('[LeadModal] Erreur logFollowup:', err);
       toast.error('Erreur lors de l\'enregistrement de la relance');
     } finally {
       setFollowupLoading(false);
@@ -832,7 +832,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       onSaved?.();
       onClose();
     } catch (err) {
-      console.error('[LeadModal] Erreur conversion:', err);
+      logger.error('[LeadModal] Erreur conversion:', err);
       toast.error('Erreur lors de la conversion');
     }
   };
@@ -864,7 +864,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         interactions: interactRes.count ?? 0,
       });
     } catch (err) {
-      console.warn('[LeadModal] hard delete preflight count error:', err);
+      logger.warn('[LeadModal] hard delete preflight count error:', err);
       setHardDeleteCounts({ appointments: null, mailings: null, interactions: null });
     }
   };
@@ -884,7 +884,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       onSaved?.();
       onClose();
     } catch (err) {
-      console.error('[LeadModal] hard delete error:', err);
+      logger.error('[LeadModal] hard delete error:', err);
       const code = err?.message || '';
       const msg = code.includes('org_admin_required')
         ? 'Action réservée aux administrateurs'
@@ -999,7 +999,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       try {
         await deleteLead(lead.id);
       } catch (deleteError) {
-        console.error('[LeadModal] softDeleteLead refusé:', deleteError);
+        logger.error('[LeadModal] softDeleteLead refusé:', deleteError);
         throw new Error('Demande de contrat créée, mais le lead n’a pas pu être retiré du pipeline');
       }
 
@@ -1008,7 +1008,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       onClose();
       navigate(`/clients/${clientId}?tab=contract`);
     } catch (err) {
-      console.error('[LeadModal] requalify error:', err);
+      logger.error('[LeadModal] requalify error:', err);
       toast.error(`Erreur : ${err.message || 'Requalification échouée'}`);
     } finally {
       setIsRequalifying(false);

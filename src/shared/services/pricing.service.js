@@ -30,6 +30,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { equipmentCategoriesService } from './equipmentCategories.service';
+import { logger } from '@lib/logger';
 
 // Re-export zone detection par temps de trajet (Phase unification contrats)
 export { detectZoneForAddress, detectZoneByDuration } from '@/lib/zoneDetection';
@@ -90,7 +91,7 @@ export const pricingService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[pricingService] getZones ERREUR:', error);
+      logger.error('[pricingService] getZones ERREUR:', error);
       return { data: [], error };
     }
   },
@@ -108,7 +109,7 @@ export const pricingService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[pricingService] getEquipmentTypes ERREUR:', error);
+      logger.error('[pricingService] getEquipmentTypes ERREUR:', error);
       return { data: [], error };
     }
   },
@@ -125,7 +126,7 @@ export const pricingService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[pricingService] getRates ERREUR:', error);
+      logger.error('[pricingService] getRates ERREUR:', error);
       return { data: [], error };
     }
   },
@@ -144,7 +145,7 @@ export const pricingService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[pricingService] getRatesForZone ERREUR:', error);
+      logger.error('[pricingService] getRatesForZone ERREUR:', error);
       return { data: [], error };
     }
   },
@@ -162,7 +163,7 @@ export const pricingService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[pricingService] getDiscounts ERREUR:', error);
+      logger.error('[pricingService] getDiscounts ERREUR:', error);
       return { data: [], error };
     }
   },
@@ -180,7 +181,7 @@ export const pricingService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[pricingService] getExtras ERREUR:', error);
+      logger.error('[pricingService] getExtras ERREUR:', error);
       return { data: [], error };
     }
   },
@@ -208,7 +209,7 @@ export const pricingService = {
         .map((r) => r.error);
 
       if (errors.length > 0) {
-        console.error('[pricingService] getAllPricingData - erreurs:', errors);
+        logger.error('[pricingService] getAllPricingData - erreurs:', errors);
         throw errors[0];
       }
 
@@ -224,7 +225,7 @@ export const pricingService = {
         error: null,
       };
     } catch (error) {
-      console.error('[pricingService] getAllPricingData ERREUR:', error);
+      logger.error('[pricingService] getAllPricingData ERREUR:', error);
       return { data: null, error };
     }
   },
@@ -249,7 +250,7 @@ export const pricingService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[pricingService] getContractPricingItems ERREUR:', error);
+      logger.error('[pricingService] getContractPricingItems ERREUR:', error);
       return { data: [], error };
     }
   },
@@ -294,7 +295,7 @@ export const pricingService = {
 
       return { data: [], error: null };
     } catch (error) {
-      console.error('[pricingService] saveContractPricingItems ERREUR:', error);
+      logger.error('[pricingService] saveContractPricingItems ERREUR:', error);
       return { data: null, error };
     }
   },
@@ -331,7 +332,7 @@ export const pricingService = {
       }
       return { data: map, error: null };
     } catch (error) {
-      console.error('[pricingService] getContractLineOverrides ERREUR:', error);
+      logger.error('[pricingService] getContractLineOverrides ERREUR:', error);
       return { data: {}, error };
     }
   },
@@ -379,7 +380,7 @@ export const pricingService = {
 
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] setContractLineOverride ERREUR:', error);
+      logger.error('[pricingService] setContractLineOverride ERREUR:', error);
       return { data: null, error };
     }
   },
@@ -400,7 +401,7 @@ export const pricingService = {
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      console.error('[pricingService] clearContractLineOverride ERREUR:', error);
+      logger.error('[pricingService] clearContractLineOverride ERREUR:', error);
       return { error };
     }
   },
@@ -420,7 +421,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] createZone:', error);
+      logger.error('[pricingService] createZone:', error);
       return { data: null, error };
     }
   },
@@ -435,7 +436,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] updateZone:', error);
+      logger.error('[pricingService] updateZone:', error);
       return { data: null, error };
     }
   },
@@ -448,7 +449,7 @@ export const pricingService = {
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      console.error('[pricingService] deleteZone:', error);
+      logger.error('[pricingService] deleteZone:', error);
       return { error };
     }
   },
@@ -475,7 +476,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] createEquipmentType:', error);
+      logger.error('[pricingService] createEquipmentType:', error);
       return { data: null, error };
     }
   },
@@ -499,7 +500,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] updateEquipmentType:', error);
+      logger.error('[pricingService] updateEquipmentType:', error);
       return { data: null, error };
     }
   },
@@ -512,7 +513,7 @@ export const pricingService = {
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      console.error('[pricingService] deleteEquipmentType:', error);
+      logger.error('[pricingService] deleteEquipmentType:', error);
       return { error };
     }
   },
@@ -531,7 +532,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] upsertRate:', error);
+      logger.error('[pricingService] upsertRate:', error);
       return { data: null, error };
     }
   },
@@ -544,7 +545,7 @@ export const pricingService = {
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      console.error('[pricingService] deleteRate:', error);
+      logger.error('[pricingService] deleteRate:', error);
       return { error };
     }
   },
@@ -560,7 +561,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] createExtra:', error);
+      logger.error('[pricingService] createExtra:', error);
       return { data: null, error };
     }
   },
@@ -575,7 +576,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] updateExtra:', error);
+      logger.error('[pricingService] updateExtra:', error);
       return { data: null, error };
     }
   },
@@ -588,7 +589,7 @@ export const pricingService = {
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      console.error('[pricingService] deleteExtra:', error);
+      logger.error('[pricingService] deleteExtra:', error);
       return { error };
     }
   },
@@ -604,7 +605,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] createDiscount:', error);
+      logger.error('[pricingService] createDiscount:', error);
       return { data: null, error };
     }
   },
@@ -619,7 +620,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] updateDiscount:', error);
+      logger.error('[pricingService] updateDiscount:', error);
       return { data: null, error };
     }
   },
@@ -632,7 +633,7 @@ export const pricingService = {
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      console.error('[pricingService] deleteDiscount:', error);
+      logger.error('[pricingService] deleteDiscount:', error);
       return { error };
     }
   },
@@ -662,7 +663,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] updateContractExceptionalDiscount ERREUR:', error);
+      logger.error('[pricingService] updateContractExceptionalDiscount ERREUR:', error);
       return { data: null, error };
     }
   },
@@ -688,7 +689,7 @@ export const pricingService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[pricingService] updateContractAmount ERREUR:', error);
+      logger.error('[pricingService] updateContractAmount ERREUR:', error);
       return { data: null, error };
     }
   },

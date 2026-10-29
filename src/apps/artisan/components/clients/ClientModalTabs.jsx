@@ -21,6 +21,7 @@ import { formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea } from '../FormFields';
 import { EquipmentList } from './EquipmentList';
 import { BanAddressInput } from '../shared/BanAddressInput';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -348,7 +349,7 @@ export function TabEquipments({ clientId }) {
       await deleteEquipment(equipment.id);
       toast.success('Équipement supprimé');
     } catch (error) {
-      console.error('[ClientModalTabs] Erreur suppression équipement:', error);
+      logger.error('[ClientModalTabs] Erreur suppression équipement:', error);
       toast.error(
         error?.code === '23503'
           ? 'Suppression refusée : cet équipement est encore référencé par un autre enregistrement.'

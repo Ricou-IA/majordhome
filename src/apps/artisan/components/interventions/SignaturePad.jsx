@@ -14,6 +14,7 @@ import { Eraser, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { logger } from '@lib/logger';
 
 /**
  * @param {Object} props
@@ -69,7 +70,7 @@ export function SignaturePad({
 
       setConfirmed(true);
     } catch (err) {
-      console.error('[SignaturePad] Erreur confirmation:', err);
+      logger.error('[SignaturePad] Erreur confirmation:', err);
     }
   };
 

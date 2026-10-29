@@ -12,6 +12,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // SERVICE ÉQUIPEMENTS
@@ -185,12 +186,12 @@ export const equipmentsService = {
         .from('certificats')
         .upload(storagePath, blob, { cacheControl: '3600', upsert: true, contentType: 'image/jpeg' });
       if (error) {
-        console.error('[equipments] uploadNameplatePhoto error:', error);
+        logger.error('[equipments] uploadNameplatePhoto error:', error);
         return { data: null, error };
       }
       return { data: { storagePath }, error: null };
     } catch (err) {
-      console.error('[equipments] uploadNameplatePhoto error:', err);
+      logger.error('[equipments] uploadNameplatePhoto error:', err);
       return { data: null, error: err };
     }
   },
@@ -201,12 +202,12 @@ export const equipmentsService = {
     try {
       const { error } = await supabase.storage.from('certificats').remove([storagePath]);
       if (error) {
-        console.error('[equipments] deleteNameplatePhoto error:', error);
+        logger.error('[equipments] deleteNameplatePhoto error:', error);
         return { data: null, error };
       }
       return { data: true, error: null };
     } catch (err) {
-      console.error('[equipments] deleteNameplatePhoto error:', err);
+      logger.error('[equipments] deleteNameplatePhoto error:', err);
       return { data: null, error: err };
     }
   },

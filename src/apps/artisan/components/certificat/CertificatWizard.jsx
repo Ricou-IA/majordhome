@@ -57,6 +57,7 @@ import { StepMesures } from './steps/StepMesures';
 import { StepPieces } from './steps/StepPieces';
 import { StepBilan } from './steps/StepBilan';
 import { StepSignature } from './steps/StepSignature';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // MAP STEP ID → COMPOSANT
@@ -229,7 +230,7 @@ export function CertificatWizard({
     try {
       saved = await saveDraft(payload);
     } catch (err) {
-      console.error('[CertificatWizard] doSave ERROR:', err);
+      logger.error('[CertificatWizard] doSave ERROR:', err);
       toast.error('Erreur sauvegarde certificat: ' + (err?.message || JSON.stringify(err)));
     }
     if (saved?.id && !certificatId) {
@@ -256,7 +257,7 @@ export function CertificatWizard({
       const urlResult = await getSignedUrl(storagePath);
       setPhotoPlaqueUrl(urlResult?.data || null);
     } catch (err) {
-      console.error('[CertificatWizard] photo plaque:', err);
+      logger.error('[CertificatWizard] photo plaque:', err);
       toast.error(`Photo non enregistrée : ${err?.message || 'erreur inconnue'}`);
       throw err;
     }
@@ -270,7 +271,7 @@ export function CertificatWizard({
       setFormData((prev) => ({ ...prev, photo_plaque_path: null }));
       setPhotoPlaqueUrl(null);
     } catch (err) {
-      console.error('[CertificatWizard] suppression photo plaque:', err);
+      logger.error('[CertificatWizard] suppression photo plaque:', err);
       toast.error(`Photo non supprimée : ${err?.message || 'erreur inconnue'}`);
       throw err;
     }
@@ -280,7 +281,7 @@ export function CertificatWizard({
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      doSave().catch(err => console.error('[CertificatWizard] auto-save error:', err));
+      doSave().catch(err => logger.error('[CertificatWizard] auto-save error:', err));
     }, 500);
 
     return () => {
@@ -331,7 +332,7 @@ export function CertificatWizard({
       certId = (await doSave()) || certificatId;
       if (certId) await signCertificat(certId, signatureBase64, signataireNom);
     } catch (err) {
-      console.error('[CertificatWizard] signature non enregistrée:', err);
+      logger.error('[CertificatWizard] signature non enregistrée:', err);
       toast.error(`Signature non enregistrée : ${err?.message || 'erreur inconnue'}`);
       return;
     }
@@ -367,7 +368,7 @@ export function CertificatWizard({
     // soit au moins tracé — un catch ne le verrait jamais.
     const { error } = await clientsService.updateEquipment(eqId, updates);
     if (error) {
-      console.error('[CertificatWizard] syncEquipmentBack refusé (équipement non mis à jour):', error);
+      logger.error('[CertificatWizard] syncEquipmentBack refusé (équipement non mis à jour):', error);
     }
   }, [formData, equipment]);
 
@@ -402,7 +403,7 @@ export function CertificatWizard({
     });
     if (error) {
       if (error.code === '23505') return; // reprise ou re-signature : la demande existe déjà
-      console.error('[CertificatWizard] createSAV error:', error);
+      logger.error('[CertificatWizard] createSAV error:', error);
       toast.warning(`Certificat signé, mais la demande SAV n’a pas été créée : ${error.message || 'erreur inconnue'}`, { duration: 12000 });
       return;
     }
@@ -444,7 +445,7 @@ export function CertificatWizard({
         ? { error: null }
         : await savService.markRealise(intervention.id, { visitDate: data.date_intervention || null });
       if (realiseError) {
-        console.error('[CertificatWizard] markRealise error:', realiseError);
+        logger.error('[CertificatWizard] markRealise error:', realiseError);
         const msg = `Certificat signé, mais la clôture de l'entretien a échoué : ${realiseError.message || 'erreur inconnue'}`;
         setPdfError(msg);
         toast.error(msg);
@@ -492,7 +493,7 @@ export function CertificatWizard({
         await updatePdfInfo(currentCertId, storagePath, signedUrl);
         setPdfUrl(signedUrl);
       } catch (archiveErr) {
-        console.error('[CertificatWizard] archivage PDF impossible:', archiveErr);
+        logger.error('[CertificatWizard] archivage PDF impossible:', archiveErr);
         // On reste sur l'écran : StepSignature affiche l'erreur et le lien vers
         // le PDF local, seul exemplaire disponible tant que l'archivage échoue.
         setPdfUrl(URL.createObjectURL(blob));
@@ -509,7 +510,7 @@ export function CertificatWizard({
     } catch (err) {
       // Le PDF n'a pas pu être rendu : l'entretien est déjà « Réalisé », le
       // bouton « Valider et générer » reste affiché pour réessayer.
-      console.error('[CertificatWizard] PDF generation error:', err);
+      logger.error('[CertificatWizard] PDF generation error:', err);
       setPdfError(`Entretien marqué réalisé, mais PDF non généré : ${err.message || 'erreur de génération'}`);
       toast.error("Entretien marqué réalisé, mais le PDF n'a pas pu être généré");
     } finally {

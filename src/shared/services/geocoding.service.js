@@ -47,14 +47,14 @@ export async function geocodeAddress(address, postalCode, city) {
 
     const res = await fetch(`${API_BASE}/search/?${params}`);
     if (!res.ok) {
-      console.warn('[geocoding] API error:', res.status);
+      logger.warn('[geocoding] API error:', res.status);
       return null;
     }
 
     const data = await res.json();
 
     if (!data.features || data.features.length === 0) {
-      console.warn('[geocoding] Aucun résultat pour:', q);
+      logger.warn('[geocoding] Aucun résultat pour:', q);
       return null;
     }
 
@@ -65,13 +65,13 @@ export async function geocodeAddress(address, postalCode, city) {
 
     // Seuil de confiance minimal
     if (score < 0.3) {
-      console.warn('[geocoding] Score trop faible:', score, 'pour', q);
+      logger.warn('[geocoding] Score trop faible:', score, 'pour', q);
       return null;
     }
 
     return { lat, lng, score, label };
   } catch (error) {
-    console.error('[geocoding] Erreur:', error);
+    logger.error('[geocoding] Erreur:', error);
     return null;
   }
 }
@@ -177,7 +177,7 @@ async function updateClientCoordinates(clientId, lat, lng) {
 
     return { success: true, error: null };
   } catch (error) {
-    console.error('[geocoding] Erreur updateClientCoordinates:', error);
+    logger.error('[geocoding] Erreur updateClientCoordinates:', error);
     return { success: false, error };
   }
 }
@@ -208,7 +208,7 @@ export async function geocodeAndUpdateByProjectId(projectId, address, postalCode
 
     return { success: true, error: null };
   } catch (error) {
-    console.error('[geocoding] Erreur geocodeAndUpdateByProjectId:', error);
+    logger.error('[geocoding] Erreur geocodeAndUpdateByProjectId:', error);
     return { success: false, error };
   }
 }
@@ -242,7 +242,7 @@ export async function batchGeocodeClients(clients, onProgress) {
         await fallbackUnitaire(batch, results);
       }
     } catch (error) {
-      console.error('[geocoding] Erreur batch:', error);
+      logger.error('[geocoding] Erreur batch:', error);
       // Fallback unitaire si erreur
       await fallbackUnitaire(batch, results);
     }
@@ -381,14 +381,14 @@ async function geocodeByPostalCode(postalCode) {
 
     const res = await fetch(`${API_BASE}/search/?${params}`);
     if (!res.ok) {
-      console.warn('[geocoding] API error (CP):', res.status);
+      logger.warn('[geocoding] API error (CP):', res.status);
       return null;
     }
 
     const data = await res.json();
 
     if (!data.features || data.features.length === 0) {
-      console.warn('[geocoding] Aucun résultat pour CP:', postalCode);
+      logger.warn('[geocoding] Aucun résultat pour CP:', postalCode);
       return null;
     }
 
@@ -398,13 +398,13 @@ async function geocodeByPostalCode(postalCode) {
     const label = feature.properties.label;
 
     if (score < 0.3) {
-      console.warn('[geocoding] Score CP trop faible:', score, 'pour', postalCode);
+      logger.warn('[geocoding] Score CP trop faible:', score, 'pour', postalCode);
       return null;
     }
 
     return { lat, lng, score, label };
   } catch (error) {
-    console.error('[geocoding] Erreur geocodeByPostalCode:', error);
+    logger.error('[geocoding] Erreur geocodeByPostalCode:', error);
     return null;
   }
 }
@@ -459,7 +459,7 @@ function detectLeadZone(lat, lng, orgId) {
       }
     }
     if (!cached) {
-      console.warn('[geocoding] Zones non disponibles en cache — zone non détectée');
+      logger.warn('[geocoding] Zones non disponibles en cache — zone non détectée');
       return null;
     }
 
@@ -476,7 +476,7 @@ function detectLeadZone(lat, lng, orgId) {
 
     return null;
   } catch (error) {
-    console.error('[geocoding] Erreur detectLeadZone:', error);
+    logger.error('[geocoding] Erreur detectLeadZone:', error);
     return null;
   }
 }
@@ -505,7 +505,7 @@ async function updateLeadCoordinates(leadId, lat, lng, zone) {
 
     return { success: true, error: null };
   } catch (error) {
-    console.error('[geocoding] Erreur updateLeadCoordinates:', error);
+    logger.error('[geocoding] Erreur updateLeadCoordinates:', error);
     return { success: false, error };
   }
 }
@@ -531,14 +531,14 @@ async function resolveCommercialByZone(zone) {
       .single();
 
     if (error || !data) {
-      console.warn('[geocoding] Aucun commercial actif pour la zone:', zone);
+      logger.warn('[geocoding] Aucun commercial actif pour la zone:', zone);
       return null;
     }
 
     _commercialZoneCache[zone] = data;
     return data;
   } catch (error) {
-    console.error('[geocoding] Erreur resolveCommercialByZone:', error);
+    logger.error('[geocoding] Erreur resolveCommercialByZone:', error);
     return null;
   }
 }
@@ -585,7 +585,7 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city) {
 
         }
       } catch (error) {
-        console.warn('[geocoding] Erreur auto-assignation:', error);
+        logger.warn('[geocoding] Erreur auto-assignation:', error);
       }
     }
   }
@@ -646,12 +646,12 @@ export async function batchGeocodeLeads(leads, onProgress) {
 
             results.assigned++;
           } catch (err) {
-            console.warn('[geocoding] Batch auto-assign failed:', err);
+            logger.warn('[geocoding] Batch auto-assign failed:', err);
           }
         }
       }
     } catch (error) {
-      console.error(`[geocoding] Batch lead error for ${lead.id}:`, error);
+      logger.error(`[geocoding] Batch lead error for ${lead.id}:`, error);
       results.failed++;
     }
 

@@ -107,7 +107,7 @@ export const devisService = {
       if (error) throw error;
       return { data: data || [], count: count || 0, error: null };
     } catch (error) {
-      console.error('[devisService] getQuotes:', error);
+      logger.error('[devisService] getQuotes:', error);
       return { data: [], count: 0, error };
     }
   },
@@ -125,7 +125,7 @@ export const devisService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[devisService] getQuoteById:', error);
+      logger.error('[devisService] getQuoteById:', error);
       return { data: null, error };
     }
   },
@@ -143,7 +143,7 @@ export const devisService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[devisService] getQuotesByLead:', error);
+      logger.error('[devisService] getQuotesByLead:', error);
       return { data: [], error };
     }
   },
@@ -161,7 +161,7 @@ export const devisService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[devisService] getQuotesByClient:', error);
+      logger.error('[devisService] getQuotesByClient:', error);
       return { data: [], error };
     }
   },
@@ -183,7 +183,7 @@ export const devisService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[devisService] getQuoteLines:', error);
+      logger.error('[devisService] getQuoteLines:', error);
       return { data: [], error };
     }
   },
@@ -262,7 +262,7 @@ export const devisService = {
 
       return { data: quote, error: null };
     } catch (error) {
-      console.error('[devisService] createQuote:', error);
+      logger.error('[devisService] createQuote:', error);
       return { data: null, error };
     }
   },
@@ -298,7 +298,7 @@ export const devisService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[devisService] updateQuote:', error);
+      logger.error('[devisService] updateQuote:', error);
       return { data: null, error };
     }
   },
@@ -373,7 +373,7 @@ export const devisService = {
 
       return { data: { lines: lines.length, totals }, error: null };
     } catch (error) {
-      console.error('[devisService] upsertQuoteLines:', error);
+      logger.error('[devisService] upsertQuoteLines:', error);
       return { data: null, error };
     }
   },
@@ -396,7 +396,7 @@ export const devisService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[devisService] sendQuote:', error);
+      logger.error('[devisService] sendQuote:', error);
       return { data: null, error };
     }
   },
@@ -445,7 +445,7 @@ export const devisService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[devisService] acceptQuote:', error);
+      logger.error('[devisService] acceptQuote:', error);
       return { data: null, error };
     }
   },
@@ -464,7 +464,7 @@ export const devisService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[devisService] refuseQuote:', error);
+      logger.error('[devisService] refuseQuote:', error);
       return { data: null, error };
     }
   },
@@ -485,7 +485,7 @@ export const devisService = {
       if (error) throw error;
       return { data: true, error: null };
     } catch (error) {
-      console.error('[devisService] deleteQuote:', error);
+      logger.error('[devisService] deleteQuote:', error);
       return { data: null, error };
     }
   },
@@ -576,7 +576,7 @@ export const devisService = {
 
       return { data: newQuote, error: null };
     } catch (error) {
-      console.error('[devisService] duplicateQuote:', error);
+      logger.error('[devisService] duplicateQuote:', error);
       return { data: null, error };
     }
   },
@@ -599,7 +599,7 @@ export const devisService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[devisService] saveQuotePdfPath:', error);
+      logger.error('[devisService] saveQuotePdfPath:', error);
       return { data: null, error };
     }
   },
@@ -616,7 +616,7 @@ export const devisService = {
       if (error) throw error;
       return { url: data?.signedUrl, error: null };
     } catch (error) {
-      console.error('[devisService] getQuotePdfUrl:', error);
+      logger.error('[devisService] getQuotePdfUrl:', error);
       return { url: null, error };
     }
   },
@@ -642,7 +642,7 @@ export const devisService = {
 
       return { data: filePath, error: null };
     } catch (error) {
-      console.error('[devisService] uploadQuotePdf:', error);
+      logger.error('[devisService] uploadQuotePdf:', error);
       return { data: null, error };
     }
   },
@@ -664,7 +664,7 @@ export const devisService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[devisService] getTemplates:', error);
+      logger.error('[devisService] getTemplates:', error);
       return { data: [], error };
     }
   },
@@ -690,7 +690,7 @@ export const devisService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[devisService] createTemplate:', error);
+      logger.error('[devisService] createTemplate:', error);
       return { data: null, error };
     }
   },
@@ -705,7 +705,7 @@ export const devisService = {
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      console.error('[devisService] deleteTemplate:', error);
+      logger.error('[devisService] deleteTemplate:', error);
       return { error };
     }
   },

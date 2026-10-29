@@ -35,13 +35,13 @@ export const certificatsService = {
         .maybeSingle();
 
       if (error) {
-        console.error('[certificats] getCertificatByIntervention error:', error);
+        logger.error('[certificats] getCertificatByIntervention error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (err) {
-      console.error('[certificats] getCertificatByIntervention error:', err);
+      logger.error('[certificats] getCertificatByIntervention error:', err);
       return { data: null, error: err };
     }
   },
@@ -114,13 +114,13 @@ export const certificatsService = {
         .single();
 
       if (error) {
-        console.error('[certificats] saveDraft error:', error);
+        logger.error('[certificats] saveDraft error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (err) {
-      console.error('[certificats] saveDraft error:', err);
+      logger.error('[certificats] saveDraft error:', err);
       return { data: null, error: err };
     }
   },
@@ -145,13 +145,13 @@ export const certificatsService = {
         .single();
 
       if (error) {
-        console.error('[certificats] signCertificat error:', error);
+        logger.error('[certificats] signCertificat error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (err) {
-      console.error('[certificats] signCertificat error:', err);
+      logger.error('[certificats] signCertificat error:', err);
       return { data: null, error: err };
     }
   },
@@ -175,13 +175,13 @@ export const certificatsService = {
         .single();
 
       if (error) {
-        console.error('[certificats] updatePdfInfo error:', error);
+        logger.error('[certificats] updatePdfInfo error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (err) {
-      console.error('[certificats] updatePdfInfo error:', err);
+      logger.error('[certificats] updatePdfInfo error:', err);
       return { data: null, error: err };
     }
   },
@@ -209,13 +209,13 @@ export const certificatsService = {
         });
 
       if (error) {
-        console.error('[certificats] uploadPdf error:', error);
+        logger.error('[certificats] uploadPdf error:', error);
         return { data: null, error };
       }
 
       return { data: { path: data.path, storagePath }, error: null };
     } catch (err) {
-      console.error('[certificats] uploadPdf error:', err);
+      logger.error('[certificats] uploadPdf error:', err);
       return { data: null, error: err };
     }
   },
@@ -301,12 +301,12 @@ export const certificatsService = {
         .from('certificats')
         .upload(storagePath, blob, { cacheControl: '3600', upsert: true, contentType: 'image/jpeg' });
       if (error) {
-        console.error('[certificats] uploadPhotoPlaque error:', error);
+        logger.error('[certificats] uploadPhotoPlaque error:', error);
         return { data: null, error };
       }
       return { data: { storagePath }, error: null };
     } catch (err) {
-      console.error('[certificats] uploadPhotoPlaque error:', err);
+      logger.error('[certificats] uploadPhotoPlaque error:', err);
       return { data: null, error: err };
     }
   },
@@ -328,12 +328,12 @@ export const certificatsService = {
         .select('id, intervention_id, photo_plaque_path, photo_plaque_absence')
         .single();
       if (error) {
-        console.error('[certificats] setPhotoPlaque error:', error);
+        logger.error('[certificats] setPhotoPlaque error:', error);
         return { data: null, error };
       }
       return { data, error: null };
     } catch (err) {
-      console.error('[certificats] setPhotoPlaque error:', err);
+      logger.error('[certificats] setPhotoPlaque error:', err);
       return { data: null, error: err };
     }
   },
@@ -344,12 +344,12 @@ export const certificatsService = {
     try {
       const { error } = await supabase.storage.from('certificats').remove([storagePath]);
       if (error) {
-        console.error('[certificats] deletePhotoPlaque error:', error);
+        logger.error('[certificats] deletePhotoPlaque error:', error);
         return { data: null, error };
       }
       return { data: true, error: null };
     } catch (err) {
-      console.error('[certificats] deletePhotoPlaque error:', err);
+      logger.error('[certificats] deletePhotoPlaque error:', err);
       return { data: null, error: err };
     }
   },
@@ -366,13 +366,13 @@ export const certificatsService = {
         .createSignedUrl(storagePath, 365 * 24 * 3600); // 1 an
 
       if (error) {
-        console.error('[certificats] getSignedUrl error:', error);
+        logger.error('[certificats] getSignedUrl error:', error);
         return { data: null, error };
       }
 
       return { data: data?.signedUrl || null, error: null };
     } catch (err) {
-      console.error('[certificats] getSignedUrl error:', err);
+      logger.error('[certificats] getSignedUrl error:', err);
       return { data: null, error: err };
     }
   },

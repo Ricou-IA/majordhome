@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { Building2, Loader2, AlertCircle, CheckCircle, LogOut } from 'lucide-react';
+import { logger } from '@lib/logger';
 
 // =============================================================================
 // PAGE JOIN ORGANIZATION
@@ -40,7 +41,7 @@ export default function JoinOrganization() {
         navigate('/');
       }, 1500);
     } catch (err) {
-      console.error('[JoinOrganization] Erreur:', err);
+      logger.error('[JoinOrganization] Erreur:', err);
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);

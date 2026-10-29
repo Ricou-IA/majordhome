@@ -192,7 +192,7 @@ export async function ensureEntretienCard({
     .single();
 
   if (error) {
-    console.error('[entretiensService] ensureEntretienCard insert error:', error);
+    logger.error('[entretiensService] ensureEntretienCard insert error:', error);
     return { interventionId: null, error };
   }
   return { interventionId: created.id, created: true, error: null };
@@ -333,13 +333,13 @@ export const entretiensService = {
       const { data, count, error } = await query;
 
       if (error) {
-        console.error('[entretiensService] getContracts error:', error);
+        logger.error('[entretiensService] getContracts error:', error);
         return { data: [], count: 0, error };
       }
 
       return { data: data || [], count: count || 0, error: null };
     } catch (error) {
-      console.error('[entretiensService] getContracts exception:', error);
+      logger.error('[entretiensService] getContracts exception:', error);
       return { data: [], count: 0, error };
     }
   },
@@ -357,13 +357,13 @@ export const entretiensService = {
         .single();
 
       if (error) {
-        console.error('[entretiensService] getContractById error:', error);
+        logger.error('[entretiensService] getContractById error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (error) {
-      console.error('[entretiensService] getContractById exception:', error);
+      logger.error('[entretiensService] getContractById exception:', error);
       return { data: null, error };
     }
   },
@@ -398,13 +398,13 @@ export const entretiensService = {
         .single();
 
       if (error) {
-        console.error('[entretiensService] updateContract error:', error);
+        logger.error('[entretiensService] updateContract error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (error) {
-      console.error('[entretiensService] updateContract exception:', error);
+      logger.error('[entretiensService] updateContract exception:', error);
       return { data: null, error };
     }
   },
@@ -471,7 +471,7 @@ export const entretiensService = {
         error: null,
       };
     } catch (error) {
-      console.error('[entretiensService] getStats error:', error);
+      logger.error('[entretiensService] getStats error:', error);
       return { data: null, error };
     }
   },
@@ -533,7 +533,7 @@ export const entretiensService = {
       const { data, error } = await query;
 
       if (error) {
-        console.error('[entretiensService] getContractsBySector error:', error);
+        logger.error('[entretiensService] getContractsBySector error:', error);
         return { data: [], error };
       }
 
@@ -614,7 +614,7 @@ export const entretiensService = {
 
       return { data: sortedSectors, error: null };
     } catch (error) {
-      console.error('[entretiensService] getContractsBySector exception:', error);
+      logger.error('[entretiensService] getContractsBySector exception:', error);
       return { data: [], error };
     }
   },
@@ -666,13 +666,13 @@ export const entretiensService = {
         .order('visit_year', { ascending: false });
 
       if (error) {
-        console.error('[entretiensService] getVisitsForContract error:', error);
+        logger.error('[entretiensService] getVisitsForContract error:', error);
         return { data: [], error };
       }
 
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[entretiensService] getVisitsForContract exception:', error);
+      logger.error('[entretiensService] getVisitsForContract exception:', error);
       return { data: [], error };
     }
   },
@@ -729,7 +729,7 @@ export const entretiensService = {
       }
 
       if (error) {
-        console.error('[entretiensService] recordVisit error:', error);
+        logger.error('[entretiensService] recordVisit error:', error);
         return { data: null, error };
       }
 
@@ -746,13 +746,13 @@ export const entretiensService = {
             userId,
           });
         } catch (cascadeErr) {
-          console.error('[entretiensService] Kanban sync error:', cascadeErr);
+          logger.error('[entretiensService] Kanban sync error:', cascadeErr);
         }
       }
 
       return { data, error: null };
     } catch (error) {
-      console.error('[entretiensService] recordVisit exception:', error);
+      logger.error('[entretiensService] recordVisit exception:', error);
       return { data: null, error };
     }
   },
@@ -775,13 +775,13 @@ export const entretiensService = {
         .single();
 
       if (error) {
-        console.error('[entretiensService] updateVisitStatus error:', error);
+        logger.error('[entretiensService] updateVisitStatus error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (error) {
-      console.error('[entretiensService] updateVisitStatus exception:', error);
+      logger.error('[entretiensService] updateVisitStatus exception:', error);
       return { data: null, error };
     }
   },
@@ -840,16 +840,16 @@ export const entretiensService = {
       });
 
       if (error) {
-        console.error('[entretiensService] contract-signed-notify error:', error);
+        logger.error('[entretiensService] contract-signed-notify error:', error);
         return { success: false, error };
       }
       if (data?.success === false) {
-        console.error('[entretiensService] contract-signed-notify failed:', data?.error);
+        logger.error('[entretiensService] contract-signed-notify failed:', data?.error);
         return { success: false, error: new Error(data?.error || 'Edge function échec') };
       }
       return { success: true, error: null, providerId: data?.provider_id, sentTo: data?.sent_to };
     } catch (err) {
-      console.error('[entretiensService] triggerContractPdf error:', err);
+      logger.error('[entretiensService] triggerContractPdf error:', err);
       return { success: false, error: err };
     }
   },
@@ -861,7 +861,7 @@ export const entretiensService = {
 
     const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_CONTRACT_PDF;
     if (!webhookUrl) {
-      console.error('[entretiensService] VITE_N8N_WEBHOOK_CONTRACT_PDF non configuré');
+      logger.error('[entretiensService] VITE_N8N_WEBHOOK_CONTRACT_PDF non configuré');
       return { success: false, error: new Error('Webhook contrat PDF non configuré') };
     }
 
@@ -959,14 +959,14 @@ export const entretiensService = {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[entretiensService] triggerContractPdf HTTP error:', response.status, errorText);
+        logger.error('[entretiensService] triggerContractPdf HTTP error:', response.status, errorText);
         return { success: false, error: new Error(`HTTP ${response.status}: ${errorText}`) };
       }
 
       const result = await response.json();
       return { success: result.success !== false, error: null };
     } catch (err) {
-      console.error('[entretiensService] triggerContractPdf error:', err);
+      logger.error('[entretiensService] triggerContractPdf error:', err);
       return { success: false, error: err };
     }
   },
@@ -987,7 +987,7 @@ export const entretiensService = {
       if (error) throw error;
       return { url: data.signedUrl, error: null };
     } catch (error) {
-      console.error('[entretiensService] getContractPdfUrl error:', error);
+      logger.error('[entretiensService] getContractPdfUrl error:', error);
       return { url: null, error };
     }
   },

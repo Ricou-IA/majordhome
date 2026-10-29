@@ -25,6 +25,7 @@ import { getOrgHeadquarters } from '@/lib/territoire-config';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { clientKeys, contractKeys, pricingKeys } from '@hooks/cacheKeys';
 import { equipmentCategoriesService } from '@services/equipmentCategories.service';
+import { logger } from '@lib/logger';
 
 // Re-export for backward compatibility
 export { pricingKeys } from '@hooks/cacheKeys';
@@ -384,7 +385,7 @@ export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
         setAsyncZone(result.zone);
         setDurationMinutes(result.durationMinutes);
       } catch (err) {
-        console.warn('[usePricingCalculator] Zone detection error:', err);
+        logger.warn('[usePricingCalculator] Zone detection error:', err);
       } finally {
         setIsDetectingZone(false);
       }

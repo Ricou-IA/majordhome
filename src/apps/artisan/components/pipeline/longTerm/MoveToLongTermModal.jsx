@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react';
 import { Hourglass, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatEuroCeil } from '@/lib/utils';
+import { logger } from '@lib/logger';
 
 export function MoveToLongTermModal({
   isOpen,
@@ -38,7 +39,7 @@ export function MoveToLongTermModal({
       toast.success('Lead basculé en Projet MT-LT');
       onClose();
     } catch (err) {
-      console.error('[MoveToLongTermModal] error:', err);
+      logger.error('[MoveToLongTermModal] error:', err);
       toast.error('Erreur lors du basculement');
     }
   };

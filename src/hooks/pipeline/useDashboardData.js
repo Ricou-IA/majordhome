@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@lib/supabaseClient';
 import { toast } from 'sonner';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // HELPERS
@@ -261,7 +262,7 @@ export const useDashboardData = (filters, profile) => {
         });
       } catch (error) {
         if (cancelled || fetchIdRef.current !== currentFetchId) return;
-        console.error('[useDashboardData] Erreur fetch:', error);
+        logger.error('[useDashboardData] Erreur fetch:', error);
         toast.error('Erreur lors du chargement des données');
       } finally {
         if (!cancelled && fetchIdRef.current === currentFetchId) {

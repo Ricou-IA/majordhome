@@ -7,6 +7,7 @@ import geogridService from '@services/geogrid.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { geogridKeys, FREE_TIER_LIMIT } from '@hooks/useGeoGrid';
 import { fetchCommunes, filterByPopulation, centroidOf } from './communesService';
+import { logger } from '@lib/logger';
 
 const PRICE_PER_REQ_OVER_FREE_EUR = 27.75 / 1000;
 
@@ -183,7 +184,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
             .update({ benchmark_id: benchmarkId })
             .eq('id', data.scanId);
           if (linkError) {
-            console.warn(`[benchmark] scan ${data.scanId} non lié au benchmark : ${linkError.message}`);
+            logger.warn(`[benchmark] scan ${data.scanId} non lié au benchmark : ${linkError.message}`);
             errorsList.push({ keyword, error: `scan créé mais non lié : ${linkError.message}` });
             setErrors([...errorsList]);
           }
@@ -194,7 +195,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
         // serait perdue → même traitement que le lien scan↔benchmark ci-dessus
         const { error: progressError } = await geogridService.updateBenchmarkProgress(benchmarkId, { completed_keywords: completedCount });
         if (progressError) {
-          console.warn(`[benchmark] progression non enregistrée après « ${keyword} » : ${progressError.message}`);
+          logger.warn(`[benchmark] progression non enregistrée après « ${keyword} » : ${progressError.message}`);
           errorsList.push({ keyword, error: `scan fait mais progression non enregistrée : ${progressError.message}` });
           setErrors([...errorsList]);
         }
@@ -218,7 +219,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
 
     if (finalError) {
       // Les scans sont faits et liés, mais le benchmark reste « en cours » en base
-      console.error('[benchmark] statut final non enregistré :', finalError);
+      logger.error('[benchmark] statut final non enregistré :', finalError);
       toast.error(`Scans terminés (${completedCount}/${totalKeywords}) mais le benchmark n’a pas pu être clôturé en base : ${finalError.message}`);
     } else if (finalStatus === 'completed') {
       toast.success(`Benchmark terminé — ${completedCount}/${totalKeywords} keywords scannés`);

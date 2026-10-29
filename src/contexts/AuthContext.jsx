@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@lib/supabaseClient';
 import { authService } from '@services/auth.service';
 import { computeEffectiveRole } from '@lib/permissions';
+import { logger } from '@lib/logger';
 
 const AuthContext = createContext(null);
 
@@ -71,7 +72,7 @@ export function AuthProvider({ children }) {
 
       return { isClient: isClientUser };
     } catch (error) {
-      console.error('[AuthContext] loadUserData error:', error);
+      logger.error('[AuthContext] loadUserData error:', error);
       return { isClient: false };
     }
   }, []);
@@ -113,7 +114,7 @@ export function AuthProvider({ children }) {
           }
         }
       } catch (error) {
-        console.error('[AuthContext] init error:', error);
+        logger.error('[AuthContext] init error:', error);
       } finally {
         if (mounted) {
           setLoading(false);

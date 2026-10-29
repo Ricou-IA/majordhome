@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import logoMayer from '@/assets/logo-mayer.png';
+import { logger } from '@lib/logger';
 
 // =============================================================================
 // PAGE LOGIN — Design unifié Mayer Energie
@@ -49,7 +50,7 @@ export default function Login() {
 
       navigate(result.isClient ? '/client' : '/');
     } catch (err) {
-      console.error('[Login] Erreur:', err);
+      logger.error('[Login] Erreur:', err);
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);

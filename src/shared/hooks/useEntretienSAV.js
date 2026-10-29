@@ -23,6 +23,7 @@ import { callCampaignsService } from '@services/callCampaigns.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { entretienSavKeys, callAttemptKeys, appointmentKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
+import { logger } from '@lib/logger';
 
 // Re-export for backward compatibility
 export { entretienSavKeys } from '@hooks/cacheKeys';
@@ -133,7 +134,7 @@ export function useEntretienSAVMutations() {
       toast.success('Entretien programmé');
     },
     onError: (err) => {
-      console.error('[useEntretienSAV] createEntretien error:', err);
+      logger.error('[useEntretienSAV] createEntretien error:', err);
       toast.error('Erreur lors de la création');
     },
   });
@@ -146,7 +147,7 @@ export function useEntretienSAVMutations() {
       toast.success('Demande SAV créée');
     },
     onError: (err) => {
-      console.error('[useEntretienSAV] createSAV error:', err);
+      logger.error('[useEntretienSAV] createSAV error:', err);
       toast.error('Erreur lors de la création SAV');
     },
   });
@@ -159,7 +160,7 @@ export function useEntretienSAVMutations() {
       invalidateAll();
     },
     onError: (err) => {
-      console.error('[useEntretienSAV] updateWorkflowStatus error:', err);
+      logger.error('[useEntretienSAV] updateWorkflowStatus error:', err);
       toast.error('Erreur de transition');
     },
   });
@@ -180,7 +181,7 @@ export function useEntretienSAVMutations() {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
     },
     onError: (err) => {
-      console.error('[useEntretienSAV] unscheduleEntretien error:', err);
+      logger.error('[useEntretienSAV] unscheduleEntretien error:', err);
       toast.error('Erreur lors de la déplanification');
     },
   });
@@ -193,7 +194,7 @@ export function useEntretienSAVMutations() {
       invalidateAll();
     },
     onError: (err) => {
-      console.error('[useEntretienSAV] updatePartsOrder error:', err);
+      logger.error('[useEntretienSAV] updatePartsOrder error:', err);
       toast.error('Erreur mise à jour commande');
     },
   });
@@ -206,7 +207,7 @@ export function useEntretienSAVMutations() {
       invalidateAll();
     },
     onError: (err) => {
-      console.error('[useEntretienSAV] updateDevis error:', err);
+      logger.error('[useEntretienSAV] updateDevis error:', err);
       toast.error('Erreur mise à jour devis');
     },
   });
@@ -219,7 +220,7 @@ export function useEntretienSAVMutations() {
       invalidateAll();
     },
     onError: (err) => {
-      console.error('[useEntretienSAV] updateNotes error:', err);
+      logger.error('[useEntretienSAV] updateNotes error:', err);
       toast.error('Erreur sauvegarde notes');
     },
   });
@@ -232,7 +233,7 @@ export function useEntretienSAVMutations() {
       invalidateAll();
     },
     onError: (err) => {
-      console.error('[useEntretienSAV] updateDescription error:', err);
+      logger.error('[useEntretienSAV] updateDescription error:', err);
       toast.error('Erreur sauvegarde description');
     },
   });
@@ -245,7 +246,7 @@ export function useEntretienSAVMutations() {
       invalidateAll();
     },
     onError: (err) => {
-      console.error('[useEntretienSAV] updateFields error:', err);
+      logger.error('[useEntretienSAV] updateFields error:', err);
       toast.error('Erreur sauvegarde');
     },
   });

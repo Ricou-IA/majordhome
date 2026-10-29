@@ -722,7 +722,7 @@ async function getQuotesByClient(clientId, orgId) {
   }
 
   if (pageCount === MAX_PAGES && hasMore) {
-    console.warn(
+    logger.warn(
       `[pennylane.getQuotesByClient] reached MAX_PAGES=${MAX_PAGES}, some quotes may be missing for plCustomerId=${plCustomerId}`,
     );
   }
@@ -952,7 +952,7 @@ async function getInvoicesByClient(clientId, orgId) {
   }
 
   if (pageCount === MAX_PAGES && hasMore) {
-    console.warn(
+    logger.warn(
       `[pennylane.getInvoicesByClient] reached MAX_PAGES=${MAX_PAGES}, some invoices may be missing for plCustomerId=${plCustomerId}`,
     );
   }

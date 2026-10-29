@@ -26,6 +26,7 @@ import { formatEuro } from '@/lib/utils';
 import { NAF_LABELS } from '../lib/nafGlossary';
 import NafSelector from './NafSelector';
 import { toast } from 'sonner';
+import { logger } from '@lib/logger';
 
 // Départements français les plus courants (pour le select)
 const DEPARTEMENTS_COURANTS = [
@@ -170,7 +171,7 @@ export default function SearchSireneModal({
       toast.success(`${prospect.raison_sociale} ajouté au pipeline`);
       setAddedSirens((prev) => new Set([...prev, prospect.siren]));
     } catch (err) {
-      console.error('[SearchSirene] createProspect error:', err);
+      logger.error('[SearchSirene] createProspect error:', err);
       toast.error('Erreur lors de l\'ajout');
     }
   };

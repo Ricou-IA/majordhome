@@ -28,6 +28,7 @@ import { useProspect, useProspectInteractions, useProspectMutations } from '@hoo
 import { useAuth } from '@contexts/AuthContext';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
 import { toast } from 'sonner';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // INTERACTION TYPE LABELS
@@ -115,7 +116,7 @@ export default function ProspectDrawer({
       await updateProspect(updates);
       toast.success('Prospect mis à jour');
     } catch (err) {
-      console.error('[ProspectDrawer] updateProspect error:', err);
+      logger.error('[ProspectDrawer] updateProspect error:', err);
       toast.error('Erreur lors de la sauvegarde');
     }
   };
@@ -126,7 +127,7 @@ export default function ProspectDrawer({
       await updateStatus(prospect.id, newStatus, user?.id);
       toast.success('Statut mis à jour');
     } catch (err) {
-      console.error('[ProspectDrawer] updateStatus error:', err);
+      logger.error('[ProspectDrawer] updateStatus error:', err);
       toast.error('Erreur lors du changement de statut');
     }
   };
@@ -139,7 +140,7 @@ export default function ProspectDrawer({
       onDeleted?.();
       onClose();
     } catch (err) {
-      console.error('[ProspectDrawer] deleteProspect error:', err);
+      logger.error('[ProspectDrawer] deleteProspect error:', err);
       toast.error('Erreur lors de la suppression');
     }
   };
@@ -151,7 +152,7 @@ export default function ProspectDrawer({
       toast.success('Prospect converti en client !');
       onConverted?.(result?.client);
     } catch (err) {
-      console.error('[ProspectDrawer] convertToClient error:', err);
+      logger.error('[ProspectDrawer] convertToClient error:', err);
       toast.error(err?.message || 'Erreur lors de la conversion');
     }
   };

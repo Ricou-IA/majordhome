@@ -8,6 +8,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@lib/logger';
 
 export const storageService = {
   /**
@@ -24,7 +25,7 @@ export const storageService = {
       if (error) return { url: null, error };
       return { url: data?.signedUrl || null, error: null };
     } catch (err) {
-      console.error(`[storage] getSignedUrl (${bucket}):`, err);
+      logger.error(`[storage] getSignedUrl (${bucket}):`, err);
       return { url: null, error: err };
     }
   },
@@ -73,7 +74,7 @@ export const storageService = {
       const { data: urlData } = await supabase.storage.from(bucket).createSignedUrl(data.path, 3600);
       return { path: data.path, url: urlData?.signedUrl || null, error: null };
     } catch (err) {
-      console.error(`[storage] uploadFile (${bucket}):`, err);
+      logger.error(`[storage] uploadFile (${bucket}):`, err);
       return { path: null, url: null, error: err };
     }
   },
@@ -91,7 +92,7 @@ export const storageService = {
       if (error) return { error };
       return { error: null };
     } catch (err) {
-      console.error(`[storage] deleteFile (${bucket}):`, err);
+      logger.error(`[storage] deleteFile (${bucket}):`, err);
       return { error: err };
     }
   },
@@ -109,7 +110,7 @@ export const storageService = {
       if (error) return { error };
       return { error: null };
     } catch (err) {
-      console.error(`[storage] deleteFiles (${bucket}):`, err);
+      logger.error(`[storage] deleteFiles (${bucket}):`, err);
       return { error: err };
     }
   },

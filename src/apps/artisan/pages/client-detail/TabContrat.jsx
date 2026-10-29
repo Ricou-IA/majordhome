@@ -164,7 +164,7 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
         queryClient.invalidateQueries({ queryKey: clientKeys.detail(contract.client_id) });
       }
     } catch (err) {
-      console.error('[ContractVisits] recordVisit error:', err);
+      logger.error('[ContractVisits] recordVisit error:', err);
       toast.error(err?.message || "Erreur lors de l'enregistrement");
     }
   };
@@ -495,7 +495,7 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
       toast.success('Contrat mis à jour');
       setIsEditing(false);
     } catch (err) {
-      console.error('[TabContrat] updateContract error:', err);
+      logger.error('[TabContrat] updateContract error:', err);
       toast.error('Erreur lors de la mise à jour');
     }
   };
@@ -505,7 +505,7 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
       await deleteContract(contract.id);
       toast.success('Contrat supprimé');
     } catch (err) {
-      console.error('[TabContrat] deleteContract error:', err);
+      logger.error('[TabContrat] deleteContract error:', err);
       toast.error('Erreur lors de la suppression');
     }
     setShowDeleteConfirm(false);
@@ -737,7 +737,7 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
             toast.success('Contrat clos');
             setShowCloseModal(false);
           } catch (err) {
-            console.error('[TabContrat] closeContract error:', err);
+            logger.error('[TabContrat] closeContract error:', err);
             toast.error('Erreur lors de la clôture');
           }
         }}

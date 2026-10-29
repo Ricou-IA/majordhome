@@ -20,6 +20,7 @@ import { EQUIPMENT_DOCUMENT_TYPES, equipmentDocumentTypeLabel, equipmentHasModel
 import { openEquipmentDocument } from '@hooks/useEquipmentDocuments';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
+import { logger } from '@lib/logger';
 
 const ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp';
 const MAX_SIZE = 20 * 1024 * 1024; // limite du bucket product-documents
@@ -189,7 +190,7 @@ export function EquipmentDocumentsSection({
       toast.success('Document déposé — visible sur tous les équipements de ce modèle');
       setUploading(false);
     } catch (err) {
-      console.error('[EquipmentDocumentsSection] upload:', err);
+      logger.error('[EquipmentDocumentsSection] upload:', err);
       toast.error(err?.message?.includes('model_required')
         ? 'Renseignez la marque et le modèle de l\'équipement avant de déposer un document'
         : 'Le document n\'a pas pu être déposé');
@@ -206,7 +207,7 @@ export function EquipmentDocumentsSection({
       toast.success('Document retiré');
       setDeleting(null);
     } catch (err) {
-      console.error('[EquipmentDocumentsSection] delete:', err);
+      logger.error('[EquipmentDocumentsSection] delete:', err);
       toast.error('Le document n\'a pas pu être retiré');
     } finally {
       setIsDeleting(false);

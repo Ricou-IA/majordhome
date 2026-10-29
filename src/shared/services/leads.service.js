@@ -29,6 +29,7 @@ import { formatPhoneForSearch } from '@/lib/phoneUtils';
 import { buildDuplicateProbe, matchLeadDuplicates } from '@/lib/leadDuplicateMatch';
 import { clientsService } from '@services/clients.service';
 import { technicalVisitService } from '@services/technicalVisit.service';
+import { logger } from '@lib/logger';
 
 // Statuts « bouclables » = cartes éligibles à un RDV Bouclage R2 (2ᵉ RDV commercial).
 // RDV planifié / Devis envoyé / Gagné uniquement. Nouveau & Contacté relèvent du R1
@@ -171,7 +172,7 @@ export const leadsService = {
    */
   async getCommercials(orgId) {
     if (!orgId) {
-      console.warn('[leads] getCommercials: orgId manquant, retour vide');
+      logger.warn('[leads] getCommercials: orgId manquant, retour vide');
       return { data: [], error: null };
     }
 
@@ -508,7 +509,7 @@ export const leadsService = {
         technicalVisitService.getByLeadId(leadId).then(({ data: visit }) => {
           if (visit?.id) {
             technicalVisitService.lock(visit.id, userId).catch((err) =>
-              console.error('[leads] lock technical visit error:', err)
+              logger.error('[leads] lock technical visit error:', err)
             );
           }
         });
@@ -578,7 +579,7 @@ export const leadsService = {
           }
         } catch (e) {
            
-          console.warn('[leads] auto-convert on Gagn\u00e9 failed:', e?.message);
+          logger.warn('[leads] auto-convert on Gagn\u00e9 failed:', e?.message);
         }
       }
 

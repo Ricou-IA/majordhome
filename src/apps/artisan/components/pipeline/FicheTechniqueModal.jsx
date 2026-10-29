@@ -37,6 +37,7 @@ import {
   SectionPhotos,
   SectionSynthese,
 } from './FicheTechniqueFormSections';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // DEFAULT FORM STATE
@@ -204,7 +205,7 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
       setVisitId(newVisit.id);
       return newVisit.id;
     } catch (err) {
-      console.error('[FicheTechniqueModal] create error:', err);
+      logger.error('[FicheTechniqueModal] create error:', err);
       toast.error('Erreur lors de la création de la fiche');
       return null;
     } finally {
@@ -220,7 +221,7 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
     try {
       await autoSave(vId, field, value, lead?.id);
     } catch (err) {
-      console.error('[FicheTechniqueModal] autoSave error:', err);
+      logger.error('[FicheTechniqueModal] autoSave error:', err);
       // Pas de toast pour les auto-saves (trop intrusif)
     }
   }, [visitId, ensureVisitExists, autoSave, lead?.id]);
@@ -254,7 +255,7 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
       }
       toast.success(`${files.length} photo${files.length > 1 ? 's' : ''} ajoutée${files.length > 1 ? 's' : ''}`);
     } catch (err) {
-      console.error('[FicheTechniqueModal] upload error:', err);
+      logger.error('[FicheTechniqueModal] upload error:', err);
       toast.error("Erreur lors de l'upload");
     }
   }, [visitId, ensureVisitExists, uploadPhoto, orgId, lead?.id, userId]);
@@ -266,7 +267,7 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
       await deletePhoto(photoId, storagePath, visitId);
       toast.success('Photo supprimée');
     } catch (err) {
-      console.error('[FicheTechniqueModal] delete photo error:', err);
+      logger.error('[FicheTechniqueModal] delete photo error:', err);
       toast.error('Erreur lors de la suppression');
     }
   }, [visitId, deletePhoto]);
@@ -280,7 +281,7 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
       refresh();
       toast.success('Fiche déverrouillée');
     } catch (err) {
-      console.error('[FicheTechniqueModal] unlock error:', err);
+      logger.error('[FicheTechniqueModal] unlock error:', err);
       toast.error('Erreur lors du déverrouillage');
     }
   }, [visitId, unlockVisit, refresh]);
@@ -321,7 +322,7 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
 
       toast.success('PDF généré et téléchargé');
     } catch (err) {
-      console.error('[FicheTechniqueModal] PDF generation error:', err);
+      logger.error('[FicheTechniqueModal] PDF generation error:', err);
       toast.error('Erreur lors de la génération du PDF');
     } finally {
       setIsGeneratingPdf(false);

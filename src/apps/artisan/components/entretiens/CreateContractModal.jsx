@@ -36,6 +36,7 @@ import { contractsService } from '@services/contracts.service';
 import { Step1Client } from './ContractStepClient';
 import { Step2Equipment } from './ContractStepEquipment';
 import { Step3Contract } from './ContractStepSummary';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // CONSTANTES
@@ -264,7 +265,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
     try {
       result = await createContractWithClient(params);
     } catch (err) {
-      console.error('[CreateContractModal] createContractWithClient error:', err);
+      logger.error('[CreateContractModal] createContractWithClient error:', err);
       const msg = err?.message || 'Erreur lors de la création';
       if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('23505')) {
         toast.error('Ce client possède déjà un contrat actif');
@@ -282,7 +283,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
       const itemsToSave = calculator.getItemsForSave();
       const saveResult = await pricingService.saveContractPricingItems(contractId, itemsToSave);
       if (saveResult.error) {
-        console.warn('[CreateContractModal] Erreur sauvegarde pricing items:', saveResult.error);
+        logger.warn('[CreateContractModal] Erreur sauvegarde pricing items:', saveResult.error);
       }
 
       // Créer les équipements réels + liens contract_equipments
@@ -291,7 +292,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
           contractId, resolvedClientId, itemsToSave
         );
         if (eqResult.error) {
-          console.warn('[CreateContractModal] Erreur création équipements:', eqResult.error);
+          logger.warn('[CreateContractModal] Erreur création équipements:', eqResult.error);
         }
       }
     }

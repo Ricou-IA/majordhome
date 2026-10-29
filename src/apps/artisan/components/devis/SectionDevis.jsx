@@ -12,6 +12,7 @@ import { useDevisByLead } from '@hooks/useDevis';
 
 import { formatEuro } from '@/lib/utils';
 import { FileText, Plus, ChevronRight, Loader2, Send, Snowflake } from 'lucide-react';
+import { logger } from '@lib/logger';
 
 // Error boundary pour isoler les erreurs
 class DevisErrorBoundary extends Component {
@@ -25,7 +26,7 @@ class DevisErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('[SectionDevis] Error boundary caught:', error, info);
+    logger.error('[SectionDevis] Error boundary caught:', error, info);
   }
 
   render() {

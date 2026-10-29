@@ -18,6 +18,7 @@ import { contractKeys } from '@hooks/cacheKeys';
 import { KanbanBoard } from '@apps/artisan/components/shared/KanbanBoard';
 import { supabase } from '@/lib/supabaseClient';
 import { formatEuroCeil } from '@/lib/utils';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // STAT CARD (léger, inline)
@@ -86,7 +87,7 @@ function useContractStats(orgId) {
           cancelled: cancelledRes.count || 0,
         });
       } catch (err) {
-        console.error('[PipelineContrats] stats error:', err);
+        logger.error('[PipelineContrats] stats error:', err);
       } finally {
         setLoading(false);
       }
@@ -124,7 +125,7 @@ function useContractsPipeline(orgId) {
       setContracts(data || []);
       setFetchError(null);
     } catch (err) {
-      console.error('[PipelineContrats] fetch error:', err);
+      logger.error('[PipelineContrats] fetch error:', err);
       setFetchError(err);
     } finally {
       setLoading(false);
@@ -148,7 +149,7 @@ function useContractsPipeline(orgId) {
       queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
       return { error: null };
     } catch (err) {
-      console.error('[PipelineContrats] updateStatus error:', err);
+      logger.error('[PipelineContrats] updateStatus error:', err);
       return { error: err };
     }
   }, [queryClient, orgId]);

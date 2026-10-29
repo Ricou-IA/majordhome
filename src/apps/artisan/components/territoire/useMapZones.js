@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as turf from '@turf/turf';
 import { TERRITOIRE_CONFIG, getTerritoireCenters } from '@/lib/territoire-config';
 import { useAuth } from '@contexts/AuthContext';
+import { logger } from '@lib/logger';
 
 // P1.9 — clés localStorage suffixées par orgId pour éviter fuite cross-org
 // au switch d'organisation (multi-tenant futur).
@@ -35,7 +36,7 @@ async function fetchIsochrone(lng, lat, minutes, token) {
 
   const res = await fetch(url);
   if (!res.ok) {
-    console.warn(`[useMapZones] Isochrone API ${res.status} — fallback cercle`);
+    logger.warn(`[useMapZones] Isochrone API ${res.status} — fallback cercle`);
     return null;
   }
 
@@ -69,7 +70,7 @@ async function fetchPostalCodeContours() {
     _postalCodesCache = await res.json();
     return _postalCodesCache;
   } catch (e) {
-    console.error('[useMapZones] Chargement contours CP échoué:', e);
+    logger.error('[useMapZones] Chargement contours CP échoué:', e);
     return null;
   }
 }
@@ -105,7 +106,7 @@ async function fetchDrivingTimesMatrix(origins, destinations, token) {
     try {
       const res = await fetch(url);
       if (!res.ok) {
-        console.warn(`[useMapZones] Matrix API ${res.status} pour batch ${i}`);
+        logger.warn(`[useMapZones] Matrix API ${res.status} pour batch ${i}`);
         batch.forEach(() => allDurations.push([null, null]));
         continue;
       }
@@ -119,7 +120,7 @@ async function fetchDrivingTimesMatrix(origins, destinations, token) {
         batch.forEach(() => allDurations.push([null, null]));
       }
     } catch (e) {
-      console.warn('[useMapZones] Matrix API erreur:', e);
+      logger.warn('[useMapZones] Matrix API erreur:', e);
       batch.forEach(() => allDurations.push([null, null]));
     }
 
@@ -190,7 +191,7 @@ function cleanupZone(zone, clipTo) {
 
     return merged || zone;
   } catch (e) {
-    console.warn('[useMapZones] cleanupZone échoué:', e);
+    logger.warn('[useMapZones] cleanupZone échoué:', e);
     return zone;
   }
 }
@@ -287,7 +288,7 @@ async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, centers, to
         }
       }, null);
     } catch (e) {
-      console.warn('[useMapZones] Union zone Pechbonnieu échouée:', e);
+      logger.warn('[useMapZones] Union zone Pechbonnieu échouée:', e);
       zoneP = pParts[0];
     }
   }
@@ -334,7 +335,7 @@ async function calculateZones(token, centers) {
   try {
     clippedIsoP = turf.intersect(turf.featureCollection([isoP, isoG]));
   } catch (e) {
-    console.warn('[useMapZones] Clip isoP à isoG échoué:', e);
+    logger.warn('[useMapZones] Clip isoP à isoG échoué:', e);
     clippedIsoP = isoP; // fallback
   }
 
@@ -343,7 +344,7 @@ async function calculateZones(token, centers) {
   try {
     overlap = turf.intersect(turf.featureCollection([isoG, clippedIsoP]));
   } catch (e) {
-    console.warn('[useMapZones] Calcul overlap échoué:', e);
+    logger.warn('[useMapZones] Calcul overlap échoué:', e);
   }
 
   // 4. Découper l'overlap par codes postaux
@@ -364,14 +365,14 @@ async function calculateZones(token, centers) {
         try {
           zoneGaillac = turf.difference(turf.featureCollection([isoG, zonePechbonnieu]));
         } catch (e) {
-          console.warn('[useMapZones] diff isoG - zoneP échoué:', e);
+          logger.warn('[useMapZones] diff isoG - zoneP échoué:', e);
           zoneGaillac = isoG;
         }
       } else {
         zoneGaillac = isoG;
       }
     } catch (e) {
-      console.warn('[useMapZones] Découpe CP échouée, fallback géométrique:', e);
+      logger.warn('[useMapZones] Découpe CP échouée, fallback géométrique:', e);
       zonePechbonnieu = clippedIsoP;
       try {
         zoneGaillac = turf.difference(turf.featureCollection([isoG, clippedIsoP]));
@@ -455,11 +456,11 @@ export function useMapZones(mapboxToken) {
             localStorage.setItem(cacheTsKey, String(Date.now()));
           }
         } catch (e) {
-          console.warn('[useMapZones] Erreur cache localStorage:', e);
+          logger.warn('[useMapZones] Erreur cache localStorage:', e);
         }
       })
       .catch(e => {
-        console.error('[useMapZones] Erreur calcul zones:', e);
+        logger.error('[useMapZones] Erreur calcul zones:', e);
         setError(e.message);
       })
       .finally(() => setLoading(false));

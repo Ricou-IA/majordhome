@@ -34,6 +34,7 @@ import { CertificatSignaturePad } from '../components/certificat/CertificatSigna
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@contexts/AuthContext';
 import { buildCompanyInfo } from '@/lib/orgBranding';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // MOIS FR
@@ -82,7 +83,7 @@ function useClient(clientId) {
 async function sendContractEmail(contract, client, pdfPath) {
   const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_CONTRACT_PDF;
   if (!webhookUrl) {
-    console.warn('[ContractSign] VITE_N8N_WEBHOOK_CONTRACT_PDF non configuré');
+    logger.warn('[ContractSign] VITE_N8N_WEBHOOK_CONTRACT_PDF non configuré');
     return;
   }
   try {
@@ -111,7 +112,7 @@ async function sendContractEmail(contract, client, pdfPath) {
     });
   } catch (err) {
     // Fire-and-forget : on ne bloque pas le flow
-    console.error('[ContractSign] sendContractEmail error:', err);
+    logger.error('[ContractSign] sendContractEmail error:', err);
   }
 }
 
@@ -310,7 +311,7 @@ export default function ContractSign() {
       // Redirection directe vers la fiche client (onglet contrat)
       navigate(`/clients/${clientId}`, { state: { tab: 'contract' } });
     } catch (err) {
-      console.error('[ContractSign] Error:', err);
+      logger.error('[ContractSign] Error:', err);
       toast.error('Erreur lors de la génération du contrat signé');
     } finally {
       setIsSaving(false);

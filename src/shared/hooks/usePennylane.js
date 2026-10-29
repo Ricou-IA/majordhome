@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { cleanPhone } from '@/lib/phoneUtils';
 import { useOrgSettings, pennylanePipelineMinAmountHt } from '@hooks/useOrgSettings';
 import { buildExplorerRows, filterExplorerRows, EXPLORER_VIEWS } from '@/lib/quotesExplorer';
+import { logger } from '@lib/logger';
 
 // Re-export for backward compatibility
 export { pennylaneKeys } from '@hooks/cacheKeys';
@@ -722,7 +723,7 @@ export function useAttachQuotesAndSend(orgId, leadId) {
         postResult = await ensureClientForLeadFromPennylane(orgId, leadId, userId);
       } catch (e) {
 
-        console.warn('[useAttachQuotesAndSend] ensureClient failed:', e?.message || e);
+        logger.warn('[useAttachQuotesAndSend] ensureClient failed:', e?.message || e);
       }
       return { ...data, _post: postResult };
     },

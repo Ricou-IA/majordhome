@@ -11,6 +11,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@lib/logger';
 
 const STORAGE_BUCKET = 'technical-visits';
 
@@ -62,12 +63,12 @@ export const technicalVisitService = {
         .maybeSingle();
 
       if (error) {
-        console.error('[technicalVisit] getByLeadId error:', error);
+        logger.error('[technicalVisit] getByLeadId error:', error);
         return { data: null, error };
       }
       return { data, error: null };
     } catch (err) {
-      console.error('[technicalVisit] getByLeadId error:', err);
+      logger.error('[technicalVisit] getByLeadId error:', err);
       return { data: null, error: err };
     }
   },
@@ -88,14 +89,14 @@ export const technicalVisitService = {
       });
 
       if (error) {
-        console.error('[technicalVisit] create error:', error);
+        logger.error('[technicalVisit] create error:', error);
         return { data: null, error };
       }
 
       const visit = Array.isArray(data) ? data[0] : data;
       return { data: visit, error: null };
     } catch (err) {
-      console.error('[technicalVisit] create error:', err);
+      logger.error('[technicalVisit] create error:', err);
       return { data: null, error: err };
     }
   },
@@ -116,14 +117,14 @@ export const technicalVisitService = {
       });
 
       if (error) {
-        console.error('[technicalVisit] update error:', error);
+        logger.error('[technicalVisit] update error:', error);
         return { data: null, error };
       }
 
       const visit = Array.isArray(data) ? data[0] : data;
       return { data: visit, error: null };
     } catch (err) {
-      console.error('[technicalVisit] update error:', err);
+      logger.error('[technicalVisit] update error:', err);
       return { data: null, error: err };
     }
   },
@@ -185,7 +186,7 @@ export const technicalVisitService = {
         });
 
       if (error) {
-        console.error('[technicalVisit] uploadPhoto storage error:', error);
+        logger.error('[technicalVisit] uploadPhoto storage error:', error);
         return { path: null, url: null, error };
       }
 
@@ -200,7 +201,7 @@ export const technicalVisitService = {
         error: null,
       };
     } catch (err) {
-      console.error('[technicalVisit] uploadPhoto error:', err);
+      logger.error('[technicalVisit] uploadPhoto error:', err);
       return { path: null, url: null, error: err };
     }
   },
@@ -217,12 +218,12 @@ export const technicalVisitService = {
         .single();
 
       if (error) {
-        console.error('[technicalVisit] createPhotoRecord error:', error);
+        logger.error('[technicalVisit] createPhotoRecord error:', error);
         return { data: null, error };
       }
       return { data, error: null };
     } catch (err) {
-      console.error('[technicalVisit] createPhotoRecord error:', err);
+      logger.error('[technicalVisit] createPhotoRecord error:', err);
       return { data: null, error: err };
     }
   },
@@ -244,12 +245,12 @@ export const technicalVisitService = {
         .eq('id', photoId);
 
       if (error) {
-        console.error('[technicalVisit] deletePhoto DB error:', error);
+        logger.error('[technicalVisit] deletePhoto DB error:', error);
         return { error };
       }
       return { error: null };
     } catch (err) {
-      console.error('[technicalVisit] deletePhoto error:', err);
+      logger.error('[technicalVisit] deletePhoto error:', err);
       return { error: err };
     }
   },
@@ -269,12 +270,12 @@ export const technicalVisitService = {
         .order('sort_order');
 
       if (error) {
-        console.error('[technicalVisit] getPhotosByVisitId error:', error);
+        logger.error('[technicalVisit] getPhotosByVisitId error:', error);
         return { data: [], error };
       }
       return { data: data || [], error: null };
     } catch (err) {
-      console.error('[technicalVisit] getPhotosByVisitId error:', err);
+      logger.error('[technicalVisit] getPhotosByVisitId error:', err);
       return { data: [], error: err };
     }
   },
@@ -325,7 +326,7 @@ export const technicalVisitService = {
         });
 
       if (error) {
-        console.error('[technicalVisit] savePdfToStorage error:', error);
+        logger.error('[technicalVisit] savePdfToStorage error:', error);
         return { path: null, url: null, error };
       }
 
@@ -339,7 +340,7 @@ export const technicalVisitService = {
         error: null,
       };
     } catch (err) {
-      console.error('[technicalVisit] savePdfToStorage error:', err);
+      logger.error('[technicalVisit] savePdfToStorage error:', err);
       return { path: null, url: null, error: err };
     }
   },
@@ -356,12 +357,12 @@ export const technicalVisitService = {
         .createSignedUrl(pdfPath, 3600);
 
       if (error) {
-        console.error('[technicalVisit] getPdfUrl error:', error);
+        logger.error('[technicalVisit] getPdfUrl error:', error);
         return { url: null, error };
       }
       return { url: data?.signedUrl || null, error: null };
     } catch (err) {
-      console.error('[technicalVisit] getPdfUrl error:', err);
+      logger.error('[technicalVisit] getPdfUrl error:', err);
       return { url: null, error: err };
     }
   },

@@ -39,6 +39,7 @@ import CatalogConnectorPanel from './suppliers/CatalogConnectorPanel';
 import ImportOffreCatalogueModal from './suppliers/ImportOffreCatalogueModal';
 import { useCatalogItemsResume } from '@hooks/useCatalogItems';
 import { photoDeLigne, autresFournisseurs } from '@/lib/catalogue/articleLigne.js';
+import { logger } from '@lib/logger';
 
 // =============================================================================
 // MODAL FOURNISSEUR
@@ -438,7 +439,7 @@ function rowsToMappedProducts(allRows) {
     }
   }
   if (Object.keys(headerMap).length === 0) {
-    console.error('[Import Excel] Aucune colonne reconnue. Colonnes trouvées:', headers);
+    logger.error('[Import Excel] Aucune colonne reconnue. Colonnes trouvées:', headers);
     return [];
   }
 
@@ -617,7 +618,7 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
       toast.success(`${result.data.imported} produit${result.data.imported > 1 ? 's' : ''} importé${result.data.imported > 1 ? 's' : ''}`);
       refetch();
     } catch (err) {
-      console.error('[Import Excel]', err);
+      logger.error('[Import Excel]', err);
       toast.error(err?.message || 'Erreur lors de l\'import');
     } finally {
       setImporting(false);

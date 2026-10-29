@@ -19,6 +19,7 @@ import { savService } from '@services/sav.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { entretienSavKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // HOOK : LISTE ENFANTS
@@ -70,7 +71,7 @@ export function useCertificatEntretienMutations() {
       unwrapResult(savService.createChildInterventions(parentId, equipments, ctx)),
     onSuccess: (_children, { parentId }) => invalidateAll(parentId),
     onError: (err) => {
-      console.error('[useCertificatEntretien] createChildren error:', err);
+      logger.error('[useCertificatEntretien] createChildren error:', err);
       toast.error('Erreur lors de la création des certificats');
     },
   });

@@ -48,6 +48,7 @@ import {
   SectionNotes,
   SectionSouplesse,
 } from './EventFormSections';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // CONSTANTES
@@ -431,7 +432,7 @@ export function EventModal({
       .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return;
-        if (error) { console.warn('[EventModal] fetch linked client error:', error); return; }
+        if (error) { logger.warn('[EventModal] fetch linked client error:', error); return; }
         if (data) setLinkedClientDetails(data);
       });
     return () => { cancelled = true; };
@@ -523,7 +524,7 @@ export function EventModal({
         .single();
 
       if (error || !data) {
-        console.error('[EventModal] fetch client error:', error);
+        logger.error('[EventModal] fetch client error:', error);
         return;
       }
 
@@ -548,7 +549,7 @@ export function EventModal({
         client_city: data.city || '',
       }));
     } catch (err) {
-      console.error('[EventModal] fetch client error:', err);
+      logger.error('[EventModal] fetch client error:', err);
     }
   }, [clearClientSearch]);
 
@@ -613,7 +614,7 @@ export function EventModal({
           });
         }
       } catch (err) {
-        console.error('[EventModal] fetch lead client error:', err);
+        logger.error('[EventModal] fetch lead client error:', err);
       }
     }
   }, [clearClientSearch, clearLeadSearch]);
@@ -674,7 +675,7 @@ export function EventModal({
         notes: `Prospect créé depuis le Planning — RDV du ${rdvDate || ''}`.trim(),
       });
       if (result.error) {
-        console.error('[EventModal] create prospect error:', result.error);
+        logger.error('[EventModal] create prospect error:', result.error);
         return { leadId: null, interventionId: null, error: 'prospect' };
       }
       const leadId = result.data?.id || null;
@@ -694,7 +695,7 @@ export function EventModal({
     if (resolved.error) {
       const expected = ['client_sans_projet', 'contrat_requis_entretien'].includes(resolved.error);
       if (!expected) {
-        console.error('[EventModal] activation error:', resolved.error);
+        logger.error('[EventModal] activation error:', resolved.error);
       }
       return {
         leadId: null,
@@ -914,7 +915,7 @@ export function EventModal({
         subjectPrefix: autoSubject,
       });
       if (batchErr) {
-        console.error('[EventModal] batch create error:', batchErr);
+        logger.error('[EventModal] batch create error:', batchErr);
         toast.error('Erreur lors de la création du RDV');
         setBatchSaving(false);
         return;
@@ -937,7 +938,7 @@ export function EventModal({
       toast.success(slots.length > 1 ? `${slots.length} RDV créés` : 'RDV créé avec succès');
       onClose();
     } catch (err) {
-      console.error('[EventModal] handleCreateFromAssistant error:', err);
+      logger.error('[EventModal] handleCreateFromAssistant error:', err);
       toast.error('Une erreur est survenue');
       setBatchSaving(false);
     }
@@ -1014,7 +1015,7 @@ export function EventModal({
         }
       }
     } catch (err) {
-      console.error('[EventModal] handleRescheduleSave error:', err);
+      logger.error('[EventModal] handleRescheduleSave error:', err);
       toast.error('Une erreur est survenue');
     } finally {
       setBatchSaving(false);
@@ -1064,7 +1065,7 @@ export function EventModal({
         subjectPrefix: subject,
       });
       if (batchErr) {
-        console.error('[EventModal] continuation batch error:', batchErr);
+        logger.error('[EventModal] continuation batch error:', batchErr);
         toast.error('Erreur lors de la création de la suite');
         setBatchSaving(false);
         return;
@@ -1086,7 +1087,7 @@ export function EventModal({
       toast.success(slots.length > 1 ? `${slots.length} RDV ajoutés` : 'Suite programmée');
       onClose();
     } catch (err) {
-      console.error('[EventModal] handleContinuationSave error:', err);
+      logger.error('[EventModal] handleContinuationSave error:', err);
       toast.error('Une erreur est survenue');
       setBatchSaving(false);
     }

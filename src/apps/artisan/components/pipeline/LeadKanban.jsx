@@ -23,6 +23,7 @@ import { QuoteModal } from './QuoteModal';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { MoveToLongTermModal } from './longTerm/MoveToLongTermModal';
 import { ALLOWED_TRANSITIONS, LOST_REASONS } from './LeadStatusConfig';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // MAPPING status label (UI) ↔ column_key (vue majordhome_kanban_cards)
@@ -352,7 +353,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
       if (error) throw error;
       setAllLeads(data || []);
     } catch (err) {
-      console.error('[LeadKanban] fetchLeads error:', err);
+      logger.error('[LeadKanban] fetchLeads error:', err);
       toast.error('Erreur chargement des leads');
     } finally {
       setIsLoading(false);
@@ -388,7 +389,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
         if (error) throw error;
         setAllLeads(data || []);
       } catch (err) {
-        console.error('[LeadKanban] refresh error:', err);
+        logger.error('[LeadKanban] refresh error:', err);
       }
     };
     refetch();
@@ -554,7 +555,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
       await moveToLongTerm({ leadId, notes });
       fetchLeads();
     } catch (err) {
-      console.error('[LeadKanban] moveToLongTerm error:', err);
+      logger.error('[LeadKanban] moveToLongTerm error:', err);
       toast.error('Erreur lors du basculement');
       fetchLeads();
       throw err;
@@ -599,7 +600,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
           colLeads.splice(destination.index, 0, moved);
           const updated = colLeads.map((l, i) => ({ ...l, sort_order: i + 1 }));
           leadsService.reorderLeads(updated.map((l) => l.id)).catch((err) =>
-            console.error('[LeadKanban] reorder error:', err),
+            logger.error('[LeadKanban] reorder error:', err),
           );
           return [...others, ...updated];
         });
@@ -691,7 +692,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
         await updateLeadStatus(leadId, newStatusId, userId);
         fetchLeads();
       } catch (err) {
-        console.error('[LeadKanban] drag status error:', err);
+        logger.error('[LeadKanban] drag status error:', err);
         toast.error('Erreur lors du deplacement');
         setAllLeads((prev) =>
           prev.map((l) => (l.id === leadId ? { ...l, status_id: oldStatusId } : l)),
@@ -724,7 +725,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
       fetchLeads();
       toast.success('Lead marque comme perdu');
     } catch (err) {
-      console.error('[LeadKanban] lost status error:', err);
+      logger.error('[LeadKanban] lost status error:', err);
       toast.error('Erreur lors du changement de statut');
       setAllLeads((prev) =>
         prev.map((l) => (l.id === leadId ? { ...l, status_id: oldStatusId } : l)),
@@ -759,7 +760,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
       fetchLeads();
       toast.success('Lead passe en "Contacte"');
     } catch (err) {
-      console.error('[LeadKanban] contact status error:', err);
+      logger.error('[LeadKanban] contact status error:', err);
       toast.error('Erreur lors du changement de statut');
       setAllLeads((prev) =>
         prev.map((l) => (l.id === leadId ? { ...l, status_id: oldStatusId } : l)),
@@ -796,7 +797,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
       fetchLeads();
       toast.success('Lead passe en "Devis envoye"');
     } catch (err) {
-      console.error('[LeadKanban] quote status error:', err);
+      logger.error('[LeadKanban] quote status error:', err);
       toast.error('Erreur lors du changement de statut');
       setAllLeads((prev) =>
         prev.map((l) => (l.id === leadId ? { ...l, status_id: oldStatusId } : l)),

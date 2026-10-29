@@ -61,6 +61,7 @@ import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
 import { CertificatsSection } from './CertificatsSection';
 import { PhotoPlaqueAnomalie } from './PhotoPlaqueAnomalie';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // CONSTANTES
@@ -294,7 +295,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
       if (item.client_id && item.tags?.includes('Web')) {
         const { error: draftError } = await clientsService.confirmWebDraft(item.client_id);
         if (draftError) {
-          console.error('[EntretienSAVModal] confirmWebDraft refusé:', draftError);
+          logger.error('[EntretienSAVModal] confirmWebDraft refusé:', draftError);
           webDraftConfirmed = false;
         }
       }
@@ -403,7 +404,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
       if (item.tags?.includes('Web')) {
         const { error: draftError } = await clientsService.confirmWebDraft(item.client_id);
         if (draftError) {
-          console.error('[EntretienSAVModal] confirmWebDraft refusé:', draftError);
+          logger.error('[EntretienSAVModal] confirmWebDraft refusé:', draftError);
           toast.warning('La fiche client web n’a pas pu être confirmée — elle reste masquée dans la liste clients');
         }
       }

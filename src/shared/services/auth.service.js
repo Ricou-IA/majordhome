@@ -30,7 +30,7 @@ async function withAbortRetry(fn, retries = 2, delay = 200) {
       if (!result.error) return result;
       // Si AbortError et encore des tentatives, retry
       if (isAbortError(result.error) && attempt < retries) {
-        console.warn(`[authService] AbortError détecté, retry ${attempt}/${retries - 1} dans ${delay}ms...`);
+        logger.warn(`[authService] AbortError détecté, retry ${attempt}/${retries - 1} dans ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
         continue;
       }
@@ -38,7 +38,7 @@ async function withAbortRetry(fn, retries = 2, delay = 200) {
       return result;
     } catch (error) {
       if (isAbortError(error) && attempt < retries) {
-        console.warn(`[authService] AbortError (thrown), retry ${attempt}/${retries - 1} dans ${delay}ms...`);
+        logger.warn(`[authService] AbortError (thrown), retry ${attempt}/${retries - 1} dans ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
         continue;
       }
@@ -73,7 +73,7 @@ export const authService = {
 
       return { data, error: null };
     } catch (error) {
-      console.error('[authService] signIn error:', error);
+      logger.error('[authService] signIn error:', error);
       return { data: null, error };
     }
   },
@@ -103,7 +103,7 @@ export const authService = {
 
       return { data, error: null };
     } catch (error) {
-      console.error('[authService] signUp error:', error);
+      logger.error('[authService] signUp error:', error);
       return { data: null, error };
     }
   },
@@ -152,7 +152,7 @@ export const authService = {
 
       return { data, error: null };
     } catch (error) {
-      console.error('[authService] signInWithGoogle error:', error);
+      logger.error('[authService] signInWithGoogle error:', error);
       return { data: null, error };
     }
   },
@@ -179,7 +179,7 @@ export const authService = {
 
       return { data, error: null };
     } catch (error) {
-      console.error('[authService] resetPassword error:', error);
+      logger.error('[authService] resetPassword error:', error);
       return { data: null, error };
     }
   },
@@ -199,7 +199,7 @@ export const authService = {
 
       return { data, error: null };
     } catch (error) {
-      console.error('[authService] updatePassword error:', error);
+      logger.error('[authService] updatePassword error:', error);
       return { data: null, error };
     }
   },
@@ -231,7 +231,7 @@ export const authService = {
 
       return { data: result, error: null };
     } catch (error) {
-      console.error('[authService] clientChangePassword error:', error);
+      logger.error('[authService] clientChangePassword error:', error);
       return { data: null, error };
     }
   },
@@ -250,7 +250,7 @@ export const authService = {
       if (error) throw error;
       return { session, error: null };
     } catch (error) {
-      console.error('[authService] getSession error:', error);
+      logger.error('[authService] getSession error:', error);
       return { session: null, error };
     }
   },
@@ -265,7 +265,7 @@ export const authService = {
       if (error) throw error;
       return { user, error: null };
     } catch (error) {
-      console.error('[authService] getUser error:', error);
+      logger.error('[authService] getUser error:', error);
       return { user: null, error };
     }
   },
@@ -285,7 +285,7 @@ export const authService = {
 
       return { data, error: null };
     } catch (error) {
-      console.error('[authService] updateUser error:', error);
+      logger.error('[authService] updateUser error:', error);
       return { data: null, error };
     }
   },
@@ -312,7 +312,7 @@ export const authService = {
 
         return { profile: data, error: null };
       } catch (error) {
-        console.error('[authService] getProfile error:', error);
+        logger.error('[authService] getProfile error:', error);
         return { profile: null, error };
       }
     });
@@ -340,7 +340,7 @@ export const authService = {
 
       return { profile: data, error: null };
     } catch (error) {
-      console.error('[authService] updateProfile error:', error);
+      logger.error('[authService] updateProfile error:', error);
       return { profile: null, error };
     }
   },
@@ -399,7 +399,7 @@ export const authService = {
           error: null,
         };
       } catch (error) {
-        console.error('[authService] getUserOrganization error:', error);
+        logger.error('[authService] getUserOrganization error:', error);
         return { organization: null, membership: null, error };
       }
     });
@@ -425,7 +425,7 @@ export const authService = {
         error: null,
       };
     } catch (error) {
-      console.error('[authService] getMemberOrgRole error:', error);
+      logger.error('[authService] getMemberOrgRole error:', error);
       return { orgRole: null, error };
     }
   },
@@ -446,7 +446,7 @@ export const authService = {
 
       return { organization: data, error: null };
     } catch (error) {
-      console.error('[authService] joinOrganization error:', error);
+      logger.error('[authService] joinOrganization error:', error);
       return { organization: null, error };
     }
   },
@@ -473,7 +473,7 @@ export const authService = {
 
       return { clientRecord: data || null, error: null };
     } catch (error) {
-      console.error('[authService] getClientRecord error:', error);
+      logger.error('[authService] getClientRecord error:', error);
       return { clientRecord: null, error };
     }
   },

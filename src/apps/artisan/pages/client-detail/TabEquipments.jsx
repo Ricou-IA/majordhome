@@ -13,6 +13,7 @@ import { reduireImage } from '@/lib/imageResize';
 import { EquipmentList } from '@/apps/artisan/components/clients/EquipmentList';
 import { EquipmentFormModal } from '@/apps/artisan/components/clients/EquipmentFormModal';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { logger } from '@lib/logger';
 
 export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed }) => {
   const { organization, effectiveRole } = useAuth();
@@ -46,7 +47,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
   // sinon l'écran invite à rattacher des équipements qui le sont déjà.
   useEffect(() => {
     if (!contractEquipmentsError) return;
-    console.error('[TabEquipments] Liens contrat illisibles:', contractEquipmentsError);
+    logger.error('[TabEquipments] Liens contrat illisibles:', contractEquipmentsError);
     toast.error('Les équipements liés au contrat n\'ont pas pu être chargés — le statut affiché n\'est pas fiable.');
   }, [contractEquipmentsError]);
 
@@ -137,7 +138,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
           toast.success('Équipement ajouté et lié au contrat');
         } catch (linkError) {
           // L'équipement existe, seule la liaison a été refusée : le dire tel quel
-          console.error('[TabEquipments] Erreur liaison contrat:', linkError);
+          logger.error('[TabEquipments] Erreur liaison contrat:', linkError);
           toast.warning('Équipement ajouté, mais la liaison au contrat a échoué');
         }
       } else {
@@ -145,7 +146,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
       }
       handleCloseModal();
     } catch (error) {
-      console.error('[TabEquipments] Erreur ajout équipement:', error);
+      logger.error('[TabEquipments] Erreur ajout équipement:', error);
       toast.error('Erreur lors de l\'ajout de l\'équipement');
     }
   };
@@ -164,7 +165,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
       invalidateAll();
       toast.success('Photo de la plaque enregistrée');
     } catch (error) {
-      console.error('[TabEquipments] photo plaque:', error);
+      logger.error('[TabEquipments] photo plaque:', error);
       toast.error(`Photo non enregistrée : ${error?.message || 'erreur inconnue'}`);
       throw error;
     } finally {
@@ -182,7 +183,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
       setEditingEquipment((prev) => (prev ? { ...prev, nameplate_photo_path: null } : prev));
       invalidateAll();
     } catch (error) {
-      console.error('[TabEquipments] suppression photo plaque:', error);
+      logger.error('[TabEquipments] suppression photo plaque:', error);
       toast.error(`Photo non supprimée : ${error?.message || 'erreur inconnue'}`);
       throw error;
     } finally {
@@ -207,7 +208,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
       invalidateAll();
       handleCloseModal();
     } catch (error) {
-      console.error('[TabEquipments] Erreur modification équipement:', error);
+      logger.error('[TabEquipments] Erreur modification équipement:', error);
       toast.error('Erreur lors de la modification');
     }
   };
@@ -230,7 +231,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
       toast.success('Équipement supprimé');
       setDeletingEquipment(null);
     } catch (error) {
-      console.error('[TabEquipments] Erreur suppression:', error);
+      logger.error('[TabEquipments] Erreur suppression:', error);
       // 23503 = la base refuse : une autre ligne pointe encore vers cet équipement
       toast.error(
         error?.code === '23503'
@@ -249,7 +250,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
     if (!contract?.signed_at) return true;
     const { error } = await contractsService.resetContractSignature(contract.id);
     if (error) {
-      console.error('[TabEquipments] Erreur invalidation signature:', error);
+      logger.error('[TabEquipments] Erreur invalidation signature:', error);
       toast.error('Le contrat signé n’a pas pu être remis en attente de signature.');
       return false;
     }
@@ -271,7 +272,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
       invalidateAll();
       toast.success('Équipement ajouté au contrat');
     } catch (error) {
-      console.error('[TabEquipments] Erreur liaison contrat:', error);
+      logger.error('[TabEquipments] Erreur liaison contrat:', error);
       toast.error('Erreur lors de la liaison au contrat');
     }
   };
@@ -284,7 +285,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
       invalidateAll();
       toast.success('Équipement retiré du contrat');
     } catch (error) {
-      console.error('[TabEquipments] Erreur retrait contrat:', error);
+      logger.error('[TabEquipments] Erreur retrait contrat:', error);
       toast.error('Erreur lors du retrait du contrat');
     }
   };

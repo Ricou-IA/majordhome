@@ -12,6 +12,7 @@
 import { useState, useRef } from 'react';
 import { Camera, Trash2, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { logger } from '@lib/logger';
 
 /**
  * @param {Object} props
@@ -55,7 +56,7 @@ export function PhotoCapture({
     try {
       await onUpload(file);
     } catch (err) {
-      console.error('[PhotoCapture] Upload error:', err);
+      logger.error('[PhotoCapture] Upload error:', err);
       // Reset preview si erreur
       setPreviewUrl(null);
     }
@@ -74,7 +75,7 @@ export function PhotoCapture({
       await onDelete(currentPath);
       setPreviewUrl(null);
     } catch (err) {
-      console.error('[PhotoCapture] Delete error:', err);
+      logger.error('[PhotoCapture] Delete error:', err);
     }
   };
 

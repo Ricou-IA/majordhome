@@ -29,6 +29,7 @@ import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { TabInfo, TabEquipments, TabHistory, CategoryBadge } from './ClientModalTabs';
 import { TabContrat } from '../../pages/client-detail/TabContrat';
 import { DuplicateClientDialog } from '../shared/DuplicateClientPanel';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // CONSTANTES
@@ -219,12 +220,12 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
           if (locErr) toast.error("Client créé, mais sa localisation n'a pas pu être enregistrée");
         } else if (formData.postalCode && formData.city && newClient?.project_id) {
           geocodeAndUpdateByProjectId(newClient.project_id, formData.address, formData.postalCode, formData.city)
-            .catch(err => console.warn('[ClientModal] Auto-geocode failed:', err));
+            .catch(err => logger.warn('[ClientModal] Auto-geocode failed:', err));
         }
         // Sync Pennylane en background (ne bloque pas la UX si l'API PL est lente/indispo)
         if (newClient?.id) {
           syncToPennylane(newClient)
-            .catch(err => console.warn('[ClientModal] Pennylane sync failed:', err));
+            .catch(err => logger.warn('[ClientModal] Pennylane sync failed:', err));
         }
         toast.success('Client créé avec succès');
         await onCreated?.(newClient);
@@ -258,14 +259,14 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
           }
         } else if (addressChanged && formData.postalCode && formData.city && client?.project_id) {
           geocodeAndUpdateByProjectId(client.project_id, formData.address, formData.postalCode, formData.city)
-            .catch(err => console.warn('[ClientModal] Auto-geocode failed:', err));
+            .catch(err => logger.warn('[ClientModal] Auto-geocode failed:', err));
         }
         originalDataRef.current = { ...formData, location: null };
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2000);
       }
     } catch (error) {
-      console.error('[ClientModal] Erreur sauvegarde:', error);
+      logger.error('[ClientModal] Erreur sauvegarde:', error);
       setErrors({ general: 'Erreur lors de la sauvegarde: ' + (error.message || 'Erreur inconnue') });
     } finally {
       setSaving(false);

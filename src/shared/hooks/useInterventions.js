@@ -18,6 +18,7 @@ import { interventionsService } from '@services/interventions.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { interventionKeys, clientKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
+import { logger } from '@lib/logger';
 
 // Re-export for backward compatibility
 export { interventionKeys } from '@hooks/cacheKeys';
@@ -288,7 +289,7 @@ export function useInterventionDraft(interventionId) {
         return parsed.data;
       }
     } catch (err) {
-      console.error('[useInterventionDraft] Erreur lecture localStorage:', err);
+      logger.error('[useInterventionDraft] Erreur lecture localStorage:', err);
     }
     return null;
   }, [storageKey]);
@@ -305,7 +306,7 @@ export function useInterventionDraft(interventionId) {
       localStorage.setItem(storageKey, JSON.stringify(payload));
       setLastSaved(new Date());
     } catch (err) {
-      console.error('[useInterventionDraft] Erreur écriture localStorage:', err);
+      logger.error('[useInterventionDraft] Erreur écriture localStorage:', err);
     }
   }, [storageKey, interventionId]);
 
@@ -316,7 +317,7 @@ export function useInterventionDraft(interventionId) {
       draftRef.current = null;
       setLastSaved(null);
     } catch (err) {
-      console.error('[useInterventionDraft] Erreur suppression localStorage:', err);
+      logger.error('[useInterventionDraft] Erreur suppression localStorage:', err);
     }
   }, [storageKey]);
 

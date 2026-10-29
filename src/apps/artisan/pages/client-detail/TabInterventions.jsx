@@ -11,6 +11,7 @@ import { chantiersService, getChantierStatusConfig } from '@services/chantiers.s
 import { formatDateFR } from '@/lib/utils';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
+import { logger } from '@lib/logger';
 
 const InterventionCard = ({ intervention, hasChildren = false }) => {
   const typeConfig = INTERVENTION_TYPES.find(t => t.value === intervention.intervention_type) || INTERVENTION_TYPES[INTERVENTION_TYPES.length - 1];
@@ -155,7 +156,7 @@ const ChantierSummary = ({ clientId }) => {
         if (error) throw error;
         setChantiers(data || []);
       } catch (err) {
-        console.error('[ChantierSummary] load error:', err);
+        logger.error('[ChantierSummary] load error:', err);
       } finally {
         setLoading(false);
       }
@@ -273,7 +274,7 @@ export const TabInterventions = ({ projectId, clientId }) => {
       setShowForm(false);
       setFormData({ interventionType: 'maintenance', scheduledDate: new Date().toISOString().split('T')[0], reportNotes: '' });
     } catch (err) {
-      console.error('[TabInterventions] create error:', err);
+      logger.error('[TabInterventions] create error:', err);
       toast.error(err?.message || "Erreur lors de la création");
     }
   };

@@ -42,6 +42,7 @@ import { GroupChantiersDialog } from './GroupChantiersDialog';
 import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 import { PlannedOrderFields } from '@apps/artisan/components/planning/scheduling/PlannedOrderFields';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
+import { logger } from '@lib/logger';
 
 export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, canEditAll = true }) {
   const { organization, user } = useAuth();
@@ -98,7 +99,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
       await updatePlannedOrder(chantier.id, { teamSize, days });
       onUpdated?.();
     } catch (err) {
-      console.error('[ChantierModal] updatePlannedOrder error:', err);
+      logger.error('[ChantierModal] updatePlannedOrder error:', err);
       toast.error('Impossible d\'enregistrer la commande');
     }
   };
@@ -265,7 +266,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
         subjectPrefix: 'Installation',
       });
       if (error) {
-        console.error('[ChantierModal] createAppointmentBatch error:', error);
+        logger.error('[ChantierModal] createAppointmentBatch error:', error);
         toast.error('Erreur lors de la planification');
         return;
       }
@@ -275,7 +276,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
       onUpdated?.();
       toast.success(slots.length > 1 ? `${slots.length} jours planifiés` : 'Installation planifiée');
     } catch (err) {
-      console.error('[ChantierModal] handleConfirmInstallation error:', err);
+      logger.error('[ChantierModal] handleConfirmInstallation error:', err);
       toast.error('Une erreur est survenue');
     } finally {
       setIsSchedulingInstall(false);

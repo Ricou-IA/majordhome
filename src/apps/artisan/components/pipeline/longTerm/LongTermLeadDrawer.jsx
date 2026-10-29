@@ -44,6 +44,7 @@ import { QuoteCandidatesModal } from '../QuoteCandidatesModal';
 import { AddInteractionModal } from './AddInteractionModal';
 import { InteractionTimeline } from './InteractionTimeline';
 import { computeFreshness, formatShortDate } from './longTermUtils';
+import { logger } from '@lib/logger';
 
 function NotesEditor({ leadId, initialNotes, onSaved }) {
   const [value, setValue] = useState(initialNotes || '');
@@ -67,7 +68,7 @@ function NotesEditor({ leadId, initialNotes, onSaved }) {
       setTimeout(() => setSavedFlash(false), 1500);
       onSaved?.();
     } catch (err) {
-      console.error('[NotesEditor] save error:', err);
+      logger.error('[NotesEditor] save error:', err);
       toast.error('Erreur sauvegarde des notes');
     } finally {
       setSaving(false);
@@ -145,7 +146,7 @@ export function LongTermLeadDrawer({
       onLeadUpdated?.();
       toast.success('Interaction supprimée');
     } catch (err) {
-      console.error('[Drawer] delete error:', err);
+      logger.error('[Drawer] delete error:', err);
       toast.error('Erreur suppression');
     } finally {
       setDeletingId(null);
@@ -159,7 +160,7 @@ export function LongTermLeadDrawer({
       onLeadUpdated?.();
       onClose();
     } catch (err) {
-      console.error('[Drawer] reactivate error:', err);
+      logger.error('[Drawer] reactivate error:', err);
       toast.error('Erreur lors de la réactivation');
     }
   };

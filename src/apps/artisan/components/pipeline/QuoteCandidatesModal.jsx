@@ -34,6 +34,7 @@ import {
 } from '@hooks/usePennylane';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
 import { useOrgSettings, pennylanePipelineMinAmountHt } from '@hooks/useOrgSettings';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // Statuts Pennylane (palette deutan-friendly — pas de rouge/vert)
@@ -298,7 +299,7 @@ export function QuoteCandidatesModal({
     try {
       if (onBeforeAttach) await onBeforeAttach();
     } catch (err) {
-      console.error('[QuoteCandidatesModal] onBeforeAttach failed:', err);
+      logger.error('[QuoteCandidatesModal] onBeforeAttach failed:', err);
       toast.error('Erreur en sauvegardant le lead avant attachement');
       return;
     }
@@ -334,7 +335,7 @@ export function QuoteCandidatesModal({
       onAttached?.(result);
       handleClose();
     } catch (err) {
-      console.error('[QuoteCandidatesModal] attach error:', err);
+      logger.error('[QuoteCandidatesModal] attach error:', err);
       toast.error(err?.message || 'Erreur lors de l\'attachement des devis');
     }
   }, [

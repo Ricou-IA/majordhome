@@ -8,6 +8,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // SERVICE
@@ -70,7 +71,7 @@ export const territoireService = {
 
       return { data: points, error: null };
     } catch (error) {
-      console.error('[territoire] getGeocodedClients error:', error);
+      logger.error('[territoire] getGeocodedClients error:', error);
       return { data: null, error };
     }
   },
@@ -109,7 +110,7 @@ export const territoireService = {
 
       return { data: points, error: null };
     } catch (error) {
-      console.error('[territoire] getGeocodedLeads error:', error);
+      logger.error('[territoire] getGeocodedLeads error:', error);
       return { data: null, error };
     }
   },
@@ -135,7 +136,7 @@ export const territoireService = {
 
       return { data: data || [], count: count || 0, error: null };
     } catch (error) {
-      console.error('[territoire] getUngeocodedClients error:', error);
+      logger.error('[territoire] getUngeocodedClients error:', error);
       return { data: null, count: null, error };
     }
   },
@@ -160,7 +161,7 @@ export const territoireService = {
 
       return { data: data || [], count: data?.length || 0, error: null };
     } catch (error) {
-      console.error('[territoire] getUngeocodedLeads error:', error);
+      logger.error('[territoire] getUngeocodedLeads error:', error);
       return { data: null, count: null, error };
     }
   },
@@ -201,7 +202,7 @@ export const territoireService = {
         error: null,
       };
     } catch (error) {
-      console.error('[territoire] getTerritoireStats error:', error);
+      logger.error('[territoire] getTerritoireStats error:', error);
       return { data: null, error };
     }
   },

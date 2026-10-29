@@ -12,6 +12,7 @@ import { useProductDocuments, useProductDocumentMutations } from '@hooks/useSupp
 import { storageService } from '@services/storage.service';
 import { useAuth } from '@contexts/AuthContext';
 import { toast } from 'sonner';
+import { logger } from '@lib/logger';
 
 const DOC_TYPE_SUGGESTIONS = [
   'Manuel',
@@ -48,7 +49,7 @@ export function ProductDocumentsInline({ productId, orgId }) {
       setFile(null);
       setDocumentType('Manuel');
     } catch (err) {
-      console.error('[ProductDocumentsInline] upload error:', err);
+      logger.error('[ProductDocumentsInline] upload error:', err);
       toast.error('Erreur lors de l\'upload');
     }
   };
@@ -59,7 +60,7 @@ export function ProductDocumentsInline({ productId, orgId }) {
       await deleteDocument({ documentId: doc.id, storagePath: doc.storage_path });
       toast.success('Document supprimé');
     } catch (err) {
-      console.error('[ProductDocumentsInline] delete error:', err);
+      logger.error('[ProductDocumentsInline] delete error:', err);
       toast.error('Erreur lors de la suppression');
     } finally {
       setDeletingId(null);
@@ -72,7 +73,7 @@ export function ProductDocumentsInline({ productId, orgId }) {
       if (error) throw error;
       window.open(url, '_blank');
     } catch (err) {
-      console.error('[ProductDocumentsInline] download error:', err);
+      logger.error('[ProductDocumentsInline] download error:', err);
       toast.error('Erreur lors du téléchargement');
     }
   };
@@ -172,7 +173,7 @@ export function ProductDocumentsPanel({ isOpen, onClose, productId, productName,
       setFile(null);
       setDocumentType('Manuel');
     } catch (err) {
-      console.error('[ProductDocumentsPanel] upload error:', err);
+      logger.error('[ProductDocumentsPanel] upload error:', err);
       toast.error('Erreur lors de l\'upload');
     }
   };
@@ -183,7 +184,7 @@ export function ProductDocumentsPanel({ isOpen, onClose, productId, productName,
       await deleteDocument({ documentId: doc.id, storagePath: doc.storage_path });
       toast.success('Document supprimé');
     } catch (err) {
-      console.error('[ProductDocumentsPanel] delete error:', err);
+      logger.error('[ProductDocumentsPanel] delete error:', err);
       toast.error('Erreur lors de la suppression');
     } finally {
       setDeletingId(null);
@@ -196,7 +197,7 @@ export function ProductDocumentsPanel({ isOpen, onClose, productId, productName,
       if (error) throw error;
       window.open(url, '_blank');
     } catch (err) {
-      console.error('[ProductDocumentsPanel] download error:', err);
+      logger.error('[ProductDocumentsPanel] download error:', err);
       toast.error('Erreur lors du téléchargement');
     }
   };

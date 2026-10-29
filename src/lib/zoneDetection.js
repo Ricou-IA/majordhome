@@ -18,6 +18,7 @@
 import { MAPBOX_CONFIG } from '@/lib/mapbox';
 import { geocodeAddress } from '@services/geocoding.service';
 import { detectZoneFromPostalCode } from '@services/pricing.service';
+import { logger } from '@lib/logger';
 
 // Cache module-level pour éviter les appels Mapbox redondants
 // La clé inclut désormais les coords HQ pour éviter les collisions cross-org
@@ -53,7 +54,7 @@ async function getCommuneCentroid(city, postalCode) {
     _communeCentroidCache.set(cacheKey, coords);
     return coords;
   } catch (err) {
-    console.warn('[zoneDetection] getCommuneCentroid error:', err);
+    logger.warn('[zoneDetection] getCommuneCentroid error:', err);
     return null;
   }
 }
@@ -69,7 +70,7 @@ async function getCommuneCentroid(city, postalCode) {
 async function getDrivingDuration(lat, lng, hqCoords) {
   const token = MAPBOX_CONFIG.accessToken;
   if (!token) {
-    console.warn('[zoneDetection] Mapbox token non configuré');
+    logger.warn('[zoneDetection] Mapbox token non configuré');
     return null;
   }
   if (!hqCoords || typeof hqCoords.lat !== 'number' || typeof hqCoords.lng !== 'number') {
@@ -88,14 +89,14 @@ async function getDrivingDuration(lat, lng, hqCoords) {
     const res = await fetch(url);
 
     if (!res.ok) {
-      console.warn('[zoneDetection] Mapbox Directions error:', res.status);
+      logger.warn('[zoneDetection] Mapbox Directions error:', res.status);
       return null;
     }
 
     const data = await res.json();
     const route = data.routes?.[0];
     if (!route) {
-      console.warn('[zoneDetection] Aucune route trouvée');
+      logger.warn('[zoneDetection] Aucune route trouvée');
       return null;
     }
 
@@ -107,7 +108,7 @@ async function getDrivingDuration(lat, lng, hqCoords) {
     _drivingCache.set(cacheKey, result);
     return result;
   } catch (error) {
-    console.error('[zoneDetection] Erreur Mapbox Directions:', error);
+    logger.error('[zoneDetection] Erreur Mapbox Directions:', error);
     return null;
   }
 }
@@ -206,7 +207,7 @@ export async function detectZoneForAddress(address, postalCode, city, zones, hqC
       coords,
     };
   } catch (error) {
-    console.error('[zoneDetection] Erreur detectZoneForAddress:', error);
+    logger.error('[zoneDetection] Erreur detectZoneForAddress:', error);
     const fallback = detectZoneFromPostalCode(postalCode, zones);
     return { zone: fallback, durationMinutes: null, coords: null };
   }

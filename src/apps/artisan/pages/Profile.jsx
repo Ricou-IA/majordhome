@@ -4,6 +4,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { User, Mail, Phone, Camera, Loader2, CheckCircle, AlertCircle, Calendar, Link2, Unlink, RefreshCw } from 'lucide-react';
 import { useGoogleCalendarStatus, useGoogleCalendarConnection } from '@hooks/useGoogleCalendar';
 import { toast } from 'sonner';
+import { logger } from '@lib/logger';
 
 // =============================================================================
 // GOOGLE CALENDAR SECTION
@@ -207,7 +208,7 @@ export default function Profile() {
 
       setSuccess(true);
     } catch (err) {
-      console.error('[Profile] Erreur:', err);
+      logger.error('[Profile] Erreur:', err);
       setError(err.message || 'Une erreur est survenue');
     } finally {
       setLoading(false);

@@ -12,6 +12,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { clientsService } from './clients.service';
+import { logger } from '@lib/logger';
 
 const DEFAULT_LIMIT = 25;
 
@@ -88,7 +89,7 @@ export const prospectsService = {
       const { data, count, error } = await query;
       return { data: data || [], count: count || 0, error };
     } catch (err) {
-      console.error('[prospectsService] getProspects:', err);
+      logger.error('[prospectsService] getProspects:', err);
       return { data: [], count: 0, error: err };
     }
   },
@@ -107,7 +108,7 @@ export const prospectsService = {
 
       return { data, error };
     } catch (err) {
-      console.error('[prospectsService] getProspectById:', err);
+      logger.error('[prospectsService] getProspectById:', err);
       return { data: null, error: err };
     }
   },
@@ -137,7 +138,7 @@ export const prospectsService = {
 
       return { data, duplicate: false, error };
     } catch (err) {
-      console.error('[prospectsService] createProspect:', err);
+      logger.error('[prospectsService] createProspect:', err);
       return { data: null, duplicate: false, error: err };
     }
   },
@@ -163,7 +164,7 @@ export const prospectsService = {
 
       return { data, error };
     } catch (err) {
-      console.error('[prospectsService] updateProspect:', err);
+      logger.error('[prospectsService] updateProspect:', err);
       return { data: null, error: err };
     }
   },
@@ -181,7 +182,7 @@ export const prospectsService = {
 
       return { success: !error, error };
     } catch (err) {
-      console.error('[prospectsService] deleteProspect:', err);
+      logger.error('[prospectsService] deleteProspect:', err);
       return { success: false, error: err };
     }
   },
@@ -227,7 +228,7 @@ export const prospectsService = {
 
       return { data, error: null };
     } catch (err) {
-      console.error('[prospectsService] updateStatus:', err);
+      logger.error('[prospectsService] updateStatus:', err);
       return { data: null, error: err };
     }
   },
@@ -246,7 +247,7 @@ export const prospectsService = {
 
       return { data: data || [], error };
     } catch (err) {
-      console.error('[prospectsService] getInteractions:', err);
+      logger.error('[prospectsService] getInteractions:', err);
       return { data: [], error: err };
     }
   },
@@ -267,7 +268,7 @@ export const prospectsService = {
 
       return { data, error };
     } catch (err) {
-      console.error('[prospectsService] addInteraction:', err);
+      logger.error('[prospectsService] addInteraction:', err);
       return { data: null, error: err };
     }
   },
@@ -308,7 +309,7 @@ export const prospectsService = {
 
       return { data: stats, error: null };
     } catch (err) {
-      console.error('[prospectsService] getStats:', err);
+      logger.error('[prospectsService] getStats:', err);
       return { data: null, error: err };
     }
   },
@@ -330,7 +331,7 @@ export const prospectsService = {
 
       return { data: (data || []).map((d) => d.siren), error };
     } catch (err) {
-      console.error('[prospectsService] getExistingSirens:', err);
+      logger.error('[prospectsService] getExistingSirens:', err);
       return { data: [], error: err };
     }
   },
@@ -400,7 +401,7 @@ export const prospectsService = {
 
       return { data: { prospect, client }, error: null };
     } catch (err) {
-      console.error('[prospectsService] convertToClient:', err);
+      logger.error('[prospectsService] convertToClient:', err);
       return { data: null, error: err };
     }
   },

@@ -51,6 +51,7 @@ import { ContractsList } from '@apps/artisan/components/entretiens/ContractsList
 import { SectorGroupView } from '@apps/artisan/components/entretiens/SectorGroupView';
 import { ContractModal } from '@apps/artisan/components/entretiens/ContractModal';
 import { CreateContractModal } from '@apps/artisan/components/entretiens/CreateContractModal';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -267,14 +268,14 @@ export default function Entretiens() {
           createdBy: user?.id,
         });
         if (result.error) {
-          console.error('[Entretiens] createEntretien error:', result.error);
+          logger.error('[Entretiens] createEntretien error:', result.error);
           toast.error(`Erreur : ${result.error.message || 'programmation échouée'}`);
         } else {
           toast.success('Entretien programmé');
           queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
         }
       } catch (err) {
-        console.error('[Entretiens] handlePlanContract error:', err);
+        logger.error('[Entretiens] handlePlanContract error:', err);
         toast.error(`Erreur : ${err.message || 'programmation échouée'}`);
       } finally {
         setIsPlanning(false);
@@ -292,7 +293,7 @@ export default function Entretiens() {
       try {
         for (const contract of sector.contracts) {
           if (!contract.client_project_id) {
-            console.warn('[Entretiens] Skipping contract without project_id:', contract.id);
+            logger.warn('[Entretiens] Skipping contract without project_id:', contract.id);
             errors++;
             continue;
           }
@@ -305,7 +306,7 @@ export default function Entretiens() {
             createdBy: user?.id,
           });
           if (result.error) {
-            console.error('[Entretiens] createEntretien error for contract:', contract.id, result.error);
+            logger.error('[Entretiens] createEntretien error for contract:', contract.id, result.error);
             errors++;
           } else {
             created++;
@@ -324,7 +325,7 @@ export default function Entretiens() {
           toast.info('Aucun contrat à programmer dans ce secteur');
         }
       } catch (err) {
-        console.error('[Entretiens] handlePlanSector error:', err);
+        logger.error('[Entretiens] handlePlanSector error:', err);
         toast.error(`Erreur : ${err.message || 'programmation échouée'}`);
       } finally {
         setIsPlanning(false);

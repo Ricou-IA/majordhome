@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { supabase } from '@/lib/supabaseClient';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // HOOK : RECHERCHE CLIENT
@@ -49,7 +50,7 @@ function useClientSearch(orgId, searchTerm) {
           .limit(10);
         setResults(data || []);
       } catch (err) {
-        console.error('[CreateSAVModal] search error:', err);
+        logger.error('[CreateSAVModal] search error:', err);
         setResults([]);
       } finally {
         setIsSearching(false);
@@ -131,7 +132,7 @@ export function CreateSAVModal({
       onCreated?.();
       onClose();
     } catch (err) {
-      console.error('[CreateSAVModal] submit error:', err);
+      logger.error('[CreateSAVModal] submit error:', err);
     }
   };
 

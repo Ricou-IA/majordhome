@@ -21,6 +21,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { leadsService } from '@services/leads.service';
 import { useLeadMutations } from '@hooks/useLeads';
 import { formatDateShortFR } from '@/lib/utils';
+import { logger } from '@lib/logger';
 
 const REASON_LABELS = {
   client: 'même client',
@@ -99,7 +100,7 @@ export function MergeLeadDialog({ open, onOpenChange, lead, orgId, onMerged }) {
       onOpenChange(false);
       onMerged?.(result);
     } catch (err) {
-      console.error('[MergeLeadDialog] merge error:', err);
+      logger.error('[MergeLeadDialog] merge error:', err);
       const code = err?.message || '';
       toast.error(
         code.includes('org_admin_required') ? 'Action réservée aux administrateurs'

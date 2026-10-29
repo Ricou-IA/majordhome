@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import { territoireService } from '@services/territoire.service';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // Hook principal — points CRM géocodés
@@ -41,11 +42,11 @@ export function useTerritoireData() {
       // Leads (non-bloquant)
       const lResult = leadsResult.status === 'fulfilled' ? leadsResult.value : null;
       if (lResult?.error) {
-        console.warn('[useTerritoireData] Leads non chargés:', lResult.error);
+        logger.warn('[useTerritoireData] Leads non chargés:', lResult.error);
       }
       setLeads(lResult?.data || []);
     } catch (err) {
-      console.error('[useTerritoireData] Error:', err);
+      logger.error('[useTerritoireData] Error:', err);
       setError(err);
     } finally {
       setIsLoading(false);
@@ -92,7 +93,7 @@ export function useTerritoireStats() {
       if (fetchError) throw fetchError;
       setStats(data);
     } catch (err) {
-      console.error('[useTerritoireStats] Error:', err);
+      logger.error('[useTerritoireStats] Error:', err);
       setError(err);
     } finally {
       setLoading(false);

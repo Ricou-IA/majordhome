@@ -9,6 +9,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Trash2, Loader2, Upload, X, ImagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { logger } from '@lib/logger';
 
 /**
  * @param {Object} props
@@ -69,7 +70,7 @@ export function PhotoDropZone({
     try {
       await onUpload(toUpload);
     } catch (err) {
-      console.error('[PhotoDropZone] Drop upload error:', err);
+      logger.error('[PhotoDropZone] Drop upload error:', err);
     } finally {
       setUploadingCount(0);
     }
@@ -88,7 +89,7 @@ export function PhotoDropZone({
     try {
       await onUpload(toUpload);
     } catch (err) {
-      console.error('[PhotoDropZone] File input upload error:', err);
+      logger.error('[PhotoDropZone] File input upload error:', err);
     } finally {
       setUploadingCount(0);
     }
@@ -108,7 +109,7 @@ export function PhotoDropZone({
     try {
       await onDelete(photo.id, photo.storage_path);
     } catch (err) {
-      console.error('[PhotoDropZone] Delete error:', err);
+      logger.error('[PhotoDropZone] Delete error:', err);
     }
   }, [onDelete, disabled]);
 

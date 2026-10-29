@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { formatDateFR } from '@/lib/utils';
 import { INTERVENTION_STATUS_CONFIG, INTERVENTION_TYPE_LABELS as TYPE_LABELS } from '../constants';
+import { logger } from '@lib/logger';
 
 // Extraction labels simples depuis la config (rétrocompat)
 const STATUS_LABELS = Object.fromEntries(
@@ -56,7 +57,7 @@ export default function ClientInterventionDetail() {
       if (error || !url) throw error || new Error('URL non disponible');
       window.open(url, '_blank');
     } catch (err) {
-      console.error('[ClientInterventionDetail] PDF download error:', err);
+      logger.error('[ClientInterventionDetail] PDF download error:', err);
     } finally {
       setDownloadingPdf(false);
     }

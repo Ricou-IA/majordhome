@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { FormField, SectionTitle, inputClass, selectClass } from '../../components/FormFields';
 import DemarchesTab from './solaire/DemarchesTab';
 import { validerDemarches } from '@apps/solaire/lib/demarches/parametres';
+import { logger } from '@lib/logger';
 
 const TABS = [
   { key: 'calcul', label: 'Paramètres calcul', icon: Calculator },
@@ -298,7 +299,7 @@ function BibliothequeTab({ form, patch, orgId }) {
     // le PDF orphelin dans le bucket pendant que la fiche disparaît de la liste.
     const { error } = await storageService.deleteFile(TECH_DOCS_BUCKET, doc.path);
     if (error) {
-      console.error('[SolaireSettings] deleteFile refusé:', error);
+      logger.error('[SolaireSettings] deleteFile refusé:', error);
       toast.error('Impossible de supprimer le fichier du Storage — la fiche est conservée');
       return;
     }

@@ -13,6 +13,7 @@ import { authService } from '@services/auth.service';
 import { supabase } from '@lib/supabaseClient';
 import { Lock, Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { logger } from '@lib/logger';
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -50,7 +51,7 @@ export default function PasswordChangeForm({ onSuccess }) {
 
       onSuccess?.();
     } catch (err) {
-      console.error('[PasswordChangeForm] error:', err);
+      logger.error('[PasswordChangeForm] error:', err);
       toast.error(err?.message || 'Erreur lors du changement de mot de passe');
     } finally {
       setLoading(false);

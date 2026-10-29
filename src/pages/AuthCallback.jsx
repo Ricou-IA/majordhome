@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@lib/supabaseClient';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { logger } from '@lib/logger';
 
 // =============================================================================
 // PAGE AUTH CALLBACK
@@ -29,7 +30,7 @@ export default function AuthCallback() {
           navigate('/login', { replace: true });
         }
       } catch (err) {
-        console.error('[AuthCallback] Erreur:', err);
+        logger.error('[AuthCallback] Erreur:', err);
         setError(err.message || 'Une erreur est survenue');
       }
     };

@@ -20,6 +20,7 @@ import { generateContractPdfBlob } from '@apps/artisan/components/contrat/Contra
 import { useAuth } from '@contexts/AuthContext';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@lib/logger';
 
 const ACCEPTED_FILE_TYPES = '.pdf,.jpg,.jpeg,.png';
 const MAX_FILE_SIZE_MB = 10;
@@ -148,11 +149,11 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       if (url) {
         window.open(url, '_blank');
       } else {
-        console.error('[ContractPdfSection] getSignedUrl error:', error);
+        logger.error('[ContractPdfSection] getSignedUrl error:', error);
         toast.error('Impossible de récupérer le PDF');
       }
     } catch (err) {
-      console.error('[ContractPdfSection] download error:', err);
+      logger.error('[ContractPdfSection] download error:', err);
       toast.error('Erreur PDF');
     } finally {
       setIsLoading(false);
@@ -170,7 +171,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       setTimeout(() => URL.revokeObjectURL(url), 10000);
       toast.success('PDF généré — prêt pour impression');
     } catch (err) {
-      console.error('[ContractPdfSection] generate unsigned error:', err);
+      logger.error('[ContractPdfSection] generate unsigned error:', err);
       toast.error('Erreur lors de la génération du PDF');
     } finally {
       setIsGenerating(false);
@@ -218,7 +219,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
       toast.success('Contrat signé téléversé avec succès');
     } catch (err) {
-      console.error('[ContractPdfSection] upload signed error:', err);
+      logger.error('[ContractPdfSection] upload signed error:', err);
       // Surfacer la cause : le bucket `contracts` filtre les mime types et la taille
       // (400 « mime type … is not supported » sinon invisible côté UI).
       toast.error(`Erreur lors du téléversement : ${err?.message || 'erreur inconnue'}`);
@@ -272,7 +273,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       const requiredPlaceholders = ['{{EQUIP_RECAP}}', '{{TOTAL_AMOUNT}}', '{{PDF_URL}}'];
       const missing = requiredPlaceholders.filter((p) => !template.html_body?.includes(p));
       if (missing.length > 0) {
-        console.warn('[ContractPdfSection] Placeholders manquants dans le template:', missing);
+        logger.warn('[ContractPdfSection] Placeholders manquants dans le template:', missing);
       }
 
       const htmlBody = (template.html_body || '')
@@ -306,7 +307,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       if (!contract.workflow_status || contract.workflow_status === 'nouveau') {
         const { error: statusError } = await contractsService.updateContract(contract.id, { workflow_status: 'proposal_sent' });
         if (statusError) {
-          console.error('[ContractPdfSection] workflow_status proposal_sent refusé:', statusError);
+          logger.error('[ContractPdfSection] workflow_status proposal_sent refusé:', statusError);
           statusMarked = false;
         } else {
           queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
@@ -319,7 +320,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
         toast.warning(`Proposition envoyée à ${client.email}, mais le contrat n’a pas pu être marqué « proposition envoyée »`);
       }
     } catch (err) {
-      console.error('[ContractPdfSection] send proposal error:', err);
+      logger.error('[ContractPdfSection] send proposal error:', err);
       toast.error(`Erreur lors de l'envoi : ${err.message || 'Erreur inconnue'}`);
     } finally {
       setIsSending(false);

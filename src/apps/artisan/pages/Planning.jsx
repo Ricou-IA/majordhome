@@ -53,6 +53,7 @@ import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal
 import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKindIcons';
 import { supabase } from '@/lib/supabaseClient';
 import { formatDateForInput } from '@/lib/utils';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // HELPERS
@@ -775,7 +776,7 @@ export default function Planning() {
       });
       toast.success('RDV déplacé');
     } catch (err) {
-      console.error('[Planning] moveAppointment error:', err);
+      logger.error('[Planning] moveAppointment error:', err);
       dropInfo.revert();
       toast.error('Erreur lors du déplacement');
     }
@@ -798,7 +799,7 @@ export default function Planning() {
         duration_minutes: Math.round((end - start) / 60000),
       });
     } catch (err) {
-      console.error('[Planning] resize error:', err);
+      logger.error('[Planning] resize error:', err);
       resizeInfo.revert();
       toast.error('Erreur lors du redimensionnement');
     }
@@ -825,7 +826,7 @@ export default function Planning() {
       handleModalClose();
       return true;
     } catch (err) {
-      console.error('[Planning] save appointment error:', err);
+      logger.error('[Planning] save appointment error:', err);
       toast.error(isCreate ? 'Erreur lors de la création du RDV' : 'Erreur lors de la modification du RDV');
       return false;
     }
@@ -838,7 +839,7 @@ export default function Planning() {
       toast.success('RDV supprimé');
       handleModalClose();
     } catch (err) {
-      console.error('[Planning] deleteAppointment error:', err);
+      logger.error('[Planning] deleteAppointment error:', err);
       toast.error('Erreur lors de la suppression');
     }
   }, [modalState, deleteAppointment, handleModalClose]);
@@ -850,7 +851,7 @@ export default function Planning() {
       toast.success('RDV annulé');
       handleModalClose();
     } catch (err) {
-      console.error('[Planning] cancelAppointment error:', err);
+      logger.error('[Planning] cancelAppointment error:', err);
       toast.error('Erreur lors de l\'annulation');
     }
   }, [modalState, cancelAppointment, handleModalClose]);

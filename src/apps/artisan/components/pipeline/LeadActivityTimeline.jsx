@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ACTIVITY_CONFIG } from '@services/leads.service';
 import { AuditEntry } from '../shared/AuditEntry';
+import { logger } from '@lib/logger';
 
 // Map des icônes (Lucide)
 const ICON_MAP = {
@@ -71,7 +72,7 @@ export function LeadActivityTimeline({
       setNoteText('');
       setShowNoteForm(false);
     } catch (err) {
-      console.error('[LeadActivityTimeline] Erreur ajout note:', err);
+      logger.error('[LeadActivityTimeline] Erreur ajout note:', err);
       toast.error("Erreur lors de l'ajout de la note");
     }
   };

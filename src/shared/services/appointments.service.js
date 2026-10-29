@@ -145,7 +145,7 @@ async function syncCardStateOnCreate(appt) {
       .update({ workflow_status: 'planifie', updated_at: new Date().toISOString() })
       .eq('id', appt.intervention_id)
       .not('workflow_status', 'in', '(realise,facture)');
-    if (error) console.error('[appointments] syncCreate entretien error:', error);
+    if (error) logger.error('[appointments] syncCreate entretien error:', error);
     return;
   }
 
@@ -159,7 +159,7 @@ async function syncCardStateOnCreate(appt) {
       .from('majordhome_chantiers')
       .select('id, org_id, chantier_status')
       .eq('id', appt.chantier_id).maybeSingle();
-    if (readError) { console.error('[appointments] syncCreate install read error:', readError); return; }
+    if (readError) { logger.error('[appointments] syncCreate install read error:', readError); return; }
     const order = CHANTIER_ORDER[chantier?.chantier_status] ?? 0;
     if (chantier && order < CHANTIER_ORDER.planification) {
       // planification_date = date de passage en planification (même sémantique que
@@ -170,7 +170,7 @@ async function syncCardStateOnCreate(appt) {
         .update({ chantier_status: 'planification', planification_date: now.toISOString().split('T')[0], updated_at: now.toISOString() })
         .eq('id', chantier.id).eq('org_id', chantier.org_id)
         .select('id').maybeSingle();
-      if (error || !patched) console.error('[appointments] syncCreate install chantier error:', error || 'aucune ligne (RLS ?)');
+      if (error || !patched) logger.error('[appointments] syncCreate install chantier error:', error || 'aucune ligne (RLS ?)');
     }
     return;
   }
@@ -186,7 +186,7 @@ async function syncCardStateOnCreate(appt) {
         p_lead_id: appt.lead_id,
         p_updates: { status_id: RDV_PLANIFIE_STATUS_ID, updated_at: new Date().toISOString() },
       });
-      if (error) console.error('[appointments] syncCreate VT lead error:', error);
+      if (error) logger.error('[appointments] syncCreate VT lead error:', error);
     }
     return;
   }
@@ -215,7 +215,7 @@ async function recomputeEntretienWorkflow(interventionId) {
     .update({ workflow_status: nextStatus, updated_at: new Date().toISOString() })
     .eq('id', interventionId)
     .not('workflow_status', 'in', '(realise,facture)');
-  if (error) console.error('[appointments] recomputeEntretien error:', error);
+  if (error) logger.error('[appointments] recomputeEntretien error:', error);
 }
 
 /**
@@ -232,7 +232,7 @@ async function syncInterventionScheduledDate(interventionId) {
     .not('status', 'in', '(cancelled,no_show)')
     .order('scheduled_date', { ascending: true })
     .limit(1);
-  if (readError) { console.error('[appointments] syncInterventionScheduledDate read error:', readError); return; }
+  if (readError) { logger.error('[appointments] syncInterventionScheduledDate read error:', readError); return; }
   const nextDate = rows?.[0]?.scheduled_date;
   if (!nextDate) return; // plus de RDV actif : le reflux « À planifier » (recompute) efface la date côté DB
   const { error } = await supabase
@@ -240,7 +240,7 @@ async function syncInterventionScheduledDate(interventionId) {
     .update({ scheduled_date: nextDate, updated_at: new Date().toISOString() })
     .eq('id', interventionId)
     .not('workflow_status', 'in', '(realise,facture)');
-  if (error) console.error('[appointments] syncInterventionScheduledDate error:', error);
+  if (error) logger.error('[appointments] syncInterventionScheduledDate error:', error);
 }
 
 /**
@@ -258,20 +258,20 @@ async function recomputeChantierAfterUnschedule(chantierId) {
     .eq('chantier_id', chantierId)
     .eq('appointment_type', 'installation')
     .not('status', 'in', '(cancelled,no_show)');
-  if (countError) { console.error('[appointments] recomputeChantier count error:', countError); return; }
+  if (countError) { logger.error('[appointments] recomputeChantier count error:', countError); return; }
   if (count > 0) return;
   const { data: chantier, error: readError } = await supabase
     .from('majordhome_chantiers')
     .select('id, org_id, chantier_status')
     .eq('id', chantierId).maybeSingle();
-  if (readError) { console.error('[appointments] recomputeChantier read error:', readError); return; }
+  if (readError) { logger.error('[appointments] recomputeChantier read error:', readError); return; }
   if (chantier?.chantier_status !== 'planification') return;
   const { data: patched, error } = await supabase
     .from('majordhome_chantiers_write')
     .update({ chantier_status: 'commande_recue', planification_date: null, updated_at: new Date().toISOString() })
     .eq('id', chantier.id).eq('org_id', chantier.org_id)
     .select('id').maybeSingle();
-  if (error || !patched) console.error('[appointments] recomputeChantier error:', error || 'aucune ligne (RLS ?)');
+  if (error || !patched) logger.error('[appointments] recomputeChantier error:', error || 'aucune ligne (RLS ?)');
 }
 
 /**
@@ -328,7 +328,7 @@ export const appointmentsService = {
       const { data, error } = await query;
 
       if (error) {
-        console.error('[appointments] getAppointments error:', error);
+        logger.error('[appointments] getAppointments error:', error);
         return { data: null, error };
       }
 
@@ -350,7 +350,7 @@ export const appointmentsService = {
 
       return { data: filteredData, error: null };
     } catch (err) {
-      console.error('[appointments] getAppointments error:', err);
+      logger.error('[appointments] getAppointments error:', err);
       return { data: null, error: err };
     }
   },
@@ -405,7 +405,7 @@ export const appointmentsService = {
         error: null,
       };
     } catch (err) {
-      console.error('[appointments] getClientAppointments error:', err);
+      logger.error('[appointments] getClientAppointments error:', err);
       return { data: null, error: err };
     }
   },
@@ -439,7 +439,7 @@ export const appointmentsService = {
         error: null,
       };
     } catch (err) {
-      console.error('[appointments] getAppointmentById error:', err);
+      logger.error('[appointments] getAppointmentById error:', err);
       return { data: null, error: err };
     }
   },
@@ -471,7 +471,7 @@ export const appointmentsService = {
             (appointmentData.postal_code && byCp.get(String(appointmentData.postal_code).trim())) ||
             null;
         } catch (e) {
-          console.warn('[appointments] grand_secteur snapshot skipped:', e?.message);
+          logger.warn('[appointments] grand_secteur snapshot skipped:', e?.message);
         }
       }
 
@@ -487,7 +487,7 @@ export const appointmentsService = {
         .single();
 
       if (error) {
-        console.error('[appointments] createAppointment error:', error);
+        logger.error('[appointments] createAppointment error:', error);
         return { data: null, error };
       }
 
@@ -516,7 +516,7 @@ export const appointmentsService = {
 
       return { data: { ...appointment, technician_ids: technicianIds }, error: null };
     } catch (err) {
-      console.error('[appointments] createAppointment error:', err);
+      logger.error('[appointments] createAppointment error:', err);
       return { data: null, error: err };
     }
   },
@@ -549,7 +549,7 @@ export const appointmentsService = {
         .single();
 
       if (error) {
-        console.error('[appointments] updateAppointment error:', error);
+        logger.error('[appointments] updateAppointment error:', error);
         return { data: null, error };
       }
 
@@ -557,7 +557,7 @@ export const appointmentsService = {
       if ('scheduled_date' in updates && appointment?.lead_id) {
         leadsService
           .updateLead(appointment.lead_id, { appointment_date: updates.scheduled_date })
-          .catch((err) => console.error('[appointments] sync lead.appointment_date error:', err));
+          .catch((err) => logger.error('[appointments] sync lead.appointment_date error:', err));
       }
 
       // Même cascade pour la carte entretien / SAV : sa `scheduled_date` suit le RDV. Sans ça un
@@ -636,7 +636,7 @@ export const appointmentsService = {
 
       return { data: { ...appointment, technician_ids: technicianIds }, error: null };
     } catch (err) {
-      console.error('[appointments] updateAppointment error:', err);
+      logger.error('[appointments] updateAppointment error:', err);
       return { data: null, error: err };
     }
   },
@@ -710,7 +710,7 @@ export const appointmentsService = {
         .eq('id', appointmentId);
 
       if (error) {
-        console.error('[appointments] deleteAppointment error:', error);
+        logger.error('[appointments] deleteAppointment error:', error);
         return { error };
       }
 
@@ -730,7 +730,7 @@ export const appointmentsService = {
 
       return { error: null };
     } catch (err) {
-      console.error('[appointments] deleteAppointment error:', err);
+      logger.error('[appointments] deleteAppointment error:', err);
       return { error: err };
     }
   },
@@ -754,13 +754,13 @@ export const appointmentsService = {
         .order('display_name', { ascending: true });
 
       if (error) {
-        console.error('[appointments] getTeamMembers error:', error);
+        logger.error('[appointments] getTeamMembers error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (err) {
-      console.error('[appointments] getTeamMembers error:', err);
+      logger.error('[appointments] getTeamMembers error:', err);
       return { data: null, error: err };
     }
   },
@@ -776,12 +776,12 @@ export const appointmentsService = {
         p_color: color,
       });
       if (error) {
-        console.error('[appointments] setTeamMemberColor error:', error);
+        logger.error('[appointments] setTeamMemberColor error:', error);
         return { error };
       }
       return { error: null };
     } catch (err) {
-      console.error('[appointments] setTeamMemberColor error:', err);
+      logger.error('[appointments] setTeamMemberColor error:', err);
       return { error: err };
     }
   },
@@ -852,12 +852,12 @@ export const appointmentsService = {
         p_color: color,
       });
       if (error) {
-        console.error('[appointments] ensureTeamMemberForUser error:', error);
+        logger.error('[appointments] ensureTeamMemberForUser error:', error);
         return { data: null, error };
       }
       return { data, error: null };
     } catch (err) {
-      console.error('[appointments] ensureTeamMemberForUser error:', err);
+      logger.error('[appointments] ensureTeamMemberForUser error:', err);
       return { data: null, error: err };
     }
   },
@@ -904,7 +904,7 @@ export const appointmentsService = {
         .eq('scheduled_date', date)
         .not('status', 'in', '(cancelled,no_show)')
         .order('scheduled_start', { ascending: true });
-      if (error) { console.error('[appointments] getTeamDayAvailability error:', error); return { data: null, error }; }
+      if (error) { logger.error('[appointments] getTeamDayAvailability error:', error); return { data: null, error }; }
 
       const rows = data || [];
       if (rows.length === 0) return { data: [], error: null };
@@ -924,7 +924,7 @@ export const appointmentsService = {
       const enriched = rows.map(r => ({ ...r, technician_ids: byAppt.get(r.id) || [] }));
       return { data: enriched, error: null };
     } catch (err) {
-      console.error('[appointments] getTeamDayAvailability error:', err);
+      logger.error('[appointments] getTeamDayAvailability error:', err);
       return { data: null, error: err };
     }
   },
@@ -996,7 +996,7 @@ export const appointmentsService = {
         .delete()
         .eq('appointment_id', appointmentId)
         .eq('technician_id', technicianId);
-      if (error) { console.error('[appointments] removeAppointmentTechnician error:', error); return { error }; }
+      if (error) { logger.error('[appointments] removeAppointmentTechnician error:', error); return { error }; }
 
       // Re-sync Google avec la liste de techs restante (fire-and-forget).
       const { data: appointment } = await supabase
@@ -1012,7 +1012,7 @@ export const appointmentsService = {
       }
       return { error: null };
     } catch (err) {
-      console.error('[appointments] removeAppointmentTechnician error:', err);
+      logger.error('[appointments] removeAppointmentTechnician error:', err);
       return { error: err };
     }
   },

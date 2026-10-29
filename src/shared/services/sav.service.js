@@ -342,13 +342,13 @@ export const savService = {
         .limit(limit);
 
       if (error) {
-        console.error('[sav] getEntretiensSAV error:', error);
+        logger.error('[sav] getEntretiensSAV error:', error);
         return { data: null, error };
       }
 
       return { data: data || [], error: null };
     } catch (err) {
-      console.error('[sav] getEntretiensSAV error:', err);
+      logger.error('[sav] getEntretiensSAV error:', err);
       return { data: null, error: err };
     }
   },
@@ -368,7 +368,7 @@ export const savService = {
         .eq('status', 'active');
 
       if (contractsError) {
-        console.error('[sav] getStats contracts error:', contractsError);
+        logger.error('[sav] getStats contracts error:', contractsError);
         return { data: null, error: contractsError };
       }
 
@@ -379,7 +379,7 @@ export const savService = {
         .eq('org_id', orgId);
 
       if (intError) {
-        console.error('[sav] getStats interventions error:', intError);
+        logger.error('[sav] getStats interventions error:', intError);
         return { data: null, error: intError };
       }
 
@@ -448,7 +448,7 @@ export const savService = {
 
       return { data: stats, error: null };
     } catch (err) {
-      console.error('[sav] getStats error:', err);
+      logger.error('[sav] getStats error:', err);
       return { data: null, error: err };
     }
   },
@@ -479,7 +479,7 @@ export const savService = {
           .limit(1);
 
         if (existing && existing.length > 0) {
-          console.warn('[sav] createEntretien: entretien actif déjà existant pour contrat', contractId);
+          logger.warn('[sav] createEntretien: entretien actif déjà existant pour contrat', contractId);
           return { data: null, error: { message: 'Un entretien est déjà en cours pour ce contrat' } };
         }
       }
@@ -501,13 +501,13 @@ export const savService = {
         .single();
 
       if (error) {
-        console.error('[sav] createEntretien error:', error);
+        logger.error('[sav] createEntretien error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (err) {
-      console.error('[sav] createEntretien error:', err);
+      logger.error('[sav] createEntretien error:', err);
       return { data: null, error: err };
     }
   },
@@ -532,12 +532,12 @@ export const savService = {
         .eq('id', interventionId);
 
       if (error) {
-        console.error('[sav] deleteEntretienCard error:', error);
+        logger.error('[sav] deleteEntretienCard error:', error);
         return { error };
       }
       return { error: null };
     } catch (err) {
-      console.error('[sav] deleteEntretienCard error:', err);
+      logger.error('[sav] deleteEntretienCard error:', err);
       return { error: err };
     }
   },
@@ -574,13 +574,13 @@ export const savService = {
         .single();
 
       if (error) {
-        console.error('[sav] createSAV error:', error);
+        logger.error('[sav] createSAV error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (err) {
-      console.error('[sav] createSAV error:', err);
+      logger.error('[sav] createSAV error:', err);
       return { data: null, error: err };
     }
   },
@@ -604,13 +604,13 @@ export const savService = {
         .single();
 
       if (error) {
-        console.error('[sav] updateWorkflowStatus error:', error);
+        logger.error('[sav] updateWorkflowStatus error:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (err) {
-      console.error('[sav] updateWorkflowStatus error:', err);
+      logger.error('[sav] updateWorkflowStatus error:', err);
       return { data: null, error: err };
     }
   },
@@ -678,7 +678,7 @@ export const savService = {
       }
       return { error: null };
     } catch (error) {
-      console.error('[sav] scheduleEntretien error:', error);
+      logger.error('[sav] scheduleEntretien error:', error);
       return { error };
     }
   },
@@ -762,12 +762,12 @@ export const savService = {
         .single();
 
       if (error) {
-        console.error('[sav] updatePartsOrderStatus error:', error);
+        logger.error('[sav] updatePartsOrderStatus error:', error);
       }
 
       return { data, error: error || null };
     } catch (err) {
-      console.error('[sav] updatePartsOrderStatus error:', err);
+      logger.error('[sav] updatePartsOrderStatus error:', err);
       return { data: null, error: err };
     }
   },
@@ -791,12 +791,12 @@ export const savService = {
         .single();
 
       if (error) {
-        console.error('[sav] updateDevis error:', error);
+        logger.error('[sav] updateDevis error:', error);
       }
 
       return { data, error: error || null };
     } catch (err) {
-      console.error('[sav] updateDevis error:', err);
+      logger.error('[sav] updateDevis error:', err);
       return { data: null, error: err };
     }
   },
@@ -816,12 +816,12 @@ export const savService = {
         .single();
 
       if (error) {
-        console.error('[sav] updateNotes error:', error);
+        logger.error('[sav] updateNotes error:', error);
       }
 
       return { data, error: error || null };
     } catch (err) {
-      console.error('[sav] updateNotes error:', err);
+      logger.error('[sav] updateNotes error:', err);
       return { data: null, error: err };
     }
   },
@@ -841,12 +841,12 @@ export const savService = {
         .single();
 
       if (error) {
-        console.error('[sav] updateSavDescription error:', error);
+        logger.error('[sav] updateSavDescription error:', error);
       }
 
       return { data, error: error || null };
     } catch (err) {
-      console.error('[sav] updateSavDescription error:', err);
+      logger.error('[sav] updateSavDescription error:', err);
       return { data: null, error: err };
     }
   },
@@ -891,12 +891,12 @@ export const savService = {
         .single();
 
       if (error) {
-        console.error('[sav] updateFields error:', error);
+        logger.error('[sav] updateFields error:', error);
       }
 
       return { data, error: error || null };
     } catch (err) {
-      console.error('[sav] updateFields error:', err);
+      logger.error('[sav] updateFields error:', err);
       return { data: null, error: err };
     }
   },
@@ -1152,7 +1152,7 @@ export const savService = {
       });
 
       if (error) {
-        console.error(`[sav] sendAvisRequest error for ${phone}:`, error);
+        logger.error(`[sav] sendAvisRequest error for ${phone}:`, error);
         if (!firstError) firstError = error;
       } else {
         successCount++;
@@ -1209,7 +1209,7 @@ export const savService = {
     });
 
     if (error) {
-      console.error('[sav] sendEntretienReminder error:', error);
+      logger.error('[sav] sendEntretienReminder error:', error);
       return { data: null, error };
     }
     return { data: { success: true }, error: null };

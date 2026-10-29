@@ -24,6 +24,7 @@ import {
   pricingService,
 } from '@services/pricing.service';
 import { formatEuro } from '@/lib/utils';
+import { logger } from '@lib/logger';
 
 export function ContractPricingSection({ contractId, contract, client }) {
   const queryClient = useQueryClient();
@@ -151,7 +152,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
         false
       );
       if (error) {
-        console.warn('[ContractPricingSection] auto-sync refusé:', error);
+        logger.warn('[ContractPricingSection] auto-sync refusé:', error);
         toast.error(
           `Le montant du contrat n’a pas pu être réaligné sur le calcul — le montant enregistré reste ${formatEuro(currentAmount)}`,
           { id: 'contract-amount-sync' }
@@ -176,7 +177,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
           await clearOverride(item.equipmentId);
           toast.success('Ligne réalignée sur le prix grille');
         } catch (err) {
-          console.error('[ContractPricingSection] clear line override:', err);
+          logger.error('[ContractPricingSection] clear line override:', err);
           toast.error('Erreur lors de la réinitialisation');
         }
       }
@@ -198,7 +199,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
       );
       toast.success('Prix de la ligne forcé');
     } catch (err) {
-      console.error('[ContractPricingSection] set line override:', err);
+      logger.error('[ContractPricingSection] set line override:', err);
       toast.error('Erreur lors du forçage du prix');
     }
   }, [setOverride, clearOverride]);
@@ -208,7 +209,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
       await clearOverride(item.equipmentId);
       toast.success('Ligne réalignée sur le prix grille');
     } catch (err) {
-      console.error('[ContractPricingSection] clear line override:', err);
+      logger.error('[ContractPricingSection] clear line override:', err);
       toast.error('Erreur lors de la réinitialisation');
     }
   }, [clearOverride]);

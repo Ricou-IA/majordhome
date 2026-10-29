@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react';
 import { X, Loader2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { CHANNEL_CONFIG } from './longTermUtils';
+import { logger } from '@lib/logger';
 
 const CHANNEL_OPTIONS = ['phone', 'email', 'sms', 'meeting', 'note'];
 
@@ -60,7 +61,7 @@ export function AddInteractionModal({
       });
       onClose();
     } catch (err) {
-      console.error('[AddInteractionModal] error:', err);
+      logger.error('[AddInteractionModal] error:', err);
       toast.error('Erreur lors de l\'ajout');
     }
   };

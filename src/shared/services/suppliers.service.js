@@ -71,7 +71,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[suppliersService] getSuppliers:', error);
+      logger.error('[suppliersService] getSuppliers:', error);
       return { data: [], error };
     }
   },
@@ -89,7 +89,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] getSupplierById:', error);
+      logger.error('[suppliersService] getSupplierById:', error);
       return { data: null, error };
     }
   },
@@ -125,7 +125,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] createSupplier:', error);
+      logger.error('[suppliersService] createSupplier:', error);
       return { data: null, error };
     }
   },
@@ -161,7 +161,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] updateSupplier:', error);
+      logger.error('[suppliersService] updateSupplier:', error);
       return { data: null, error };
     }
   },
@@ -328,7 +328,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] deactivateSupplier:', error);
+      logger.error('[suppliersService] deactivateSupplier:', error);
       return { data: null, error };
     }
   },
@@ -367,7 +367,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: data || [], count: count || 0, error: null };
     } catch (error) {
-      console.error('[suppliersService] getProducts:', error);
+      logger.error('[suppliersService] getProducts:', error);
       return { data: [], count: 0, error };
     }
   },
@@ -390,7 +390,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[suppliersService] getAccessoriesForProduct:', error);
+      logger.error('[suppliersService] getAccessoriesForProduct:', error);
       return { data: [], error };
     }
   },
@@ -433,7 +433,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[suppliersService] getProductsByCategory:', error);
+      logger.error('[suppliersService] getProductsByCategory:', error);
       return { data: [], error };
     }
   },
@@ -481,7 +481,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[suppliersService] searchProducts:', error);
+      logger.error('[suppliersService] searchProducts:', error);
       return { data: [], error };
     }
   },
@@ -499,7 +499,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[suppliersService] getSuppliersByCategory:', error);
+      logger.error('[suppliersService] getSuppliersByCategory:', error);
       return { data: [], error };
     }
   },
@@ -537,7 +537,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: (data || []).map((r) => r.gamme), error: null };
     } catch (error) {
-      console.error('[suppliersService] getDistinctGammes:', error);
+      logger.error('[suppliersService] getDistinctGammes:', error);
       return { data: [], error };
     }
   },
@@ -553,7 +553,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: (data || []).map((r) => r.diametre), error: null };
     } catch (error) {
-      console.error('[suppliersService] getDistinctDiametres:', error);
+      logger.error('[suppliersService] getDistinctDiametres:', error);
       return { data: [], error };
     }
   },
@@ -578,7 +578,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[suppliersService] getFilteredProducts:', error);
+      logger.error('[suppliersService] getFilteredProducts:', error);
       return { data: [], error };
     }
   },
@@ -648,7 +648,7 @@ export const suppliersService = {
       }
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] createProduct:', error);
+      logger.error('[suppliersService] createProduct:', error);
       return { data: null, error };
     }
   },
@@ -732,7 +732,7 @@ export const suppliersService = {
 
       return { data: { imported }, error: null };
     } catch (error) {
-      console.error('[suppliersService] bulkCreateProducts:', error);
+      logger.error('[suppliersService] bulkCreateProducts:', error);
       return { data: null, error };
     }
   },
@@ -789,7 +789,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] updateProduct:', error);
+      logger.error('[suppliersService] updateProduct:', error);
       return { data: null, error };
     }
   },
@@ -808,7 +808,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] deactivateProduct:', error);
+      logger.error('[suppliersService] deactivateProduct:', error);
       return { data: null, error };
     }
   },
@@ -830,7 +830,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[suppliersService] getProductDocuments:', error);
+      logger.error('[suppliersService] getProductDocuments:', error);
       return { data: [], error };
     }
   },
@@ -848,7 +848,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[suppliersService] getDocumentsByProductIds:', error);
+      logger.error('[suppliersService] getDocumentsByProductIds:', error);
       return { data: [], error };
     }
   },
@@ -889,7 +889,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] uploadProductDocument:', error);
+      logger.error('[suppliersService] uploadProductDocument:', error);
       return { data: null, error };
     }
   },
@@ -911,7 +911,7 @@ export const suppliersService = {
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      console.error('[suppliersService] deleteProductDocument:', error);
+      logger.error('[suppliersService] deleteProductDocument:', error);
       return { error };
     }
   },
@@ -932,7 +932,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] getProductById:', error);
+      logger.error('[suppliersService] getProductById:', error);
       return { data: null, error };
     }
   },
@@ -954,7 +954,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data: data || [], error: null };
     } catch (error) {
-      console.error('[suppliersService] getProductVariants:', error);
+      logger.error('[suppliersService] getProductVariants:', error);
       return { data: [], error };
     }
   },
@@ -1001,7 +1001,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] uploadProductImage:', error);
+      logger.error('[suppliersService] uploadProductImage:', error);
       return { data: null, error };
     }
   },
@@ -1028,7 +1028,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] setProductImageFromUrl:', error);
+      logger.error('[suppliersService] setProductImageFromUrl:', error);
       return { data: null, error };
     }
   },
@@ -1066,7 +1066,7 @@ export const suppliersService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      console.error('[suppliersService] clearProductImage:', error);
+      logger.error('[suppliersService] clearProductImage:', error);
       return { data: null, error };
     }
   },

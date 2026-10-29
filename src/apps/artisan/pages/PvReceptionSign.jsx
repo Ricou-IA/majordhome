@@ -26,6 +26,7 @@ import { formatEuro, formatDateFR } from '@/lib/utils';
 import { generatePvReceptionPdfBlob } from '../components/chantiers/PvReceptionPDF';
 import { CertificatSignaturePad } from '../components/certificat/CertificatSignaturePad';
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // HOOK : Charger le chantier (via vue majordhome_chantiers)
@@ -172,7 +173,7 @@ export default function PvReceptionSign() {
       toast.success('PV de réception signé et généré');
       navigate('/chantiers');
     } catch (err) {
-      console.error('[PvReceptionSign] Error:', err);
+      logger.error('[PvReceptionSign] Error:', err);
       toast.error('Erreur lors de la génération du PV');
     } finally {
       setIsSaving(false);

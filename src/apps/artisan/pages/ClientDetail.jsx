@@ -40,6 +40,7 @@ import { TabMailings } from './client-detail/TabMailings';
 import { TabSms } from './client-detail/TabSms';
 import { TabDevisPL } from './client-detail/TabDevisPL';
 import { TabFacturesPL } from './client-detail/TabFacturesPL';
+import { logger } from '@lib/logger';
 
 const TABS = [
   { id: 'info', label: 'Informations', icon: User },
@@ -175,7 +176,7 @@ export default function ClientDetail() {
         internalNotes: formData.internalNotes,
       });
     } catch (err) {
-      console.error('[ClientDetail] Erreur sauvegarde:', err);
+      logger.error('[ClientDetail] Erreur sauvegarde:', err);
       toast.error('Erreur lors de la sauvegarde');
       return;
     }
@@ -192,7 +193,7 @@ export default function ClientDetail() {
       setShowArchiveConfirm(false);
       navigate('/clients');
     } catch (err) {
-      console.error('[ClientDetail] Erreur archivage:', err);
+      logger.error('[ClientDetail] Erreur archivage:', err);
       toast.error("Erreur lors de l'archivage");
     }
   };
@@ -226,7 +227,7 @@ export default function ClientDetail() {
       toast.success('Client désarchivé');
       refresh();
     } catch (err) {
-      console.error('[ClientDetail] Erreur désarchivage:', err);
+      logger.error('[ClientDetail] Erreur désarchivage:', err);
       toast.error('Erreur lors du désarchivage');
     }
   };
@@ -255,7 +256,7 @@ export default function ClientDetail() {
         sms: smsRes.count ?? 0,
       });
     } catch (err) {
-      console.warn('[ClientDetail] hard delete preflight count error:', err);
+      logger.warn('[ClientDetail] hard delete preflight count error:', err);
       setHardDeleteCounts({ contracts: null, interventions: null, certificats: null, appointments: null, mailings: null, sms: null });
     }
   };
@@ -268,7 +269,7 @@ export default function ClientDetail() {
       setHardDeleteCounts(null);
       navigate('/clients');
     } catch (err) {
-      console.error('[ClientDetail] hard delete error:', err);
+      logger.error('[ClientDetail] hard delete error:', err);
       const code = err?.message || '';
       const msg = code.includes('org_admin_required') || code.includes('not_member_of_org')
         ? 'Action réservée aux administrateurs'

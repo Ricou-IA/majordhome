@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@lib/logger';
 
 /**
  * Wrapper try/catch standardisé pour les méthodes de service.
@@ -31,7 +32,7 @@ export async function withErrorHandling(fn, context = '') {
     return { data: result, error: null };
   } catch (error) {
     if (context) {
-      console.error(`[${context}]`, error);
+      logger.error(`[${context}]`, error);
     }
     return { data: null, error };
   }
@@ -74,7 +75,7 @@ export async function withErrorHandlingCount(fn, context = '') {
     return { data: result.data, count: result.count, error: null };
   } catch (error) {
     if (context) {
-      console.error(`[${context}]`, error);
+      logger.error(`[${context}]`, error);
     }
     return { data: null, count: 0, error };
   }
@@ -143,7 +144,7 @@ export async function getMajordhomeOrgId(coreOrgId) {
     .single();
 
   if (error || !data) {
-    console.error('[serviceHelpers] Impossible de résoudre org_id:', error);
+    logger.error('[serviceHelpers] Impossible de résoudre org_id:', error);
     throw new Error('Organisation majordhome introuvable pour cet org_id');
   }
 

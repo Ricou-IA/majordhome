@@ -13,6 +13,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { clientKeys } from '@hooks/cacheKeys';
 import { UserPlus, Loader2, Globe } from 'lucide-react';
+import { logger } from '@lib/logger';
 
 export function InviteClientButton({ client }) {
   const [inviting, setInviting] = useState(false);
@@ -57,7 +58,7 @@ export function InviteClientButton({ client }) {
       toast.success(`Invitation envoyée à ${client.email}`);
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, client.id) });
     } catch (err) {
-      console.error('[InviteClientButton] error:', err);
+      logger.error('[InviteClientButton] error:', err);
       const msg = err?.message || 'Erreur lors de l\'envoi de l\'invitation';
       toast.error(msg);
     } finally {

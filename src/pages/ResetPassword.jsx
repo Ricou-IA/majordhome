@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { authService } from '@services/auth.service';
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
+import { logger } from '@lib/logger';
 
 // =============================================================================
 // PAGE RESET PASSWORD
@@ -72,7 +73,7 @@ export default function ResetPassword() {
       );
       setFormData({ ...formData, email: '' });
     } catch (err) {
-      console.error('[ResetPassword] Erreur:', err);
+      logger.error('[ResetPassword] Erreur:', err);
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
@@ -111,7 +112,7 @@ export default function ResetPassword() {
         navigate('/login');
       }, 2000);
     } catch (err) {
-      console.error('[ResetPassword] Erreur:', err);
+      logger.error('[ResetPassword] Erreur:', err);
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);

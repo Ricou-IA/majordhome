@@ -30,6 +30,7 @@ import {
 } from '@hooks/usePennylane';
 import { technicalVisitService } from '@services/technicalVisit.service';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
+import { logger } from '@lib/logger';
 
 // Même palette deutan-friendly que QuoteCandidatesModal
 const QUOTE_STATUS_CONFIG = {
@@ -109,7 +110,7 @@ export function MarkWonQuoteModal({
     try {
       if (onBeforeMark) await onBeforeMark();
     } catch (err) {
-      console.error('[MarkWonQuoteModal] onBeforeMark failed:', err);
+      logger.error('[MarkWonQuoteModal] onBeforeMark failed:', err);
       toast.error('Erreur en sauvegardant le lead avant bascule');
       return;
     }
@@ -124,7 +125,7 @@ export function MarkWonQuoteModal({
         technicalVisitService.getByLeadId(leadId).then(({ data: visit }) => {
           if (visit?.id) {
             technicalVisitService.lock(visit.id, userId).catch((e) =>
-              console.error('[MarkWonQuoteModal] lock technical visit error:', e)
+              logger.error('[MarkWonQuoteModal] lock technical visit error:', e)
             );
           }
         }).catch(() => { /* silencieux : pas de fiche technique = pas de lock */ });
@@ -138,7 +139,7 @@ export function MarkWonQuoteModal({
       onMarked?.(result);
       handleClose();
     } catch (err) {
-      console.error('[MarkWonQuoteModal] markWon error:', err);
+      logger.error('[MarkWonQuoteModal] markWon error:', err);
       toast.error(err?.message || 'Erreur lors de la bascule en Gagné');
     }
   }, [

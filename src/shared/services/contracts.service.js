@@ -14,6 +14,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@lib/serviceHelpers';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // CONSTANTES
@@ -341,14 +342,14 @@ export const contractsService = {
           })
           .select('id')
           .single();
-        if (eqError) { console.warn('[contracts] equipment insert skipped:', eqError); continue; }
+        if (eqError) { logger.warn('[contracts] equipment insert skipped:', eqError); continue; }
         equipmentIds.push(eq.id);
       }
 
       if (equipmentIds.length > 0) {
         const links = equipmentIds.map((eqId) => ({ contract_id: contractId, equipment_id: eqId }));
         const { error: linkError } = await supabase.from('majordhome_contract_equipments').insert(links);
-        if (linkError) console.warn('[contracts] links insert error:', linkError);
+        if (linkError) logger.warn('[contracts] links insert error:', linkError);
       }
 
       return equipmentIds;

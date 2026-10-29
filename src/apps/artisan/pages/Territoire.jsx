@@ -14,6 +14,7 @@ import { useMapZones } from '../components/territoire/useMapZones';
 import { useTerritoireData, useTerritoireStats } from '../components/territoire/useTerritoireData';
 import { territoireService } from '@services/territoire.service';
 import { geocodingService } from '@services/geocoding.service';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // COMPOSANT PAGE
@@ -51,7 +52,7 @@ export default function Territoire() {
     if (!orgId) return;
     territoireService.getUngeocodedLeads(orgId).then(({ count, error }) => {
       if (error) {
-        console.error('[Territoire] getUngeocodedLeads error:', error);
+        logger.error('[Territoire] getUngeocodedLeads error:', error);
       }
       setUngeocodedLeadsCount(count || 0);
     });
@@ -89,7 +90,7 @@ export default function Territoire() {
       refetchPoints();
     } catch (error) {
       toast.error('Erreur lors du géocodage batch');
-      console.error('[Territoire] batch geocode error:', error);
+      logger.error('[Territoire] batch geocode error:', error);
     } finally {
       setBatchRunning(false);
       setBatchProgress(null);
@@ -129,7 +130,7 @@ export default function Territoire() {
       refetchPoints();
     } catch (error) {
       toast.error('Erreur lors du géocodage des leads');
-      console.error('[Territoire] batch geocode leads error:', error);
+      logger.error('[Territoire] batch geocode leads error:', error);
     } finally {
       setLeadBatchRunning(false);
       setLeadBatchProgress(null);

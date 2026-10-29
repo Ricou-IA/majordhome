@@ -8,6 +8,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@lib/logger';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -113,11 +114,11 @@ export const googleCalendarService = {
 
       if (!res.ok) {
         const err = await res.text();
-        console.warn('[gcal] Sync failed:', err);
+        logger.warn('[gcal] Sync failed:', err);
       }
     } catch (err) {
       // Fire-and-forget — log but don't throw
-      console.warn('[gcal] Sync error:', err);
+      logger.warn('[gcal] Sync error:', err);
     }
   },
 };

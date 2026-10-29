@@ -10,6 +10,7 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Loader2 } from 'lucide-react';
 import { certificatsService } from '@services/certificats.service';
+import { logger } from '@lib/logger';
 
 export function CertificatLink({
   interventionId,
@@ -54,7 +55,7 @@ export function CertificatLink({
       // Fallback: no PDF yet → go to wizard page
       navigate(`/certificat/${interventionId}`);
     } catch (err) {
-      console.error('[CertificatLink] error:', err);
+      logger.error('[CertificatLink] error:', err);
       navigate(`/certificat/${interventionId}`);
     } finally {
       setLoading(false);

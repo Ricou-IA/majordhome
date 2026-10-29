@@ -9,6 +9,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { logger } from '@lib/logger';
 
 const DEFAULT_LIMIT = 25;
 
@@ -75,7 +76,7 @@ export function usePaginatedList({
         setOffset((prev) => prev + limit);
       }
     } catch (err) {
-      console.error('[usePaginatedList] loadMore:', err);
+      logger.error('[usePaginatedList] loadMore:', err);
     } finally {
       setLoadingMore(false);
     }

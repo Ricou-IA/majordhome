@@ -21,6 +21,7 @@ import { savService } from '@services/sav.service';
 import { useCertificatChildren, useCertificatEntretienMutations } from '@hooks/useCertificatEntretien';
 import { useAuth } from '@/contexts/AuthContext';
 import { CertificatEquipmentRow } from './CertificatEquipmentRow';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // COMPOSANT
@@ -97,7 +98,7 @@ export function CertificatsSection({ item, onCloseModal }) {
       // dessus. Best effort : la vue continue de dériver si l'écriture échoue.
       if (contractId && !item.contract_id) {
         savService.updateFields(item.id, { contract_id: contractId })
-          .catch((err) => console.warn('[CertificatsSection] backfill contract_id:', err));
+          .catch((err) => logger.warn('[CertificatsSection] backfill contract_id:', err));
       }
       refetch();
     }).catch(() => {
@@ -128,7 +129,7 @@ export function CertificatsSection({ item, onCloseModal }) {
 
     selfHealRef.current = true;
     completeParent(item.id, organization.id).catch((err) => {
-      console.warn('[CertificatsSection] self-heal completeParent error:', err);
+      logger.warn('[CertificatsSection] self-heal completeParent error:', err);
       selfHealRef.current = false;
     });
   }, [

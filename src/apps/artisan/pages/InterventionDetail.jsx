@@ -47,6 +47,7 @@ import { PhotoCapture } from '../components/interventions/PhotoCapture';
 import { SignaturePad } from '../components/interventions/SignaturePad';
 import { PartsReplacedList } from '../components/interventions/PartsReplacedList';
 import { PdfViewer } from '../components/interventions/PdfViewer';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // PAGE PRINCIPALE
@@ -135,7 +136,7 @@ export default function InterventionDetail() {
       toast.success('Intervention démarrée');
       refresh();
     } catch (err) {
-      console.error('[InterventionDetail] handleStart error:', err);
+      logger.error('[InterventionDetail] handleStart error:', err);
       toast.error("Erreur au démarrage de l'intervention");
     }
   };
@@ -150,7 +151,7 @@ export default function InterventionDetail() {
       toast.success('Intervention terminée');
       refresh();
     } catch (err) {
-      console.error('[InterventionDetail] handleComplete error:', err);
+      logger.error('[InterventionDetail] handleComplete error:', err);
       toast.error("Erreur à la finalisation de l'intervention");
     }
   };
@@ -168,7 +169,7 @@ export default function InterventionDetail() {
       draft.saveDraft(formData);
       toast.success('Rapport sauvegardé');
     } catch (err) {
-      console.error('[InterventionDetail] handleSaveReport error:', err);
+      logger.error('[InterventionDetail] handleSaveReport error:', err);
       toast.error('Erreur de sauvegarde du rapport');
     }
   };
@@ -195,7 +196,7 @@ export default function InterventionDetail() {
       fileUrls.refreshUrls();
       refresh();
     } catch (err) {
-      console.error('[InterventionDetail] handlePhotoUpload error:', err);
+      logger.error('[InterventionDetail] handlePhotoUpload error:', err);
       toast.error("Erreur d'upload de la photo");
     }
   };
@@ -218,7 +219,7 @@ export default function InterventionDetail() {
       fileUrls.refreshUrls();
       refresh();
     } catch (err) {
-      console.error('[InterventionDetail] handlePhotoDelete error:', err);
+      logger.error('[InterventionDetail] handlePhotoDelete error:', err);
       toast.error('Erreur de suppression de la photo');
     }
   };
@@ -240,7 +241,7 @@ export default function InterventionDetail() {
       fileUrls.refreshUrls();
       refresh();
     } catch (err) {
-      console.error('[InterventionDetail] handleSignatureConfirm error:', err);
+      logger.error('[InterventionDetail] handleSignatureConfirm error:', err);
       toast.error("Erreur d'enregistrement de la signature");
     }
   };
@@ -266,7 +267,7 @@ export default function InterventionDetail() {
         fileUrls.refreshUrls();
       }, 5000);
     } catch (err) {
-      console.error('[InterventionDetail] handleGeneratePdf error:', err);
+      logger.error('[InterventionDetail] handleGeneratePdf error:', err);
       setPdfError("Erreur de génération du PV. Vérifiez la connexion N8N.");
       toast.error('Erreur de génération du PV');
     }
@@ -280,7 +281,7 @@ export default function InterventionDetail() {
         description: `Email envoyé à ${client?.email || 'l\'adresse du client'}`,
       });
     } catch (err) {
-      console.error('[InterventionDetail] handleSendReport error:', err);
+      logger.error('[InterventionDetail] handleSendReport error:', err);
       toast.error("Erreur d'envoi du rapport");
     }
   };
