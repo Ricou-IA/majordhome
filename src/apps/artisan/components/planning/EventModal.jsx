@@ -8,7 +8,7 @@
  *   - EventFormSections.jsx (SectionType, SectionDateTime, SectionClient, SectionAssignee, SectionNotes, SectionSouplesse)
  *   - EventConfirmations.jsx (CancelConfirmation, DeleteConfirmation)
  *   - AppointmentHistorySection.jsx (mouchard : historique des écritures du RDV)
- *   - eventForm.js (formulaire ↔ RDV, validation, objet auto — pur)
+ *   - @/lib/eventForm.js (formulaire ↔ RDV, validation, objet auto — pur)
  *   - eventActivation.js (carte du RDV : walk-in, filet doublon, carte du client)
  *   - useEventClientLinking.js (client / carte pipeline liés)
  *   - useEventSaveActions.js (classique, assistant, re-planification, suite)
@@ -47,7 +47,7 @@ import { Ban } from 'lucide-react';
 import {
   VT_PHONE_REQUIRED_MESSAGE, appointmentToForm, newEventForm, linkedClientFromAppointment,
   linkedLeadFromAppointment, linkedClientFromPrefill, applyFieldChange, validateEventForm,
-} from './eventForm';
+} from '@/lib/eventForm';
 import { useEventClientLinking } from './useEventClientLinking';
 import { useEventSaveActions } from './useEventSaveActions';
 import { useAppointmentEntretien } from './useAppointmentEntretien';

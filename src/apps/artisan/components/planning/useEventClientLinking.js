@@ -10,7 +10,7 @@ import { useClientSearch } from '@hooks/useClients';
 import { useLeadSearch, useRecentPipelineCards } from '@hooks/useLeads';
 import { BOUCLABLE_STATUS_IDS } from '@services/leads.service';
 import { logger } from '@lib/logger';
-import { EMPTY_CONTACT, contactFromRecord } from './eventForm';
+import { EMPTY_CONTACT, contactFromRecord } from '@/lib/eventForm';
 
 const clientRef = (c) => ({
   id: c.id,

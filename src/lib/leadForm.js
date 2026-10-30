@@ -2,7 +2,7 @@
  * leadForm.js — état du formulaire de LeadModal et payloads d'écriture (module pur).
  * Les champs de contact sont partagés par le lead et par la fiche client liée.
  */
-import { formatDateForInput } from '@/lib/utils';
+import { formatDateForInput } from './utils.js';
 
 export const EMPTY_LEAD_FORM = Object.freeze({
   first_name: '', last_name: '', company_name: '',

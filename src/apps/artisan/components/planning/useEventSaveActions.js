@@ -16,7 +16,7 @@ import { PHONE_REQUIRED_TYPES } from '@/lib/planningEvents';
 import { hasPhoneNumber } from '@/lib/phoneUtils';
 import { logger } from '@lib/logger';
 import { resolveEventActivation, reportActivationError } from './eventActivation';
-import { VT_PHONE_REQUIRED_MESSAGE, dupDecisionOf, clientLabelOf, autoSubjectFor } from './eventForm';
+import { VT_PHONE_REQUIRED_MESSAGE, dupDecisionOf, clientLabelOf, autoSubjectFor } from '@/lib/eventForm';
 
 export function useEventSaveActions({
   orgId, userId, isEdit, appointment, attachContext, formData, setErrors, validate,
@@ -71,7 +71,7 @@ export function useEventSaveActions({
       const oldLabel = getAppointmentTypeConfig(appointment?.appointment_type).label;
       const looksAuto = !subject || subject === oldLabel
         || subject.startsWith(`${oldLabel} —`) || subject.startsWith(`${oldLabel}—`);
-      if (looksAuto) subject = autoSubjectFor(formData.appointment_type, formData);
+      if (looksAuto) subject = autoSubjectFor(getAppointmentTypeConfig(formData.appointment_type).label, formData);
     }
 
     // Construire les données à envoyer
@@ -266,7 +266,7 @@ export function useEventSaveActions({
 
       // Objet recalculé si le type change (cohérence type — client), conservé sinon
       const subject = typeChanged
-        ? autoSubjectFor(formData.appointment_type, formData)
+        ? autoSubjectFor(getAppointmentTypeConfig(formData.appointment_type).label, formData)
         : (formData.subject || null);
 
       const ok = await onSave({

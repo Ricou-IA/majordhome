@@ -7,7 +7,7 @@
  * Sous-modules extraits :
  *   ./LeadStatusConfig.js         — ALLOWED_TRANSITIONS, getAllowedNextStatuses, LOST_REASONS
  *   ./LeadFormSections.jsx        — SectionClientLinking, SectionContact, SectionPipeline, etc.
- *   ./leadForm.js                 — état du formulaire et payloads (pur)
+ *   @/lib/leadForm.js             — état du formulaire et payloads (pur)
  *   ./useLeadStatusTransitions.js — gestes de statut (Contacté, RDV, Devis, Perdu, Gagné, appels)
  *   ./useLeadRequalification.js   — requalification en Entretien
  *   ./useLeadClientLinking.js     — liaison à une fiche client (MDH / Pennylane)
@@ -54,7 +54,7 @@ import {
   SectionActions,
   SectionNotes,
 } from './LeadFormSections';
-import { EMPTY_LEAD_FORM, newLeadForm, leadToForm, contactPayload, buildLeadPayload } from './leadForm';
+import { EMPTY_LEAD_FORM, newLeadForm, leadToForm, contactPayload, buildLeadPayload } from '@/lib/leadForm';
 import { useLeadStatusTransitions, VT_PHONE_REQUIRED_MESSAGE } from './useLeadStatusTransitions';
 import { useLeadRequalification } from './useLeadRequalification';
 import { useLeadClientLinking } from './useLeadClientLinking';

@@ -2,10 +2,9 @@
  * eventForm.js — état du formulaire d'EventModal (module pur) : RDV ↔ formulaire,
  * recalcul heure de fin / durée, validation, objet automatique.
  */
-import { formatDateForInput, computeEndTime, computeDuration } from '@/lib/utils';
-import { getAppointmentTypeConfig } from '@services/appointments.service';
-import { PHONE_REQUIRED_TYPES } from '@/lib/planningEvents';
-import { hasPhoneNumber } from '@/lib/phoneUtils';
+import { formatDateForInput, computeEndTime, computeDuration } from './utils.js';
+import { PHONE_REQUIRED_TYPES } from './planningEvents.js';
+import { hasPhoneNumber } from './phoneUtils.js';
 
 // Une visite technique sans numéro = un commercial qui ne peut ni confirmer ni
 // prévenir d'un retard (vécu : lead LOLLENFANT, 2026-09-14). Si un client ou une
@@ -179,8 +178,7 @@ export function clientLabelOf(formData) {
 }
 
 /** Objet automatique « Type — Client » (type seul sans client). */
-export function autoSubjectFor(appointmentType, formData) {
-  const typeLabel = getAppointmentTypeConfig(appointmentType).label;
+export function autoSubjectFor(typeLabel, formData) {
   const clientLabel = clientLabelOf(formData);
   return clientLabel ? `${typeLabel} — ${clientLabel}` : typeLabel;
 }
