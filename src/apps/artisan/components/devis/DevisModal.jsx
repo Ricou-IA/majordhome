@@ -180,8 +180,8 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
       const { invoicingSettings } = await import('@/lib/invoiceDocumentModel.js');
       // Une seule source : le modèle de document (même rendu que l'aperçu de Settings → Devis)
       const model = buildDevisDocumentModel({
-        quote, lines, totals, company: buildCompanyInfo(settings || organization?.settings),
-        config: devisConfig, invoicing: invoicingSettings(settings || organization?.settings),
+        quote, lines, totals, company: buildCompanyInfo(settings),
+        config: devisConfig, invoicing: invoicingSettings(settings),
       });
 
       // annexes : fiche technique de chaque équipement puis brochure de l'entreprise (devisAnnexes.js)

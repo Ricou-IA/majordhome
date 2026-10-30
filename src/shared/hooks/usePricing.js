@@ -21,6 +21,7 @@ import {
   calculateContractTotal,
 } from '@services/pricing.service';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { getOrgHeadquarters } from '@/lib/territoire-config';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { clientKeys, contractKeys, pricingKeys } from '@hooks/cacheKeys';
@@ -344,11 +345,8 @@ export function useContractLineOverrides(contractId) {
 export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
   const { zones, equipmentTypes, rates, discounts } = pricingData || {};
   // P0.19 — siège org pour calcul temps de trajet (null si non configuré)
-  const { organization } = useAuth();
-  const orgHq = useMemo(
-    () => getOrgHeadquarters(organization?.settings),
-    [organization?.settings],
-  );
+  const { settings: orgSettings } = useOrgSettings();
+  const orgHq = useMemo(() => getOrgHeadquarters(orgSettings), [orgSettings]);
 
   // Normaliser l'entrée : string (legacy) ou objet { address, postalCode, city }
   const clientAddress = useMemo(() => {

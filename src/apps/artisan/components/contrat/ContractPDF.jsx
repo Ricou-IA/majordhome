@@ -28,7 +28,7 @@ import { LOGO_BASE64 } from './logo-base64';
 // ============================================================================
 
 // P0.13/P0.14 multi-tenant — Fallback Mayer si pas de company en prop.
-// Le caller doit passer `company` issu de buildCompanyInfo(organization.settings).
+// Le caller doit passer `company` issu de buildCompanyInfo(useOrgSettings().settings).
 const DEFAULT_COMPANY = {
   name: 'Mayer Energie',
   legalName: 'MAYER ENERGIE',

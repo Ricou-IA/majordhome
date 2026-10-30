@@ -17,7 +17,7 @@ import {
   buildContractPresentation,
 } from '@services/pricing.service';
 import { generateContractPdfBlob } from '@apps/artisan/components/contrat/ContractPDF';
-import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@lib/logger';
@@ -29,8 +29,8 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
-  const { organization } = useAuth();
-  const company = useMemo(() => buildCompanyInfo(organization?.settings), [organization]);
+  const { settings } = useOrgSettings();
+  const company = useMemo(() => buildCompanyInfo(settings), [settings]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);

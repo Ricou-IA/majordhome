@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, Check, Copy, Eye, Loader2, X, Sparkles, Zap, Filter } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { useMailSegments } from '@hooks/useMailSegments';
 import { formatResourcesForPrompt, getResources } from './resources';
@@ -37,6 +38,7 @@ function slugifyKey(text) {
  */
 export default function CampaignWizard({ initial, onClose, onSave, isSaving }) {
   const { organization } = useAuth();
+  const { settings: orgSettings } = useOrgSettings();
   const { segments } = useMailSegments(organization?.id);
 
   // État du formulaire
@@ -45,8 +47,8 @@ export default function CampaignWizard({ initial, onClose, onSave, isSaving }) {
 
   const update = useCallback((patch) => setForm((f) => ({ ...f, ...patch })), []);
 
-  const company = useMemo(() => buildCompanyInfo(organization?.settings), [organization]);
-  const resourcesCatalog = useMemo(() => getResources(organization?.settings), [organization]);
+  const company = useMemo(() => buildCompanyInfo(orgSettings), [orgSettings]);
+  const resourcesCatalog = useMemo(() => getResources(orgSettings), [orgSettings]);
   const promptText = useMemo(() => buildPrompt(form, company, resourcesCatalog), [form, company, resourcesCatalog]);
   const jsonText = useMemo(() => JSON.stringify(buildJsonPayload(form), null, 2), [form]);
 

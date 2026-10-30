@@ -6,6 +6,8 @@ import { orgSettingsKeys } from './cacheKeys';
 import { invoiceTemplatesFromSettings } from '@/lib/entretienInvoiceModel';
 import { PIPELINE_MIN_AMOUNT_HT } from '@/lib/constants';
 
+const NO_SETTINGS = Object.freeze({});
+
 /**
  * Hook React Query pour les settings de l'org courante.
  * - settings : objet (vide {} si rien configuré)
@@ -13,9 +15,7 @@ import { PIPELINE_MIN_AMOUNT_HT } from '@/lib/constants';
  * - isDirty est calculé localement par chaque consumer (form values vs initial)
  *
  * AuthContext utilise useState local (pas React Query) pour l'organization,
- * on appelle donc refreshUserData() après save pour rafraîchir l'objet
- * organization de AuthContext (consommé partout via useAuth().organization.settings,
- * notamment par buildCompanyInfo dans les PDFs/emails).
+ * on appelle donc refreshUserData() après save pour que les deux copies restent alignées.
  */
 export function useOrgSettings() {
   const { organization, refreshUserData } = useAuth();
@@ -42,14 +42,17 @@ export function useOrgSettings() {
     onSuccess: async () => {
       qc.invalidateQueries({ queryKey: orgSettingsKeys.byOrg(orgId) });
       // AuthContext gère organization en useState local — refresh manuel
-      // pour que useAuth().organization.settings reflète les nouvelles valeurs
-      // (consommé par buildCompanyInfo, getMapDefaultCenter, etc.)
+      // pour que la copie de session (repli pendant le chargement) suive
       await refreshUserData();
     },
   });
 
   return {
-    settings: query.data ?? {},
+    // Pendant le chargement : les settings déjà chargés par AuthContext (même colonne), jamais {} —
+    // un PDF ou une carte initialisés à ce moment sortiraient neutres. isLoading garde son sens
+    // (les onglets de Réglages attendent la base avant d'initialiser leur formulaire).
+    // Repli figé : un {} neuf à chaque rendu relancerait les useMemo / useEffect qui en dépendent.
+    settings: query.data ?? organization?.settings ?? NO_SETTINGS,
     isLoading: query.isLoading,
     error: query.error,
     save: mutation.mutateAsync,

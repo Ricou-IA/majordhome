@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, AlertTriangle, Info, Grid3x3, MapPin, ExternalLink } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useGeoGridQuota } from '@hooks/useGeoGrid';
 import { fetchCommunes, filterByPopulation, centroidOf } from './communesService';
 
@@ -48,8 +49,8 @@ function normalizeBusinessName(s) {
 
 export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
   const { organization } = useAuth();
+  const { settings: orgSettings } = useOrgSettings();
   const orgName = organization?.name || '';
-  const orgSettings = organization?.settings || {};
   const orgPlaceId = orgSettings.google_place_id || '';
   // P0.20 — Multi-tenant : business name + default city + département depuis settings org
   const orgBusinessName = orgSettings.brand_name || orgName || DEFAULT_CONFIG.businessName;

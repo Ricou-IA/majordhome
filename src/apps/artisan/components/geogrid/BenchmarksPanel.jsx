@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Play, Trash2, Clock, CheckCircle2, XCircle, BarChart3 } from 'lucide-react';
 import { formatDateTimeFR } from '@/lib/utils';
-import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useKeywordLists, useBenchmarks, useDeleteBenchmark, useGeoGridQuota } from '@hooks/useGeoGrid';
 import BenchmarkLauncher from './BenchmarkLauncher';
 import BenchmarkResultTable from './BenchmarkResultTable';
@@ -39,8 +39,8 @@ function StatusBadge({ status, completed, total }) {
 }
 
 export default function BenchmarksPanel({ orgId }) {
-  const { organization } = useAuth();
-  const orgDepartmentLabel = organization?.settings?.geogrid_department_label || '';
+  const { settings: orgSettings } = useOrgSettings();
+  const orgDepartmentLabel = orgSettings?.geogrid_department_label || '';
 
   const [selectedBenchmarkId, setSelectedBenchmarkId] = useState(null);
   const [launcherOpen, setLauncherOpen] = useState(false);

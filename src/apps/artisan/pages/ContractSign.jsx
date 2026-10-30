@@ -33,6 +33,7 @@ import { generateContractPdfBlob } from '../components/contrat/ContractPDF';
 import { CertificatSignaturePad } from '../components/certificat/CertificatSignaturePad';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { logger } from '@lib/logger';
 
@@ -121,7 +122,8 @@ async function sendContractEmail(contract, client, pdfPath) {
 export default function ContractSign() {
   const { organization } = useAuth();
   const orgId = organization?.id;
-  const company = useMemo(() => buildCompanyInfo(organization?.settings), [organization]);
+  const { settings } = useOrgSettings();
+  const company = useMemo(() => buildCompanyInfo(settings), [settings]);
 
   const { clientId } = useParams();
   const navigate = useNavigate();

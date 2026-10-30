@@ -3,6 +3,7 @@ import { X, Play, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import geogridService from '@services/geogrid.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { geogridKeys, FREE_TIER_LIMIT } from '@hooks/useGeoGrid';
@@ -28,15 +29,16 @@ const GRID_SIZES = [
 
 export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaunched }) {
   const { organization } = useAuth();
+  const { settings: orgSettings } = useOrgSettings();
   const queryClient = useQueryClient();
   const cancelRef = useRef(false);
 
   // P0.20 — Multi-tenant : default city + département depuis settings org
-  const orgDefaultCity = organization?.settings?.geogrid_default_city || null;
+  const orgDefaultCity = orgSettings?.geogrid_default_city || null;
   const defaultCityCode = orgDefaultCity?.code || '';
-  const orgBusinessName = organization?.settings?.brand_name || organization?.name || '';
-  const orgDepartmentCode = organization?.settings?.geogrid_target_department || null;
-  const orgDepartmentLabel = organization?.settings?.geogrid_department_label || '';
+  const orgBusinessName = orgSettings?.brand_name || organization?.name || '';
+  const orgDepartmentCode = orgSettings?.geogrid_target_department || null;
+  const orgDepartmentLabel = orgSettings?.geogrid_department_label || '';
 
   const [selectedListId, setSelectedListId] = useState(lists[0]?.id || '');
   const [scanMode, setScanMode] = useState('grid'); // grid | cities
@@ -125,7 +127,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
         list_id: selectedListId,
         scan_mode: scanMode,
         business_name: orgBusinessName,
-        place_id: organization?.settings?.google_place_id || null,
+        place_id: orgSettings?.google_place_id || null,
         center_lat: center.lat,
         center_lng: center.lng,
         radius_km: scanMode === 'grid' ? radiusKm : null,
@@ -156,7 +158,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
           orgId,
           keyword,
           businessName: orgBusinessName,
-          placeId: organization?.settings?.google_place_id || '',
+          placeId: orgSettings?.google_place_id || '',
           searchRadiusM,
         };
 

@@ -24,6 +24,7 @@ import {
 } from '@services/chantiers.service';
 import { useChantierMutations } from '@hooks/useChantiers';
 import { useCanAccess } from '@hooks/usePermissions';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { AdresseItineraire } from '@/apps/artisan/components/shared/AdresseItineraire';
 import { formaterAdresse } from '@/lib/itineraire';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -107,10 +108,8 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
   // Trajet depuis le siège de l'org (P0.19 — paramétré via settings, fallback Mayer/Gaillac
   // tant que territoire_centers n'est pas configuré). Calcul Mapbox idempotent (cache module).
-  const orgHq = useMemo(
-    () => getOrgHeadquarters(organization?.settings),
-    [organization?.settings],
-  );
+  const { settings: orgSettings } = useOrgSettings();
+  const orgHq = useMemo(() => getOrgHeadquarters(orgSettings), [orgSettings]);
   const [drivingInfo, setDrivingInfo] = useState(null);
   const [isLoadingDriving, setIsLoadingDriving] = useState(false);
 

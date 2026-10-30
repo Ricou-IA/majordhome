@@ -1,6 +1,6 @@
 import { Trash2, Eye, Clock } from 'lucide-react';
 import { formatDateTimeFR } from '@/lib/utils';
-import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 
 function getRankColor(rank) {
   if (rank === null || rank === undefined) return 'bg-secondary-100 text-secondary-600';
@@ -10,8 +10,8 @@ function getRankColor(rank) {
 }
 
 export default function ScanHistory({ scans, isLoading, selectedScanId, onSelect, onDelete }) {
-  const { organization } = useAuth();
-  const orgDepartmentLabel = organization?.settings?.geogrid_department_label || 'Département';
+  const { settings: orgSettings } = useOrgSettings();
+  const orgDepartmentLabel = orgSettings?.geogrid_department_label || 'Département';
 
   if (isLoading) {
     return (

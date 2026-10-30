@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as turf from '@turf/turf';
 import { TERRITOIRE_CONFIG, getTerritoireCenters } from '@/lib/territoire-config';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { logger } from '@lib/logger';
 
 // P1.9 — clés localStorage suffixées par orgId pour éviter fuite cross-org
@@ -409,10 +410,8 @@ export function useMapZones(mapboxToken) {
   // P0.19 — centres territoriaux depuis settings org (fallback Mayer si non défini,
   // mais le composant TerritoireMap gère le cas où orgCenters est vide ou ne
   // matche pas la convention gaillac/pechbonnieu attendue par calculateZones).
-  const orgCenters = useMemo(
-    () => getTerritoireCenters(organization?.settings),
-    [organization?.settings],
-  );
+  const { settings: orgSettings } = useOrgSettings();
+  const orgCenters = useMemo(() => getTerritoireCenters(orgSettings), [orgSettings]);
 
   const [zones, setZones] = useState(null);
   const [isLoading, setLoading] = useState(true);

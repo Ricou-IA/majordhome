@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Grid3x3, Search, ListChecks, BarChart3, Globe } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import ScanTab from '../components/geogrid/ScanTab';
 import KeywordListsPanel from '../components/geogrid/KeywordListsPanel';
 import BenchmarksPanel from '../components/geogrid/BenchmarksPanel';
@@ -16,6 +17,7 @@ const TABS = [
 
 export default function GeoGrid() {
   const { organization } = useAuth();
+  const { settings: orgSettings } = useOrgSettings();
   const orgId = organization?.id;
   const location = useLocation();
   // Auto-selection de l'onglet Search Console au retour OAuth (?gsc=connected)
@@ -23,8 +25,8 @@ export default function GeoGrid() {
   const [activeTab, setActiveTab] = useState(initialTab);
 
   // P0.20 — sous-titre paramétré par org (fallback générique)
-  const brandName = organization?.settings?.brand_name || organization?.name || '';
-  const territoryLabel = organization?.settings?.geogrid_territory_label || ''; // ex "le Tarn", "la Loire-Atlantique"
+  const brandName = orgSettings?.brand_name || organization?.name || '';
+  const territoryLabel = orgSettings?.geogrid_territory_label || ''; // ex "le Tarn", "la Loire-Atlantique"
   const subtitle = brandName && territoryLabel
     ? `Mesurez la visibilité Google Maps de ${brandName} sur ${territoryLabel}`
     : brandName

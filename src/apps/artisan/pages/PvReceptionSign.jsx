@@ -18,6 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { chantierKeys } from '@hooks/cacheKeys';
 import { chantiersService, getChantierAmount } from '@services/chantiers.service';
@@ -63,7 +64,8 @@ export default function PvReceptionSign() {
   const queryClient = useQueryClient();
   const { user, organization } = useAuth();
   const orgId = organization?.id;
-  const company = useMemo(() => buildCompanyInfo(organization?.settings), [organization]);
+  const { settings } = useOrgSettings();
+  const company = useMemo(() => buildCompanyInfo(settings), [settings]);
 
   // -- Données --
   const { chantier, isLoading } = useChantier(chantierId);

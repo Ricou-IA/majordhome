@@ -4,6 +4,7 @@ import { Send, FlaskConical, Loader2, Filter } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { supabase } from '@/lib/supabaseClient';
 import CampaignIdentityPanel from './CampaignIdentityPanel';
 import { useMailCampaigns } from '@hooks/useMailCampaigns';
@@ -19,6 +20,7 @@ import { useMailSegments, useSegmentCount } from '@hooks/useMailSegments';
  */
 export default function SendTab() {
   const { organization } = useAuth();
+  const { settings: orgSettings } = useOrgSettings();
   const orgId = organization?.id;
 
   const { campaigns: allCampaigns, isLoading: campaignsLoading } = useMailCampaigns(orgId);
@@ -107,7 +109,7 @@ export default function SendTab() {
     if (!doc) return;
     // Substitutions alignées avec l'edge mailing-send pour que la preview reflète
     // le rendu final reçu par les destinataires (squelette + placeholders).
-    const s = (organization?.settings ?? {});
+    const s = orgSettings;
     const contactEmail = s.from_email || s.reply_to || 'contact@mayer-energie.fr';
     const replacements = {
       '{{SALUTATION}}': 'Bonjour Jean Dupont,',
@@ -138,7 +140,7 @@ export default function SendTab() {
     doc.open();
     doc.write(rendered);
     doc.close();
-  }, [htmlBody, organization]);
+  }, [htmlBody, orgSettings]);
 
   const sendCampaign = useCallback(async (isTest = false) => {
     if (isTest && !testEmail) {

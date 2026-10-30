@@ -15,16 +15,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { detectZoneForAddress, detectZoneFromPostalCode } from '@services/pricing.service';
-import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { getOrgHeadquarters } from '@/lib/territoire-config';
 import { logger } from '@lib/logger';
 
 export function useContractZone(client, contract, zones) {
-  const { organization } = useAuth();
-  const orgHq = useMemo(
-    () => getOrgHeadquarters(organization?.settings),
-    [organization?.settings],
-  );
+  const { settings: orgSettings } = useOrgSettings();
+  const orgHq = useMemo(() => getOrgHeadquarters(orgSettings), [orgSettings]);
   const [asyncZone, setAsyncZone] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(null);

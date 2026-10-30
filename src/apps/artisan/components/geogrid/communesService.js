@@ -6,7 +6,7 @@
  *
  * Multi-tenant : le département est passé par le caller (lu depuis
  * `core.organizations.settings.geogrid_target_department` via
- * `useAuth().organization.settings`). Mayer = "81" (Tarn).
+ * `useOrgSettings().settings`). Mayer = "81" (Tarn).
  *
  * Cf docs/superpowers/specs/2026-05-22-multitenant-settings-organization-design.md §9.4
  */

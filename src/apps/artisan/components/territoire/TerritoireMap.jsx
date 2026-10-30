@@ -17,7 +17,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 import { MAPBOX_CONFIG, getMapDefaultCenter } from '@/lib/mapbox';
 import { CRM_POINT_TYPES, CONTRACT_COLOR, getTerritoireCenters } from '@/lib/territoire-config';
-import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import MapControls from './MapControls';
 import MapPopup from './MapPopup';
 import MapSearch from './MapSearch';
@@ -41,11 +41,8 @@ export default function TerritoireMap({
   initialZoom = 9,
 }) {
   const navigate = useNavigate();
-  const { organization } = useAuth();
-  const orgCenters = useMemo(
-    () => getTerritoireCenters(organization?.settings),
-    [organization?.settings],
-  );
+  const { settings: orgSettings } = useOrgSettings();
+  const orgCenters = useMemo(() => getTerritoireCenters(orgSettings), [orgSettings]);
   const hasOrgCenters = Object.keys(orgCenters).length > 0;
 
   const mapContainer = useRef(null);
@@ -123,7 +120,7 @@ export default function TerritoireMap({
     const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: MAPBOX_CONFIG.style,
-      center: initialCenter || getMapDefaultCenter(organization?.settings),
+      center: initialCenter || getMapDefaultCenter(orgSettings),
       zoom: initialZoom,
       maxBounds: MAPBOX_CONFIG.maxBounds,
       attributionControl: false,

@@ -25,6 +25,7 @@ import { savService } from '@services/sav.service';
 import { doitCreerSav, descriptionSavDepuisCertificat, blocagePhotoPlaque } from '@/lib/certificatAnomalies';
 import { reduireImage } from '@/lib/imageResize';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { clientsService } from '@services/clients.service';
 import { StepIndicator } from './StepIndicator';
 import { generatePdfBlob } from './CertificatPDF';
@@ -93,6 +94,7 @@ export function CertificatWizard({
 }) {
   const navigate = useNavigate();
   const { profile, effectiveRole, organization } = useAuth();
+  const { settings: orgSettings } = useOrgSettings();
   const canSelectTechnician = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
   const { members: teamMembers = [] } = useTeamMembers(canSelectTechnician ? organization?.id : null);
   const {
@@ -472,7 +474,7 @@ export function CertificatWizard({
       };
 
       // Générer le blob PDF
-      const blob = await generatePdfBlob(pdfData, buildCompanyInfo(organization?.settings));
+      const blob = await generatePdfBlob(pdfData, buildCompanyInfo(orgSettings));
 
       // 3. Archivage. Un échec ici n'annule pas la bascule « réalisé » (déjà
       //    faite) : le PDF est régénérable depuis les données du certificat.
