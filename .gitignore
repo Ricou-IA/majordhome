@@ -88,3 +88,7 @@ deno.lock
 
 # Scripts certificats : bundle esbuild + PDF de contrôle
 scripts/certificats/out/
+
+# Jeu d'essai FAB-DIS (regenerable : node scripts/fabdis/make-sample.mjs)
+docs/imports/fabdis-echantillon.xlsx
+fabdis-payload.json

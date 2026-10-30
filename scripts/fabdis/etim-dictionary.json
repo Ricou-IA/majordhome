@@ -1,0 +1,38 @@
+{
+  "_README": [
+    "Dictionnaire ETIM local, utilise par `node scripts/fabdis-import.mjs --etim <ce fichier>`.",
+    "",
+    "IMPORTANT — CE QUE CE FICHIER EST, ET N'EST PAS :",
+    "Les codes ci-dessous sont ceux du JEU D'ESSAI (docs/imports/fabdis-echantillon.xlsx),",
+    "qui est fictif. Leurs libelles sont coherents avec cet echantillon, ils ne sont PAS",
+    "certifies conformes au dictionnaire ETIM International. Ne pas s'en servir pour",
+    "interpreter un vrai fichier fabricant.",
+    "",
+    "Ce fichier n'existe que pour deux raisons :",
+    "  1. montrer ce que la traduction apporte — sans elle, le texte soumis a l'embedding",
+    "     ressemble a « EF000008 : 8 EU570448 », inexploitable pour une recherche semantique ;",
+    "  2. permettre d'avancer avant l'ouverture d'un compte API ETIM (section 2.2).",
+    "",
+    "A remplacer par l'appel a etimapi.etim-international.com (OAuth2) des que le compte",
+    "est disponible : le point d'injection est l'option `resolveEtim` d'assembleProducts."
+  ],
+
+  "EC010912": { "label": "Pompe a chaleur air/eau" },
+  "EC003104": { "label": "Poele a granules" },
+  "EC002616": { "label": "Conduit de fumee double paroi" },
+  "EC001234": { "label": "Unite exterieure de climatisation" },
+  "EC001235": { "label": "Unite interieure de climatisation" },
+
+  "EF000005": { "label": "Diametre nominal" },
+  "EF000006": { "label": "Longueur" },
+  "EF000008": { "label": "Puissance calorifique" },
+  "EF000060": { "label": "Fluide frigorigene" },
+  "EF000199": { "label": "Efficacite energetique saisonniere (ETAS)" },
+  "EF002169": { "label": "Rendement" },
+
+  "EV000123": { "label": "R32" },
+
+  "EU570025": { "label": "%" },
+  "EU570092": { "label": "mm" },
+  "EU570448": { "label": "kW" }
+}
