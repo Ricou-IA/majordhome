@@ -4,19 +4,21 @@
  * Slide-over droite pour créer ou éditer un lead.
  * Sections : Contact, Pipeline, Action suivante, Notes + Timeline
  *
- * Sous-composants extraits dans :
- *   ./LeadStatusConfig.js   — ALLOWED_TRANSITIONS, getAllowedNextStatuses, LOST_REASONS
- *   ./LeadFormSections.jsx  — SectionClientLinking, SectionContact, SectionPipeline, etc.
+ * Sous-modules extraits :
+ *   ./LeadStatusConfig.js         — ALLOWED_TRANSITIONS, getAllowedNextStatuses, LOST_REASONS
+ *   ./LeadFormSections.jsx        — SectionClientLinking, SectionContact, SectionPipeline, etc.
+ *   ./leadForm.js                 — état du formulaire et payloads (pur)
+ *   ./useLeadStatusTransitions.js — gestes de statut (Contacté, RDV, Devis, Perdu, Gagné, appels)
+ *   ./useLeadRequalification.js   — requalification en Entretien
+ *   ./useLeadClientLinking.js     — liaison à une fiche client (MDH / Pennylane)
+ *   ./LeadHardDeleteDialog.jsx    — suppression définitive (org_admin)
+ *   ./LeadModalFrame.jsx          — en-tête et pied du slide-over
  * ============================================================================
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { X, Save, Loader2, ArrowLeft, Trash2, Link2, GitMerge } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MergeLeadDialog } from './MergeLeadDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -31,21 +33,13 @@ import {
 } from '@hooks/useLeads';
 import { useAuditResolvers } from '@hooks/useAuditResolvers';
 import { buildAuditEntry, mergeTimeline } from '@/lib/auditTrail';
-import { useClientSearch } from '@hooks/useClients';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildDevisConfig, famillesActives } from '@/lib/devisConfig.js';
-import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
-import { appointmentsService } from '@services/appointments.service';
 import { leadsService } from '@services/leads.service';
-import { clientsService } from '@services/clients.service';
-import { contractsService } from '@services/contracts.service';
-import { savService } from '@services/sav.service';
-import { entretienSavKeys } from '@hooks/cacheKeys';
 import { logger } from '@lib/logger';
-import { formatDateForInput } from '@/lib/utils';
 import { hasPhoneNumber } from '@/lib/phoneUtils';
 import { dureeImposee } from '@/lib/planningEvents';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
@@ -60,6 +54,12 @@ import {
   SectionActions,
   SectionNotes,
 } from './LeadFormSections';
+import { EMPTY_LEAD_FORM, newLeadForm, leadToForm, contactPayload, buildLeadPayload } from './leadForm';
+import { useLeadStatusTransitions, VT_PHONE_REQUIRED_MESSAGE } from './useLeadStatusTransitions';
+import { useLeadRequalification } from './useLeadRequalification';
+import { useLeadClientLinking } from './useLeadClientLinking';
+import { LeadHardDeleteDialog } from './LeadHardDeleteDialog';
+import { LeadModalHeader, LeadModalFooter } from './LeadModalFrame';
 import SectionDevis from '../devis/SectionDevis';
 import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 import { FicheTechniqueModal } from './FicheTechniqueModal';
@@ -71,10 +71,9 @@ import { LinkedQuotesPanel } from './LinkedQuotesPanel';
 import { DuplicateLeadDialog } from '../shared/DuplicateLeadDialog';
 import { DuplicateClientDialog } from '../shared/DuplicateClientPanel';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
-import { useLinkedPennylaneQuotes, usePennylaneClientSearch, useImportPennylaneCustomer } from '@hooks/usePennylane';
+import { useLinkedPennylaneQuotes } from '@hooks/usePennylane';
 import CreateDevisModal from '../devis/CreateDevisModal';
 import DevisModal from '../devis/DevisModal';
-import { devisService } from '@services/devis.service';
 import { useDevisMutations } from '@hooks/useDevis';
 
 // ============================================================================
@@ -88,23 +87,14 @@ import { useDevisMutations } from '@hooks/useDevis';
  * @param {Function} props.onClose - Fermer
  * @param {Function} props.onSaved - Callback après save/create
  */
-// Une visite technique sans numéro = un commercial qui ne peut ni confirmer ni
-// prévenir d'un retard (vécu : lead LOLLENFANT, 2026-09-14).
-const VT_PHONE_REQUIRED_MESSAGE = 'Téléphone requis : renseignez le numéro du client avant de planifier la visite technique';
-
 export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = false, autoQuote = false, onOpenLead = null }) {
   const isEditing = !!leadId;
   const { organization, user, effectiveRole } = useAuth();
   const { can } = useCanAccess();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const orgId = organization?.id;
   const userId = user?.id;
-  const [isRequalifying, setIsRequalifying] = useState(false);
   // Filet anti-doublon à la création : candidats actifs partageant téléphone/email/nom
   const [duplicateCandidates, setDuplicateCandidates] = useState(null);
-  // Filet anti-doublon CLIENT à la requalification (fiche client créée pour le contrat)
-  const [clientDuplicateCandidates, setClientDuplicateCandidates] = useState([]);
 
   // Données
   const { lead, isLoading: loadingLead } = useLead(isEditing ? leadId : null);
@@ -123,19 +113,6 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const { equipmentTypes, index: referentiel } = useEquipmentReferential();
   const { settings: orgSettings } = useOrgSettings();
   const pennylaneActive = usePennylaneEnabled();
-  const { query: clientSearchQuery, results: clientResults, searching: clientSearching, search: searchClientMdh, clear: clearClientMdhSearch } = useClientSearch(orgId);
-  // Bug #5 ROGERO : search customer Pennylane (cache D.5 + fallback live)
-  const { results: pennylaneResults, searching: pennylaneSearching, search: searchPennylane, clear: clearPennylaneSearch } = usePennylaneClientSearch();
-  const { importCustomer, isImporting: isImportingPennylane } = useImportPennylaneCustomer();
-  // Fan-out search MDH + Pennylane (search PL skip si org sans PL)
-  const searchClient = useCallback((value) => {
-    searchClientMdh(value);
-    if (pennylaneActive) searchPennylane(value);
-  }, [searchClientMdh, searchPennylane, pennylaneActive]);
-  const clearClientSearch = useCallback(() => {
-    clearClientMdhSearch();
-    clearPennylaneSearch();
-  }, [clearClientMdhSearch, clearPennylaneSearch]);
   const {
     createLead, updateLead, updateLeadStatus, convertLead, addNote, deleteLead, hardDeleteLead,
     isCreating, isUpdating, isChangingStatus, isConverting, isAddingNote, isHardDeleting,
@@ -146,17 +123,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const isAdmin = effectiveRole === 'org_admin';
 
   // État formulaire
-  const [form, setForm] = useState({
-    first_name: '', last_name: '', company_name: '',
-    email: '', phone: '', phone_secondary: '',
-    address: '', address_complement: '', postal_code: '', city: '',
-    source_id: '', status_id: '', assigned_user_id: '',
-    equipment_type_id: '', project_family_key: '', order_amount_ht: '', estimated_revenue: '',
-    probability: '50', next_action: '', next_action_date: '',
-    notes: '', lost_reason: '',
-    appointment_date: '', quote_sent_date: '', won_date: '',
-    email_sent: false,
-  });
+  const [form, setForm] = useState(() => ({ ...EMPTY_LEAD_FORM }));
 
   // Commercial par défaut à la création :
   // - Commercial/team_leader → lui-même (match profile_id)
@@ -175,34 +142,70 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   }, [commercials, userId, effectiveRole]);
 
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
-  const [linkedClient, setLinkedClient] = useState(null);
-  const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [editClientMode, setEditClientMode] = useState(false);
-  const [showLinkSearch, setShowLinkSearch] = useState(false);
-  const [pendingLostStatusId, setPendingLostStatusId] = useState(null);
-  const [lostReasonInput, setLostReasonInput] = useState('');
-  const [pendingRdvStatusId, setPendingRdvStatusId] = useState(null);
-  const [pendingContactStatusId, setPendingContactStatusId] = useState(null);
-  const [callModalForLog, setCallModalForLog] = useState(false);
-  const [callLoading, setCallLoading] = useState(false);
-  const [followupModalOpen, setFollowupModalOpen] = useState(false);
-  const [followupLoading, setFollowupLoading] = useState(false);
-  const [pendingQuoteStatusId, setPendingQuoteStatusId] = useState(null);
-  const [quoteLoading, setQuoteLoading] = useState(false);
-  const [showQuoteCandidates, setShowQuoteCandidates] = useState(false);
-  const [showMarkWon, setShowMarkWon] = useState(false);
+  const {
+    linkedClient, setLinkedClient, showClientDropdown, setShowClientDropdown,
+    editClientMode, setEditClientMode, showLinkSearch, setShowLinkSearch,
+    clientSearchQuery, clientResults, clientSearching, searchClient, clearClientSearch,
+    pennylaneResults, pennylaneSearching, isImportingPennylane,
+    handleSelectClient, handleUnlinkClient, handleImportPennylane,
+  } = useLeadClientLinking({ orgId, pennylaneActive, sources, setForm });
   // Devis PL attachés (lecture, pour le branchement Gagné). Fetch léger via vue
   // publique, staleTime 30s côté hook → pas de surcoût notable.
   const { linkedQuotes } = useLinkedPennylaneQuotes(pennylaneActive && isEditing ? leadId : null);
-  const [schedulingLoading, setSchedulingLoading] = useState(false);
   const [showFicheTechnique, setShowFicheTechnique] = useState(false);
   const [showCreateDevis, setShowCreateDevis] = useState(false);
   const [openDevisId, setOpenDevisId] = useState(null);
   const [mailingCampaigns, setMailingCampaigns] = useState([]);
   const [showHardDelete, setShowHardDelete] = useState(false);
-  const [hardDeleteCounts, setHardDeleteCounts] = useState(null);
   // God mode — fusion d'un doublon dans cette carte (org_admin, RPC lead_merge)
   const [showMerge, setShowMerge] = useState(false);
+
+  const setField = useCallback((field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const syncClientFields = useCallback(async () => {
+    if (!linkedClient?.id || !editClientMode) return false;
+    const { error } = await supabase
+      .from('majordhome_clients')
+      .update(contactPayload(form))
+      .eq('id', linkedClient.id);
+    if (error) {
+      logger.error('[LeadModal] Erreur sync client:', error);
+      toast.error('Erreur lors de la mise à jour de la fiche client');
+      return false;
+    }
+    return true;
+  }, [linkedClient, editClientMode, form]);
+
+  const buildPayload = useCallback(() => buildLeadPayload(form, linkedClient?.id), [form, linkedClient]);
+
+  // Enregistre le formulaire en cours (lead + fiche client liée) avant tout geste qui en dépend.
+  const persistForm = useCallback(async () => {
+    await updateLead(leadId, buildPayload());
+    await syncClientFields();
+  }, [updateLead, leadId, buildPayload, syncClientFields]);
+
+  const {
+    pendingLostStatusId, setPendingLostStatusId, lostReasonInput, setLostReasonInput,
+    pendingRdvStatusId, setPendingRdvStatusId, schedulingLoading, setSchedulingLoading,
+    pendingContactStatusId, setPendingContactStatusId,
+    callModalForLog, setCallModalForLog, callLoading,
+    followupModalOpen, setFollowupModalOpen, followupLoading,
+    pendingQuoteStatusId, setPendingQuoteStatusId, quoteLoading,
+    showQuoteCandidates, setShowQuoteCandidates, showMarkWon, setShowMarkWon,
+    handleStatusChange, handleConfirmLost, handleConfirmScheduling, handleConfirmContact,
+    handleConfirmQuote, handleSendDevis, handleLogCall, handleLogFollowup, handleConvert,
+  } = useLeadStatusTransitions({
+    leadId, isEditing, orgId, userId, form, setForm, statuses, linkedClientId: linkedClient?.id,
+    pennylaneActive, linkedQuotes, persistForm,
+    updateLeadStatus, convertLead, sendQuote, onSaved, onClose,
+  });
+
+  const {
+    requalify, isRequalifying,
+    duplicateCandidates: clientDuplicateCandidates, setDuplicateCandidates: setClientDuplicateCandidates,
+  } = useLeadRequalification({ orgId, userId, lead, form, deleteLead, onClose });
 
   // Charger les mailings envoyés au lead
   useEffect(() => {
@@ -223,34 +226,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     if (!isOpen) return;
 
     if (isEditing && lead) {
-      setForm({
-        first_name: lead.first_name || '',
-        last_name: lead.last_name || '',
-        company_name: lead.company_name || '',
-        email: lead.email || '',
-        phone: lead.phone || '',
-        phone_secondary: lead.phone_secondary || '',
-        address: lead.address || '',
-        address_complement: lead.address_complement || '',
-        postal_code: lead.postal_code || '',
-        city: lead.city || '',
-        source_id: lead.source_id || '',
-        status_id: lead.status_id || '',
-        assigned_user_id: lead.assigned_user_id || '',
-        equipment_type_id: lead.equipment_type_id || '',
-        project_family_key: lead.project_family_key || '',
-        order_amount_ht: lead.order_amount_ht ?? '',
-        estimated_revenue: lead.estimated_revenue ?? '',
-        probability: lead.probability ?? '50',
-        next_action: lead.next_action || '',
-        next_action_date: formatDateForInput(lead.next_action_date) || '',
-        notes: lead.notes || '',
-        lost_reason: lead.lost_reason || '',
-        appointment_date: formatDateForInput(lead.appointment_date) || '',
-        quote_sent_date: formatDateForInput(lead.quote_sent_date) || '',
-        won_date: formatDateForInput(lead.won_date) || '',
-        email_sent: lead.email_sent || false,
-      });
+      setForm(leadToForm(lead));
       setEditClientMode(false);
       setShowLinkSearch(false);
       setPendingRdvStatusId(null);
@@ -272,16 +248,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       setSchedulingLoading(false);
       clearClientSearch();
       const defaultStatus = statuses.find((s) => s.display_order === 1);
-      setForm({
-        first_name: '', last_name: '', company_name: '',
-        email: '', phone: '', phone_secondary: '',
-        address: '', address_complement: '', postal_code: '', city: '',
-        source_id: '', status_id: defaultStatus?.id || '', assigned_user_id: defaultCommercialId,
-        equipment_type_id: '', project_family_key: '', order_amount_ht: '', estimated_revenue: '',
-        probability: '50', next_action: '', next_action_date: '',
-        notes: '', lost_reason: '',
-        appointment_date: '', quote_sent_date: '', won_date: '',
-      });
+      setForm(newLeadForm({ statusId: defaultStatus?.id || '', assignedUserId: defaultCommercialId }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isEditing, lead]);
@@ -305,7 +272,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       return;
     }
     setPendingRdvStatusId(rdvStatus.id);
-  }, [autoSchedule, isOpen, isEditing, lead, statuses]);
+  }, [autoSchedule, isOpen, isEditing, lead, statuses, setPendingRdvStatusId]);
 
   // Auto-quote : ouvrir directement la modale d'attache de devis Pennylane
   // (drag kanban → « Devis envoyé » sur une org PL). Le rattachement d'un devis
@@ -314,140 +281,9 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   useEffect(() => {
     if (!autoQuote || !isOpen || !isEditing || !lead || !pennylaneActive) return;
     setShowQuoteCandidates(true);
-  }, [autoQuote, isOpen, isEditing, lead, pennylaneActive]);
+  }, [autoQuote, isOpen, isEditing, lead, pennylaneActive, setShowQuoteCandidates]);
 
   // ========== HANDLERS ==========
-
-  const setField = useCallback((field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  }, []);
-
-  const handleSelectClient = useCallback(async (client) => {
-    try {
-      const { data, error } = await supabase
-        .from('majordhome_clients')
-        .select('id, display_name, first_name, last_name, company_name, email, phone, phone_secondary, address, address_complement, postal_code, city, client_number')
-        .eq('id', client.id)
-        .single();
-
-      if (error || !data) {
-        logger.error('[LeadModal] fetch client error:', error);
-        return;
-      }
-
-      setLinkedClient(data);
-      setShowClientDropdown(false);
-      setEditClientMode(false);
-      setShowLinkSearch(false);
-      clearClientSearch();
-
-      const clientExistantSource = sources.find((s) => s.name === 'Client Existant');
-
-      setForm((prev) => ({
-        ...prev,
-        first_name: data.first_name || '',
-        last_name: data.last_name || data.display_name || '',
-        company_name: data.company_name || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        phone_secondary: data.phone_secondary || '',
-        address: data.address || '',
-        address_complement: data.address_complement || '',
-        postal_code: data.postal_code || '',
-        city: data.city || '',
-        source_id: clientExistantSource?.id || prev.source_id,
-      }));
-    } catch (err) {
-      logger.error('[LeadModal] fetch client error:', err);
-    }
-  }, [clearClientSearch, sources]);
-
-  const handleUnlinkClient = useCallback(() => {
-    setLinkedClient(null);
-    setEditClientMode(false);
-    setShowLinkSearch(false);
-    clearClientSearch();
-    toast.info('Client délié — vous pouvez en rechercher un autre ou laisser vide');
-  }, [clearClientSearch]);
-
-  // Bug #5 ROGERO — import un customer Pennylane comme nouveau client MDH +
-  // lie automatiquement au lead courant (via handleSelectClient).
-  const handleImportPennylane = useCallback(async (plCustomer) => {
-    try {
-      const result = await importCustomer(plCustomer);
-      const client = result?.client;
-      if (!client?.id) {
-        toast.error('Import depuis Pennylane échoué');
-        return;
-      }
-      // Lie le lead au client (existant ou nouvellement créé)
-      await handleSelectClient(client);
-      toast.success(
-        result.alreadyExisted
-          ? `Client existant lié (${client.display_name || 'sans nom'})`
-          : `Client importé depuis Pennylane (${client.display_name || 'sans nom'})`,
-      );
-    } catch (err) {
-      logger.error('[LeadModal] import Pennylane error:', err);
-      toast.error(err?.message || 'Erreur lors de l\'import du client Pennylane');
-    }
-  }, [importCustomer, handleSelectClient]);
-
-  const syncClientFields = useCallback(async () => {
-    if (!linkedClient?.id || !editClientMode) return false;
-    const clientPayload = {
-      first_name: form.first_name.trim() || null,
-      last_name: form.last_name.trim(),
-      company_name: form.company_name.trim() || null,
-      email: form.email.trim() || null,
-      phone: form.phone.trim() || null,
-      phone_secondary: form.phone_secondary.trim() || null,
-      address: form.address.trim() || null,
-      address_complement: form.address_complement.trim() || null,
-      postal_code: form.postal_code.trim() || null,
-      city: form.city.trim() || null,
-    };
-    const { error } = await supabase
-      .from('majordhome_clients')
-      .update(clientPayload)
-      .eq('id', linkedClient.id);
-    if (error) {
-      logger.error('[LeadModal] Erreur sync client:', error);
-      toast.error('Erreur lors de la mise à jour de la fiche client');
-      return false;
-    }
-    return true;
-  }, [linkedClient, editClientMode, form]);
-
-  const buildPayload = useCallback(() => ({
-    first_name: form.first_name.trim() || null,
-    last_name: form.last_name.trim(),
-    company_name: form.company_name.trim() || null,
-    email: form.email.trim() || null,
-    phone: form.phone.trim() || null,
-    phone_secondary: form.phone_secondary.trim() || null,
-    address: form.address.trim() || null,
-    address_complement: form.address_complement.trim() || null,
-    postal_code: form.postal_code.trim() || null,
-    city: form.city.trim() || null,
-    source_id: form.source_id || null,
-    status_id: form.status_id || null,
-    assigned_user_id: form.assigned_user_id || null,
-    equipment_type_id: form.equipment_type_id || null,
-    project_family_key: form.project_family_key || null,
-    order_amount_ht: form.order_amount_ht ? Number(form.order_amount_ht) : null,
-    estimated_revenue: form.order_amount_ht ? Number(form.order_amount_ht) : null,
-    probability: form.probability ? Number(form.probability) : 50,
-    next_action: form.next_action.trim() || null,
-    next_action_date: form.next_action_date || null,
-    notes: form.notes.trim() || null,
-    lost_reason: form.lost_reason.trim() || null,
-    appointment_date: form.appointment_date || null,
-    quote_sent_date: form.quote_sent_date || null,
-    won_date: form.won_date || null,
-    email_sent: form.email_sent || false,
-    client_id: linkedClient?.id || null,
-  }), [form, linkedClient]);
 
   const handleSave = async (maybeDecision) => {
     // Reprise après le dialogue doublon (l'event DOM d'un onClick n'a pas d'action)
@@ -520,384 +356,9 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     }
   };
 
-  const handleStatusChange = async (newStatusId) => {
-    if (!isEditing || newStatusId === form.status_id) return;
-    const targetStatus = statuses.find((s) => s.id === newStatusId);
-    if (targetStatus?.label === 'Perdu') {
-      setPendingLostStatusId(newStatusId);
-      setLostReasonInput('');
-      return;
-    }
-    if (targetStatus?.label === 'Contacté') {
-      // Forward (Nouveau → Contacté) : modale d'appel pour qualifier le contact.
-      // Régression (ex. RDV planifié → Contacté après annulation de RDV) : retour
-      // direct sans modale d'appel (un résultat d'appel n'aurait pas de sens ici).
-      const isRegression = currentStatus && targetStatus.display_order < currentStatus.display_order;
-      if (!isRegression) {
-        setPendingContactStatusId(newStatusId);
-        return;
-      }
-      // régression → on tombe dans le flux de changement direct ci-dessous
-    }
-    if (targetStatus?.label === 'RDV planifié') {
-      if (!hasPhoneNumber(form.phone)) {
-        toast.error(VT_PHONE_REQUIRED_MESSAGE);
-        return;
-      }
-      setPendingRdvStatusId(newStatusId);
-      return;
-    }
-    if (targetStatus?.label === 'Devis envoyé') {
-      // PR 4 bridge : si Pennylane actif, multi-attach via QuoteCandidatesModal
-      // (RPC PR 2 fait la bascule statut + activity transactionnellement).
-      // Sinon flow MDH classique : QuoteModal (montant + date manuels).
-      if (pennylaneActive) {
-        setShowQuoteCandidates(true);
-      } else {
-        setPendingQuoteStatusId(newStatusId);
-      }
-      return;
-    }
-    if (targetStatus?.label === 'Gagné' && pennylaneActive) {
-      // PR 5 bridge : si Pennylane actif, choix du devis canonique via
-      // MarkWonQuoteModal (RPC PR 3 fait la bascule statut + activity +
-      // is_winning_quote flag transactionnellement).
-      // Si org sans Pennylane → flow MDH actuel (default ci-dessous).
-      const attachedCount = linkedQuotes?.length || 0;
-      if (attachedCount === 0) {
-        toast.error(
-          'Aucun devis Pennylane attaché à ce lead. Rattache d\'abord un devis via « Devis envoyé ».'
-        );
-        return;
-      }
-      setShowMarkWon(true);
-      return;
-    }
-    try {
-      const payload = buildPayload();
-      await updateLead(leadId, payload);
-      await syncClientFields();
-      const result = await updateLeadStatus(leadId, newStatusId, userId);
-      const targetLabel = statuses.find((s) => s.id === newStatusId)?.label;
-      if (result?.clientCreated) {
-        const clientName = result.clientCreated.display_name || result.clientCreated.client_number;
-        toast.success(`Lead passé en "${targetLabel}" — Fiche client créée : ${clientName}`, { duration: 5000 });
-      } else {
-        toast.success(`Lead passé en "${targetLabel}"`);
-      }
-      onSaved?.();
-      onClose();
-    } catch (err) {
-      logger.error('[LeadModal] Erreur statut:', err);
-      toast.error('Erreur lors du changement de statut');
-    }
-  };
-
-  const handleConfirmLost = async () => {
-    if (!lostReasonInput) {
-      toast.error('Veuillez sélectionner un motif de perte');
-      return;
-    }
-    try {
-      const payload = buildPayload();
-      await updateLead(leadId, payload);
-      await syncClientFields();
-      await updateLeadStatus(leadId, pendingLostStatusId, userId, {
-        lostReason: lostReasonInput.trim(),
-      });
-      setPendingLostStatusId(null);
-      toast.success('Lead marqué comme perdu');
-      onSaved?.();
-      onClose();
-    } catch (err) {
-      logger.error('[LeadModal] Erreur passage perdu:', err);
-      toast.error('Erreur lors du changement de statut');
-    }
-  };
-
-  // VT pipeline (Bloc B stage 2) : l'assistant remonte slots[] (mode commercial,
-  // 1 créneau). On crée le(s) RDV via createAppointmentBatch (assigned_commercial_id
-  // = owner de la carte, technicianIds vide), puis on bascule le lead en
-  // « RDV planifié » avec le PREMIER appointment créé.
-  const handleConfirmScheduling = async (slots) => {
-    if (!pendingRdvStatusId) return;
-    if (!slots || slots.length === 0) return;
-    if (!hasPhoneNumber(form.phone)) {
-      toast.error(VT_PHONE_REQUIRED_MESSAGE);
-      return;
-    }
-    setSchedulingLoading(true);
-    try {
-      const payload = buildPayload();
-      await updateLead(leadId, payload);
-      await syncClientFields();
-      const { data: created, error: aptError } = await appointmentsService.createAppointmentBatch(slots, {
-        coreOrgId: orgId,
-        appointment_type: 'rdv_technical',
-        lead_id: leadId,
-        client_id: linkedClient?.id || null,
-        assigned_commercial_id: form.assigned_user_id || null,
-        client_name: form.last_name || 'Sans nom',
-        client_first_name: form.first_name || null,
-        client_phone: form.phone || '',
-        client_email: form.email || null,
-        address: form.address || null,
-        city: form.city || null,
-        postal_code: form.postal_code || null,
-        subjectPrefix: 'Visite technique',
-      });
-      if (aptError) {
-        logger.error('[LeadModal] Erreur création RDV:', aptError);
-        toast.error('Erreur lors de la création du RDV');
-        setSchedulingLoading(false);
-        return;
-      }
-      await updateLeadStatus(leadId, pendingRdvStatusId, userId, {
-        appointmentDate: slots[0].date,
-        appointmentId: created?.[0]?.id || null,
-      });
-      setPendingRdvStatusId(null);
-      toast.success('RDV planifié avec succès');
-      onSaved?.();
-      onClose();
-    } catch (err) {
-      logger.error('[LeadModal] Erreur planification RDV:', err);
-      toast.error('Erreur lors de la planification du RDV');
-    } finally {
-      setSchedulingLoading(false);
-    }
-  };
-
-  // Confirmer transition vers Contacté (depuis bouton statut)
-  const handleConfirmContact = async (callData) => {
-    if (!pendingContactStatusId) return;
-    setCallLoading(true);
-    try {
-      const payload = buildPayload();
-      await updateLead(leadId, payload);
-      await syncClientFields();
-      await updateLeadStatus(leadId, pendingContactStatusId, userId, {
-        callResult: callData.result,
-        callDate: callData.date,
-      });
-      setPendingContactStatusId(null);
-      toast.success('Lead passé en "Contacté"');
-      onSaved?.();
-      onClose();
-    } catch (err) {
-      logger.error('[LeadModal] Erreur passage contacté:', err);
-      toast.error('Erreur lors du changement de statut');
-    } finally {
-      setCallLoading(false);
-    }
-  };
-
-  // Confirmer transition vers Devis envoyé (depuis bouton statut)
-  const handleConfirmQuote = async (quoteData) => {
-    if (!pendingQuoteStatusId) return;
-    setQuoteLoading(true);
-    try {
-      const payload = buildPayload();
-      await updateLead(leadId, payload);
-      await syncClientFields();
-      const result = await updateLeadStatus(leadId, pendingQuoteStatusId, userId, {
-        quoteSentDate: quoteData.date,
-        quoteAmount: quoteData.amount,
-      });
-      setPendingQuoteStatusId(null);
-      if (result?.clientCreated) {
-        const clientName = result.clientCreated.display_name || result.clientCreated.client_number;
-        toast.success(`Lead passé en "Devis envoyé" — Fiche client créée : ${clientName}`, { duration: 5000 });
-      } else {
-        toast.success('Lead passé en "Devis envoyé"');
-      }
-      onSaved?.();
-      onClose();
-    } catch (err) {
-      logger.error('[LeadModal] Erreur passage devis:', err);
-      toast.error('Erreur lors du changement de statut');
-    } finally {
-      setQuoteLoading(false);
-    }
-  };
-
-  // Envoyer le devis (marquer brouillons comme envoyés + transition lead → Devis envoyé)
-  const handleSendDevis = async () => {
-    // Org Pennylane : « Devis envoyé » exige le rattachement d'un devis PL
-    // (invariant DB). On route vers la modale d'attache plutôt que le flux MDH.
-    if (pennylaneActive) {
-      setShowQuoteCandidates(true);
-      return;
-    }
-    try {
-      // 1. Marquer tous les devis brouillon comme envoyés. Une lecture refusée
-      // renverrait `[]` : on ne passe pas le lead en « Devis envoyé » sans savoir.
-      const { data: quotes, error: quotesError } = await devisService.getQuotesByLead(leadId);
-      if (quotesError) throw quotesError;
-      const brouillons = (quotes || []).filter((q) => q.status === 'brouillon');
-      for (const q of brouillons) {
-        await sendQuote(q.id); // rejette sur refus → catch, pas de transition
-      }
-
-      // 2. Calculer le montant total des devis envoyés
-      const totalHt = brouillons.reduce((sum, q) => sum + (parseFloat(q.total_ht) || 0), 0);
-
-      // 3. Passer le lead en "Devis envoyé"
-      const devisEnvoyeStatus = statuses.find((s) => s.label === 'Devis envoyé');
-      if (devisEnvoyeStatus) {
-        const payload = buildPayload();
-        await updateLead(leadId, payload);
-        await syncClientFields();
-        await updateLeadStatus(leadId, devisEnvoyeStatus.id, userId, {
-          quoteSentDate: new Date().toISOString().split('T')[0],
-          quoteAmount: totalHt || null,
-        });
-      }
-
-      toast.success('Devis envoyé — lead mis à jour');
-      onSaved?.();
-      onClose();
-    } catch (err) {
-      logger.error('[LeadModal] handleSendDevis:', err);
-      toast.error('Erreur lors de l\'envoi du devis');
-    }
-  };
-
-  // Ajouter un appel supplémentaire (lead déjà en Contacté ou +)
-  const handleLogCall = async (callData) => {
-    setCallLoading(true);
-    try {
-      const result = await leadsService.logCall(leadId, {
-        orgId,
-        userId,
-        result: callData.result,
-        callDate: callData.date,
-      });
-      if (result?.data) {
-        setForm((prev) => ({
-          ...prev,
-          call_count: result.data.call_count ?? (prev.call_count || 0) + 1,
-          last_call_date: result.data.last_call_date || new Date().toISOString(),
-          last_call_result: callData.result,
-        }));
-      }
-      setCallModalForLog(false);
-      toast.success('Appel enregistré');
-      onSaved?.();
-    } catch (err) {
-      logger.error('[LeadModal] Erreur logCall:', err);
-      toast.error('Erreur lors de l\'enregistrement de l\'appel');
-    } finally {
-      setCallLoading(false);
-    }
-  };
-
-  // Enregistrer une relance (suivi devis envoyé)
-  const handleLogFollowup = async (callData) => {
-    setFollowupLoading(true);
-    try {
-      const result = await leadsService.logFollowup(leadId, {
-        orgId,
-        userId,
-        result: callData.result,
-        callDate: callData.date,
-      });
-      if (result?.data) {
-        setForm((prev) => ({
-          ...prev,
-          followup_count: result.data.followup_count ?? (prev.followup_count || 0) + 1,
-          last_followup_date: result.data.last_followup_date || new Date().toISOString(),
-        }));
-      }
-      setFollowupModalOpen(false);
-      toast.success('Relance enregistrée');
-      onSaved?.();
-    } catch (err) {
-      logger.error('[LeadModal] Erreur logFollowup:', err);
-      toast.error('Erreur lors de l\'enregistrement de la relance');
-    } finally {
-      setFollowupLoading(false);
-    }
-  };
-
-  const handleConvert = async () => {
-    try {
-      const payload = buildPayload();
-      await updateLead(leadId, payload);
-      await syncClientFields();
-      const result = await convertLead(leadId, orgId, userId);
-      if (result?.skipped) {
-        toast.info('Ce lead est déjà lié à un client');
-      } else if (result?.client) {
-        const clientName = result.client.display_name || result.client.client_number;
-        toast.success(`Fiche client créée : ${clientName}`, { duration: 5000 });
-      } else {
-        toast.success('Lead converti en client !');
-      }
-      onSaved?.();
-      onClose();
-    } catch (err) {
-      logger.error('[LeadModal] Erreur conversion:', err);
-      toast.error('Erreur lors de la conversion');
-    }
-  };
-
   const handleAddNote = async (description) => {
     await addNote(leadId, orgId, userId, description);
     toast.success('Note ajoutée');
-  };
-
-  // ========== HARD DELETE (org_admin only) ==========
-
-  /**
-   * Ouvre le dialog en pré-fetchant les compteurs de dépendances
-   * (RDV, mailings, interactions) pour afficher ce qui sera supprimé.
-   */
-  const handleOpenHardDelete = async () => {
-    if (!leadId) return;
-    setShowHardDelete(true);
-    setHardDeleteCounts(null);
-    try {
-      const [apptRes, mailRes, interactRes] = await Promise.all([
-        supabase.from('majordhome_appointments').select('id', { count: 'exact', head: true }).eq('lead_id', leadId),
-        supabase.from('majordhome_mailing_logs').select('id', { count: 'exact', head: true }).eq('lead_id', leadId),
-        supabase.from('majordhome_lead_interactions').select('id', { count: 'exact', head: true }).eq('lead_id', leadId),
-      ]);
-      setHardDeleteCounts({
-        appointments: apptRes.count ?? 0,
-        mailings: mailRes.count ?? 0,
-        interactions: interactRes.count ?? 0,
-      });
-    } catch (err) {
-      logger.warn('[LeadModal] hard delete preflight count error:', err);
-      setHardDeleteCounts({ appointments: null, mailings: null, interactions: null });
-    }
-  };
-
-  const handleConfirmHardDelete = async () => {
-    if (!leadId) return;
-    try {
-      const result = await hardDeleteLead(leadId);
-      const nbApp = result?.counts?.appointments ?? 0;
-      toast.success(
-        nbApp > 0
-          ? `Lead supprimé (${nbApp} RDV nettoyé${nbApp > 1 ? 's' : ''})`
-          : 'Lead supprimé définitivement',
-      );
-      setShowHardDelete(false);
-      setHardDeleteCounts(null);
-      onSaved?.();
-      onClose();
-    } catch (err) {
-      logger.error('[LeadModal] hard delete error:', err);
-      const code = err?.message || '';
-      const msg = code.includes('org_admin_required')
-        ? 'Action réservée aux administrateurs'
-        : code.includes('lead_not_found')
-        ? 'Lead introuvable (déjà supprimé ?)'
-        : `Erreur : ${code || 'suppression échouée'}`;
-      toast.error(msg);
-    }
   };
 
   // ========== COMPUTED ==========
@@ -910,122 +371,16 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   // « Projet » = familles de devis actives de l'org (liste commerciale, découplée du référentiel d'entretien)
   const projectFamilies = useMemo(() => famillesActives(buildDevisConfig(orgSettings)), [orgSettings]);
 
-  // Requalifier lead → Entretien : crée client + contrat pending + carte Kanban
-  // Entretien « À planifier », puis soft-delete du lead
-  // existingClientId : fiche choisie dans le filet anti-doublon client ;
-  // skipDuplicateCheck : « Créer quand même ».
-  const handleRequalifyEntretien = useCallback(async ({ existingClientId = null, skipDuplicateCheck = false } = {}) => {
-    if (isRequalifying || !orgId || !lead) return;
-    setIsRequalifying(true);
-    try {
-      let clientId = lead.client_id || existingClientId;
-      let projectId = null;
-
-      if (!clientId && !skipDuplicateCheck) {
-        const { data: duplicates, error: dupError } = await clientsService.findPotentialDuplicates({
-          orgId,
-          phone: form.phone, email: form.email,
-          firstName: form.first_name, lastName: form.last_name || form.company_name,
-          postalCode: form.postal_code,
-        });
-        if (dupError) {
-          toast.warning('Vérification des doublons clients indisponible — contrôlez la liste des clients');
-        } else if (duplicates?.length) {
-          setClientDuplicateCandidates(duplicates);
-          return;
-        }
-      }
-
-      if (!clientId) {
-        const { data: newClient, error: clientError } = await clientsService.createClient({
-          orgId,
-          lastName: form.last_name || form.company_name || 'Client',
-          firstName: form.first_name || '',
-          email: form.email || null,
-          phone: form.phone || null,
-          address: form.address || null,
-          postalCode: form.postal_code || null,
-          city: form.city || null,
-          clientCategory: 'particulier',
-          leadSource: 'appointment_legacy',
-        });
-        if (clientError) throw clientError;
-        clientId = newClient?.id;
-        projectId = newClient?.project_id || null;
-        if (!clientId) throw new Error('Client non créé');
-
-        // Lier le lead au client (traçabilité + pas de doublon client si retry après échec)
-        const { error: linkError } = await leadsService.updateLead(lead.id, { client_id: clientId });
-        if (linkError) logger.warn('[LeadModal] requalify: lien lead→client non posé:', linkError);
-      } else {
-        const { data: clientRow } = await supabase
-          .from('majordhome_clients')
-          .select('project_id')
-          .eq('id', clientId)
-          .maybeSingle();
-        projectId = clientRow?.project_id || null;
-
-        // Fiche existante choisie dans le filet : y rattacher le lead (traçabilité).
-        if (existingClientId && !lead.client_id) {
-          const { error: linkError } = await leadsService.updateLead(lead.id, { client_id: clientId });
-          if (linkError) logger.warn('[LeadModal] requalify: lien lead→client existant non posé:', linkError);
-        }
-      }
-
-      if (!projectId) throw new Error('Projet client introuvable — requalification impossible');
-
-      const { data: newContract, error: contractError } = await contractsService.createContract({
-        orgId,
-        clientId,
-        status: 'pending',
-        workflowStatus: 'nouveau',
-        frequency: 'annuel',
-        startDate: new Date().toISOString().split('T')[0],
-        source: 'pipeline',
-        notes: form.notes || null,
-      });
-      if (contractError) throw contractError;
-
-      // Carte Kanban Entretien « Demande de contrat » — la demande reste visible côté
-      // Entretien sans être planifiable (pas de contrat actif). Elle bascule en
-      // « À planifier » à l'activation du contrat (trigger DB) ou manuellement.
-      const { error: entretienError } = await savService.createEntretien({
-        orgId,
-        clientId,
-        contractId: newContract?.id || null,
-        projectId,
-        scheduledDate: null,
-        createdBy: userId,
-        workflowStatus: 'demande_contrat',
-      });
-      if (entretienError) throw entretienError;
-
-      // Mutation du hook (rejette sur refus). Le contrat et la carte Entretien
-      // existent déjà : un refus ici laisse le lead dans le pipeline — le dire,
-      // pour que personne ne relance la requalification (2ᵉ contrat, 2ᵉ carte).
-      try {
-        await deleteLead(lead.id);
-      } catch (deleteError) {
-        logger.error('[LeadModal] softDeleteLead refusé:', deleteError);
-        throw new Error('Demande de contrat créée, mais le lead n’a pas pu être retiré du pipeline');
-      }
-
-      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
-      toast.success('Lead requalifié → demande de contrat créée (Kanban Entretien)');
-      onClose();
-      navigate(`/clients/${clientId}?tab=contract`);
-    } catch (err) {
-      logger.error('[LeadModal] requalify error:', err);
-      toast.error(`Erreur : ${err.message || 'Requalification échouée'}`);
-    } finally {
-      setIsRequalifying(false);
-    }
-  }, [orgId, lead, form, isRequalifying, navigate, onClose, userId, queryClient, deleteLead]);
-
   const currentStatus = statuses.find((s) => s.id === form.status_id);
   const isWon = currentStatus?.is_won === true;
   const isFinal = currentStatus?.is_final === true;
   const isSaving = isCreating || isUpdating;
+
+  // Quitter le mode planification RDV (ouvert par l'assistant auto : on referme tout)
+  const cancelScheduling = () => {
+    setPendingRdvStatusId(null);
+    if (autoSchedule) onClose();
+  };
 
   // Bloquer le passage manuel à "Perdu" et "Gagné" si le lead a au moins un devis PL attaché
   // (Pennylane canonical — quote_status pilote le placement Kanban via majordhome_kanban_cards).
@@ -1055,62 +410,16 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
 
       {/* Slide-over */}
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-xl flex flex-col animate-in slide-in-from-right duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-white sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            {pendingRdvStatusId && (
-              <button
-                onClick={() => { setPendingRdvStatusId(null); if (autoSchedule) onClose(); }}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-            )}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                {pendingRdvStatusId
-                  ? 'Planifier le RDV'
-                  : isEditing ? 'Modifier le lead' : 'Nouveau lead'
-                }
-              </h2>
-              {!pendingRdvStatusId && isEditing && currentStatus && (
-                <div className="mt-1 flex items-center gap-2 flex-wrap">
-                  <Badge
-                    className="text-xs text-white"
-                    style={{ backgroundColor: currentStatus.color }}
-                  >
-                    {currentStatus.label}
-                  </Badge>
-                  {/* TEMP backfill — point d'entrée QuoteCandidatesModal sur les leads
-                      déjà en "Devis envoyé" (pour rattacher leurs devis PL existants).
-                      À revert une fois le backfill manuel terminé. */}
-                  {pennylaneActive && currentStatus.label === 'Devis envoyé' && (
-                    <button
-                      type="button"
-                      onClick={() => setShowQuoteCandidates(true)}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors"
-                      title="Rattacher des devis Pennylane à ce lead (temporaire — backfill)"
-                    >
-                      <Link2 className="w-3 h-3" />
-                      Rattacher devis PL
-                    </button>
-                  )}
-                </div>
-              )}
-              {pendingRdvStatusId && (
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {form.first_name || ''} {form.last_name || ''}
-                </p>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={pendingRdvStatusId ? () => { setPendingRdvStatusId(null); if (autoSchedule) onClose(); } : onClose}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        <LeadModalHeader
+          isEditing={isEditing}
+          currentStatus={currentStatus}
+          pennylaneActive={pennylaneActive}
+          onAttachQuotes={() => setShowQuoteCandidates(true)}
+          scheduling={!!pendingRdvStatusId}
+          contactName={`${form.first_name || ''} ${form.last_name || ''}`}
+          onBack={cancelScheduling}
+          onClose={onClose}
+        />
 
         {/* Body (scroll) */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-1">
@@ -1135,7 +444,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
               lead={lead || form}
               orgId={orgId}
               onConfirm={handleConfirmScheduling}
-              onCancel={() => { setPendingRdvStatusId(null); if (autoSchedule) onClose(); }}
+              onCancel={cancelScheduling}
               isLoading={schedulingLoading}
             />
           ) : (
@@ -1251,7 +560,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 handleConvert={handleConvert}
                 isConverting={isConverting}
                 currentStatus={currentStatus}
-                onRequalifyEntretien={() => handleRequalifyEntretien()}
+                onRequalifyEntretien={() => requalify()}
                 isRequalifying={isRequalifying}
               />
             </>
@@ -1260,50 +569,16 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
 
         {/* Footer sticky — masqué en mode planification RDV */}
         {!pendingRdvStatusId && (
-          <div className="border-t bg-white px-6 py-4 flex items-center justify-between sticky bottom-0">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={onClose} className="min-h-[44px]">
-                Annuler
-              </Button>
-              {isEditing && isAdmin && (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setShowMerge(true)}
-                    className="min-h-[44px] text-gray-600 hover:bg-gray-100 hover:text-gray-800 gap-1.5"
-                    title="God mode — absorber un doublon dans cette carte (org_admin)"
-                  >
-                    <GitMerge className="h-4 w-4" />
-                    Fusionner
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={handleOpenHardDelete}
-                    disabled={isHardDeleting}
-                    className="min-h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
-                    title="God mode — supprimer définitivement (org_admin)"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Supprimer
-                  </Button>
-                </>
-              )}
-            </div>
-            <Button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="gap-2 min-h-[44px] bg-blue-600 hover:bg-blue-700"
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              {isEditing ? 'Enregistrer' : 'Créer le lead'}
-            </Button>
-          </div>
+          <LeadModalFooter
+            isEditing={isEditing}
+            isAdmin={isAdmin}
+            isSaving={isSaving}
+            isHardDeleting={isHardDeleting}
+            onCancel={onClose}
+            onMerge={() => setShowMerge(true)}
+            onHardDelete={() => setShowHardDelete(true)}
+            onSave={handleSave}
+          />
         )}
       </div>
 
@@ -1356,13 +631,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           onClose={() => setShowQuoteCandidates(false)}
           leadId={leadId}
           orgId={orgId}
-          onBeforeAttach={async () => {
-            // Sauve les modifs en cours du form + sync client AVANT la RPC
-            // (cohérent avec handleConfirmQuote du flow MDH classique)
-            const payload = buildPayload();
-            await updateLead(leadId, payload);
-            await syncClientFields();
-          }}
+          // Sauve les modifs en cours du form + sync client AVANT la RPC
+          onBeforeAttach={persistForm}
           onAttached={() => {
             onSaved?.();
             onClose();
@@ -1378,11 +648,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           leadId={leadId}
           orgId={orgId}
           userId={userId}
-          onBeforeMark={async () => {
-            const payload = buildPayload();
-            await updateLead(leadId, payload);
-            await syncClientFields();
-          }}
+          onBeforeMark={persistForm}
           onMarked={() => {
             onSaved?.();
             onClose();
@@ -1409,7 +675,6 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         />
       )}
 
-      {/* Hard delete — org_admin god mode */}
       {/* God mode — fusion additive d'un doublon dans cette carte (org_admin) */}
       {isEditing && isAdmin && (
         <MergeLeadDialog
@@ -1421,48 +686,17 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         />
       )}
 
-      <ConfirmDialog
+      <LeadHardDeleteDialog
         open={showHardDelete}
-        onOpenChange={(open) => {
-          setShowHardDelete(open);
-          if (!open) setHardDeleteCounts(null);
+        onOpenChange={setShowHardDelete}
+        leadId={leadId}
+        hardDeleteLead={hardDeleteLead}
+        isHardDeleting={isHardDeleting}
+        onDeleted={() => {
+          onSaved?.();
+          onClose();
         }}
-        title="Supprimer définitivement ce lead ?"
-        description="Cette action est irréversible. Le lead et toutes ses données associées seront purgés de la base."
-        confirmLabel={isHardDeleting ? 'Suppression…' : 'Supprimer définitivement'}
-        cancelLabel="Annuler"
-        variant="destructive"
-        loading={isHardDeleting}
-        onConfirm={handleConfirmHardDelete}
-      >
-        <div className="mt-4 rounded-lg border border-red-100 bg-red-50/60 p-3 text-sm text-gray-700">
-          <p className="font-medium text-red-700 mb-2">Données qui seront supprimées :</p>
-          {hardDeleteCounts === null ? (
-            <p className="text-gray-500 italic">Calcul en cours…</p>
-          ) : (
-            <ul className="space-y-1 list-disc list-inside text-xs">
-              <li>
-                <span className="font-medium">{hardDeleteCounts.appointments ?? '?'}</span>{' '}
-                RDV planning lié{(hardDeleteCounts.appointments || 0) > 1 ? 's' : ''}
-              </li>
-              <li>
-                <span className="font-medium">{hardDeleteCounts.interactions ?? '?'}</span>{' '}
-                interaction{(hardDeleteCounts.interactions || 0) > 1 ? 's' : ''} (timeline)
-              </li>
-              <li>
-                <span className="font-medium">{hardDeleteCounts.mailings ?? '?'}</span>{' '}
-                log{(hardDeleteCounts.mailings || 0) > 1 ? 's' : ''} mailing
-              </li>
-              <li className="text-gray-500">
-                + activités, devis Pennylane liés, visites techniques (cascade DB)
-              </li>
-            </ul>
-          )}
-          <p className="mt-3 text-xs text-gray-500 italic">
-            Les interventions ou devis fournisseur liés seront déliés (préservés mais sans lead).
-          </p>
-        </div>
-      </ConfirmDialog>
+      />
 
       {/* Filet anti-doublon CLIENT à la requalification : rattacher la fiche existante ou en créer une */}
       <DuplicateClientDialog
@@ -1471,11 +705,11 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         chooseLabel="Utiliser cette fiche"
         onChoose={(existing) => {
           setClientDuplicateCandidates([]);
-          handleRequalifyEntretien({ existingClientId: existing.id });
+          requalify({ existingClientId: existing.id });
         }}
         onCreateAnyway={() => {
           setClientDuplicateCandidates([]);
-          handleRequalifyEntretien({ skipDuplicateCheck: true });
+          requalify({ skipDuplicateCheck: true });
         }}
         onCancel={() => setClientDuplicateCandidates([])}
       />
