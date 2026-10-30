@@ -373,6 +373,7 @@ export const SectionPipeline = ({
   sources,
   commercials,
   groupedEquipmentTypes,
+  projectFamilies = [],
   isFinal,
   isWon,
   // Lost reason
@@ -443,7 +444,28 @@ export const SectionPipeline = ({
 
     {/* Assistant de planification rendu en overlay dans LeadModal */}
 
-    <FormField label="Équipement concerné" className="mt-3">
+    {/* « Projet » = liste COMMERCIALE (familles de devis, Settings → Devis) : c'est elle qui présélectionne
+        l'installation d'un devis. L'équipement ci-dessous reste le référentiel d'entretien (parc client). */}
+    <FormField label="Projet" className="mt-3">
+      <div className="relative">
+        <select
+          value={form.project_family_key}
+          onChange={(e) => setField('project_family_key', e.target.value)}
+          className={selectClass}
+        >
+          <option value="">—</option>
+          {projectFamilies.map((f) => (
+            <option key={f.key} value={f.key}>{f.label}</option>
+          ))}
+          {form.project_family_key && !projectFamilies.some((f) => f.key === form.project_family_key) && (
+            <option value={form.project_family_key}>{form.project_family_key} (famille désactivée)</option>
+          )}
+        </select>
+        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+      </div>
+    </FormField>
+
+    <FormField label="Équipement (parc d'entretien)" className="mt-3">
       <div className="relative">
         <select
           value={form.equipment_type_id}

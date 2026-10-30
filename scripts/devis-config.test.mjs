@@ -216,3 +216,19 @@ test('familleDepuisEquipement : l\'équipement concerné du lead présélectionn
   const sansBorne = buildDevisConfig({ devis: { familles: [{ key: 'autre', label: 'Autre', actif: true, categories: [], sections: ['A'] }, { key: 'borne_recharge', label: 'Borne', actif: false, categories: [], sections: ['A'] }] } });
   assert.equal(familleDepuisEquipement(sansBorne, 'Borne de Recharge'), null, 'famille désactivée : pas de présélection');
 });
+
+test('familleDuLead : le « Projet » commercial du lead prime, le libellé d\'équipement n\'est qu\'un repli', async () => {
+  const { familleDuLead } = await import('../src/lib/devisConfig.js');
+  const config = buildDevisConfig({});
+  // le projet décide, même si l'équipement d'entretien dirait autre chose
+  assert.equal(familleDuLead(config, { project_family_key: 'borne_recharge', equipment_type_label: 'Poêle à granulés' }), 'Borne de recharge');
+  assert.equal(familleDuLead(config, { project_family_key: 'autre', equipment_type_label: 'Travaux Électricité' }), 'Autre');
+  // sans projet : repli sur le libellé (leads existants)
+  assert.equal(familleDuLead(config, { project_family_key: null, equipment_type_label: 'PAC Air/Air' }), 'Climatisation');
+  assert.equal(familleDuLead(config, { equipment_type_label: 'Prestation Diverses' }), null);
+  // projet inconnu de l'org ou désactivé : repli, jamais d'erreur
+  assert.equal(familleDuLead(config, { project_family_key: 'famille_supprimee', equipment_type_label: 'Gainable' }), 'Climatisation');
+  const sansBorne = buildDevisConfig({ devis: { familles: [{ key: 'autre', label: 'Autre', actif: true, categories: [], sections: ['A'] }, { key: 'borne_recharge', label: 'Borne', actif: false, categories: [], sections: ['A'] }] } });
+  assert.equal(familleDuLead(sansBorne, { project_family_key: 'borne_recharge' }), null, 'famille désactivée, pas d\'équipement : rien');
+  assert.equal(familleDuLead(config, null), null);
+});
