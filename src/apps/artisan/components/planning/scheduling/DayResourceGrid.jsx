@@ -464,7 +464,7 @@ export function DayResourceGrid({
                   // Bloc draft démarrant sur ce créneau
                   const draftBlock = (draftsByMember.get(m.id) || []).find((b) => b.startIdx === slot.index);
 
-                  let cellClass = 'border-b border-r relative transition-colors';
+                  let cellClass = 'group border-b border-r relative transition-colors';
                   if (occupied) cellClass += ' cursor-default';
                   else if (inDrag) cellClass += ' bg-blue-200 cursor-row-resize';
                   else if (off) cellClass += ' bg-gray-100 hover:bg-blue-50/60 cursor-pointer';
@@ -477,8 +477,14 @@ export function DayResourceGrid({
                       onMouseEnter={() => handleSlotMouseEnter(m.id, slot.index)}
                       className={cellClass}
                       style={{ height: `${SLOT_HEIGHT}px` }}
-                      title={off ? 'Hors horaires' : slot.time}
                     >
+                      {/* Heure survolée écrite DANS la case : l'infobulle native s'affichait sous
+                          le pointeur, une demi-heure plus bas (« 8 h 00 tombe sur 8 h 30 », 2026-10-31). */}
+                      {!occupied && !inDrag && (
+                        <span className="pointer-events-none absolute inset-0 hidden items-center pl-1 text-[9px] leading-none text-blue-600 group-hover:flex">
+                          {slot.time}{off ? ' · hors horaires' : ''}
+                        </span>
+                      )}
                       {/* Bloc occupé (rendu sur la cellule de début, hauteur = nb créneaux) */}
                       {busyBlock && (
                         <div
