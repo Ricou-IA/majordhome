@@ -20,8 +20,9 @@
  * ============================================================================
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { CalendarCheck, Loader2, X, FileText, User } from 'lucide-react';
+import { toast } from 'sonner';
 import { DayResourceGrid } from './DayResourceGrid';
 import { SlotDraftList } from './SlotDraftList';
 import { AssignSlotModal } from './AssignSlotModal';
@@ -180,6 +181,21 @@ export function SchedulingAssistant({
   // poser = poser dans la colonne de quelqu'un, la modale n'est que le filet du
   // sélecteur inline vidé. Annuler retire le créneau.
   const [assignPromptSlot, setAssignPromptSlot] = useState(null);
+
+  // Bloc contrat : un créneau posé porte la durée du moment. Si elle change (autre
+  // client choisi, durée du contrat arrivée après la pose), le créneau est faux —
+  // on le retire et on le dit. Vécu 2026-10-31 : MAZEL ERIC (2 poêles, 162 min)
+  // puis MAZEL PHILIPPE (1 poêle, 90 min) → RDV posé à 162 min.
+  const fixedDurationPosee = useRef(fixedDuration);
+  const nbCreneaux = useRef(0);
+  nbCreneaux.current = draftSlots.length;
+  useEffect(() => {
+    if (fixedDurationPosee.current === fixedDuration) return;
+    fixedDurationPosee.current = fixedDuration;
+    if (nbCreneaux.current === 0) return;
+    setDraftSlots([]);
+    toast.info('Durée du rendez-vous modifiée : reposez le créneau.');
+  }, [fixedDuration]);
 
   // RDV du jour sélectionné (avec technician_ids) pour les colonnes.
   const { dayAppointments } = useTeamDayAvailability(orgId, selectedDate);
