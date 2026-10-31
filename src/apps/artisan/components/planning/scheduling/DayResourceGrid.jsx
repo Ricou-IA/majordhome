@@ -447,7 +447,9 @@ export function DayResourceGrid({
                   className="border-r border-b px-1 flex items-start justify-end"
                   style={{ height: `${SLOT_HEIGHT}px` }}
                 >
-                  <span className="text-[10px] text-gray-400 -mt-1.5 select-none">{slot.label}</span>
+                  {/* Libellé SOUS le trait, dans sa ligne (comme le Planning) : remonté à cheval
+                      sur le trait, il était barré et un RDV de 8 h semblait entre deux lignes. */}
+                  <span className="text-[10px] leading-none pt-0.5 text-gray-400 select-none">{slot.label}</span>
                 </div>
 
                 {/* Cellules par membre */}
