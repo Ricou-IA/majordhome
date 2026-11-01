@@ -205,6 +205,9 @@ const FUNCTIONS = [
   'public.webshop_order_move_slot(uuid, uuid)',
   'public.webshop_slot_send_now(uuid)',
   'public.webshop_slot_send_result(uuid)',
+  'majordhome.phone_tail_key(text)', // 20261101_1 : helpers de find_or_create_client (20261021_1), absents du snapshot ⇒ la fonction échouait à l'exécution
+  'majordhome.client_identity_tokens(text[])',
+  'majordhome.client_names_compatible(text[], text[])',
   'public.find_or_create_client(uuid, text, text, text, text, text, text, text, text, text, text, text, text, boolean)', // 20261021_1 : remplacée (rapprochement fort) ; signature prod relue le 2026-10-24 (14ᵉ paramètre boolean)
 ];
 
