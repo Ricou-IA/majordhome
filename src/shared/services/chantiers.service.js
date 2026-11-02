@@ -34,12 +34,16 @@ export const ORDER_STATUSES = [
 ];
 
 /**
- * Transitions autorisées entre statuts chantier
+ * Transitions autorisées entre statuts chantier (boutons du pied de la fiche).
+ * « Planification » n'est pas un geste manuel : la carte y entre quand un RDV
+ * d'installation est posé (`syncCardStateOnCreate`) et en ressort quand le dernier
+ * est annulé — le bouton « Planification → » depuis « À planifier » déplaçait la
+ * carte sans RDV (CHABBERT, GAYRAN, 2026-10-27).
  */
 export const CHANTIER_TRANSITIONS = {
   gagne: ['commande_a_faire'],
   commande_a_faire: ['commande_recue', 'gagne'],
-  commande_recue: ['planification', 'commande_a_faire'],
+  commande_recue: ['commande_a_faire'],
   planification: ['realise', 'commande_recue'],
   realise: ['facture'],
   facture: [],
