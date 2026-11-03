@@ -18,8 +18,9 @@ import { champsClientManquantsPourPennylane } from '@/lib/pennylaneCustomerRequi
 import { formatEuro, formatDateFR } from '@/lib/utils';
 import {
   X, CheckCircle, XCircle, Copy, Trash2, Pencil,
-  FileText, Download, Loader2, User, MapPin, Phone, Mail, BookmarkPlus, Send,
+  FileText, Download, Loader2, User, MapPin, Phone, Mail, BookmarkPlus, Send, RefreshCw,
 } from 'lucide-react';
+import { rafraichirPrixLignes } from '@/lib/devisLigneArticle.js';
 import { useClient } from '@hooks/useClients';
 import { usePennylaneEnabled, useOrgSettings } from '@hooks/useOrgSettings';
 import { buildDevisConfig, famillesActives } from '@/lib/devisConfig.js';
@@ -36,7 +37,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const { quote, isLoading: loadingQuote } = useDevisDetail(quoteId);
   const { lines, isLoading: loadingLines } = useDevisLines(quoteId);
   const {
-    acceptQuote, refuseQuote, duplicateQuote, deleteQuote, ensureQuoteClient, pushToPennylane,
+    acceptQuote, refuseQuote, duplicateQuote, deleteQuote, ensureQuoteClient, pushToPennylane, upsertLines,
     isDeleting, isPushing,
   } = useDevisMutations(leadId);
   const { client } = useClient(quote?.client_id);
@@ -51,6 +52,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [edition, setEdition] = useState(false); // fenêtre de devis en mode édition, ouverte par « Modifier »
   const [completion, setCompletion] = useState(null); // { client, champs } : fiche client à compléter avant l'envoi Pennylane
+  const [rafraichissement, setRafraichissement] = useState(false); // « Rafraîchir les prix » en cours
 
   if (loadingQuote || loadingLines) {
     return (
@@ -145,6 +147,35 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
     } catch (err) {
       logger.error('[DevisModal] push Pennylane', err);
       toast.error(err?.message || 'Envoi Pennylane impossible');
+    }
+  };
+
+  // Brouillon : remettre sur les lignes le prix de vente courant de leur article (geste de l'opérateur, par exemple
+  // après un relevé de prix publics — une ligne est figée à l'enregistrement, rien ne la suit tout seul)
+  const handleRafraichirPrix = async () => {
+    const ids = [...new Set((lines || []).filter((l) => l.line_type === 'product' && l.catalog_item_id).map((l) => l.catalog_item_id))];
+    if (!ids.length) return toast.info('Aucune ligne de ce devis n\'est liée à un article de la base');
+    setRafraichissement(true);
+    try {
+      const { catalogItemsService } = await import('@services/catalogItems.service');
+      const { data: articles, error } = await catalogItemsService.getItemsSpecs(orgId, ids);
+      if (error) throw error;
+      const { lignes, modifiees, sansPrix } = rafraichirPrixLignes(lines, articles);
+      if (!modifiees.length) {
+        toast.info(sansPrix.length
+          ? `Prix déjà à jour ; ${sansPrix.length > 1 ? `${sansPrix.length} lignes restent` : '1 ligne reste'} sans prix dans la base : ${sansPrix.map((l) => l.designation).join(', ')}`
+          : 'Les prix du devis sont déjà ceux de la base');
+        return;
+      }
+      await upsertLines(quoteId, lignes, quote.global_discount_percent);
+      toast.success(`${modifiees.length > 1 ? `${modifiees.length} prix repris` : '1 prix repris'} de la base : ${modifiees.map((m) => `${m.designation} (${formatEuro(m.avant)} → ${formatEuro(m.apres)})`).join(', ')}`);
+      if (sansPrix.length) toast.info(`${sansPrix.length > 1 ? `${sansPrix.length} lignes restent` : '1 ligne reste'} sans prix dans la base : ${sansPrix.map((l) => l.designation).join(', ')}`);
+      onStatusChange?.();
+    } catch (err) {
+      logger.error('[DevisModal] rafraîchir les prix:', err);
+      toast.error(err?.message || 'Rafraîchissement des prix impossible');
+    } finally {
+      setRafraichissement(false);
     }
   };
 
@@ -511,6 +542,18 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
               </button>
             )}
 
+            {/* Brouillon : reprendre les prix de vente courants des articles (un prix ajusté à la main est remplacé aussi) */}
+            {isBrouillon && (
+              <button
+                onClick={handleRafraichirPrix}
+                disabled={rafraichissement}
+                className="btn-secondary btn-sm"
+                title="Remettre sur chaque ligne liée à un article le prix de vente actuel de la base (un prix ajusté à la main est remplacé)"
+              >
+                {rafraichissement ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+                Rafraîchir les prix
+              </button>
+            )}
             {/* Modifier le devis (brouillon ou envoyé ; un devis accepté ou refusé est figé) */}
             {(isBrouillon || isEnvoye) && (
               <button

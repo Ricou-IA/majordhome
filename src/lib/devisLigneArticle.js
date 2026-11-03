@@ -37,3 +37,35 @@ export function realignerLigne(ligne, articleAvant, articleApres, champs) {
     unit_price_ht: suitLePrix ? Number(articleApres.selling_price_ht) : ligne.unit_price_ht,
   };
 }
+
+/**
+ * Remet sur les lignes d'un devis le prix de vente courant de leur article (bouton « Rafraîchir les prix » d'un
+ * brouillon, geste de l'opérateur — Eric, 2026-11-03 : une ligne est figée à l'enregistrement, c'est lui qui décide de
+ * reprendre les prix de la base, par exemple après un relevé de prix publics). Ne change que les lignes produit liées
+ * à un article dont le prix de vente est renseigné (> 0) et différent du prix de la ligne ; un prix ajusté à la main est
+ * donc remplacé lui aussi (c'est le sens du geste). Les totaux de la ligne suivent (mêmes arrondis que l'écran).
+ * Les autres lignes sont renvoyées telles quelles (même objet).
+ * @param {Array<object>} lignes lignes du devis
+ * @param {Array<{ id: string, selling_price_ht?: number|string|null }>} articles articles relus en base
+ * @returns {{ lignes: Array<object>, modifiees: Array<{ designation: string, avant: number, apres: number }>,
+ *   sansPrix: Array<object> }} `sansPrix` = lignes produit sans article, article disparu ou article encore à 0
+ */
+export function rafraichirPrixLignes(lignes, articles) {
+  const prixParArticle = new Map((articles || []).map((a) => [a.id, Number(a.selling_price_ht) || 0]));
+  const modifiees = [];
+  const sansPrix = [];
+  const resultat = (lignes || []).map((ligne) => {
+    if (ligne.line_type !== 'product') return ligne;
+    const prix = ligne.catalog_item_id ? prixParArticle.get(ligne.catalog_item_id) || 0 : 0;
+    if (!(prix > 0)) { sansPrix.push(ligne); return ligne; }
+    const avant = Number(ligne.unit_price_ht) || 0;
+    if (avant === prix) return ligne;
+    modifiees.push({ designation: ligne.designation, avant, apres: prix });
+    const qte = Number(ligne.quantity) || 0;
+    const remise = Number(ligne.discount_percent) || 0;
+    const totalHt = Math.round(qte * prix * (1 - remise / 100) * 100) / 100;
+    const totalTva = Math.round(totalHt * (Number(ligne.tva_rate) || 0) / 100 * 100) / 100;
+    return { ...ligne, unit_price_ht: prix, total_ht: totalHt, total_tva: totalTva, total_ttc: Math.round((totalHt + totalTva) * 100) / 100 };
+  });
+  return { lignes: resultat, modifiees, sansPrix };
+}
