@@ -355,6 +355,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+          {/* Mode planification : seul l'assistant à l'écran (Eric 2026-11-03 : le haut de
+              la fiche prenait la place de la grille et cachait le bouton de validation). */}
+          {!showScheduler && (<>
           {/* Infos client */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-gray-700">
@@ -420,6 +423,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
             </>
           )}
+          </>)}
 
           {/* Section installation (Bloc B stage 4 : jours = appointments `installation`) */}
           {showScheduler ? (
@@ -583,7 +587,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
         </div>
 
         {/* Footer : transitions */}
-        {(allowedTransitions.length > 0 || canGroup || canDelete) && (() => {
+        {!showScheduler && (allowedTransitions.length > 0 || canGroup || canDelete) && (() => {
           const currentOrder = statusConfig.display_order;
           const backTransitions = allowedTransitions.filter((t) => {
             const cfg = getChantierStatusConfig(t);

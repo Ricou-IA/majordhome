@@ -358,31 +358,54 @@ export function SchedulingAssistant({
   return (
     <div className="space-y-4">
       {!embedded && (
-        <>
-          {/* Header */}
-          <div className="flex items-center justify-between">
+        /* Barre d'action collante : titre + type à gauche, validation à droite. Reste visible
+           pendant le défilement de la grille (Eric 2026-11-03 : le bouton « Planifier » en pied
+           de fiche était hors de vue, on quittait la fiche sans poser le RDV). */
+        <div className="sticky top-0 z-30 bg-white rounded-lg border border-gray-200 shadow-sm px-3 py-2 flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <CalendarCheck className="w-5 h-5 text-blue-600" />
+              <CalendarCheck className="w-5 h-5 text-blue-600 shrink-0" />
               Planifier le RDV
             </h3>
+            <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5 min-w-0">
+              <span className="font-medium">{appointmentTypeLabel}</span>
+              <span className="text-gray-300">•</span>
+              <User className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              <span className="text-gray-500 truncate">{assigneeDisplay}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isLoading || assignedSlots.length === 0}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg
+                         hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                         flex items-center gap-2 min-h-[40px]"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Planification...
+                </>
+              ) : (
+                <>
+                  <CalendarCheck className="w-4 h-4" />
+                  Planifier {assignedSlots.length || ''} créneau{assignedSlots.length > 1 ? 'x' : ''}
+                </>
+              )}
+            </button>
             <button
               type="button"
               onClick={onCancel}
-              className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+              disabled={isLoading}
+              title="Annuler"
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
             >
               <X className="w-4 h-4 text-gray-500" />
             </button>
           </div>
-
-          {/* Type de RDV */}
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <CalendarCheck className="w-3.5 h-3.5 text-blue-500" />
-            <span className="font-medium">{appointmentTypeLabel}</span>
-            <span className="text-gray-300">•</span>
-            <User className="w-3.5 h-3.5 text-indigo-500" />
-            <span className="text-gray-500">{assigneeDisplay}</span>
-          </div>
-        </>
+        </div>
       )}
 
       {/* Grille jour × colonnes par membre */}
@@ -476,40 +499,8 @@ export function SchedulingAssistant({
         </p>
       )}
 
-      {/* Boutons (mode autonome uniquement — en embedded, le host confirme) */}
-      {!embedded && (
-        <div className="flex gap-2 pt-1">
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isLoading || assignedSlots.length === 0}
-            className="flex-1 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg
-                       hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-                       flex items-center justify-center gap-2 min-h-[44px]"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Planification...
-              </>
-            ) : (
-              <>
-                <CalendarCheck className="w-4 h-4" />
-                Planifier {assignedSlots.length || ''} créneau{assignedSlots.length > 1 ? 'x' : ''}
-              </>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isLoading}
-            className="px-4 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg
-                       hover:bg-gray-50 transition-colors disabled:opacity-50 min-h-[44px]"
-          >
-            Annuler
-          </button>
-        </div>
-      )}
+      {/* En embedded, le host confirme ; en mode autonome la barre collante du haut porte
+          « Planifier » et la fermeture. */}
     </div>
   );
 }
