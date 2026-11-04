@@ -15,6 +15,7 @@ import { contractsService } from '@services/contracts.service';
 import { savService } from '@services/sav.service';
 import { entretienSavKeys } from '@hooks/cacheKeys';
 import { logger } from '@lib/logger';
+import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
 
 export function useLeadRequalification({ orgId, userId, lead, form, deleteLead, onClose }) {
   const navigate = useNavigate();
@@ -26,6 +27,10 @@ export function useLeadRequalification({ orgId, userId, lead, form, deleteLead, 
   // skipDuplicateCheck : « Créer quand même ».
   const requalify = useCallback(async ({ existingClientId = null, skipDuplicateCheck = false } = {}) => {
     if (isRequalifying || !orgId || !lead) return;
+    if (emailRefuse(form.email, lead.email)) {
+      toast.error(EMAIL_INVALIDE_MESSAGE);
+      return;
+    }
     setIsRequalifying(true);
     try {
       let clientId = lead.client_id || existingClientId;

@@ -169,6 +169,14 @@ test('validateEventForm : champs requis, une personne obligatoire', () => {
   assert.deepEqual(validateEventForm({ ...formOk, client_name: '' }, { ...opts, isFreeType: true }).errors, {});
 });
 
+test('validateEventForm : e-mail saisi invalide refusé, sauf client lié ou adresse ancienne inchangée', () => {
+  const bad = { ...formOk, client_email: 'a@gmail..com' };
+  assert.ok(validateEventForm(bad, opts).errors.client_email);
+  assert.deepEqual(validateEventForm(bad, { ...opts, clientLie: true }).errors, {});
+  assert.deepEqual(validateEventForm(bad, { ...opts, isEdit: true, originalEmail: 'a@gmail..com' }).errors, {});
+  assert.deepEqual(validateEventForm({ ...formOk, client_email: 'a@gmail.com' }, opts).errors, {});
+});
+
 test('validateEventForm : RDV commercial = assigned_commercial_id ou commercial résolu', () => {
   const vt = { ...formOk, appointment_type: 'rdv_technical', technicianIds: [], client_phone: '0612345678' };
   const c = { ...opts, isCommercialType: true };

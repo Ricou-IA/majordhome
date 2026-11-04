@@ -41,6 +41,7 @@ import { TabSms } from './client-detail/TabSms';
 import { TabDevisPL } from './client-detail/TabDevisPL';
 import { TabFacturesPL } from './client-detail/TabFacturesPL';
 import { logger } from '@lib/logger';
+import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
 
 const TABS = [
   { id: 'info', label: 'Informations', icon: User },
@@ -149,6 +150,10 @@ export default function ClientDetail() {
   const handleSave = async () => {
     if (!formData.lastName?.trim()) {
       toast.error('Le nom est requis');
+      return;
+    }
+    if (emailRefuse(formData.email, initialData?.email)) {
+      toast.error(EMAIL_INVALIDE_MESSAGE);
       return;
     }
 

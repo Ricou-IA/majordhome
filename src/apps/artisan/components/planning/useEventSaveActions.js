@@ -14,6 +14,7 @@ import { leadKeys } from '@hooks/useLeads';
 import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, chantierKeys } from '@hooks/cacheKeys';
 import { PHONE_REQUIRED_TYPES } from '@/lib/planningEvents';
 import { hasPhoneNumber } from '@/lib/phoneUtils';
+import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
 import { logger } from '@lib/logger';
 import { resolveEventActivation, reportActivationError } from './eventActivation';
 import { VT_PHONE_REQUIRED_MESSAGE, dupDecisionOf, clientLabelOf, autoSubjectFor } from '@/lib/eventForm';
@@ -153,6 +154,11 @@ export function useEventSaveActions({
     if (PHONE_REQUIRED_TYPES.includes(formData.appointment_type) && !hasPhoneNumber(formData.client_phone)) {
       setErrors((prev) => ({ ...prev, client_phone: 'Téléphone requis pour ce type de RDV' }));
       toast.error(VT_PHONE_REQUIRED_MESSAGE);
+      return;
+    }
+    if (!selectedClient && !selectedLead && emailRefuse(formData.client_email)) {
+      setErrors((prev) => ({ ...prev, client_email: EMAIL_INVALIDE_MESSAGE }));
+      toast.error(EMAIL_INVALIDE_MESSAGE);
       return;
     }
     setBatchSaving(true);

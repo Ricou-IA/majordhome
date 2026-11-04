@@ -41,6 +41,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { leadsService } from '@services/leads.service';
 import { logger } from '@lib/logger';
 import { hasPhoneNumber } from '@/lib/phoneUtils';
+import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
 import { dureeImposee } from '@/lib/planningEvents';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
 
@@ -180,11 +181,24 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
 
   const buildPayload = useCallback(() => buildLeadPayload(form, linkedClient?.id), [form, linkedClient]);
 
+  // Contact disabled si :
+  //  - client lié et pas en mode édition (flow MDH actuel), OU
+  //  - bridge Pennylane actif avec >=1 devis attaché (les coordonnées du lead
+  //    sont synchronisées depuis Pennylane — cf spec §9)
+  const pennylaneSyncedContact = pennylaneActive && (linkedQuotes?.length || 0) > 0;
+  const contactFieldsDisabled = pennylaneSyncedContact || (!!linkedClient && !editClientMode);
+  // Champ en lecture seule : l'opérateur ne pourrait pas corriger, on ne le bloque pas
+  const emailInvalide = !contactFieldsDisabled && emailRefuse(form.email, lead?.email);
+
   // Enregistre le formulaire en cours (lead + fiche client liée) avant tout geste qui en dépend.
   const persistForm = useCallback(async () => {
+    if (emailInvalide) {
+      toast.error(EMAIL_INVALIDE_MESSAGE);
+      throw new Error(EMAIL_INVALIDE_MESSAGE);
+    }
     await updateLead(leadId, buildPayload());
     await syncClientFields();
-  }, [updateLead, leadId, buildPayload, syncClientFields]);
+  }, [emailInvalide, updateLead, leadId, buildPayload, syncClientFields]);
 
   const {
     pendingLostStatusId, setPendingLostStatusId, lostReasonInput, setLostReasonInput,
@@ -292,6 +306,10 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       toast.error('Le nom de famille est requis');
       return;
     }
+    if (emailInvalide) {
+      toast.error(EMAIL_INVALIDE_MESSAGE);
+      return;
+    }
     try {
       // Filet anti-doublon (création uniquement) : un lead actif partageant
       // téléphone / email / nom+prénom doit être un choix explicite, pas un accident.
@@ -392,13 +410,6 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         .filter((s) => !(hasLinkedPlQuotes && PL_DRIVEN_STATUSES.includes(s.label)))
     : [];
 
-  // Contact disabled si :
-  //  - client lié et pas en mode édition (flow MDH actuel), OU
-  //  - bridge Pennylane actif avec >=1 devis attaché (les coordonnées du lead
-  //    sont synchronisées depuis Pennylane — cf spec §9)
-  const pennylaneSyncedContact = pennylaneActive && (linkedQuotes?.length || 0) > 0;
-  const contactFieldsDisabled = pennylaneSyncedContact || (!!linkedClient && !editClientMode);
-
   if (!isOpen) return null;
 
   // ========== RENDER ==========
@@ -481,6 +492,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 setField={setField}
                 contactFieldsDisabled={contactFieldsDisabled}
                 pennylaneSynced={pennylaneSyncedContact}
+                emailError={emailInvalide ? EMAIL_INVALIDE_MESSAGE : null}
               />
 
               <SectionPipeline

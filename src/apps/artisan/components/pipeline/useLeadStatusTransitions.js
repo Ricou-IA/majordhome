@@ -238,6 +238,9 @@ export function useLeadStatusTransitions({
       return;
     }
     try {
+      // Avant l'envoi : un formulaire refusé ne doit pas laisser des devis envoyés sans transition du lead
+      await persistForm();
+
       // 1. Marquer tous les devis brouillon comme envoyés. Une lecture refusée
       // renverrait `[]` : on ne passe pas le lead en « Devis envoyé » sans savoir.
       const { data: quotes, error: quotesError } = await devisService.getQuotesByLead(leadId);
@@ -253,7 +256,6 @@ export function useLeadStatusTransitions({
       // 3. Passer le lead en "Devis envoyé"
       const devisEnvoyeStatus = statuses.find((s) => s.label === 'Devis envoyé');
       if (devisEnvoyeStatus) {
-        await persistForm();
         await updateLeadStatus(leadId, devisEnvoyeStatus.id, userId, {
           quoteSentDate: new Date().toISOString().split('T')[0],
           quoteAmount: totalHt || null,

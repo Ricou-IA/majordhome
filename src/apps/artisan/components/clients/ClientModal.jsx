@@ -30,6 +30,7 @@ import { TabInfo, TabEquipments, TabHistory, CategoryBadge } from './ClientModal
 import { TabContrat } from '../../pages/client-detail/TabContrat';
 import { DuplicateClientDialog } from '../shared/DuplicateClientPanel';
 import { logger } from '@lib/logger';
+import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
 
 // ============================================================================
 // CONSTANTES
@@ -167,6 +168,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
   const validate = useCallback(() => {
     const newErrors = {};
     if (!formData.lastName?.trim()) newErrors.lastName = 'Le nom est requis';
+    if (emailRefuse(formData.email, originalDataRef.current?.email)) newErrors.email = EMAIL_INVALIDE_MESSAGE;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData]);
@@ -174,7 +176,10 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
   // Sauvegarde
   // skipDuplicateCheck : « Créer quand même » depuis le filet anti-doublon.
   const handleSave = async ({ skipDuplicateCheck = false } = {}) => {
-    if (!validate()) return;
+    if (!validate()) {
+      setActiveTab('info'); // les erreurs s'affichent sur cet onglet
+      return;
+    }
     setSaving(true);
     setSaveSuccess(false);
 

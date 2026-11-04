@@ -213,7 +213,7 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
               disabled={isLocked}
             />
           </FormField>
-          <FormField label="Email">
+          <FormField label="Email" error={errors.email}>
             <TextInput
               value={formData.email}
               onChange={(v) => updateField('email', v)}

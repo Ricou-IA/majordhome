@@ -3,7 +3,7 @@
 // Run : node --test scripts/pennylane-customer-requirements.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { adressesEmail, emailsValides, champsClientManquantsPourPennylane, messageClientIncompletPennylane } from '../src/lib/pennylaneCustomerRequirements.js';
+import { champsClientManquantsPourPennylane, messageClientIncompletPennylane } from '../src/lib/pennylaneCustomerRequirements.js';
 
 const cles = (client) => champsClientManquantsPourPennylane(client).map((m) => m.key);
 const COMPLET = { first_name: 'A', last_name: 'B', address: 'x', postal_code: '81000', city: 'Albi' };
@@ -37,20 +37,6 @@ test('adresses valides : rien n\'est demandé', () => {
 test('plusieurs adresses sur la fiche : valides ensemble, une seule mauvaise suffit à demander', () => {
   assert.deepEqual(cles({ ...COMPLET, email: 'a@veolia.com, b@veolia.com; c@veolia.com' }), []);
   assert.deepEqual(cles({ ...COMPLET, email: 'a@veolia.com, b@gmail..com' }), ['email']);
-});
-
-test('adressesEmail découpe la saisie pour le tableau `emails` de Pennylane', () => {
-  assert.deepEqual(adressesEmail('a@x.fr, b@x.fr;c@x.fr  d@x.fr'), ['a@x.fr', 'b@x.fr', 'c@x.fr', 'd@x.fr']);
-  assert.deepEqual(adressesEmail(' a@x.fr '), ['a@x.fr']);
-  assert.deepEqual(adressesEmail(null), []);
-  assert.deepEqual(adressesEmail(''), []);
-});
-
-test('emailsValides : vide accepté (e-mail facultatif)', () => {
-  assert.equal(emailsValides(''), true);
-  assert.equal(emailsValides(null), true);
-  assert.equal(emailsValides('a@x.fr'), true);
-  assert.equal(emailsValides('a@x..fr'), false);
 });
 
 test('e-mail demandé après les champs obligatoires, message en clair', () => {

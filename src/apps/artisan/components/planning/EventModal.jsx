@@ -243,11 +243,12 @@ export function EventModal({
   const validate = useCallback(() => {
     const { errors: newErrors, phoneMissing } = validateEventForm(formData, {
       isFreeType, isCommercialType, commercialMemberId, isEdit, originalType: appointment?.appointment_type,
+      clientLie: !!selectedClient || !!selectedLead, originalEmail: appointment?.client_email,
     });
     if (phoneMissing) toast.error(VT_PHONE_REQUIRED_MESSAGE);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, isCommercialType, isFreeType, commercialMemberId, isEdit, appointment]);
+  }, [formData, isCommercialType, isFreeType, commercialMemberId, isEdit, appointment, selectedClient, selectedLead]);
 
   const {
     batchSaving, setBatchSaving, duplicatePrompt, setDuplicatePrompt, resumeDuplicate,

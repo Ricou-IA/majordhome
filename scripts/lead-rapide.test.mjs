@@ -12,6 +12,8 @@ test('validerLeadRapide : nom obligatoire, et un moyen de contact (téléphone o
   assert.deepEqual(validerLeadRapide({ ...FORMULAIRE_LEAD_VIDE, phone: '0688593257' }), ['Le nom est requis']);
   assert.deepEqual(validerLeadRapide({ ...FORMULAIRE_LEAD_VIDE, last_name: 'Cassagne' }), ['Un téléphone ou un e-mail est requis']);
   assert.deepEqual(validerLeadRapide({ ...FORMULAIRE_LEAD_VIDE, last_name: 'Cassagne', email: 'pas-un-email' }), ['E-mail invalide']);
+  // le double point passait l'ancien contrôle, puis Pennylane refusait le client (422, 2026-11-04)
+  assert.deepEqual(validerLeadRapide({ ...FORMULAIRE_LEAD_VIDE, last_name: 'Revel', email: 'pratpastat@gmail..com' }), ['E-mail invalide']);
 });
 
 test('leadDepuisFormulaire : champs nettoyés, vides ⇒ null, statut posé, ids de référentiel repris', () => {

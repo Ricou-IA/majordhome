@@ -224,7 +224,7 @@ export const SectionClientLinking = ({
 // CONTACT
 // ============================================================================
 
-export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylaneSynced = false }) => {
+export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylaneSynced = false, emailError = null }) => {
   // Hint conditionnel — évite de mentir si on prétend "synchronisé" alors qu'on
   // n'a rien aspiré du customer PL (cf bug #6, fix commit pré-remplissage contact).
   // Si tous les champs contact sont vides, c'est probablement un lead ancien
@@ -319,7 +319,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylan
       </FormField>
     </div>
 
-    <FormField label="Email" className="mt-3">
+    <FormField label="Email" className="mt-3" error={emailError}>
       <div className="relative">
         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
         <input

@@ -37,6 +37,7 @@ import { Step1Client } from './ContractStepClient';
 import { Step2Equipment } from './ContractStepEquipment';
 import { Step3Contract } from './ContractStepSummary';
 import { logger } from '@lib/logger';
+import { emailsValides } from '@/lib/emailUtils';
 
 // ============================================================================
 // CONSTANTES
@@ -226,7 +227,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
 
   const canGoToStep1 = (() => {
     if (clientMode === 'search') return selectedClient && !selectedClientHasContract;
-    if (clientMode === 'create') return newClientData.lastName.trim().length >= 2 && !hasDuplicates;
+    if (clientMode === 'create') return newClientData.lastName.trim().length >= 2 && !hasDuplicates && emailsValides(newClientData.email);
     return false;
   })();
 

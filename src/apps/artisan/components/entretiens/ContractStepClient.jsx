@@ -15,6 +15,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput } from '../FormFields';
+import { emailsValides, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
 import { DuplicateClientPanel } from '../shared/DuplicateClientPanel';
 
 // ============================================================================
@@ -249,7 +250,7 @@ export function Step1Client({
                 type="tel"
               />
             </FormField>
-            <FormField label="Email">
+            <FormField label="Email" error={emailsValides(newClientData.email) ? null : EMAIL_INVALIDE_MESSAGE}>
               <TextInput
                 value={newClientData.email}
                 onChange={(val) => onClientDataChange('email', val)}

@@ -530,7 +530,7 @@ export const SectionClient = ({
             disabled={isCancelled || !!selectedClient || !!selectedLead}
           />
         </FormField>
-        <FormField label="Email">
+        <FormField label="Email" error={errors.client_email}>
           <TextInput
             value={formData.client_email}
             onChange={(v) => updateField('client_email', v)}

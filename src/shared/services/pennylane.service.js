@@ -26,7 +26,8 @@ import { withErrorHandling } from '@/lib/serviceHelpers';
 import { cleanPhone } from '@/lib/phoneUtils';
 import { logger } from '@/lib/logger';
 import { buildPennylaneQuotePayload, buildPennylaneQuoteUpdatePayload, TVA_MAPPING, UNIT_MAPPING } from '@/lib/pennylaneQuotePayload.js';
-import { adressesEmail, champsClientManquantsPourPennylane, messageClientIncompletPennylane } from '@/lib/pennylaneCustomerRequirements.js';
+import { champsClientManquantsPourPennylane, messageClientIncompletPennylane } from '@/lib/pennylaneCustomerRequirements.js';
+import { adressesEmail } from '@/lib/emailUtils.js';
 import { clientsService } from '@services/clients.service';
 
 // ============================================================================

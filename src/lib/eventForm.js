@@ -5,6 +5,7 @@
 import { formatDateForInput, computeEndTime, computeDuration } from './utils.js';
 import { PHONE_REQUIRED_TYPES } from './planningEvents.js';
 import { hasPhoneNumber } from './phoneUtils.js';
+import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from './emailUtils.js';
 
 // Une visite technique sans numéro = un commercial qui ne peut ni confirmer ni
 // prévenir d'un retard (vécu : lead LOLLENFANT, 2026-09-14). Si un client ou une
@@ -150,7 +151,7 @@ export function applyFieldChange(prev, field, value) {
  * Pas de RDV R1 sans numéro, à la pose ou à la re-catégorisation (un RDV déjà posé reste éditable).
  * @returns {{ errors: Object, phoneMissing: boolean }}
  */
-export function validateEventForm(formData, { isFreeType, isCommercialType, commercialMemberId, isEdit, originalType }) {
+export function validateEventForm(formData, { isFreeType, isCommercialType, commercialMemberId, isEdit, originalType, clientLie = false, originalEmail = null }) {
   const errors = {};
   if (!formData.scheduled_date) errors.scheduled_date = 'Date requise';
   if (!formData.scheduled_start) errors.scheduled_start = 'Heure de début requise';
@@ -164,6 +165,8 @@ export function validateEventForm(formData, { isFreeType, isCommercialType, comm
     && (!isEdit || !PHONE_REQUIRED_TYPES.includes(originalType));
   const phoneMissing = becomesVt && !hasPhoneNumber(formData.client_phone);
   if (phoneMissing) errors.client_phone = 'Téléphone requis pour ce type de RDV';
+  // Client ou carte liés : champ en lecture seule, un e-mail ancien invalide ne bloque pas un RDV
+  if (!clientLie && emailRefuse(formData.client_email, originalEmail)) errors.client_email = EMAIL_INVALIDE_MESSAGE;
   return { errors, phoneMissing };
 }
 

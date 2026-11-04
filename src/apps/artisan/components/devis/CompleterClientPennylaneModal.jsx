@@ -14,7 +14,8 @@ import { X, Loader2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClient } from '@hooks/useClients';
 import { FormField, TextInput } from '../FormFields';
-import { LIBELLES_CHAMPS_CLIENT_PENNYLANE, emailsValides } from '@/lib/pennylaneCustomerRequirements.js';
+import { LIBELLES_CHAMPS_CLIENT_PENNYLANE } from '@/lib/pennylaneCustomerRequirements.js';
+import { emailsValides } from '@/lib/emailUtils.js';
 
 // clé de la fiche → clé attendue par clientsService.updateClient
 const CLE_UPDATE = { company_name: 'companyName', first_name: 'firstName', last_name: 'lastName', address: 'address', postal_code: 'postalCode', city: 'city', email: 'email' };

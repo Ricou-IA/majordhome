@@ -3,6 +3,8 @@
 // module PUR, testé (scripts/lead-rapide.test.mjs). Le lead créé ici est un lead comme les autres : statut
 // « Nouveau » posé, filet anti-doublon passé avant (NouveauDevisRapideModal), commercial / source / projet repris.
 
+import { emailsValides } from './emailUtils.js';
+
 /** Formulaire vide. `commercial_id` = id de la table commercials (assigned_user_id d'un lead, pont dual-ID). */
 export const FORMULAIRE_LEAD_VIDE = Object.freeze({
   first_name: '', last_name: '', phone: '', email: '', address: '', postal_code: '', city: '',
@@ -21,7 +23,7 @@ export function validerLeadRapide(form) {
   const erreurs = [];
   if (!t(form.last_name)) erreurs.push('Le nom est requis');
   const email = t(form.email);
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) erreurs.push('E-mail invalide');
+  if (!emailsValides(email)) erreurs.push('E-mail invalide');
   else if (!t(form.phone) && !email && t(form.last_name)) erreurs.push('Un téléphone ou un e-mail est requis');
   return erreurs;
 }
