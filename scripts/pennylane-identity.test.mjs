@@ -42,6 +42,39 @@ test('push particulier : seules les colonnes modifiées, adresse + complément, 
   assert.deepEqual(r.fields, ['email', 'address']);
 });
 
+test('push : plusieurs adresses sur la fiche ⇒ une entrée par adresse, secondaires PL gardés sans doublon', () => {
+  const plCustomer = { ...PL, emails: ['ancien@example.invalid', 'compta@example.invalid', 'B@example.invalid'] };
+  const r = buildPlUpdate({ client: { email: 'a@example.invalid, b@example.invalid; c@example.invalid' }, columns: ['email'], plCustomer });
+  assert.deepEqual(r.body.emails, ['a@example.invalid', 'b@example.invalid', 'c@example.invalid', 'compta@example.invalid']);
+  assert.deepEqual(r.fields, ['email']);
+});
+
+test('pull : PL change la première adresse ⇒ les autres adresses de la fiche restent', () => {
+  const r = planPullUpdate({
+    changed: ['email'], plIdentity: { email: 'nouveau@example.invalid', customer_type: 'individual' }, plUpdatedAt: null,
+    client: { email: 'a@example.invalid, b@example.invalid' }, pending: null,
+  });
+  assert.deepEqual(r.apply, { email: 'nouveau@example.invalid, b@example.invalid' });
+});
+
+test('pull : adresse PL déjà présente sur la fiche (écho, casse comprise) ⇒ rien à écrire', () => {
+  for (const email of ['a@example.invalid', 'B@example.invalid']) {
+    const r = planPullUpdate({
+      changed: ['email'], plIdentity: { email, customer_type: 'individual' }, plUpdatedAt: null,
+      client: { email: 'a@example.invalid, b@example.invalid' }, pending: null,
+    });
+    assert.deepEqual(r.apply, {}, email);
+  }
+});
+
+test('pull : fiche à une seule adresse ou sans adresse ⇒ remplacée par celle de PL', () => {
+  const plIdentity = { email: 'nouveau@example.invalid', customer_type: 'individual' };
+  for (const email of ['a@example.invalid', null]) {
+    const r = planPullUpdate({ changed: ['email'], plIdentity, plUpdatedAt: null, client: { email }, pending: null });
+    assert.deepEqual(r.apply, { email: 'nouveau@example.invalid' });
+  }
+});
+
 test('push : une valeur MDH vide ne vide jamais Pennylane', () => {
   const r = buildPlUpdate({ client: { phone: '' }, columns: ['phone'], plCustomer: PL });
   assert.equal(r, null);

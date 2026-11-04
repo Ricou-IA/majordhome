@@ -37,6 +37,15 @@ function clean(v) {
 }
 
 /**
+ * Adresses d'une fiche MDH, qui peut en porter plusieurs (« a@x.fr, b@x.fr ») — même découpage
+ * que `adressesEmail` de src/lib/emailUtils.js (ce module n'importe rien).
+ * @param {unknown} v @returns {string[]}
+ */
+function adressesFiche(v) {
+  return typeof v === 'string' ? v.split(/[\s,;]+/).filter(Boolean) : [];
+}
+
+/**
  * Ligne d'adresse PL d'un client MDH : `address, complément` — même règle qu'à la création.
  * @param {{ address?: string|null, address_complement?: string|null }} client
  * @returns {string|null}
@@ -117,13 +126,15 @@ export function buildPlUpdate({ client, columns, plCustomer }) {
   const phone = clean(client?.phone);
   if (cols.has('phone') && phone) { body.phone = phone; fields.push('phone'); }
 
-  const email = clean(client?.email);
-  if (cols.has('email') && email) {
-    // `emails` REMPLACE la liste : on ne touche que le premier, les autres sont conservés.
+  const adresses = adressesFiche(client?.email);
+  if (cols.has('email') && adresses.length > 0) {
+    // `emails` REMPLACE la liste : les adresses de la fiche prennent la tête, les secondaires
+    // de Pennylane sont conservés.
+    const connues = new Set(adresses.map((a) => a.toLowerCase()));
     const others = (Array.isArray(plCustomer?.emails) ? plCustomer.emails : [])
       .slice(1)
-      .filter((e) => clean(e) && clean(e).toLowerCase() !== email.toLowerCase());
-    body.emails = [email, ...others];
+      .filter((e) => clean(e) && !connues.has(clean(e).toLowerCase()));
+    body.emails = [...adresses, ...others];
     fields.push('email');
   }
 
@@ -185,6 +196,14 @@ export function planPullUpdate({ changed, plIdentity, plUpdatedAt, client, pendi
 
     // Écho de notre propre ligne « adresse, complément » : rien n'a changé côté MDH.
     if (f === 'address' && v === plAddressLine(client)) continue;
+    if (f === 'email') {
+      // PL ne remonte que sa première adresse : les autres adresses de la fiche restent.
+      const adresses = adressesFiche(client?.email);
+      if (!adresses.some((a) => a.toLowerCase() === v.toLowerCase())) {
+        apply.email = [v, ...adresses.slice(1)].join(', ');
+      }
+      continue;
+    }
     if (clean(client?.[f]) === v) continue;
     apply[f] = v;
   }
