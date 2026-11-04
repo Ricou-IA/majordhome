@@ -260,6 +260,8 @@ export function useDevisMutations(leadId) {
       if (quote.lead_id) {
         const res = await unwrapResult(pennylaneService.attachQuotesAndSendLead(orgId, quote.lead_id, [{
           quote_pl_id: pushed.pennylane_id,
+          // Sans lui, le cron de synchro d'identité Pennylane → lead saute ce devis
+          customer_id: pushed.pennylane_customer_id,
           amount_ht: Number(quote.total_ht) || null,
           label: pushed.pennylane_number || quote.quote_number,
           date: new Date().toISOString().slice(0, 10),

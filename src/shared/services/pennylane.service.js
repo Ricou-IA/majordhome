@@ -383,6 +383,7 @@ async function pushQuote(quote, lines, client, orgId) {
   return {
     pennylane_id: result.id,
     pennylane_number: result.quote_number,
+    pennylane_customer_id: pennylaneCustomerId,
     url: result.public_url || null,
     syncRecord,
     sansSection,
