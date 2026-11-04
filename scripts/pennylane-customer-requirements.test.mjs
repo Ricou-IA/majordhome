@@ -3,9 +3,61 @@
 // Run : node --test scripts/pennylane-customer-requirements.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { champsClientManquantsPourPennylane, messageClientIncompletPennylane } from '../src/lib/pennylaneCustomerRequirements.js';
+import { adressesEmail, emailsValides, champsClientManquantsPourPennylane, messageClientIncompletPennylane } from '../src/lib/pennylaneCustomerRequirements.js';
 
 const cles = (client) => champsClientManquantsPourPennylane(client).map((m) => m.key);
+const COMPLET = { first_name: 'A', last_name: 'B', address: 'x', postal_code: '81000', city: 'Albi' };
+
+test('e-mail absent : Pennylane ne l\'exige pas, rien n\'est demandé', () => {
+  for (const email of [undefined, null, '', '   ']) assert.deepEqual(cles({ ...COMPLET, email }), []);
+});
+
+test('adresses réellement refusables de la prod : e-mail demandé', () => {
+  for (const email of [
+    'pratpastat@gmail..com', // le 422 du 2026-11-04 (CLI-03819)
+    'cedric.malroux@gmail',
+    'germafrancoise@outlook',
+    'eric.robert81000orange.fr',
+    'angelique9292gmail.com',
+    'mcs@laurent@gmail.com',
+    'adeline.fraysse@-nmp',
+    'mairie-réalmont@wanadoo.fr',
+    'rivière.richard@outlook.fr',
+    'a..b@gmail.com',
+    '.a@gmail.com',
+  ]) assert.deepEqual(cles({ ...COMPLET, email }), ['email'], email);
+});
+
+test('adresses valides : rien n\'est demandé', () => {
+  for (const email of ['jean.dupont@gmail.com', 'J.Dupont+devis@Mairie-Albi.fr', ' a@b.fr ', "o'neil@orange.fr"]) {
+    assert.deepEqual(cles({ ...COMPLET, email }), [], email);
+  }
+});
+
+test('plusieurs adresses sur la fiche : valides ensemble, une seule mauvaise suffit à demander', () => {
+  assert.deepEqual(cles({ ...COMPLET, email: 'a@veolia.com, b@veolia.com; c@veolia.com' }), []);
+  assert.deepEqual(cles({ ...COMPLET, email: 'a@veolia.com, b@gmail..com' }), ['email']);
+});
+
+test('adressesEmail découpe la saisie pour le tableau `emails` de Pennylane', () => {
+  assert.deepEqual(adressesEmail('a@x.fr, b@x.fr;c@x.fr  d@x.fr'), ['a@x.fr', 'b@x.fr', 'c@x.fr', 'd@x.fr']);
+  assert.deepEqual(adressesEmail(' a@x.fr '), ['a@x.fr']);
+  assert.deepEqual(adressesEmail(null), []);
+  assert.deepEqual(adressesEmail(''), []);
+});
+
+test('emailsValides : vide accepté (e-mail facultatif)', () => {
+  assert.equal(emailsValides(''), true);
+  assert.equal(emailsValides(null), true);
+  assert.equal(emailsValides('a@x.fr'), true);
+  assert.equal(emailsValides('a@x..fr'), false);
+});
+
+test('e-mail demandé après les champs obligatoires, message en clair', () => {
+  const m = champsClientManquantsPourPennylane({ first_name: 'A', last_name: 'B', address: 'x', postal_code: '81000', email: 'a@x..fr' });
+  assert.deepEqual(m.map((x) => x.key), ['city', 'email']);
+  assert.equal(messageClientIncompletPennylane(m), 'Fiche client incomplète pour Pennylane : ville, e-mail valide manquant(s)');
+});
 
 test('particulier complet : rien ne manque', () => {
   assert.deepEqual(cles({ first_name: 'PHILIPPE', last_name: 'FONTA', address: '3 rue des Lilas', postal_code: '81370', city: 'Saint-Sulpice' }), []);

@@ -8,6 +8,9 @@
  *
  * Schéma Pennylane `POST /customers` : particulier = first_name + last_name + billing_address ;
  * entreprise = name + billing_address ; adresse = address + postal_code + city (+ pays).
+ * L'e-mail est facultatif, mais une adresse invalide fait refuser le customer (422 « At least
+ * one email address is not valid », vécu 2026-11-04 avec `…@gmail..com`) : il est donc demandé
+ * dès qu'il est renseigné et mal formé.
  * Testé : node --test scripts/pennylane-customer-requirements.test.mjs
  * ============================================================================
  */
@@ -20,7 +23,29 @@ export const LIBELLES_CHAMPS_CLIENT_PENNYLANE = Object.freeze({
   address: 'adresse',
   postal_code: 'code postal',
   city: 'ville',
+  email: 'e-mail valide',
 });
+
+const EMAIL_RE = /^[a-z0-9_%+'-]+(\.[a-z0-9_%+'-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i;
+
+/**
+ * Adresses d'une saisie e-mail : une fiche peut en porter plusieurs (« a@x.fr, b@x.fr »),
+ * Pennylane les veut une par une dans `emails[]`.
+ * @param {string|null|undefined} saisie
+ * @returns {string[]}
+ */
+export function adressesEmail(saisie) {
+  return String(saisie || '').split(/[\s,;]+/).filter(Boolean);
+}
+
+/**
+ * Toutes les adresses de la saisie sont-elles bien formées ? Vide = oui (e-mail facultatif).
+ * @param {string|null|undefined} saisie
+ * @returns {boolean}
+ */
+export function emailsValides(saisie) {
+  return adressesEmail(saisie).every((a) => EMAIL_RE.test(a));
+}
 
 /**
  * Champs manquants d'une fiche client (ligne `majordhome_clients`) pour créer le customer Pennylane.
@@ -41,6 +66,7 @@ export function champsClientManquantsPourPennylane(client) {
   if (![c.address, c.address_complement].some((x) => typeof x === 'string' && x.trim())) manquants.push('address');
   if (!c.postal_code) manquants.push('postal_code');
   if (!c.city) manquants.push('city');
+  if (!emailsValides(c.email)) manquants.push('email');
   return manquants.map((key) => ({ key, label: LIBELLES_CHAMPS_CLIENT_PENNYLANE[key] }));
 }
 

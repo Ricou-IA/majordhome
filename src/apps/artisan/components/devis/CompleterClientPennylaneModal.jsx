@@ -14,11 +14,11 @@ import { X, Loader2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClient } from '@hooks/useClients';
 import { FormField, TextInput } from '../FormFields';
-import { LIBELLES_CHAMPS_CLIENT_PENNYLANE } from '@/lib/pennylaneCustomerRequirements.js';
+import { LIBELLES_CHAMPS_CLIENT_PENNYLANE, emailsValides } from '@/lib/pennylaneCustomerRequirements.js';
 
 // clé de la fiche → clé attendue par clientsService.updateClient
-const CLE_UPDATE = { company_name: 'companyName', first_name: 'firstName', last_name: 'lastName', address: 'address', postal_code: 'postalCode', city: 'city' };
-const PLACEHOLDERS = { company_name: 'Raison sociale', first_name: 'Prénom', last_name: 'Nom', address: 'N° et rue', postal_code: '81000', city: 'Ville' };
+const CLE_UPDATE = { company_name: 'companyName', first_name: 'firstName', last_name: 'lastName', address: 'address', postal_code: 'postalCode', city: 'city', email: 'email' };
+const PLACEHOLDERS = { company_name: 'Raison sociale', first_name: 'Prénom', last_name: 'Nom', address: 'N° et rue', postal_code: '81000', city: 'Ville', email: 'client@email.com' };
 
 /**
  * @param {object} p
@@ -31,7 +31,9 @@ export default function CompleterClientPennylaneModal({ client, champs, onClose,
   const { updateClient, isUpdating } = useClient(client?.id);
   const [form, setForm] = useState(() => Object.fromEntries(champs.map((c) => [c.key, client?.[c.key] || ''])));
 
-  const incomplet = champs.some((c) => !String(form[c.key] || '').trim());
+  // L'e-mail est le seul champ facultatif pour Pennylane : à corriger, ou à vider si on ne le connaît pas
+  const emailInvalide = form.email !== undefined && !emailsValides(form.email);
+  const incomplet = emailInvalide || champs.some((c) => c.key !== 'email' && !String(form[c.key] || '').trim());
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,7 +62,12 @@ export default function CompleterClientPennylaneModal({ client, champs, onClose,
             Pennylane a besoin de ces renseignements pour créer le client <span className="font-medium text-secondary-900">{client?.display_name || ''}</span>. Ils seront enregistrés sur sa fiche.
           </p>
           {champs.map((c) => (
-            <FormField key={c.key} label={libelle(c)} required>
+            <FormField
+              key={c.key}
+              label={libelle(c)}
+              required={c.key !== 'email'}
+              error={c.key === 'email' && emailInvalide ? 'Adresse invalide : corrigez-la, ou videz le champ si vous ne la connaissez pas' : null}
+            >
               <TextInput
                 value={form[c.key]}
                 onChange={(v) => setForm((prev) => ({ ...prev, [c.key]: v }))}

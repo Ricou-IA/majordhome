@@ -26,7 +26,7 @@ import { withErrorHandling } from '@/lib/serviceHelpers';
 import { cleanPhone } from '@/lib/phoneUtils';
 import { logger } from '@/lib/logger';
 import { buildPennylaneQuotePayload, buildPennylaneQuoteUpdatePayload, TVA_MAPPING, UNIT_MAPPING } from '@/lib/pennylaneQuotePayload.js';
-import { champsClientManquantsPourPennylane, messageClientIncompletPennylane } from '@/lib/pennylaneCustomerRequirements.js';
+import { adressesEmail, champsClientManquantsPourPennylane, messageClientIncompletPennylane } from '@/lib/pennylaneCustomerRequirements.js';
 import { clientsService } from '@services/clients.service';
 
 // ============================================================================
@@ -202,7 +202,7 @@ function buildPennylaneCustomer(client) {
   const companyName = client.display_name || `${client.first_name || ''} ${client.last_name || ''}`.trim();
 
   const common = {
-    emails: client.email ? [client.email] : [],
+    emails: adressesEmail(client.email),
     phone: client.phone || undefined,
     reference: client.client_number || undefined,
     external_reference: client.id,
