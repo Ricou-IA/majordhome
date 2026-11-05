@@ -18,7 +18,7 @@ const DEFAULT_SOURCE_BOUCHE_A_OREILLE = '3d945733-475a-46ee-891b-50acf9e2151d';
 /**
  * @returns {Promise<{ leadId: string|null, interventionId: string|null, error: string|null, candidates?: Array }>}
  *   error ∈ null | 'duplicate' (candidates fournis) | 'prospect' | 'activation' |
- *   'client_sans_projet' | 'contrat_requis_entretien'
+ *   'client_sans_projet' | 'contrat_requis_entretien' | 'client_requis_entretien'
  */
 export async function resolveEventActivation({
   orgId, userId, formData, selectedClient, selectedLead, attachContext, rdvDate, dupDecision,
@@ -86,7 +86,7 @@ export async function resolveEventActivation({
     interventionId: fallbackInterventionId,
   });
   if (resolved.error) {
-    const expected = ['client_sans_projet', 'contrat_requis_entretien'].includes(resolved.error);
+    const expected = ['client_sans_projet', 'contrat_requis_entretien', 'client_requis_entretien'].includes(resolved.error);
     if (!expected) {
       logger.error('[EventModal] activation error:', resolved.error);
     }
@@ -110,6 +110,8 @@ export function reportActivationError(error) {
     toast.error("Ce client n'a pas de fiche projet — impossible de créer l'entretien.");
   } else if (error === 'contrat_requis_entretien') {
     toast.error("Ce client n'a pas de contrat d'entretien actif : créez d'abord le contrat, ou choisissez un autre type de RDV (SAV, Autre…).");
+  } else if (error === 'client_requis_entretien') {
+    toast.error("Un SAV ou un entretien se rattache à une fiche client : ce contact n'en a pas encore.");
   } else if (error === 'bouclage_requiert_carte') {
     toast.error('Sélectionnez la carte du pipeline à boucler.');
   } else if (error === 'prospect') {

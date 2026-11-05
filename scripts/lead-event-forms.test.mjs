@@ -9,7 +9,7 @@ import { EMPTY_LEAD_FORM, newLeadForm, leadToForm, contactPayload, buildLeadPayl
 import {
   EMPTY_CONTACT, contactFromRecord, appointmentToForm, newEventForm, linkedClientFromAppointment,
   linkedLeadFromAppointment, linkedClientFromPrefill, applyFieldChange, validateEventForm,
-  dupDecisionOf, clientLabelOf, autoSubjectFor,
+  dupDecisionOf, clientLabelOf, autoSubjectFor, rattachementExplicite,
 } from '../src/lib/eventForm.js';
 
 // ---------------------------------------------------------------------------
@@ -218,6 +218,19 @@ test('contactFromRecord / EMPTY_CONTACT : coordonnées recopiées d\'une fiche o
   assert.equal(contactFromRecord({ last_name: 'Martin', display_name: 'X' }, { nameFallback: 'X' }).client_name, 'Martin');
   assert.equal(contactFromRecord({}).client_name, '');
   assert.deepEqual(Object.keys(EMPTY_CONTACT).sort(), Object.keys(contactFromRecord({})).sort());
+});
+
+test('rattachementExplicite : un lead sélectionné ne détourne pas un SAV ou un entretien de sa carte (MENEYER, 2026-11-05)', () => {
+  for (const type of ['service', 'maintenance']) {
+    assert.equal(rattachementExplicite({ type, leadId: 'lead-1' }), null);
+    assert.deepEqual(rattachementExplicite({ type, leadId: 'lead-1', interventionId: 'carte-1' }), { intervention_id: 'carte-1' });
+    assert.deepEqual(rattachementExplicite({ type, interventionId: 'carte-1' }), { intervention_id: 'carte-1' });
+  }
+  for (const type of ['rdv_technical', 'rdv_agency', 'rdv_closing', 'installation', 'other']) {
+    assert.deepEqual(rattachementExplicite({ type, leadId: 'lead-1' }), { lead_id: 'lead-1' });
+  }
+  assert.equal(rattachementExplicite({ type: 'service' }), null);
+  assert.equal(rattachementExplicite({ type: 'rdv_technical' }), null);
 });
 
 test('liaisons restaurées : client et carte depuis le RDV, client depuis la fiche (création)', () => {

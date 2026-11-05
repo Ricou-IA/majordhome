@@ -36,6 +36,18 @@ export function contactFromRecord(r, { nameFallback = '' } = {}) {
   };
 }
 
+/**
+ * Carte déjà désignée pour un RDV (sélection, kanban), ou null s'il reste à la résoudre.
+ * Le type décide de la carte : un entretien ou un SAV vit sur une intervention, jamais sur
+ * un lead. Un lead choisi dans la recherche unifiée ne doit pas court-circuiter sa création
+ * (sinon RDV au planning et aucune carte, sans erreur : MENEYER, FRENCH COUNTRY).
+ */
+export function rattachementExplicite({ type, leadId = null, interventionId = null }) {
+  if (interventionId) return { intervention_id: interventionId };
+  if (leadId && type !== 'maintenance' && type !== 'service') return { lead_id: leadId };
+  return null;
+}
+
 /** Formulaire pré-rempli depuis un RDV existant. */
 export function appointmentToForm(a) {
   return {

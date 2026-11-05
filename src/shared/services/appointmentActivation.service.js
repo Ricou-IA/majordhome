@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { ensureEntretienCard } from '@services/entretiens.service';
 import { leadsService } from '@services/leads.service';
 import { FREE_TYPES } from '@services/appointments.service';
+import { rattachementExplicite } from '@/lib/eventForm';
 
 const RDV_PLANIFIE_STATUS_ID = 'e23d04b8-da2e-4477-8e1c-b92868b682ae';
 const STATUS_GAGNE = 'c717780c-0ba7-4bf1-9e1e-5f014c1e9e2f';
@@ -47,9 +48,9 @@ export async function resolveCardForAppointment({
   leadId = null,
   interventionId = null,
 }) {
-  // 1. Rattachement explicite (depuis un kanban) -> passthrough
-  if (leadId) return { lead_id: leadId };
-  if (interventionId) return { intervention_id: interventionId };
+  // 1. Rattachement explicite (kanban, lead sélectionné) -> passthrough
+  const explicite = rattachementExplicite({ type, leadId, interventionId });
+  if (explicite) return explicite;
 
   // 1bis. Bouclage R2 : rattachement STRICT à une carte pipeline existante. Le leadId
   // est toujours fourni via la sélection lead-only de l'EventModal (passthrough ci-dessus).
