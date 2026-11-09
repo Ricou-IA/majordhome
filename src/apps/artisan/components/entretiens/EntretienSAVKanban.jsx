@@ -28,6 +28,8 @@ import { SchedulingTransitionModal } from './SchedulingTransitionModal';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { construireReglages } from '@/lib/tournee/reglages.js';
 import { trierCartes } from '@/lib/savUrgency';
+import { peutCloturerSansPlanifier } from '@/lib/savCloture';
+import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
 // CertificatsEntretienModal retiré — section certificats intégrée dans EntretienSAVModal
 
 // ============================================================================
@@ -145,6 +147,13 @@ export function EntretienSAVKanban() {
     const newStatus = destination.droppableId;
     const item = roleFilteredItems.find(i => i.id === draggableId);
     if (!item) return;
+
+    // SAV déposé directement en Réalisé : le technicien est déjà intervenu → fenêtre
+    // « Intervention faite » (clôture + inscription au planning après coup).
+    if (newStatus === 'realise' && peutCloturerSansPlanifier(item)) {
+      setPendingTransition({ item, oldStatus, newStatus, type: 'close' });
+      return;
+    }
 
     // Vérifier transition autorisée
     const allowed = getTransitions(item.intervention_type, oldStatus);
@@ -345,6 +354,13 @@ export function EntretienSAVKanban() {
         clientName={pendingClientName}
         devisAmount={pendingTransition?.item?.devis_amount || null}
       />
+      {pendingTransition?.type === 'close' && (
+        <SAVInterventionFaiteModal
+          item={pendingTransition.item}
+          onClose={handleCancelTransition}
+          onDone={refresh}
+        />
+      )}
       {pendingTransition?.type === 'schedule' && (
         <SchedulingTransitionModal
           item={pendingTransition.item}

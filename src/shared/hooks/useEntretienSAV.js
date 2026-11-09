@@ -19,6 +19,7 @@ import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { savService } from '@services/sav.service';
+import { savClotureService } from '@services/savCloture.service';
 import { callCampaignsService } from '@services/callCampaigns.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { entretienSavKeys, callAttemptKeys, appointmentKeys } from '@hooks/cacheKeys';
@@ -186,6 +187,21 @@ export function useEntretienSAVMutations() {
     },
   });
 
+  // --- « Intervention faite » : SAV clôturé sans planification, RDV inscrit après coup ---
+  // Invalidation même en erreur : la carte ou le planning peuvent avoir bougé à moitié,
+  // l'écran doit montrer l'état réel. Le message d'erreur du service dit ce qui EST fait.
+  const closeWithoutSchedulingMutation = useMutation({
+    mutationFn: ({ card, saisie }) =>
+      unwrapResult(savClotureService.cloturerSansPlanifier({ card, coreOrgId: orgId, saisie })),
+    onSettled: () => {
+      invalidateAll();
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+    },
+    onError: (err) => {
+      logger.error('[useEntretienSAV] cloturerSansPlanifier error:', err);
+    },
+  });
+
   // --- Commande pièces ---
   const partsOrderMutation = useMutation({
     mutationFn: ({ interventionId, status }) =>
@@ -261,6 +277,9 @@ export function useEntretienSAVMutations() {
       statusMutation.mutateAsync({ interventionId, newStatus }),
     /** @returns {Promise<{ deleted: number }>} nombre de RDV supprimés du planning */
     unscheduleEntretien: (card) => unscheduleMutation.mutateAsync({ card }),
+    /** SAV traité sans planification : carte en Réalisé + RDV terminé inscrit au planning. Rejette avec un message lisible. */
+    closeWithoutScheduling: (card, saisie) => closeWithoutSchedulingMutation.mutateAsync({ card, saisie }),
+    isClosingWithoutScheduling: closeWithoutSchedulingMutation.isPending,
 
     // SAV fields
     updatePartsOrder: (interventionId, status) =>

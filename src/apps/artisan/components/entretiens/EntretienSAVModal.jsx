@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   X, Loader2, ArrowLeft, ArrowRight, Save,
   User, Phone, ClipboardCheck, Wrench, Mail, FileText,
-  ExternalLink, Calendar, Check, UserPlus, Archive, Link2, AlertTriangle, Zap,
+  ExternalLink, Calendar, Check, UserPlus, Archive, Link2, AlertTriangle, Zap, CheckCircle2,
 } from 'lucide-react';
 import { anomaliesDeCarte } from '@/lib/certificatAnomalies';
 import { toast } from 'sonner';
@@ -61,6 +61,8 @@ import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
 import { SAVUrgencySelect, SAVUrgencyBadge } from './SAVUrgency';
 import { urgenceDe } from '@/lib/savUrgency';
+import { peutCloturerSansPlanifier } from '@/lib/savCloture';
+import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
 import { CertificatsSection } from './CertificatsSection';
 import { PhotoPlaqueAnomalie } from './PhotoPlaqueAnomalie';
 import { logger } from '@lib/logger';
@@ -113,6 +115,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
   // État planification
   const [showScheduling, setShowScheduling] = useState(false);
   const [schedulingLoading, setSchedulingLoading] = useState(false);
+  const [showCloture, setShowCloture] = useState(false); // fenêtre « Intervention faite » (SAV sans planification)
 
   // --- Certificats multi-équipements ---
   const isEntretien = item?.intervention_type === 'entretien';
@@ -906,6 +909,20 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
 
                 <div className="flex-1" />
 
+                {/* SAV traité sans planification : clôture + inscription au planning après coup */}
+                {peutCloturerSansPlanifier(item) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCloture(true)}
+                    disabled={isUpdatingStatus}
+                    title="Le technicien est déjà intervenu : clôturer et inscrire l'intervention au planning"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-emerald-600 text-emerald-700 bg-emerald-50 transition-colors hover:shadow-sm hover:bg-emerald-100 disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Intervention faite
+                  </button>
+                )}
+
                 {/* Avancer à droite */}
                 {forwardTransitions.map((targetStatus) => {
                   const col = KANBAN_COLUMNS.find(c => c.value === targetStatus)
@@ -934,6 +951,14 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
           </div>
         )}
       </div>
+
+      {showCloture && (
+        <SAVInterventionFaiteModal
+          item={item}
+          onClose={() => setShowCloture(false)}
+          onDone={() => { onUpdated?.(); onClose(); }}
+        />
+      )}
     </div>
   );
 }
