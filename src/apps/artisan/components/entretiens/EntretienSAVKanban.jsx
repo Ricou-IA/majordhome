@@ -28,7 +28,7 @@ import { SchedulingTransitionModal } from './SchedulingTransitionModal';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { construireReglages } from '@/lib/tournee/reglages.js';
 import { trierCartes } from '@/lib/savUrgency';
-import { peutCloturerSansPlanifier } from '@/lib/savCloture';
+import { peutCloturerSansPlanifier, colonnesTechnicien, carteVisibleParTechnicien, limiteALaCloture } from '@/lib/savCloture';
 import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
 // CertificatsEntretienModal retiré — section certificats intégrée dans EntretienSAVModal
 
@@ -36,7 +36,6 @@ import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-const TECHNICIEN_STATUSES = ['planifie', 'realise'];
 
 export function EntretienSAVKanban() {
   const { organization, user } = useAuth();
@@ -68,7 +67,7 @@ export function EntretienSAVKanban() {
   // Colonnes visibles selon le rôle
   const visibleColumns = useMemo(() => {
     const cols = effectiveRole === 'technicien'
-      ? KANBAN_COLUMNS.filter(c => TECHNICIEN_STATUSES.includes(c.value))
+      ? KANBAN_COLUMNS.filter(c => colonnesTechnicien().includes(c.value))
       : KANBAN_COLUMNS;
     return cols.map(c => ({ id: c.value, label: c.label, color: c.color }));
   }, [effectiveRole]);
@@ -77,7 +76,9 @@ export function EntretienSAVKanban() {
   const roleFilteredItems = useMemo(() => {
     let result = items;
     if (effectiveRole === 'technicien') {
-      result = result.filter(i => TECHNICIEN_STATUSES.includes(i.workflow_status));
+      // Son planning, plus les demandes SAV en attente qu'il peut clôturer lui-même
+      // (jamais les entretiens « À planifier » : la programmation reste au bureau).
+      result = result.filter(carteVisibleParTechnicien);
     }
     if (effectiveRole === 'commercial' && user?.id) {
       result = result.filter(i => i.created_by === user.id || i.technician_id === user.id);
@@ -162,6 +163,13 @@ export function EntretienSAVKanban() {
       return;
     }
 
+    // Technicien sur une demande SAV en attente : un seul geste, la clôture (ci-dessus).
+    // Planifier, envoyer un devis ou déplacer la carte restent au bureau.
+    if (limiteALaCloture(item, effectiveRole)) {
+      toast.error('Pour une demande SAV, utilisez « Intervention faite » : le reste se fait au bureau');
+      return;
+    }
+
     // Vérifier transition autorisée
     const allowed = getTransitions(item.intervention_type, oldStatus);
     if (!allowed.includes(newStatus)) {
@@ -187,7 +195,7 @@ export function EntretienSAVKanban() {
     } else {
       handleDirectTransition(item, newStatus);
     }
-  }, [roleFilteredItems, handleDirectTransition, handleUnschedule]);
+  }, [roleFilteredItems, handleDirectTransition, handleUnschedule, effectiveRole]);
 
   const handleCancelTransition = useCallback(() => {
     setPendingTransition(null);
@@ -266,8 +274,9 @@ export function EntretienSAVKanban() {
     <EntretienSAVCard
       item={item} onClick={setSelectedItem} onRefresh={refresh} orgId={orgId}
       invitation={invitationsParContrat.get(item.effective_contract_id || item.contract_id) || null}
+      canRanger={effectiveRole !== 'technicien'}
     />
-  ), [refresh, orgId, invitationsParContrat]);
+  ), [refresh, orgId, invitationsParContrat, effectiveRole]);
 
   if (isLoading) {
     return (
@@ -294,10 +303,13 @@ export function EntretienSAVKanban() {
       emptyMessage="Aucun élément"
       headerRight={
         <>
-          <LancerAppelButton
-            items={roleFilteredItems.filter((i) => i.workflow_status === 'a_planifier')}
-            orgId={orgId}
-          />
+          {/* Campagne d'appels = bureau : le technicien voit des SAV « À planifier », pas la file d'appels */}
+          {effectiveRole !== 'technicien' && (
+            <LancerAppelButton
+              items={roleFilteredItems.filter((i) => i.workflow_status === 'a_planifier')}
+              orgId={orgId}
+            />
+          )}
           {canCreateSAV && (
             <button
               onClick={() => { setCreateSAVPrefill(null); setCreateSAVOpen(true); }}

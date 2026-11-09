@@ -80,3 +80,33 @@ test('construireRdvCloture : entretien inclus dans l’objet, notes sans texte v
   assert.equal(rdv.client_name, 'GRAHOVAC SYLVIE');
   assert.equal(rdv.internal_notes.split('\n').length, 1);
 });
+
+// ── Ouverture aux techniciens (2026-11-09) ──────────────────────────────────
+import { colonnesTechnicien, carteVisibleParTechnicien, limiteALaCloture, STATUTS_TECHNICIEN } from '../src/lib/savCloture.js';
+
+test('colonnesTechnicien : son planning + les demandes SAV en attente, jamais « Demande de contrat »', () => {
+  const colonnes = colonnesTechnicien();
+  for (const s of [...STATUTS_TECHNICIEN, 'demande', 'devis_envoye', 'pieces_commandees', 'a_planifier']) assert.ok(colonnes.includes(s), s);
+  assert.equal(colonnes.includes('demande_contrat'), false);
+  assert.equal(new Set(colonnes).size, colonnes.length);
+});
+
+test('carteVisibleParTechnicien : SAV en attente oui, entretien à planifier non', () => {
+  assert.equal(carteVisibleParTechnicien(carte({ workflow_status: 'demande' })), true);
+  assert.equal(carteVisibleParTechnicien(carte({ workflow_status: 'a_planifier' })), true);
+  assert.equal(carteVisibleParTechnicien(carte({ workflow_status: 'planifie' })), true);
+  assert.equal(carteVisibleParTechnicien({ intervention_type: 'entretien', workflow_status: 'planifie' }), true);
+  assert.equal(carteVisibleParTechnicien({ intervention_type: 'entretien', workflow_status: 'realise' }), true);
+  assert.equal(carteVisibleParTechnicien({ intervention_type: 'entretien', workflow_status: 'a_planifier' }), false);
+  assert.equal(carteVisibleParTechnicien({ intervention_type: 'entretien', workflow_status: 'demande_contrat' }), false);
+  assert.equal(carteVisibleParTechnicien(null), false);
+});
+
+test('limiteALaCloture : le technicien seulement, et seulement sur une demande en attente', () => {
+  assert.equal(limiteALaCloture(carte({ workflow_status: 'demande' }), 'technicien'), true);
+  assert.equal(limiteALaCloture(carte({ workflow_status: 'pieces_commandees' }), 'technicien'), true);
+  assert.equal(limiteALaCloture(carte({ workflow_status: 'planifie' }), 'technicien'), false);
+  assert.equal(limiteALaCloture(carte({ workflow_status: 'demande' }), 'team_leader'), false);
+  assert.equal(limiteALaCloture(carte({ workflow_status: 'demande' }), 'org_admin'), false);
+  assert.equal(limiteALaCloture(carte({ workflow_status: 'demande' }), null), false);
+});

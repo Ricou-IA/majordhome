@@ -91,7 +91,7 @@ function libelleInvitation(inv) {
   return parts.length ? parts.join(' · ') : null;
 }
 
-export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation = null }) {
+export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation = null, canRanger = true }) {
   const [smsLoading, setSmsLoading] = useState(false);
   const [smsSent, setSmsSent] = useState(item.sms_avis_sent === true);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -200,7 +200,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(item); }}
       className="relative w-full text-left bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
     >
-      {item.workflow_status === 'a_planifier' && (
+      {item.workflow_status === 'a_planifier' && canRanger && (
         <button
           type="button"
           onClick={handleRanger}

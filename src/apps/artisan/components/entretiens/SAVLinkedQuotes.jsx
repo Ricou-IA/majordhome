@@ -32,7 +32,9 @@ import DevisModal from '../devis/DevisModal';
  */
 export function SAVLinkedQuotes({ item, canEdit = true, onUpdated, onCardSynced }) {
   const { can } = useCanAccess();
-  const { quotes, isLoading } = useDevisByIntervention(item.id);
+  // Le détail d'un devis (prix, marge) suit le droit « devis.view » : un technicien ne l'a pas par défaut.
+  const peutVoir = can('devis', 'view');
+  const { quotes, isLoading } = useDevisByIntervention(peutVoir ? item.id : null);
   const { updateFields, updateWorkflowStatus } = useEntretienSAVMutations();
   const [showCreate, setShowCreate] = useState(false);
   const [openQuoteId, setOpenQuoteId] = useState(null);
@@ -58,6 +60,8 @@ export function SAVLinkedQuotes({ item, canEdit = true, onUpdated, onCardSynced 
       onUpdated?.();
     }
   };
+
+  if (!peutVoir && !peutCreer) return null;
 
   return (
     <div className="space-y-2">

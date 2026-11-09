@@ -61,7 +61,7 @@ import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
 import { SAVUrgencySelect, SAVUrgencyBadge } from './SAVUrgency';
 import { urgenceDe } from '@/lib/savUrgency';
-import { peutCloturerSansPlanifier } from '@/lib/savCloture';
+import { peutCloturerSansPlanifier, limiteALaCloture } from '@/lib/savCloture';
 import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
 import { SAVLinkedQuotes } from './SAVLinkedQuotes';
 import { CertificatsSection } from './CertificatsSection';
@@ -85,7 +85,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useAuth();
-  const { can } = useCanAccess();
+  const { can, effectiveRole } = useCanAccess();
   const orgId = organization?.id;
   const [lienBusy, setLienBusy] = useState(false); // copie du lien de prise de RDV (auto-RDV)
 
@@ -476,7 +476,10 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
   };
 
   // --- Transitions ---
-  const allTransitions = getTransitions(type, item.workflow_status);
+  // Technicien sur une demande SAV en attente : un seul geste, « Intervention faite ».
+  // Planifier, envoyer un devis, ranger ou déplacer la carte restent au bureau.
+  const clotureSeule = limiteALaCloture(item, effectiveRole);
+  const allTransitions = clotureSeule ? [] : getTransitions(type, item.workflow_status);
 
   const currentColumn = KANBAN_COLUMNS.find(c => c.value === item.workflow_status);
   const currentOrder = currentColumn
@@ -721,7 +724,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                     <Zap className="w-4 h-4" />
                     Degré d&apos;urgence
                   </h3>
-                  <SAVUrgencySelect value={urgence} onChange={setUrgence} disabled={!canEditSAV} />
+                  <SAVUrgencySelect value={urgence} onChange={setUrgence} disabled={!canEditSAV || clotureSeule} />
                 </div>
               )}
 
@@ -749,7 +752,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                 <SAVPartsSection
                   partsOrderStatus={partsOrder}
                   onChange={setPartsOrder}
-                  disabled={!canEditSAV}
+                  disabled={!canEditSAV || clotureSeule}
                 />
               )}
 
@@ -760,13 +763,13 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                   devisStatus={devisStatus}
                   onAmountChange={setDevisAmount}
                   onStatusChange={setDevisStatus}
-                  disabled={!canEditSAV}
+                  disabled={!canEditSAV || clotureSeule}
                   hideAmount={(item.sav_quotes?.length || 0) > 0}
                 >
                   {/* Devis créés depuis la fiche, fléchés vers la carte (jamais dans le pipeline) */}
                   <SAVLinkedQuotes
                     item={item}
-                    canEdit={canEditSAV}
+                    canEdit={canEditSAV && !clotureSeule}
                     onUpdated={onUpdated}
                     onCardSynced={setDevisStatus}
                   />
@@ -868,7 +871,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
             )}
 
             {/* Boutons transition */}
-            {canEditSAV && (backTransitions.length > 0 || forwardTransitions.length > 0) && (
+            {canEditSAV && (backTransitions.length > 0 || forwardTransitions.length > 0 || peutCloturerSansPlanifier(item)) && (
               <div className="flex items-center gap-2 flex-wrap pt-1">
                 {/* Retour arrière à gauche */}
                 {backTransitions.map((targetStatus) => {
@@ -890,7 +893,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                 })}
 
                 {/* Ranger (À planifier uniquement) : retire la carte du kanban, undo via toast */}
-                {item.workflow_status === 'a_planifier' && (
+                {item.workflow_status === 'a_planifier' && !clotureSeule && (
                   <button
                     type="button"
                     onClick={handleRanger}
@@ -904,7 +907,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                 )}
 
                 {/* Lien de prise de RDV (À planifier, contrat requis) : page client de l'auto-RDV */}
-                {item.workflow_status === 'a_planifier' && contractId && (
+                {item.workflow_status === 'a_planifier' && contractId && !clotureSeule && (
                   <button
                     type="button"
                     onClick={handleCopierLien}

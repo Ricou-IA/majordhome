@@ -57,6 +57,40 @@ export function peutCloturerSansPlanifier(item) {
   return !!item && item.intervention_type === 'sav' && STATUTS_CLOTURE_DIRECTE.includes(item.workflow_status);
 }
 
+/** Colonnes du kanban qu'un technicien voit pour son propre travail : ce qui est au planning, ce qui est fait. */
+export const STATUTS_TECHNICIEN = ['planifie', 'realise'];
+
+/**
+ * Colonnes du kanban ouvertes à un technicien : les siennes, plus les demandes SAV en attente
+ * (Eric, 2026-11-09 : le technicien clôture lui-même un SAV réglé entre deux entretiens).
+ * @returns {string[]}
+ */
+export function colonnesTechnicien() {
+  return [...STATUTS_CLOTURE_DIRECTE, ...STATUTS_TECHNICIEN];
+}
+
+/**
+ * Un technicien voit-il cette carte ? Son planning comme avant, et les SAV pas encore planifiés —
+ * jamais les entretiens « À planifier » ni les demandes de contrat (programmation = bureau).
+ * @param {{ intervention_type?: string, workflow_status?: string } | null | undefined} item
+ * @returns {boolean}
+ */
+export function carteVisibleParTechnicien(item) {
+  if (!item) return false;
+  return STATUTS_TECHNICIEN.includes(item.workflow_status) || peutCloturerSansPlanifier(item);
+}
+
+/**
+ * Sur une demande SAV en attente, un technicien n'a qu'un geste : « Intervention faite ».
+ * Planifier, envoyer un devis ou déplacer la carte restent au bureau.
+ * @param {{ intervention_type?: string, workflow_status?: string } | null | undefined} item
+ * @param {string | null | undefined} role rôle effectif (`useCanAccess().effectiveRole`)
+ * @returns {boolean}
+ */
+export function limiteALaCloture(item, role) {
+  return role === 'technicien' && peutCloturerSansPlanifier(item);
+}
+
 /**
  * Saisie proposée à l'ouverture : aujourd'hui, une intervention de 30 min qui vient de se
  * terminer (début ramené au quart d'heure, jamais avant minuit).
