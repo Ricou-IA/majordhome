@@ -30,6 +30,7 @@ import { generateInvoicePdfBlob } from '../facturation/InvoicePDF';
 import CancelInvoiceDialog from '../facturation/CancelInvoiceDialog';
 import SendInvoiceEmailDialog from '../facturation/SendInvoiceEmailDialog';
 import FacturerEntretienDialog from './FacturerEntretienDialog';
+import { SAVUrgencyBadge } from './SAVUrgency';
 
 // ============================================================================
 // CONSTANTES VISUELLES
@@ -262,6 +263,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${config.bgClass}`}>
               {config.label}
             </span>
+            <SAVUrgencyBadge item={item} />
             {item.tags?.includes('Web') && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">
                 Web

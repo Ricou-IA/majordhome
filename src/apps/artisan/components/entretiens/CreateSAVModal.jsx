@@ -16,6 +16,8 @@ import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { supabase } from '@/lib/supabaseClient';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { logger } from '@lib/logger';
+import { SAV_URGENCE_DEFAUT } from '@/lib/savUrgency';
+import { SAVUrgencySelect } from './SAVUrgency';
 
 // ============================================================================
 // HOOK : RECHERCHE CLIENT
@@ -83,6 +85,7 @@ export function CreateSAVModal({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState(prefillClient);
   const [description, setDescription] = useState('');
+  const [urgence, setUrgence] = useState(SAV_URGENCE_DEFAUT);
   const searchRef = useRef(null);
 
   const { results, isSearching } = useClientSearch(orgId, searchTerm);
@@ -100,6 +103,7 @@ export function CreateSAVModal({
       setSearchTerm('');
       setSelectedClient(prefillClient);
       setDescription('');
+      setUrgence(SAV_URGENCE_DEFAUT);
     }
   }, [isOpen, prefillClient]);
 
@@ -126,6 +130,7 @@ export function CreateSAVModal({
         projectId: selectedClient.project_id,
         savDescription: description.trim(),
         savOrigin,
+        savUrgency: urgence,
         createdBy: user?.id,
       });
 
@@ -253,6 +258,12 @@ export function CreateSAVModal({
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
             />
+          </div>
+
+          {/* Degré d'urgence */}
+          <div className="space-y-2">
+            <span className="block text-sm font-medium text-gray-700">Degré d&apos;urgence</span>
+            <SAVUrgencySelect value={urgence} onChange={setUrgence} />
           </div>
         </div>
 

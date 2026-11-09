@@ -546,7 +546,7 @@ export const savService = {
    * Créer un SAV (demande de réparation)
    * projectId est obligatoire (NOT NULL + RLS via projects.org_id)
    */
-  async createSAV({ orgId, clientId, contractId, projectId, savDescription, savOrigin, createdBy, sourceCertificatId = null, equipmentId = null }) {
+  async createSAV({ orgId, clientId, contractId, projectId, savDescription, savOrigin, createdBy, sourceCertificatId = null, equipmentId = null, savUrgency = null }) {
     if (!orgId || !clientId || !projectId) {
       throw new Error('[sav] orgId, clientId et projectId requis');
     }
@@ -564,6 +564,8 @@ export const savService = {
           scheduled_date: null,
           sav_description: savDescription || null,
           sav_origin: savOrigin || 'appel_client',
+          // Degré d'urgence (src/lib/savUrgency.js) : NULL = non renseigné, lu « normal ».
+          sav_urgency: savUrgency || null,
           // Demande ouverte depuis un certificat « Devis à établir » : index unique en base,
           // un second INSERT pour le même certificat renvoie 23505 (spec 2026-10-10).
           source_certificat_id: sourceCertificatId || null,
@@ -867,6 +869,7 @@ export const savService = {
       if (fields.devis_status !== undefined) updates.devis_status = fields.devis_status || null;
       if (fields.parts_order_status !== undefined) updates.parts_order_status = fields.parts_order_status || null;
       if (fields.includes_entretien !== undefined) updates.includes_entretien = !!fields.includes_entretien;
+      if (fields.sav_urgency !== undefined) updates.sav_urgency = fields.sav_urgency || null;
       if (fields.invoiced_at !== undefined) updates.invoiced_at = fields.invoiced_at;
       // Id de la facture Pennylane créée depuis la carte (push MDH → PL, spec 2026-09-21)
       if (fields.invoice_id !== undefined) updates.invoice_id = fields.invoice_id || null;

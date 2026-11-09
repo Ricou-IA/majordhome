@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   X, Loader2, ArrowLeft, ArrowRight, Save,
   User, Phone, ClipboardCheck, Wrench, Mail, FileText,
-  ExternalLink, Calendar, Check, UserPlus, Archive, Link2, AlertTriangle,
+  ExternalLink, Calendar, Check, UserPlus, Archive, Link2, AlertTriangle, Zap,
 } from 'lucide-react';
 import { anomaliesDeCarte } from '@/lib/certificatAnomalies';
 import { toast } from 'sonner';
@@ -59,6 +59,8 @@ import { SchedulingAssistant } from '@apps/artisan/components/planning/schedulin
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
+import { SAVUrgencySelect, SAVUrgencyBadge } from './SAVUrgency';
+import { urgenceDe } from '@/lib/savUrgency';
 import { CertificatsSection } from './CertificatsSection';
 import { PhotoPlaqueAnomalie } from './PhotoPlaqueAnomalie';
 import { logger } from '@lib/logger';
@@ -105,6 +107,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
   const [devisAmount, setDevisAmount] = useState(item?.devis_amount || null);
   const [devisStatus, setDevisStatus] = useState(item?.devis_status || null);
   const [includesEntretien, setIncludesEntretien] = useState(item?.includes_entretien || false);
+  const [urgence, setUrgence] = useState(() => urgenceDe(item)); // SAV uniquement (null sinon)
   const [lastEntretienDate, setLastEntretienDate] = useState(null);
 
   // État planification
@@ -178,8 +181,9 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
     if (devisAmount !== (item.devis_amount || null)) return true;
     if (devisStatus !== (item.devis_status || null)) return true;
     if (includesEntretien !== (item.includes_entretien || false)) return true;
+    if (urgence !== urgenceDe(item)) return true;
     return false;
-  }, [notes, savDesc, partsOrder, devisAmount, devisStatus, includesEntretien, item]);
+  }, [notes, savDesc, partsOrder, devisAmount, devisStatus, includesEntretien, urgence, item]);
 
   // --- Objet "lead-like" pour le SchedulingAssistant ---
   // (déclaré AVANT early return)
@@ -339,6 +343,9 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
         }
         if (includesEntretien !== (item.includes_entretien || false)) {
           fields.includes_entretien = includesEntretien;
+        }
+        if (urgence !== urgenceDe(item)) {
+          fields.sav_urgency = urgence;
         }
       }
 
@@ -506,6 +513,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
               <span className={`text-xs font-semibold px-2 py-0.5 rounded ${typeConfig.bgClass}`}>
                 {typeConfig.label}
               </span>
+              <SAVUrgencyBadge item={{ ...item, sav_urgency: urgence }} taille="fiche" />
               {type === 'sav' && includesEntretien && (
                 <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-700">
                   Entretien à faire
@@ -701,6 +709,17 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                   </button>
                 )}
               </div>
+
+              {/* Degré d'urgence (SAV uniquement) */}
+              {type === 'sav' && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
+                    <Zap className="w-4 h-4" />
+                    Degré d&apos;urgence
+                  </h3>
+                  <SAVUrgencySelect value={urgence} onChange={setUrgence} disabled={!canEditSAV} />
+                </div>
+              )}
 
               {/* Description SAV */}
               {type === 'sav' && (

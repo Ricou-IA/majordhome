@@ -27,6 +27,7 @@ import { AcceptQuoteModal } from './AcceptQuoteModal';
 import { SchedulingTransitionModal } from './SchedulingTransitionModal';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { construireReglages } from '@/lib/tournee/reglages.js';
+import { trierCartes } from '@/lib/savUrgency';
 // CertificatsEntretienModal retiré — section certificats intégrée dans EntretienSAVModal
 
 // ============================================================================
@@ -72,10 +73,9 @@ export function EntretienSAVKanban() {
     if (effectiveRole === 'commercial' && user?.id) {
       result = result.filter(i => i.created_by === user.id || i.technician_id === user.id);
     }
-    // Tri par date du RDV, ascendant (du plus ancien au plus futur) — même date que
-    // celle affichée sur la carte : next_rdv_date > scheduled_date > created_at.
-    const cardDate = (i) => i.next_rdv_date || i.scheduled_date || i.created_at || '9999-12-31';
-    return [...result].sort((a, b) => String(cardDate(a)).localeCompare(String(cardDate(b))));
+    // SAV urgents à traiter en tête de colonne, puis date ascendante — même date que celle
+    // affichée sur la carte : next_rdv_date > scheduled_date > created_at (src/lib/savUrgency.js).
+    return trierCartes(result);
   }, [items, effectiveRole, user?.id]);
 
   // =========================================================================
