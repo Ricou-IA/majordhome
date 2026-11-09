@@ -58,6 +58,13 @@ export function EntretienSAVKanban() {
 
   const canCreateSAV = can('sav', 'create');
 
+  // La fiche ouverte suit la liste : un objet capturé au clic resterait figé alors que la carte
+  // change sous la fiche (devis créé, statut reporté). Carte sortie de la liste ⇒ dernier état connu.
+  const selectedLive = useMemo(
+    () => (selectedItem ? (items.find((i) => i.id === selectedItem.id) || selectedItem) : null),
+    [items, selectedItem],
+  );
+
   // Colonnes visibles selon le rôle
   const visibleColumns = useMemo(() => {
     const cols = effectiveRole === 'technicien'
@@ -311,9 +318,9 @@ export function EntretienSAVKanban() {
       }
     >
       {/* Modale détail */}
-      {selectedItem && (
+      {selectedLive && (
         <EntretienSAVModal
-          item={selectedItem}
+          item={selectedLive}
           onClose={() => setSelectedItem(null)}
           onUpdated={refresh}
           onCreateSAV={handleCreateSAVFromEntretien}

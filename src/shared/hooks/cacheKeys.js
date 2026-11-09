@@ -407,6 +407,7 @@ export const devisKeys = {
   lines: (orgId, quoteId) => [...devisKeys.all(orgId), 'lines', quoteId],
   byLead: (orgId, leadId) => [...devisKeys.all(orgId), 'byLead', leadId],
   byClient: (orgId, clientId) => [...devisKeys.all(orgId), 'byClient', clientId],
+  byIntervention: (orgId, interventionId) => [...devisKeys.all(orgId), 'byIntervention', interventionId],
 };
 
 // --- Fumisterie (assistant devis fumisterie) ---

@@ -63,6 +63,7 @@ import { SAVUrgencySelect, SAVUrgencyBadge } from './SAVUrgency';
 import { urgenceDe } from '@/lib/savUrgency';
 import { peutCloturerSansPlanifier } from '@/lib/savCloture';
 import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
+import { SAVLinkedQuotes } from './SAVLinkedQuotes';
 import { CertificatsSection } from './CertificatsSection';
 import { PhotoPlaqueAnomalie } from './PhotoPlaqueAnomalie';
 import { logger } from '@lib/logger';
@@ -760,7 +761,16 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                   onAmountChange={setDevisAmount}
                   onStatusChange={setDevisStatus}
                   disabled={!canEditSAV}
-                />
+                  hideAmount={(item.sav_quotes?.length || 0) > 0}
+                >
+                  {/* Devis créés depuis la fiche, fléchés vers la carte (jamais dans le pipeline) */}
+                  <SAVLinkedQuotes
+                    item={item}
+                    canEdit={canEditSAV}
+                    onUpdated={onUpdated}
+                    onCardSynced={setDevisStatus}
+                  />
+                </SAVDevisSection>
               )}
 
               {/* Anomalie constatée sur un certificat (lecture seule : la source reste le certificat) */}

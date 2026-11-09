@@ -166,6 +166,25 @@ export const devisService = {
     }
   },
 
+  /** Devis fléchés vers une carte SAV (quotes.intervention_id), du plus récent au plus ancien. */
+  async getQuotesByIntervention(interventionId) {
+    try {
+      if (!interventionId) throw new Error('[devisService] interventionId requis');
+
+      const { data, error } = await supabase
+        .from('majordhome_quotes')
+        .select('*')
+        .eq('intervention_id', interventionId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      logger.error('[devisService] getQuotesByIntervention:', error);
+      return { data: [], error };
+    }
+  },
+
   // ==========================================================================
   // LIGNES
   // ==========================================================================
@@ -192,7 +211,7 @@ export const devisService = {
   // CRÉATION
   // ==========================================================================
 
-  async createQuote({ orgId, leadId, clientId, subject, validityDays = 30, conditions, notesInternes, commentaire, globalDiscountPercent = 0, lines = [], createdBy }) {
+  async createQuote({ orgId, leadId, clientId, interventionId = null, subject, validityDays = 30, conditions, notesInternes, commentaire, globalDiscountPercent = 0, lines = [], createdBy }) {
     try {
       if (!orgId) throw new Error('[devisService] orgId requis');
 
@@ -206,6 +225,8 @@ export const devisService = {
           org_id: orgId,
           lead_id: leadId || null,
           client_id: clientId || null,
+          // Devis fléché vers une carte SAV (src/lib/savDevis.js) : jamais dans le pipeline commercial
+          intervention_id: interventionId || null,
           subject: subject || null,
           validity_days: validityDays,
           conditions: conditions || null,
@@ -523,6 +544,7 @@ export const devisService = {
           org_id: orgId,
           lead_id: original.lead_id,
           client_id: original.client_id,
+          intervention_id: original.intervention_id || null, // la copie d'un devis SAV reste sur sa carte
           status: 'brouillon',
           subject: original.subject ? `${original.subject} (copie)` : 'Copie',
           validity_days: original.validity_days,

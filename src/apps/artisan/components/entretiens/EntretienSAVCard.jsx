@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw, Undo2, Mail, Link2, AlertTriangle, Camera } from 'lucide-react';
+import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw, Undo2, Mail, Link2, AlertTriangle, Camera, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
@@ -31,6 +31,8 @@ import CancelInvoiceDialog from '../facturation/CancelInvoiceDialog';
 import SendInvoiceEmailDialog from '../facturation/SendInvoiceEmailDialog';
 import FacturerEntretienDialog from './FacturerEntretienDialog';
 import { SAVUrgencyBadge } from './SAVUrgency';
+import { montantDevisSav, devisDeReference } from '@/lib/savDevis';
+import { QUOTE_STATUSES } from '@services/devis.service';
 
 // ============================================================================
 // CONSTANTES VISUELLES
@@ -137,7 +139,8 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
 
   const name = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim() || 'Sans nom';
   // Montant : SAV = devis + contrat si entretien inclus, Entretien = contrat
-  const devis = Number(item.devis_amount) || 0;
+  const devis = montantDevisSav(item);
+  const devisFleche = type === 'sav' ? devisDeReference(item.sav_quotes) : null;
   const contrat = Number(item.contract_amount) || 0;
   const amount = type === 'sav'
     ? devis + (item.includes_entretien ? contrat : 0)
@@ -314,6 +317,18 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
               </span>
             )}
           </div>
+
+          {/* Devis fléché vers la carte SAV : numéro + statut (le montant est sur la ligne 1) */}
+          {devisFleche && (
+            <div className="flex items-center gap-1 text-[10px] text-gray-500">
+              <FileText className="w-3 h-3 text-gray-400 flex-shrink-0" />
+              <span className="truncate">
+                {devisFleche.quote_number || 'Devis'}
+                {' · '}
+                {QUOTE_STATUSES.find((s) => s.value === devisFleche.status)?.label || devisFleche.status}
+              </span>
+            </div>
+          )}
 
           {/* Ligne 4 : Numéro contrat */}
           {item.contract_number && (

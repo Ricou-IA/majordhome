@@ -77,6 +77,31 @@ export function useDevisByClient(clientId) {
 }
 
 /**
+ * Devis fléchés vers une carte SAV (quotes.intervention_id)
+ */
+export function useDevisByIntervention(interventionId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const {
+    data: quotes,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: devisKeys.byIntervention(orgId, interventionId),
+    queryFn: async () => {
+      const { data, error } = await devisService.getQuotesByIntervention(interventionId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!interventionId,
+    staleTime: 30_000,
+  });
+
+  return { quotes: quotes || [], isLoading, error, refetch };
+}
+
+/**
  * Détail d'un devis (header)
  */
 export function useDevisDetail(quoteId) {

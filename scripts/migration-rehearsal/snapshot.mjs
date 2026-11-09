@@ -177,6 +177,11 @@ const FUNCTIONS = [
   'public.upsert_pennylane_lead(uuid, uuid, text, text, text, text, text, text, text, text, numeric, text)',
   'public.pennylane_sync_auto_attach_quote(uuid, uuid, bigint, bigint, numeric, text, date, text, text)',
   'public.pennylane_sync_update_quote_fields(uuid, text, text, numeric, text, date, numeric)',
+  // 20261109_2 : pennylane_sync_auto_attach_pending remplacée (devis fléchés SAV exclus) — elle et ses deux
+  // helpers sont en prod depuis 20261012_5, donc à photographier (un snapshot frais ne rejoue plus cette migration)
+  'majordhome.pl_pipeline_min_amount_ht(uuid)',
+  'majordhome.find_active_lead(uuid, uuid, text, text)',
+  'public.pennylane_sync_auto_attach_pending(uuid, boolean)',
   'majordhome.webshop_slot_recount(uuid)', // 20261013_2 (en prod) : appelée par le trigger de 20261013_3
   // 20261017_1 : réglages webshop lus par la base — définitions LIVE des fonctions remplacées
   'public.webshop_easter_sunday(integer)',

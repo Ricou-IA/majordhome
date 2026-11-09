@@ -2,7 +2,9 @@
  * SAVDevisSection.jsx - Majord'home Artisan
  * ============================================================================
  * Section devis dans la modale SAV.
- * Montant + statut du devis (Envoyé / Accepté / Refusé).
+ * En tête (children) : les devis créés depuis la fiche et fléchés vers la carte (SAVLinkedQuotes).
+ * Montant + statut du devis (Envoyé / Accepté / Refusé) : le montant saisi à la main ne sert que
+ * pour un devis fait hors de l'outil (hideAmount dès qu'un devis est fléché — la carte lit le sien).
  * Les callbacks de changement de statut déclenchent aussi les transitions
  * workflow dans le composant parent (EntretienSAVModal).
  *
@@ -25,6 +27,8 @@ export function SAVDevisSection({
   onAmountChange,
   onStatusChange,
   disabled = false,
+  hideAmount = false,
+  children = null,
 }) {
   return (
     <div className="space-y-3">
@@ -33,8 +37,11 @@ export function SAVDevisSection({
         Devis
       </h3>
 
+      {children}
+
       <div className="flex items-center gap-3">
-        {/* Montant */}
+        {/* Montant (devis fait hors de l'outil) */}
+        {!hideAmount && (
         <div className="flex-1">
           <label className="block text-xs text-gray-500 mb-1">Montant HT</label>
           <div className="relative">
@@ -51,6 +58,7 @@ export function SAVDevisSection({
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">€</span>
           </div>
         </div>
+        )}
 
         {/* Statut */}
         <div className="flex-1">

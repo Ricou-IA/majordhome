@@ -33,8 +33,10 @@ import { toast } from 'sonner';
  * @param {Array<object>} [p.initialLines] lignes pré-remplies (ex. dimensionnement clim /clim) — sections comprises
  * @param {string} [p.initialFamily] famille d'installation pré-sélectionnée (QUOTE_TEMPLATE_FAMILIES)
  * @param {{ quote: object, lines: object[] }} [p.devisAModifier] devis existant à modifier (mode édition)
+ * @param {string|null} [p.interventionId] carte SAV vers laquelle flécher le devis créé (fiche SAV) : pas de lead, le
+ *   devis part sur le client et n'entre jamais dans le pipeline (src/lib/savDevis.js)
  */
-export default function CreateDevisModal({ lead, onClose, onCreated, initialLines = null, initialFamily = '', devisAModifier = null }) {
+export default function CreateDevisModal({ lead, onClose, onCreated, initialLines = null, initialFamily = '', devisAModifier = null, interventionId = null }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const { createQuote, isCreating, updateQuote, upsertLines } = useDevisMutations(lead?.id);
@@ -171,6 +173,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
         orgId,
         leadId: lead?.id || null,
         clientId: lead?.client_id || null,
+        interventionId,
         subject: form.subject || null,
         validityDays: parseInt(form.validityDays) || 30,
         conditions: form.conditions || null,
