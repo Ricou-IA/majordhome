@@ -60,7 +60,7 @@ export default function ReglagesDevisPanel({ form, onChange, onFamilles, ouverts
   return (
     <div className="space-y-3">
       <Accordeon k="familles" label="Familles et chapitres" icon={Layers} ouvert={ouverts.familles} onToggle={() => onToggle('familles')}>
-        <p className="text-xs text-secondary-500">Les installations proposées dans « Nouveau devis », et les chapitres créés pour chacune. Les familles masquées restent lisibles sur les anciens devis.</p>
+        <p className="text-xs text-secondary-500">Les familles proposées dans « Nouveau devis », et les chapitres créés pour chacune. Les familles masquées restent lisibles sur les anciens devis.</p>
         <FamillesEditor familles={form.familles} onChange={onFamilles} />
       </Accordeon>
 

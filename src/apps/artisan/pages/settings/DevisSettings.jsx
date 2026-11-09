@@ -101,7 +101,7 @@ export default function DevisSettings() {
   };
 
   return (
-    <SettingsPage title="Devis" description="Familles d’installation, chapitres, mentions et affichage de vos devis. Cliquez une zone du document pour trouver son réglage.">
+    <SettingsPage title="Devis" description="Familles de devis, chapitres, mentions et affichage de vos devis. Cliquez une zone du document pour trouver son réglage.">
       {isLoading ? <div className="card text-sm text-secondary-500">Chargement…</div> : (
         <div className="grid gap-6 xl:grid-cols-[440px_minmax(0,1fr)] items-start">
           <div className="space-y-3">

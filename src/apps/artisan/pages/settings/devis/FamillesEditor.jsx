@@ -1,5 +1,5 @@
 // src/apps/artisan/pages/settings/devis/FamillesEditor.jsx
-// Accordéon « Familles et chapitres » : la liste des installations proposées dans « Nouveau devis » et le
+// Accordéon « Familles et chapitres » : la liste des familles proposées dans « Nouveau devis » et le
 // squelette (titres de chapitre) de chacune. Édition pure d'état : la validation est dans devisConfig.js.
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';

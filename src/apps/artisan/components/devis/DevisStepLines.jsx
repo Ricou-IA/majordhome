@@ -352,7 +352,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
       ) : (
         <div className="text-center py-8 text-secondary-500 text-sm">
           <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          Choisissez une installation ci-dessus pour créer les chapitres du devis
+          Choisissez une famille ci-dessus pour créer les chapitres du devis
         </div>
       )}
 

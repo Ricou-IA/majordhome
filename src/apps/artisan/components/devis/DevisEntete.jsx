@@ -1,6 +1,7 @@
 /**
  * DevisEntete.jsx — en-tête compact de la modale « Nouveau devis » (un seul écran, décision Eric
- * 2026-09-29) : client en une ligne, installation + devis type sur une rangée, objet.
+ * 2026-09-29) : client en une ligne, famille + devis type sur une rangée, objet. « Famille » et non
+ * « installation » : le devis est transversal (SAV, pièces, fumisterie…), pas seulement une pose (Eric, 2026-11-09).
  * Remplace l'ancienne étape « Client » du wizard.
  */
 
@@ -29,11 +30,11 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
         )}
       </div>
 
-      {/* Installation + devis type + import d'une offre fournisseur sur une rangée (l'import est une autre façon de
+      {/* Famille + devis type + import d'une offre fournisseur sur une rangée (l'import est une autre façon de
           partir d'un contenu tout fait, au même niveau que le devis type — Eric 2026-10-25) */}
       <div className={`grid gap-3 md:items-end ${onImportOffre ? 'md:grid-cols-[1fr_16rem_auto]' : 'md:grid-cols-[1fr_16rem]'}`}>
         <div>
-          <label className="block text-xs font-medium text-secondary-600 mb-1.5">Installation</label>
+          <label className="block text-xs font-medium text-secondary-600 mb-1.5">Famille</label>
           <div className="flex flex-wrap gap-2">
             {listeFamilles.map((f) => (
               <button key={f} type="button" onClick={() => onSelectFamily(f)}
@@ -46,7 +47,7 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1.5">Devis type</label>
           <select value={selectedTemplateId || ''} disabled={!selectedFamily} onChange={(e) => onSelectTemplate(e.target.value || null)} className={`${inputClass} disabled:bg-secondary-50 disabled:text-secondary-400`}>
-            <option value="">{selectedFamily ? '— Aucun (devis vierge) —' : '— Choisir une installation —'}</option>
+            <option value="">{selectedFamily ? '— Aucun (devis vierge) —' : '— Choisir une famille —'}</option>
             {familyTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.description ? ` — ${t.description}` : ''}</option>)}
           </select>
         </div>

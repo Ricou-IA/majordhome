@@ -179,7 +179,7 @@ export function exempleDevis(config, { aujourdhui = new Date() } = {}) {
   return {
     quote: {
       quote_number: 'DEV-2026-0001', created_at: aujourdhui.toISOString(), validity_date: validite.toISOString(),
-      subject: `${famille?.label || 'Installation'} — exemple`, client_display_name: 'Jean Dupont', client_address: '12 rue des Lilas',
+      subject: `${famille?.label || 'Devis'} — exemple`, client_display_name: 'Jean Dupont', client_address: '12 rue des Lilas',
       client_postal_code: '81600', client_city: 'Gaillac', client_phone: '06 12 34 56 78', client_email: 'jean.dupont@exemple.fr',
       global_discount_percent: 0, conditions: '',
       commentaire: 'Commentaire propre à ce devis (exemple) : accès au chantier, délai de livraison, précision sur la pose.',
