@@ -13,7 +13,7 @@
  * - Notes
  * - Bouton "Enregistrer" unique pour sauvegarder tous les champs modifiés
  * - Footer : boutons transition back/forward
- * - Transition "Planifié" → ouvre le SchedulingAssistant (jour + colonnes par tech)
+ * - Transition "Planifié" → ouvre la fenêtre « Nouveau RDV » rattachée à la carte
  *
  * @version 4.0.0 - Sprint 8 Entretien & SAV
  * ============================================================================
@@ -35,7 +35,6 @@ import { useCanAccess } from '@hooks/usePermissions';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
 import { entretienSavKeys } from '@hooks/cacheKeys';
-import { PlannedOrderFields } from '@apps/artisan/components/planning/scheduling/PlannedOrderFields';
 import { AdresseItineraire } from '@/apps/artisan/components/shared/AdresseItineraire';
 import { formaterAdresse } from '@/lib/itineraire';
 import {
@@ -44,7 +43,6 @@ import {
   getTransitions,
   KANBAN_COLUMNS,
 } from '@services/sav.service';
-import { appointmentsService } from '@services/appointments.service';
 import { autoRdvService } from '@services/autoRdv.service';
 import { clientsService } from '@services/clients.service';
 import { equipmentsService } from '@services/equipments.service';
@@ -54,9 +52,8 @@ import { libelleEquipement } from '@/lib/equipmentReferential';
 import { EntretienPartsSection } from './EntretienPartsSection';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { useTeamMembers } from '@hooks/useAppointments';
-import { useDureeContrat } from '@hooks/useTournees';
 import { FormField, TextArea } from '@apps/artisan/components/FormFields';
-import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
+import { EventModal } from '@apps/artisan/components/planning/EventModal';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
@@ -85,7 +82,7 @@ const TYPE_LABELS = {
 export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling = false }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { organization } = useAuth();
+  const { organization, user } = useAuth();
   const { can, effectiveRole } = useCanAccess();
   const orgId = organization?.id;
   const [lienBusy, setLienBusy] = useState(false); // copie du lien de prise de RDV (auto-RDV)
@@ -116,7 +113,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
 
   // État planification
   const [showScheduling, setShowScheduling] = useState(initialScheduling); // ouverte sur l'assistant après « Créer et planifier »
-  const [schedulingLoading, setSchedulingLoading] = useState(false);
   const [showCloture, setShowCloture] = useState(false); // fenêtre « Intervention faite » (SAV sans planification)
   const [confirmAnnuler, setConfirmAnnuler] = useState(false); // « Annuler la demande » (SAV, org_admin)
   const [annulation, setAnnulation] = useState(false);
@@ -131,8 +127,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
   // jamais `item.contract_id` brut, sinon la section certificats reste muette.
   const contractId = item?.effective_contract_id || item?.contract_id || null;
 
-  // Bloc contrat (R5) : un entretien se pose à la durée du contrat (barème), d'un clic.
-  const { dureeMinutes: dureeContratMinutes } = useDureeContrat(orgId, isEntretien ? contractId : null);
 
   // Certificats : seulement une fois le RDV planifié (déclencheur de la suite),
   // pas en "Demande de contrat" ni "À planifier"
@@ -192,18 +186,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
     return false;
   }, [notes, savDesc, partsOrder, devisAmount, devisStatus, includesEntretien, urgence, item]);
 
-  // --- Objet "lead-like" pour le SchedulingAssistant ---
-  // (déclaré AVANT early return)
-  const schedulingLead = useMemo(() => ({
-    last_name: item?.client_last_name || item?.client_name || '',
-    first_name: item?.client_first_name || '',
-    phone: item?.client_phone || '',
-    email: item?.client_email || '',
-    address: item?.client_address || '',
-    city: item?.client_city || '',
-    postal_code: item?.client_postal_code || '',
-    assigned_user_id: null,
-  }), [item]);
 
   if (!item) return null;
 
@@ -274,62 +256,27 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
     }
   };
 
-  // Confirmation de la planification → crée le(s) RDV + transition planifié
-  // L'assistant (Bloc B) remonte `slots[]` (multi-créneau possible).
-  const handleConfirmScheduling = async (slots) => {
-    if (!slots || slots.length === 0) return;
-    setSchedulingLoading(true);
+  // RDV posés depuis la fenêtre « Nouveau RDV » (fenêtre unique, rattachée à la carte) :
+  // elle crée les RDV (createAppointmentBatch, carte avancée en Planifié par le service) ;
+  // ici, ce qui est propre à la carte : sa date, la fiche client web confirmée.
+  const handleRdvPoses = async (slots) => {
+    if (!slots?.length) return;
     try {
-      // 1 appointment par créneau via createAppointmentBatch (même cycle de vie Bloc A :
-      // chaque createAppointment passe par syncCardStateOnCreate via intervention_id).
-      const { error: appointmentError } = await appointmentsService.createAppointmentBatch(slots, {
-        coreOrgId: orgId,
-        appointment_type: type === 'sav' ? 'service' : 'maintenance',
-        intervention_id: item.id,
-        client_id: item.client_id || null,
-        client_name: item.client_last_name || item.client_name || 'Sans nom',
-        client_first_name: item.client_first_name || null,
-        client_phone: item.client_phone || '',
-        client_email: item.client_email || null,
-        address: item.client_address || null,
-        city: item.client_city || null,
-        postal_code: item.client_postal_code || null,
-        subjectPrefix: type === 'sav' ? (includesEntretien ? 'SAV + Entretien' : 'SAV') : 'Entretien',
-      });
-
-      if (appointmentError) {
-        toast.error('Erreur création du RDV');
-        return;
-      }
-
-      // Mettre à jour l'intervention : workflow_status + scheduled_date (1er créneau)
       await updateWorkflowStatus(item.id, 'planifie');
       await updateFields(item.id, { scheduled_date: slots[0].date });
-
-      // Confirmer le client draft si c'est un contact web. Le service ne throw
-      // pas (`{ data, error }`) : un refus laisserait la fiche masquée en silence.
-      let webDraftConfirmed = true;
-      if (item.client_id && item.tags?.includes('Web')) {
-        const { error: draftError } = await clientsService.confirmWebDraft(item.client_id);
-        if (draftError) {
-          logger.error('[EntretienSAVModal] confirmWebDraft refusé:', draftError);
-          webDraftConfirmed = false;
-        }
-      }
-
-      if (webDraftConfirmed) {
-        toast.success('RDV planifié avec succès');
-      } else {
-        // Le RDV est bien posé : ne pas le nier, mais dire ce qui manque
+    } catch {
+      toast.warning('RDV posé, mais la carte n’a pas pu être mise à jour : vérifiez-la dans le kanban');
+    }
+    // Le service ne throw pas (`{ data, error }`) : un refus laisserait la fiche masquée en silence.
+    if (item.client_id && item.tags?.includes('Web')) {
+      const { error: draftError } = await clientsService.confirmWebDraft(item.client_id);
+      if (draftError) {
+        logger.error('[EntretienSAVModal] confirmWebDraft refusé:', draftError);
         toast.warning('RDV planifié, mais la fiche client web n’a pas pu être confirmée — elle reste masquée dans la liste clients');
       }
-      onUpdated?.();
-      onClose();
-    } catch {
-      toast.error('Erreur lors de la planification');
-    } finally {
-      setSchedulingLoading(false);
     }
+    onUpdated?.();
+    onClose();
   };
 
   // Bouton Enregistrer — sauvegarde groupée de tous les champs
@@ -535,13 +482,53 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
     return KANBAN_COLUMNS.indexOf(col) > currentOrder;
   });
 
+  // Planifier = la fenêtre unique « Nouveau RDV », rattachée à cette carte (type figé)
+  if (showScheduling) {
+    const prefill = {
+      id: item.client_id,
+      display_name: name,
+      last_name: item.client_last_name || item.client_name || '',
+      first_name: item.client_first_name || '',
+      phone: item.client_phone || '',
+      email: item.client_email || '',
+      address: item.client_address || '',
+      postal_code: item.client_postal_code || '',
+      city: item.client_city || '',
+    };
+    return (
+      <EventModal
+        isOpen
+        mode="create"
+        prefillClient={item.client_id ? prefill : null}
+        members={teamMembers || []}
+        orgId={orgId}
+        userId={user?.id}
+        attachContext={{
+          interventionId: item.id,
+          lockedType: isSav ? 'service' : 'maintenance',
+          subjectLabel: isSav ? (includesEntretien ? 'SAV + Entretien' : 'SAV') : 'Entretien',
+          multi: true,
+          mergeOverlapping: isSav,
+          plannedOrder: isSav ? {
+            teamSize: plannedTeamSize, days: plannedDays, onChange: handlePlannedOrderChange, disabled: isSavingFields,
+          } : null,
+        }}
+        onCreated={handleRdvPoses}
+        onClose={() => setShowScheduling(false)}
+        onSave={async () => false}
+        onDelete={async () => {}}
+        onCancel={async () => {}}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-8">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Contenu */}
-      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${showScheduling ? 'max-w-6xl' : isSav ? 'max-w-4xl' : 'max-w-lg'} ${MODAL_PANEL_PHONE}`}>
+      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${isSav ? 'max-w-4xl' : 'max-w-lg'} ${MODAL_PANEL_PHONE}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-3 min-w-0">
@@ -573,53 +560,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-          {/* ============================================================ */}
-          {/* VUE PLANIFICATION (SchedulingAssistant — Bloc B) */}
-          {/* ============================================================ */}
-          {showScheduling ? (
-            <div className="space-y-3">
-              {/* SAV : commande « personnes × jours » (l'entretien est dimensionné par le barème) */}
-              {isSav && (
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <PlannedOrderFields
-                    teamSize={plannedTeamSize}
-                    days={plannedDays}
-                    onChange={handlePlannedOrderChange}
-                    disabled={isSavingFields}
-                  />
-                </div>
-              )}
-              <SchedulingAssistant
-                lead={schedulingLead}
-                orgId={orgId}
-                commercials={[]}
-                onConfirm={handleConfirmScheduling}
-                onCancel={() => setShowScheduling(false)}
-                isLoading={schedulingLoading}
-                appointmentTypeLabel={type === 'sav' ? (includesEntretien ? 'SAV + Entretien' : 'SAV') : 'Entretien'}
-                appointmentTypeValue={type === 'sav' ? 'service' : 'maintenance'}
-                assigneeType="technician"
-                members={teamMembers || []}
-                fixedDuration={!isSav && dureeContratMinutes ? dureeContratMinutes : null}
-                defaultDuration={
-                  (!isSav && dureeContratMinutes) || (item.estimated_time
-                    ? Math.round(Number(item.estimated_time) * 60)
-                    : 60)
-                }
-                defaultSubjectPrefix={
-                  type === 'sav'
-                    ? (includesEntretien ? 'SAV + Entretien' : 'SAV')
-                    : 'Entretien'
-                }
-                multi
-                sideBySide
-                mergeOverlapping={isSav}
-                expectedTeamSize={plannedTeamSize}
-                expectedDays={plannedDays}
-              />
-            </div>
-          ) : (
-            <>
+          <>
               {/* SAV : deux colonnes (client, urgence, problème | devis, pièces, notes) — pas d'ascenseur sur un écran de bureau */}
               <div className={isSav ? 'space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8' : 'space-y-6'}>
               {/* Colonnes en flex : description (gauche) et notes (droite) calées en bas, zones de saisie alignées */}
@@ -845,12 +786,10 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
               {showCertificatsSection && (
                 <CertificatsSection item={item} onCloseModal={onClose} />
               )}
-            </>
-          )}
+          </>
         </div>
 
-        {/* Footer : Enregistrer + transitions (masqué en mode planification) */}
-        {!showScheduling && (
+        {/* Footer : Enregistrer + transitions */}
           <div className={`px-5 py-3 border-t bg-gray-50 rounded-b-xl space-y-2 ${MODAL_FOOTER_PHONE}`}>
             {/* CTA Envoyer par mail (entretien réalisé avec email client) */}
             {isEntretien && item.workflow_status === 'realise' && item.client_email && (
@@ -985,7 +924,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
               </div>
             )}
           </div>
-        )}
       </div>
 
       <ConfirmDialog

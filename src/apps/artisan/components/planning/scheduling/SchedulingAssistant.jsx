@@ -114,6 +114,9 @@ export function SchedulingAssistant({
   // Deux colonnes sur grand écran (grille | créneaux, objet, notes) : la fiche qui l'héberge
   // s'élargit et n'a plus d'ascenseur (Eric 2026-11-11). Défaut : empilé, comme partout ailleurs.
   sideBySide = false,
+  // Contenu placé en tête de la colonne de droite (sideBySide) : type, client, pers. × jours
+  // de la fenêtre « Nouveau RDV », fenêtre unique de pose d'un RDV.
+  sidePanel = null,
   onSlotsChange,
   initialDate = null,
   mergeOverlapping = false,
@@ -446,6 +449,7 @@ export function SchedulingAssistant({
       </div>
 
       <div className="space-y-4">
+      {sideBySide && sidePanel}
       {/* Liste des créneaux empilés (sélecteur par créneau masqué en mode commercial :
           l'assignation est celle de la carte, pas choisie ici). */}
       <SlotDraftList

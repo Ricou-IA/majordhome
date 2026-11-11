@@ -51,6 +51,7 @@ import {
 import { useEventClientLinking } from './useEventClientLinking';
 import { useEventSaveActions } from './useEventSaveActions';
 import { CreateSAVModal } from '../entretiens/CreateSAVModal';
+import { PlannedOrderFields } from './scheduling/PlannedOrderFields';
 import { useAppointmentEntretien } from './useAppointmentEntretien';
 import { EventModalHeader, EventModalFooter } from './EventModalFrame';
 
@@ -77,6 +78,9 @@ import { EventModalHeader, EventModalFooter } from './EventModalFrame';
  * @param {Function} props.onCancel - (reason) => Promise
  * @param {boolean} props.isSaving
  * @param {Object|null} [props.attachContext] - Rattachement direct depuis un kanban : { leadId?, interventionId?, lockedType? }. Le type est figé et la carte pré-liée.
+ *   Options de la carte d'origine : subjectLabel (objet « SAV + Entretien »), multi (plusieurs créneaux),
+ *   mergeOverlapping + plannedOrder { teamSize, days, onChange, disabled } (pers. × jours d'un SAV / chantier).
+ * @param {(slots: object[]) => Promise<void>|void} [props.onCreated] - suites de l'écran d'origine après création
  */
 export function EventModal({
   isOpen,
@@ -94,6 +98,7 @@ export function EventModal({
   onCancel,
   isSaving = false,
   attachContext = null,
+  onCreated = null,
 }) {
   // État du formulaire
   const [formData, setFormData] = useState({});
@@ -258,7 +263,7 @@ export function EventModal({
   } = useEventSaveActions({
     orgId, userId, isEdit, appointment, attachContext, formData, setErrors, validate,
     selectedClient, selectedLead, isCommercialType, isFreeType, isLeave, isClosing, fromFiche,
-    commercialMemberId, allTeamMembers, assistantSlots, onSave, onClose,
+    commercialMemberId, allTeamMembers, assistantSlots, onSave, onClose, onCreated,
   });
 
   // --------------------------------------------------------------------------
@@ -319,6 +324,56 @@ export function EventModal({
     );
   }, [attachContext, formData.appointment_type]);
 
+  // Blocs Type et Client : dans la colonne de droite de l'assistant (création, re-planification,
+  // suite), sinon dans le formulaire classique (édition au repos). Une seule définition.
+  const sectionType = (
+    <SectionType
+      formData={formData}
+      updateField={updateField}
+      errors={errors}
+      isEdit={isEdit}
+      isCancelled={isCancelled}
+      selectedLead={selectedLead}
+      availableTypes={availableTypes}
+      typeLocked={typeLocked}
+      hideSubject={usesAssistant}
+      allowTypeChange={rescheduleMode || (canRetypeInline && !continuationMode)}
+      retypeHint={canRetypeInline && !rescheduleMode && !continuationMode
+        ? 'Admin : corriger le type recrée la carte liée (entretien, visite…) et conserve la date.'
+        : null}
+    />
+  );
+  const sectionClient = ((!fromFiche || isClosing) && !isLeave) ? (
+    <SectionClient
+      formData={formData}
+      updateField={updateField}
+      errors={errors}
+      isCancelled={isCancelled}
+      showContactDetails={isEdit}
+      leadOnly={isClosing}
+      browseLeads={recentPipelineCards}
+      selectedClient={selectedClientView}
+      selectedLead={selectedLead}
+      quotes={installQuotes}
+      navigate={navigate}
+      handleUnlinkClient={handleUnlinkClient}
+      handleUnlinkLead={handleUnlinkLead}
+      clientSearchQuery={clientSearchQuery}
+      searchClient={searchClient}
+      searchLead={searchLead}
+      showClientDropdown={showClientDropdown}
+      setShowClientDropdown={setShowClientDropdown}
+      clientSearching={clientSearching}
+      leadSearching={leadSearching}
+      clientSearchResults={clientSearchResults}
+      leadSearchResults={leadSearchResults}
+      handleSelectClient={handleSelectClient}
+      handleSelectLead={handleSelectLead}
+    />
+  ) : null;
+  // « pers. × jours » d'une carte SAV / chantier (le moteur fusionne les clics d'un même horaire)
+  const plannedOrder = attachContext?.plannedOrder || null;
+
   // Si fermée, on ne rend rien
   if (!isOpen) return null;
 
@@ -327,12 +382,13 @@ export function EventModal({
   // ==========================================================================
   return (
     <>
-      {/* Overlay transparent — laisse passer les clics sur le calendrier */}
-      <div className="fixed inset-0 z-40 pointer-events-none" />
+      {/* Overlay transparent — laisse passer les clics sur le calendrier. Ouverte depuis une
+          carte (attachContext) : voile qui bloque l'écran derrière (un clic ouvrirait une autre carte). */}
+      <div className={`fixed inset-0 z-40 ${attachContext ? 'bg-black/40' : 'pointer-events-none'}`} />
 
       {/* Panel modale — taille uniforme pour tous les types de RDV (largeur de la grille assistant).
           Sous `sm` (téléphone) le gabarit partagé MODAL_PANEL_PHONE le passe en plein écran. */}
-      <div className={`fixed sm:inset-y-4 sm:left-auto sm:right-4 sm:w-full max-w-2xl bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
+      <div className={`fixed sm:inset-y-4 sm:left-auto sm:right-4 sm:w-full ${usesAssistant ? 'max-w-6xl' : 'max-w-2xl'} bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
         <EventModalHeader
           typeConfig={typeConfig}
           title={continuationMode ? 'Programmer une suite' : (isEdit ? 'Modifier le RDV' : 'Nouveau RDV')}
@@ -377,21 +433,7 @@ export function EventModal({
                 </div>
               )}
 
-              <SectionType
-                formData={formData}
-                updateField={updateField}
-                errors={errors}
-                isEdit={isEdit}
-                isCancelled={isCancelled}
-                selectedLead={selectedLead}
-                availableTypes={availableTypes}
-                typeLocked={typeLocked}
-                hideSubject={usesAssistant}
-                allowTypeChange={rescheduleMode || (canRetypeInline && !continuationMode)}
-                retypeHint={canRetypeInline && !rescheduleMode && !continuationMode
-                  ? 'Admin : corriger le type recrée la carte liée (entretien, visite…) et conserve la date.'
-                  : null}
-              />
+              {!usesAssistant && sectionType}
 
               {/* Date/heure (édition) : lecture seule + bouton « Modifier le RDV » →
                   assistant créneaux. Le déplacement reste possible par drag & drop calendrier. */}
@@ -423,34 +465,7 @@ export function EventModal({
                   lié au client, sans carte kanban).
                   Bouclage R2 : toujours affiché (même depuis une fiche) en mode leadOnly —
                   la sélection d'une carte pipeline existante est obligatoire. */}
-              {((!fromFiche || isClosing) && !isLeave) && (
-                <SectionClient
-                  formData={formData}
-                  updateField={updateField}
-                  errors={errors}
-                  isCancelled={isCancelled}
-                  showContactDetails={isEdit}
-                  leadOnly={isClosing}
-                  browseLeads={recentPipelineCards}
-                  selectedClient={selectedClientView}
-                  selectedLead={selectedLead}
-                  quotes={installQuotes}
-                  navigate={navigate}
-                  handleUnlinkClient={handleUnlinkClient}
-                  handleUnlinkLead={handleUnlinkLead}
-                  clientSearchQuery={clientSearchQuery}
-                  searchClient={searchClient}
-                  searchLead={searchLead}
-                  showClientDropdown={showClientDropdown}
-                  setShowClientDropdown={setShowClientDropdown}
-                  clientSearching={clientSearching}
-                  leadSearching={leadSearching}
-                  clientSearchResults={clientSearchResults}
-                  leadSearchResults={leadSearchResults}
-                  handleSelectClient={handleSelectClient}
-                  handleSelectLead={handleSelectLead}
-                />
-              )}
+              {!usesAssistant && sectionClient}
 
               {/* Assistant créneaux INTÉGRÉ : création VT/entretien/SAV/install.
                   Colonnes filtrées par type (VT→commerciaux/direction, entretien/SAV→techs).
@@ -477,11 +492,31 @@ export function EventModal({
                     : (!isEdit ? defaultDate : null)}
                   // Installation : N jours ; Congés : N jours d'absence en une saisie, un clic
                   // sur la personne = sa journée (une partie de journée reste possible au glisser).
-                  multi={!rescheduleMode && (formData.appointment_type === 'installation' || isLeave)}
                   fullDayClick={isLeave}
                   // Congés : un RDV par personne, chacun sur SES horaires (jamais l'horaire
                   // du premier cliqué pour tous : la fin de journée des autres restait libre).
                   regrouperJournees={!isLeave}
+                  multi={!rescheduleMode && (formData.appointment_type === 'installation' || isLeave || !!attachContext?.multi)}
+                  mergeOverlapping={!!attachContext?.mergeOverlapping}
+                  expectedTeamSize={plannedOrder?.teamSize ?? null}
+                  expectedDays={plannedOrder?.days ?? null}
+                  // Fenêtre unique de pose d'un RDV (Eric 2026-11-11) : grille à gauche ; type,
+                  // client, pers. × jours puis créneaux à droite — sans ascenseur sur un écran de bureau.
+                  sideBySide
+                  sidePanel={(
+                    <div className="space-y-4">
+                      {sectionType}
+                      {plannedOrder && (
+                        <PlannedOrderFields
+                          teamSize={plannedOrder.teamSize}
+                          days={plannedOrder.days}
+                          onChange={plannedOrder.onChange}
+                          disabled={plannedOrder.disabled}
+                        />
+                      )}
+                      {sectionClient}
+                    </div>
+                  )}
                 />
               )}
 

@@ -23,7 +23,7 @@ import { VT_PHONE_REQUIRED_MESSAGE, dupDecisionOf, clientLabelOf, autoSubjectFor
 export function useEventSaveActions({
   orgId, userId, isEdit, appointment, attachContext, formData, setErrors, validate,
   selectedClient, selectedLead, isCommercialType, isFreeType, isLeave, isClosing, fromFiche,
-  commercialMemberId, allTeamMembers, assistantSlots, onSave, onClose,
+  commercialMemberId, allTeamMembers, assistantSlots, onSave, onClose, onCreated,
 }) {
   const queryClient = useQueryClient();
   const [batchSaving, setBatchSaving] = useState(false);
@@ -195,7 +195,8 @@ export function useEventSaveActions({
       // Objet AUTO (type + client) — pas de champ Objet/Notes dans le flux assistant
       // (RDV rapide = type + créneau). Notes éditables après coup via l'édition du RDV.
       // Congés : « Congés — Prénom » par créneau (la personne, pas un client).
-      const typeLabel = getAppointmentTypeConfig(formData.appointment_type).label;
+      // Libellé imposé par la carte d'origine (ex. « SAV + Entretien »), sinon celui du type
+      const typeLabel = attachContext?.subjectLabel || getAppointmentTypeConfig(formData.appointment_type).label;
       const clientLabel = clientLabelOf(formData);
       const autoSubject = clientLabel
         ? `${typeLabel} — ${clientLabel}`
@@ -245,13 +246,18 @@ export function useEventSaveActions({
       }
 
       toast.success(slots.length > 1 ? `${slots.length} RDV créés` : 'RDV créé avec succès');
+      // Suites propres à l'écran d'origine (fiche SAV : date de la carte, fiche web confirmée).
+      // Le RDV existe : un échec ici se dit sans le défaire.
+      if (onCreated) {
+        try { await onCreated(slots); } catch (err) { logger.error('[EventModal] onCreated error:', err); }
+      }
       onClose();
     } catch (err) {
       logger.error('[EventModal] handleCreateFromAssistant error:', err);
       toast.error('Une erreur est survenue');
       setBatchSaving(false);
     }
-  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, isCommercialType, isFreeType, isLeave, allTeamMembers, orgId, formData, selectedClient, queryClient, onClose, setErrors, attachContext]);
+  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, isCommercialType, isFreeType, isLeave, allTeamMembers, orgId, formData, selectedClient, queryClient, onClose, onCreated, setErrors, attachContext]);
 
   // Demande SAV créée depuis la fenêtre SAV : on reprend la création du RDV, rattaché à elle.
   const resumeAfterSav = useCallback((created) => {
