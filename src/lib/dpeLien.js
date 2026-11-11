@@ -6,8 +6,14 @@
 
 import { VERSION_CARTE } from './dpeCorpus.js';
 
-/** Délai avant de retenter un rattachement tombé sur une panne. */
+/** Délai avant de retenter un rattachement ou une lecture tombés sur un refus ou une panne. */
 const DELAI_NOUVEL_ESSAI_MS = 60 * 60 * 1000;
+
+/** La dernière tentative date-t-elle d'au moins DELAI_NOUVEL_ESSAI_MS ? Une date absente ou illisible : oui. */
+function assezVieux(tenteLe, maintenant) {
+  const t = Date.parse(tenteLe || '');
+  return !Number.isFinite(t) || maintenant.getTime() - t >= DELAI_NOUVEL_ESSAI_MS;
+}
 
 const FORME_NUMERO = /^[0-9A-Za-z]{13}$/;
 
@@ -73,6 +79,7 @@ const MESSAGES = {
   corpus_indisponible: 'Le corpus MonsieurDPE ne répond pas pour le moment. Réessayez dans quelques minutes.',
   partenaire_indisponible: "MonsieurDPE n'a pas pu ouvrir l'analyse pour le moment. Réessayez dans quelques minutes.",
   enregistrement_impossible: "L'accès n'a pas pu être enregistré. Réessayez, et prévenez-nous si cela se reproduit.",
+  numero_desynchronise: "Le numéro de DPE de la fiche a changé : patientez pendant la mise à jour de la carte, puis recommencez.",
   numero_protege: "Un numéro de DPE a été posé à la main sur cette fiche : la recherche automatique ne le remplace pas.",
   numero_ecarte: "Ce DPE a été écarté pour ce client (« Ce n'est pas le bon »).",
   module_communication_inactif: "L'envoi d'e-mails (module Communication) n'est pas ouvert pour votre organisation.",
@@ -165,12 +172,13 @@ export function actionALouverture({ adresseFiche, dpeNumberFiche, peutModifier, 
     if (!numeroLigne || clientDpe.origine === 'auto') return 'rattacher';
     return 'signaler_adresse';
   }
-  if (numeroLigne && (!clientDpe.carte || (clientDpe.version_carte ?? 0) < VERSION_CARTE)) return 'actualiser';
-  // Une panne (géocodeur, corpus) n'est pas une réponse : on retente, mais pas plus d'une fois par heure.
-  if (!numeroLigne && clientDpe.etat === 'erreur') {
-    const tente = Date.parse(clientDpe.tente_le || '');
-    if (!Number.isFinite(tente) || maintenant.getTime() - tente >= DELAI_NOUVEL_ESSAI_MS) return 'rattacher';
+  if (numeroLigne && (!clientDpe.carte || (clientDpe.version_carte ?? 0) < VERSION_CARTE)) {
+    // Carte refusée ou en panne à la dernière lecture : on attend une heure avant de redemander.
+    if (!clientDpe.carte && clientDpe.carte_erreur && !assezVieux(clientDpe.tente_le, maintenant)) return 'rien';
+    return 'actualiser';
   }
+  // Une panne (géocodeur, corpus) n'est pas une réponse : on retente, mais pas plus d'une fois par heure.
+  if (!numeroLigne && clientDpe.etat === 'erreur' && assezVieux(clientDpe.tente_le, maintenant)) return 'rattacher';
   return 'rien';
 }
 
@@ -188,4 +196,26 @@ export function disponibiliteEnvoi({ communicationActive, peutModifier, emailCli
   if (!rapportComplet) return non("MonsieurDPE n'a pas d'analyse complète pour ce DPE.");
   if (!expediteurConfigure) return non("L'adresse d'expédition des e-mails n'est pas configurée : Paramètres → Emails.");
   return { visible: true, actif: true, raison: null };
+}
+
+/**
+ * Ce que le bloc Logement affiche, selon la ligne `client_dpe` et le numéro ENREGISTRÉ de la fiche.
+ * - `carte` : numéro de la fiche = numéro de la ligne, et une carte ;
+ * - `carte_indisponible` : même numéro, pas de carte, une raison (corpus en refus ou en panne) — jamais « aucun DPE » ;
+ * - `lecture` : un numéro est sur la fiche mais la carte qui lui correspond n'est pas (encore) là ;
+ * - `candidats` : plusieurs DPE (ou un seul à confirmer) proposés ;
+ * - `vide` : rien de rattaché (aucun DPE, adresse inconnue, panne, détaché).
+ * @param {{ ligne: object|null, numeroFiche?: string|null }} p
+ * @returns {'carte' | 'carte_indisponible' | 'lecture' | 'candidats' | 'vide'}
+ */
+export function etatDuBloc({ ligne, numeroFiche }) {
+  const fiche = (numeroFiche || '').trim().toUpperCase();
+  const numeroLigne = (ligne?.dpe_number || '').trim().toUpperCase();
+  if (fiche || numeroLigne) {
+    if (fiche !== numeroLigne) return 'lecture';
+    if (ligne?.carte) return 'carte';
+    return ligne?.carte_erreur ? 'carte_indisponible' : 'lecture';
+  }
+  if (ligne?.etat === 'candidats' && Array.isArray(ligne.candidats) && ligne.candidats.length > 0) return 'candidats';
+  return 'vide';
 }

@@ -9,6 +9,8 @@ export const CODES = Object.freeze([
   // refonte 2026-11-12
   'numero_protege', 'numero_ecarte', 'module_communication_inactif', 'no_from_email', 'client_sans_email',
   'template_missing', 'pdf_indisponible', 'resend_failed',
+  // revue finale 2026-11-12
+  'numero_desynchronise',
 ]);
 
 const FORME_NUMERO = /^[0-9A-Za-z]{13}$/;
@@ -148,4 +150,20 @@ export function decisionRattachement({ geocodage, candidats, dossierUnique, ecar
     && Boolean(dossierUnique?.dossier)
     && !methode.startsWith('dpe appartement généré');
   return sur ? { etat: 'rattache', numero: seul.identifiant_dpe, candidats: liste } : { etat: 'candidats', candidats: liste };
+}
+
+/**
+ * Le numéro de la fiche est-il celui de la ligne client_dpe ? Garde de `detacher`, `ouvrir` et `envoyer` : sans elle,
+ * un numéro tapé et pas encore relu laissait l'écran agir sur l'ANCIEN (rapport envoyé pour un autre DPE que celui
+ * annoncé, numéro tapé effacé). Avec `rapportRequis`, le rapport complet doit être connu VRAI (NULL refusé).
+ * @param {{ numeroFiche?: string|null, ligne: { dpe_number?: string|null, rapport_complet?: boolean|null } | null,
+ *   rapportRequis?: boolean }} p
+ * @returns {string | null} un code de CODES, ou null si tout est cohérent
+ */
+export function controleNumero({ numeroFiche, ligne, rapportRequis = false }) {
+  const fiche = (numeroFiche || '').trim().toUpperCase();
+  if (!fiche) return 'client_sans_numero';
+  if (fiche !== (ligne?.dpe_number || '').trim().toUpperCase()) return 'numero_desynchronise';
+  if (rapportRequis && ligne?.rapport_complet !== true) return 'sans_rapport_complet';
+  return null;
 }

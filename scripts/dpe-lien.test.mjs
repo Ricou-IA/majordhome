@@ -167,3 +167,33 @@ test('disponibiliteEnvoi : invisible sans module Communication ou sans droit ; r
     assert.ok(d.raison && d.raison.length > 10, cle);
   }
 });
+
+// --- Corrections de la revue finale (2026-11-12) -----------------------------------------------------------
+import { etatDuBloc } from '../src/lib/dpeLien.js';
+
+test('actionALouverture : carte indisponible récente ⇒ rien ; vieille d\'une heure ⇒ actualiser', () => {
+  const maintenant = new Date('2026-11-12T12:00:00Z');
+  const sansCarte = { ...LIGNE, origine: 'choisi', carte: null, carte_erreur: 'numero_absent' };
+  assert.equal(ouvrir({ clientDpe: { ...sansCarte, tente_le: '2026-11-12T11:30:00Z' }, maintenant }), 'rien');
+  assert.equal(ouvrir({ clientDpe: { ...sansCarte, tente_le: '2026-11-12T10:00:00Z' }, maintenant }), 'actualiser');
+  assert.equal(ouvrir({ clientDpe: { ...sansCarte, tente_le: null }, maintenant }), 'actualiser');
+});
+
+test('etatDuBloc : la carte ne s\'affiche que si le numéro de la fiche est celui de la ligne', () => {
+  assert.equal(etatDuBloc({ ligne: LIGNE, numeroFiche: '2631E0482288Y' }), 'carte');
+  assert.equal(etatDuBloc({ ligne: LIGNE, numeroFiche: '2481E2082752C' }), 'lecture');
+  assert.equal(etatDuBloc({ ligne: LIGNE, numeroFiche: '' }), 'lecture');
+});
+
+test('etatDuBloc : numéro rattaché sans carte ⇒ carte_indisponible (jamais « aucun DPE »)', () => {
+  assert.equal(etatDuBloc({ ligne: { ...LIGNE, carte: null, carte_erreur: 'numero_absent' }, numeroFiche: '2631E0482288Y' }), 'carte_indisponible');
+  assert.equal(etatDuBloc({ ligne: { ...LIGNE, carte: null, carte_erreur: null }, numeroFiche: '2631E0482288Y' }), 'lecture');
+  // Numéro tapé sans ligne : lecture en cours, pas « aucun DPE ».
+  assert.equal(etatDuBloc({ ligne: null, numeroFiche: '2631E0482288Y' }), 'lecture');
+});
+
+test('etatDuBloc : sans numéro, l\'état de la tentative décide', () => {
+  assert.equal(etatDuBloc({ ligne: null, numeroFiche: '' }), 'vide');
+  assert.equal(etatDuBloc({ ligne: { etat: 'candidats', candidats: [{}], dpe_number: null }, numeroFiche: '' }), 'candidats');
+  assert.equal(etatDuBloc({ ligne: { etat: 'aucun_dpe', dpe_number: null }, numeroFiche: '' }), 'vide');
+});

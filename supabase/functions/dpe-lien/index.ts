@@ -34,7 +34,7 @@ import { adresseNormalisee } from "../_shared/dpeLien.js";
 import { DPE_RAPPORT_EMAIL_TEMPLATE_KEY } from "../_shared/dpeRapportEmailTemplate.js";
 import {
   numeroValide, adresseDeRecherche, codeDepuisCorpus, resumeDossier, rapportCompletPossible, projeterCandidat,
-  decisionRattachement,
+  decisionRattachement, controleNumero,
 } from "./regles.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -270,6 +270,8 @@ Deno.serve(async (req) => {
     if (action === "detacher") {
       const client = await lireClient();
       if (!client) return refus("client_introuvable");
+      const ecart = controleNumero({ numeroFiche: client.dpe_number, ligne: await lireLigne(client.id) });
+      if (ecart) return refus(ecart);
       return reponseEcriture(await enregistrer(client.id, "detacher", {}));
     }
 
@@ -284,6 +286,12 @@ Deno.serve(async (req) => {
       if (!numero) return reponseEcriture(await enregistrer(client.id, "actualiser", { origine, adresse_tentee: adresseNormalisee(client) }));
       if (!numeroValide(numero)) return refus("numero_mal_forme");
       const d = await corpus(`/dossier/${encodeURIComponent(numero)}`);
+      if (d.code === "numero_absent" || d.code === "corpus_indisponible") {
+        // Le numéro reste rattaché sans carte, avec la raison : l'écran l'affiche et ne relance pas avant une heure.
+        return reponseEcriture(await enregistrer(client.id, "actualiser", {
+          dpe_number: numero, origine, adresse_tentee: adresseNormalisee(client), carte_erreur: d.code,
+        }));
+      }
       if (d.code) return refus(d.code);
       return reponseEcriture(await enregistrer(client.id, "actualiser", {
         dpe_number: numero, origine, adresse_tentee: adresseNormalisee(client), ...patchCarte(d.data),
@@ -308,9 +316,10 @@ Deno.serve(async (req) => {
     if (action === "ouvrir") {
       const client = await lireClient();
       if (!client) return refus("client_introuvable");
-      const numero = (client.dpe_number || "").trim();
-      if (!numero) return refus("client_sans_numero");
-      if (!numeroValide(numero)) return refus("numero_mal_forme");
+      const numero = (client.dpe_number || "").trim().toUpperCase();
+      if (!numeroValide(numero)) return refus(numero ? "numero_mal_forme" : "client_sans_numero");
+      const ecart = controleNumero({ numeroFiche: numero, ligne: await lireLigne(client.id), rapportRequis: true });
+      if (ecart) return refus(ecart);
       const lien = await lienRapport(client, numero, body.forcer === true);
       if (lien.code) return refus(lien.code);
       return ok({ url: lien.url, numero, deja_emis: lien.dejaEmis });
@@ -329,10 +338,11 @@ Deno.serve(async (req) => {
       if (!client) return refus("client_introuvable");
       const to = (client.email || "").trim();
       if (!to) return refus("client_sans_email");
-      const numero = (client.dpe_number || "").trim();
-      if (!numero) return refus("client_sans_numero");
+      const numero = (client.dpe_number || "").trim().toUpperCase();
       const ligne = await lireLigne(client.id);
-      if (ligne?.rapport_complet === false) return refus("sans_rapport_complet");
+      // Le rapport envoyé est celui du numéro annoncé à l'écran, et seulement s'il existe (NULL refusé).
+      const ecart = controleNumero({ numeroFiche: numero, ligne, rapportRequis: true });
+      if (ecart) return refus(ecart);
 
       const { data: gabarit, error: errGabarit } = await auth.supabase.from("majordhome_mail_campaigns")
         .select("subject, html_body").eq("org_id", orgId).eq("key", DPE_RAPPORT_EMAIL_TEMPLATE_KEY).eq("is_archived", false)

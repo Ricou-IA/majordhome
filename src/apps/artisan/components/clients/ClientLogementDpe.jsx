@@ -22,6 +22,7 @@ import { moduleActif } from '@lib/modules';
 import { toClientPatch } from '@lib/dpeApi';
 import {
   formaterCandidats, messageErreurDpeLien, lienObservatoire, actionALouverture, adresseNormalisee, disponibiliteEnvoi,
+  etatDuBloc,
 } from '@lib/dpeLien';
 import { formatDateShortFR } from '@lib/utils';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
@@ -125,8 +126,10 @@ export function ClientLogementDpe({ client, formHousingType, formSurface, onAppl
     }
   };
 
+  const etat = etatDuBloc({ ligne, numeroFiche });
+
   // ---------------------------------------------------------------- chargement / pas d'adresse
-  if (!ligneChargee || (enCours && !ligne?.carte)) {
+  if (!ligneChargee || (enCours && etat !== 'carte')) {
     return (
       <Cadre>
         <p className="flex items-center gap-2 text-sm text-secondary-500">
@@ -137,11 +140,11 @@ export function ClientLogementDpe({ client, formHousingType, formSurface, onAppl
       </Cadre>
     );
   }
-  if (!ligne && !adresseFiche) {
+  if (etat === 'vide' && !ligne && !adresseFiche) {
     return <Cadre><p className="text-sm text-secondary-500">Renseignez l’adresse du client pour retrouver le DPE de son logement.</p></Cadre>;
   }
 
-  const record = ligne?.etat === 'rattache' && ligne?.carte ? ligne.carte : null;
+  const record = etat === 'carte' ? ligne.carte : null;
 
   // ---------------------------------------------------------------- DPE rattaché : la carte
   if (record) {
@@ -235,7 +238,39 @@ export function ClientLogementDpe({ client, formHousingType, formSurface, onAppl
     );
   }
 
-  // ---------------------------------------------------------------- pas de carte : candidats, rien, erreur
+  // ---------------------------------------------------------------- un numéro, mais pas (encore) sa carte
+  if (etat === 'carte_indisponible' || etat === 'lecture') {
+    const numeroAffiche = numeroFiche || ligne?.dpe_number || '';
+    return (
+      <Cadre>
+        <Titre>DPE n° {numeroAffiche}</Titre>
+        <p className="text-sm text-secondary-600">
+          {etat === 'carte_indisponible'
+            ? `${ORIGINES[ligne?.origine] || 'DPE rattaché'}. Sa carte n’est pas disponible : ${messageErreurDpeLien(ligne?.carte_erreur)}`
+            : 'La carte de ce DPE n’a pas encore été lue.'}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {lienObservatoire(numeroAffiche) && (
+            <a href={lienObservatoire(numeroAffiche)} target="_blank" rel="noopener noreferrer" className={BOUTON}>
+              <ExternalLink className="w-3.5 h-3.5" />Voir le DPE
+            </a>
+          )}
+          {peutModifier && (
+            <button type="button" className={BOUTON} disabled={enCours} onClick={geste(actualiser, 'Carte mise à jour')}>
+              <RefreshCw className={`w-3.5 h-3.5 ${enCours ? 'animate-spin' : ''}`} />Mettre à jour
+            </button>
+          )}
+          {peutModifier && etat === 'carte_indisponible' && (
+            <button type="button" className={BOUTON} disabled={enCours} onClick={geste(detacher, 'DPE retiré de la fiche')}>
+              <Undo2 className="w-3.5 h-3.5" />Ce n’est pas le bon
+            </button>
+          )}
+        </div>
+      </Cadre>
+    );
+  }
+
+  // ---------------------------------------------------------------- pas de numéro : candidats, rien, erreur
   const resultat = formaterCandidats({ candidats: ligne?.candidats || [] });
   const voisinage = onRechercherVoisinage && (
     <button type="button" className={BOUTON} onClick={onRechercherVoisinage}>
@@ -249,7 +284,7 @@ export function ClientLogementDpe({ client, formHousingType, formSurface, onAppl
     </button>
   );
 
-  if (ligne?.etat === 'candidats' && resultat.candidats.length > 0) {
+  if (etat === 'candidats' && resultat.candidats.length > 0) {
     return (
       <Cadre>
         <Titre>{resultat.candidats.length > 1 ? 'Plusieurs DPE possibles pour ce logement' : 'Un DPE à confirmer'}</Titre>

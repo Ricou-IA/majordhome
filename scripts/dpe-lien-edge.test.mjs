@@ -127,3 +127,22 @@ test('decisionRattachement : les candidats ne portent que les champs lus par l\'
   const d = decide({ candidats: [CAND({ batiment_groupe_id: 'x' }), CAND({ identifiant_dpe: '2481E2082752C', batiment_groupe_id: 'y' })] });
   for (const c of d.candidats) assert.equal('batiment_groupe_id' in c, false);
 });
+
+// --- Corrections de la revue finale (2026-11-12) -----------------------------------------------------------
+import { controleNumero } from '../supabase/functions/dpe-lien/regles.js';
+
+test('controleNumero : le numéro de la fiche doit être celui de la ligne (casse et espaces neutralisés)', () => {
+  const ligne = { dpe_number: '2631E0482288Y', rapport_complet: true };
+  assert.equal(controleNumero({ numeroFiche: ' 2631e0482288y ', ligne }), null);
+  assert.equal(controleNumero({ numeroFiche: '2481E2082752C', ligne }), 'numero_desynchronise');
+  assert.equal(controleNumero({ numeroFiche: '', ligne }), 'client_sans_numero');
+  assert.equal(controleNumero({ numeroFiche: '2631E0482288Y', ligne: null }), 'numero_desynchronise');
+});
+
+test('controleNumero avec exigence de rapport : rapport_complet doit être VRAI, NULL compris refusé', () => {
+  const avec = (rc) => controleNumero({ numeroFiche: '2631E0482288Y', ligne: { dpe_number: '2631E0482288Y', rapport_complet: rc }, rapportRequis: true });
+  assert.equal(avec(true), null);
+  assert.equal(avec(false), 'sans_rapport_complet');
+  assert.equal(avec(null), 'sans_rapport_complet');
+  assert.equal(avec(undefined), 'sans_rapport_complet');
+});
