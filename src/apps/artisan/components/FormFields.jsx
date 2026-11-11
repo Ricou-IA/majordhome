@@ -83,13 +83,13 @@ export function PhoneInput({ value, onChange, placeholder = '06 12 34 56 78', di
 /**
  * SelectInput — select contrôlé avec options {value, label}[]
  */
-export function SelectInput({ value, onChange, options, placeholder, disabled = false, children }) {
+export function SelectInput({ value, onChange, options, placeholder, disabled = false, className = '', children }) {
   return (
     <select
       value={value || ''}
       onChange={(e) => onChange(e.target.value || null)}
       disabled={disabled}
-      className={`${baseClass} ${disabled ? disabledClass : enabledClass}`}
+      className={`${baseClass} ${disabled ? disabledClass : enabledClass} ${className}`}
     >
       {placeholder && <option value="">{placeholder}</option>}
       {options

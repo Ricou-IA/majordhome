@@ -63,15 +63,19 @@ export const SectionType = ({
       <span className="text-red-500 -ml-1">*</span>
     </h3>
     {/* Sans libellé de champ : le titre le porte, et le sélecteur s'aligne sur la recherche client */}
-    <FormField label={null} error={errors.appointment_type} className="[&>label]:hidden">
+    <div>
       <SelectInput
+        className="h-[38px]"
         value={formData.appointment_type}
         onChange={(v) => updateField('appointment_type', v)}
         options={availableTypes}
         placeholder={formData.appointment_type ? undefined : 'Choisir le type…'}
         disabled={(isEdit && !allowTypeChange) || isCancelled || typeLocked}
       />
-    </FormField>
+      {errors.appointment_type && (
+        <p className="mt-1 text-sm text-red-600">{errors.appointment_type}</p>
+      )}
+    </div>
     {retypeHint && (
       <p className="mt-1.5 text-xs text-gray-400">{retypeHint}</p>
     )}
