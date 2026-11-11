@@ -1,6 +1,6 @@
 /**
  * DevisEntete.jsx — en-tête compact de la modale « Nouveau devis » (un seul écran, décision Eric
- * 2026-09-29) : client en une ligne, famille + devis type sur une rangée, objet. « Famille » et non
+ * 2026-09-29) : client en une ligne, familles sur toute la largeur, puis objet + devis type + import. « Famille » et non
  * « installation » : le devis est transversal (SAV, pièces, fumisterie…), pas seulement une pose (Eric, 2026-11-09).
  * Remplace l'ancienne étape « Client » du wizard.
  */
@@ -30,19 +30,25 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
         )}
       </div>
 
-      {/* Famille + devis type + import d'une offre fournisseur sur une rangée (l'import est une autre façon de
+      {/* Famille sur toute la largeur (13 tuiles, Eric 2026-11-11 : « on a de l'espace vide ») */}
+      <div>
+        <label className="block text-xs font-medium text-secondary-600 mb-1.5">Famille</label>
+        <div className="flex flex-wrap gap-2">
+          {listeFamilles.map((f) => (
+            <button key={f} type="button" onClick={() => onSelectFamily(f)}
+              className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${selectedFamily === f ? 'bg-primary-100 border-primary-400 text-primary-800 font-medium' : 'bg-white border-secondary-200 text-secondary-600 hover:border-primary-300 hover:bg-primary-50/50'}`}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Objet + devis type + import d'une offre fournisseur sur une rangée (l'import est une autre façon de
           partir d'un contenu tout fait, au même niveau que le devis type — Eric 2026-10-25) */}
       <div className={`grid gap-3 md:items-end ${onImportOffre ? 'md:grid-cols-[1fr_16rem_auto]' : 'md:grid-cols-[1fr_16rem]'}`}>
         <div>
-          <label className="block text-xs font-medium text-secondary-600 mb-1.5">Famille</label>
-          <div className="flex flex-wrap gap-2">
-            {listeFamilles.map((f) => (
-              <button key={f} type="button" onClick={() => onSelectFamily(f)}
-                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${selectedFamily === f ? 'bg-primary-100 border-primary-400 text-primary-800 font-medium' : 'bg-white border-secondary-200 text-secondary-600 hover:border-primary-300 hover:bg-primary-50/50'}`}>
-                {f}
-              </button>
-            ))}
-          </div>
+          <label className="block text-xs font-medium text-secondary-600 mb-1.5">Objet du devis</label>
+          <input type="text" value={form.subject} onChange={(e) => setField('subject', e.target.value)} placeholder="Ex : Poêle à granulés + tubage du conduit existant" className={inputClass} />
         </div>
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1.5">Devis type</label>
@@ -56,12 +62,6 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
             <FileUp className="w-4 h-4 mr-1.5" /> Importer une offre fournisseur
           </button>
         )}
-      </div>
-
-      {/* Objet */}
-      <div>
-        <label className="block text-xs font-medium text-secondary-600 mb-1.5">Objet du devis</label>
-        <input type="text" value={form.subject} onChange={(e) => setField('subject', e.target.value)} placeholder="Ex : Poêle à granulés + tubage du conduit existant" className={inputClass} />
       </div>
     </div>
   );
