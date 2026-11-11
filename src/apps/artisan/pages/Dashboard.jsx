@@ -33,6 +33,7 @@ import {
 import { getAppointmentTypeConfig } from '@services/appointments.service';
 import { PennylaneDoublonsClients } from '@apps/artisan/components/devis/PennylaneDoublonsClients';
 import { PennylaneLeadsMultiPayeurs } from '@apps/artisan/components/devis/PennylaneLeadsMultiPayeurs';
+import AppareilsAControler from '@apps/artisan/components/dashboard/AppareilsAControler';
 
 // =============================================================================
 // HOOK — Données dashboard (KPIs + planning du jour)
@@ -327,6 +328,9 @@ export default function Dashboard() {
 
       {/* Leads rattachés à plusieurs clients Pennylane : synchro d'identité suspendue, l'admin tranche (mouchard 2026-09-16) */}
       {showQuotesKpi && <PennylaneLeadsMultiPayeurs />}
+
+      {/* Appareils trouvés sur le web par un intervenant, en attente de contrôle (référentiel des appareils) */}
+      {isOrgAdmin && <AppareilsAControler />}
 
       {/* Contenu principal */}
       <div className="grid lg:grid-cols-3 gap-6">

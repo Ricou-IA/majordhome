@@ -173,6 +173,17 @@ export const equipmentModelsService = {
     return appelEdge({ action: 'creer', org_id: orgId, appareil, equipment_type_id: equipmentTypeId, champs }, 'createFromWeb');
   },
 
+  /** Documents rattachés à une fiche (notice, fiche technique…), dans l'ordre de dépôt. */
+  async getModelFiles(orgId, modelId) {
+    return withErrorHandling(async () => {
+      if (!orgId || !modelId) throw new Error('[equipmentModelsService] orgId et modelId requis');
+      const { data, error } = await supabase.from('majordhome_equipment_model_files').select('*')
+        .eq('org_id', orgId).eq('equipment_model_id', modelId).order('created_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    }, 'equipmentModels.getModelFiles');
+  },
+
   /** File de contrôle : fiches web à contrôler, avec les clients qui en ont une. */
   async listToReview(orgId) {
     return withErrorHandling(async () => {

@@ -138,6 +138,19 @@ export function useModelsToReview(enabled = true) {
   return { fiches: data || [], isLoading, error };
 }
 
+/** `{ documents, isLoading }` — documents rattachés à une fiche. */
+export function useModelFiles(modelId, enabled = true) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { data, isLoading } = useQuery({
+    queryKey: equipmentModelKeys.files(orgId, modelId),
+    queryFn: lire(() => equipmentModelsService.getModelFiles(orgId, modelId)),
+    enabled: !!orgId && !!modelId && enabled,
+    staleTime: 60 * 1000,
+  });
+  return { documents: data || [], isLoading };
+}
+
 /** `{ review, merge, isSaving }` — valider / corriger, fusionner (org_admin). */
 export function useModelReview() {
   const { organization } = useAuth();

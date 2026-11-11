@@ -316,6 +316,7 @@ export const equipmentModelKeys = {
   brandRefs: (orgId) => [...equipmentModelKeys.all(orgId), 'brand-refs'],
   articles: (orgId, brandKey, modelKey) => [...equipmentModelKeys.all(orgId), 'articles', brandKey || '', modelKey || ''],
   toReview: (orgId) => [...equipmentModelKeys.all(orgId), 'to-review'],
+  files: (orgId, modelId) => [...equipmentModelKeys.all(orgId), 'files', modelId],
 };
 
 export const catalogItemKeys = {
