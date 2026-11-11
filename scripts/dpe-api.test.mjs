@@ -360,6 +360,56 @@ test('assessMatch — score ADEME faible : à vérifier', () => {
   assert.match(m.reason, /approximative/);
 });
 
+// Cas réel MONTOYA (2026-11-11) : le diagnostiqueur a écrit « Chem. » ; le texte abrégé fait tomber le score
+// ADEME à 0,48 alors que le logement est le bon. L'adresse du DPE, une fois l'abréviation dépliée, est celle
+// de la fiche : le rattachement est confirmé par la comparaison, pas par le score.
+const MONTOYA = {
+  adresse_brut: '423 Chem. de Caroulet', code_postal_brut: '31340', nom_commune_brut: 'VACQUIERS',
+  score_ban: 0.48, statut_geocodage: "adresse géocodée ban à l'adresse",
+};
+const FICHE_MONTOYA = { address: '423 CHEMIN DE CAROULET', postal_code: '31340', city: 'VACQUIERS' };
+
+test('assessMatch — MONTOYA : score 0,48 mais adresse du DPE identique à la fiche ⇒ exact', () => {
+  const r = mapDpeRecord(MONTOYA);
+  assert.deepEqual(assessMatch(r, { matchMode: 'ban_id', clientAddress: FICHE_MONTOYA }), { level: 'exact', reason: null });
+});
+
+test('assessMatch — sans adresse de fiche, le score faible reste à vérifier (comportement inchangé)', () => {
+  assert.equal(assessMatch(mapDpeRecord(MONTOYA), { matchMode: 'ban_id' }).level, 'a_verifier');
+});
+
+test('assessMatch — Laborie / la Borie : deux rues différentes, toujours à vérifier', () => {
+  const r = mapDpeRecord({
+    adresse_brut: '11 Impasse de Laborie', code_postal_brut: '81600', nom_commune_brut: 'Gaillac',
+    score_ban: 0.29, statut_geocodage: "adresse géocodée ban à l'adresse",
+  });
+  const fiche = { address: '11 Impasse de la Borie', postal_code: '81600', city: 'Gaillac' };
+  assert.equal(assessMatch(r, { matchMode: 'ban_id', clientAddress: fiche }).level, 'a_verifier');
+});
+
+test('assessMatch — même rue, autre numéro : à vérifier', () => {
+  const fiche = { ...FICHE_MONTOYA, address: '425 CHEMIN DE CAROULET' };
+  assert.equal(assessMatch(mapDpeRecord(MONTOYA), { matchMode: 'ban_id', clientAddress: fiche }).level, 'a_verifier');
+});
+
+test('assessMatch — même rue, autre code postal : à vérifier', () => {
+  const fiche = { ...FICHE_MONTOYA, postal_code: '31330' };
+  assert.equal(assessMatch(mapDpeRecord(MONTOYA), { matchMode: 'ban_id', clientAddress: fiche }).level, 'a_verifier');
+});
+
+test('assessMatch — abréviations, accents et ponctuation ne séparent pas deux adresses identiques', () => {
+  const r = mapDpeRecord({
+    adresse_brut: '12, av. du Gal-de-Gaulle', code_postal_brut: '81600', nom_commune_brut: 'Gaillac',
+    score_ban: 0.41, statut_geocodage: "adresse géocodée ban à l'adresse",
+  });
+  const fiche = { address: '12 Avenue du Général de Gaulle', postal_code: '81600', city: 'GAILLAC' };
+  assert.equal(assessMatch(r, { matchMode: 'ban_id', clientAddress: fiche }).level, 'exact');
+});
+
+test('assessMatch — le voisinage reste à vérifier même si l\'adresse correspond', () => {
+  assert.equal(assessMatch(mapDpeRecord(MONTOYA), { matchMode: 'proximity', clientAddress: FICHE_MONTOYA }).level, 'a_verifier');
+});
+
 test('assessMatch — le repli par proximité est toujours à vérifier', () => {
   const r = mapDpeRecord({ score_ban: 0.99, statut_geocodage: "adresse géocodée ban à l'adresse" });
   assert.equal(assessMatch(r, { matchMode: 'proximity' }).level, 'a_verifier');

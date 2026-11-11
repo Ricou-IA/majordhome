@@ -185,12 +185,12 @@ function EquipmentDrafts({ record, onCreate }) {
 /** Libellés des champs de la fiche que ce DPE peut renseigner. */
 const PATCH_LABELS = { dpeNumber: 'n° DPE', surface: 'surface', housingType: 'type' };
 
-function RecordCard({ record, onApply, onExport, exportingId, matchMode, onCreateEquipment }) {
+function RecordCard({ record, onApply, onExport, exportingId, matchMode, onCreateEquipment, clientAddress }) {
   const expired = isDpeExpired(record);
   const patch = toClientPatch(record);
   const fillable = Object.keys(patch);
   const isExporting = exportingId === record.id;
-  const match = assessMatch(record, { matchMode });
+  const match = assessMatch(record, { matchMode, clientAddress });
 
   return (
     <div className="rounded-xl border border-secondary-200 bg-white p-4 space-y-3">
@@ -312,7 +312,7 @@ function EmptyState({ icon: Icon, title, children }) {
 function Body({
   result, isLoading, hasAddress, onRetry, onApply, onExport, exportingId,
   onSearchNearby, nearbySearched, selectedId, onSelect, onStep,
-  nearbyRadius, onRadiusChange, onCreateEquipment,
+  nearbyRadius, onRadiusChange, onCreateEquipment, clientAddress,
 }) {
   if (!hasAddress) {
     return (
@@ -471,6 +471,7 @@ function Body({
                 exportingId={exportingId}
                 matchMode={result.matchMode}
                 onCreateEquipment={onCreateEquipment}
+                clientAddress={clientAddress}
               />
             ))}
         </>
@@ -491,6 +492,7 @@ function Body({
               exportingId={exportingId}
               matchMode={result.matchMode}
               onCreateEquipment={onCreateEquipment}
+              clientAddress={clientAddress}
             />
           ))}
         </>
@@ -597,6 +599,7 @@ export function ClientInvestigationPanel({ client, isOpen, onClose, onApply, onC
             onStep={step}
             nearbyRadius={nearbyRadius}
             onRadiusChange={setNearbyRadius}
+            clientAddress={client}
             onCreateEquipment={onCreateEquipment}
           />
         </div>

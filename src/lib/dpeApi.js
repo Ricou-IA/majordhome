@@ -358,6 +358,48 @@ export function buildCostBreakdown(record) {
   return items;
 }
 
+// Abréviations de voies et de titres courantes dans la saisie des diagnostiqueurs.
+const ABREVIATIONS = {
+  ch: 'chemin', chem: 'chemin', che: 'chemin', av: 'avenue', ave: 'avenue', bd: 'boulevard', bld: 'boulevard',
+  boul: 'boulevard', rte: 'route', imp: 'impasse', all: 'allee', pl: 'place', lot: 'lotissement',
+  lotis: 'lotissement', res: 'residence', resid: 'residence', sq: 'square', crs: 'cours', fg: 'faubourg',
+  fbg: 'faubourg', ham: 'hameau', st: 'saint', ste: 'sainte', gal: 'general', gen: 'general', mal: 'marechal',
+  pdt: 'president', dr: 'docteur', prom: 'promenade', sent: 'sentier',
+};
+const MOTS_VIDES = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'l', 'd', 'et', 'a', 'au', 'aux']);
+
+/** Adresse → mots comparables : minuscules, sans accent ni ponctuation, abréviations dépliées, articles retirés. */
+function motsAdresse(texte) {
+  return String(texte || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .map((m) => ABREVIATIONS[m] || m)
+    .filter((m) => !MOTS_VIDES.has(m));
+}
+
+/**
+ * L'adresse écrite par le diagnostiqueur est-elle celle de la fiche ? Numéro + voie identiques (une fois
+ * abréviations, accents et articles neutralisés) et même code postal. La commune n'est pas comparée : son
+ * orthographe varie et le code postal la porte. « Impasse de Laborie » ≠ « Impasse de la Borie » reste vrai.
+ *
+ * @param {string|null|undefined} rawAddress  adresse brute du DPE (`mapDpeRecord().rawAddress`)
+ * @param {{ address?: string|null, postal_code?: string|null } | null | undefined} client
+ * @returns {boolean}
+ */
+export function memeAdresseQueLaFiche(rawAddress, client) {
+  const cp = String(client?.postal_code || '').replace(/\s/g, '');
+  const voie = motsAdresse(client?.address);
+  if (!/^\d{5}$/.test(cp) || voie.length < 2 || !/^\d/.test(voie[0])) return false;
+  const brut = motsAdresse(rawAddress);
+  const iCp = brut.indexOf(cp);
+  if (iCp < 1) return false;
+  return brut.slice(0, iCp).join(' ') === voie.join(' ');
+}
+
 /**
  * Fiabilité du rattachement d'un DPE à l'adresse du client.
  *
@@ -368,14 +410,26 @@ export function buildCostBreakdown(record) {
  * Un identifiant BAN identique des deux côtés ne prouve donc rien si l'ADEME
  * a mal géocodé au départ.
  *
+ * MAIS le score ADEME mesure la ressemblance du TEXTE saisi avec la BAN : une
+ * simple abréviation (« Chem. ») le fait tomber sous 0,5 alors que le logement
+ * est le bon (cas MONTOYA, 2026-11-11). Quand l'adresse écrite par le
+ * diagnostiqueur est celle de la fiche (`memeAdresseQueLaFiche`), c'est cette
+ * comparaison qui fait foi, et le score n'alerte plus.
+ *
+ * @param {object} record
+ * @param {{ matchMode?: string, clientAddress?: { address?: string, postal_code?: string } }} [opts]
  * @returns {{level: 'exact'|'a_verifier', reason: string|null}}
  */
-export function assessMatch(record, { matchMode } = {}) {
+export function assessMatch(record, { matchMode, clientAddress } = {}) {
   if (matchMode === 'proximity') {
     return {
       level: 'a_verifier',
       reason: 'DPE trouvé dans le voisinage, pas sur le numéro exact',
     };
+  }
+
+  if (memeAdresseQueLaFiche(record?.rawAddress, clientAddress)) {
+    return { level: 'exact', reason: null };
   }
 
   if (Number.isFinite(record?.banScore) && record.banScore < BAN_MATCH_LOW_SCORE) {
