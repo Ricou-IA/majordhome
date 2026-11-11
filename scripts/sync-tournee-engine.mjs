@@ -38,7 +38,7 @@ const WEBSHOP = ['orders', 'reglages', 'process', 'emailTemplates'];
 // Catalogue fournisseur (adaptateurs relevé → lignes de catalogue) → edge supplier-catalog-sync ; enrichissement → catalog-item-enrich ;
 // offreFournisseur (offre PDF lue par l'IA) → supplier-offer-import.
 // Copiés dans _shared/catalogue/ (offreFournisseur importe './modelKey.js', même dossier).
-const CATALOGUE = ['suitecommerce', 'woocommerce', 'modelKey', 'mapping', 'releve', 'enrichissement', 'enrichissementAppareil', 'offreFournisseur'];
+const CATALOGUE = ['suitecommerce', 'woocommerce', 'modelKey', 'mapping', 'releve', 'enrichissement', 'enrichissementAppareil', 'ressourcesPage', 'offreFournisseur'];
 
 export const FICHIERS = [
   ...NOMS.map((n) => ({ source: path.join(SRC, `${n}.js`), cible: path.join(DST, `${n}.js`) })),

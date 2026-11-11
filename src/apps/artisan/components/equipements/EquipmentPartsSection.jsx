@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Wrench, Loader2, Search, Maximize2, ShoppingCart, AlertTriangle, Minus, Plus } from 'lucide-react';
 import { useEquipmentModel, useEquipmentModelParts, useEquipmentModelImages, useSetEquipmentModel } from '@hooks/useEquipmentModels';
-import { chercherDansNomenclature, trierParRepere, mentionsPiece, prixPublicPiece } from '@/lib/catalogue/nomenclature';
+import { chercherDansNomenclature, trierParRepere, mentionsPiece, prixPublicPiece, listePiecesDisponible } from '@/lib/catalogue/nomenclature';
 import { formatEuro } from '@/lib/utils';
 import EquipmentModelPicker from './EquipmentModelPicker';
 import ExplodedViewViewer from './ExplodedViewViewer';
@@ -100,6 +100,20 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
         </button>
         {choixModele && (
           <EquipmentModelPicker equipment={equipment} currentModelId={null} isSaving={isSaving} onSelect={choisirModele} onClose={() => setChoixModele(false)} />
+        )}
+      </div>
+    );
+  }
+
+  // Fiche trouvée sur le web ou créée depuis un article : jamais de liste de pièces — une ligne, pas un tableau vide
+  if (model && !listePiecesDisponible(model)) {
+    return (
+      <div className={`flex items-center gap-2 text-xs text-secondary-500 ${className}`}>
+        <Wrench className="w-3.5 h-3.5 flex-shrink-0" />
+        <span>Pièces détachées : pas de liste de pièces pour cet appareil.</span>
+        {canEdit && <button type="button" onClick={() => setChoixModele(true)} className="text-indigo-600 hover:text-indigo-800">Changer</button>}
+        {choixModele && (
+          <EquipmentModelPicker equipment={equipment} currentModelId={modelId} isSaving={isSaving} onSelect={choisirModele} onClose={() => setChoixModele(false)} />
         )}
       </div>
     );

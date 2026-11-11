@@ -22,6 +22,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOrgMembership, jsonResponse, buildCorsHeaders, sanitizeError, getAdminClient } from "../_shared/auth.ts";
 import { estPdf, nomDeFichier } from "../_shared/catalogue/enrichissement.js";
 import { construirePromptAppareil, lireAppareils } from "../_shared/catalogue/enrichissementAppareil.js";
+import { extraireRessourcesPage } from "../_shared/catalogue/ressourcesPage.js";
 import { PHOTO_MAX, PDF_MAX, TYPES_IMAGE, champsPropres, telecharger, verifierPhoto, verifierFiche } from "../_shared/telechargement.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
@@ -35,6 +36,7 @@ const ECHEANCE_MS = 140_000;
 const REPRISES_MAX = 4;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BUCKET = "product-documents";
+const PAGE_MAX = 3 * 1024 * 1024; // page HTML du fabricant lue pour la photo et les documents
 
 const texte = (v: unknown, max = 200): string => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const erreur = (req: Request, status: number, message: string, code: string) => jsonResponse({ error: message, code }, status, req);
@@ -123,6 +125,32 @@ Deno.serve(async (req) => {
       const lu = lireAppareils(reponse, champs);
       if (lu.erreur === "reponse_illisible") return erreur(req, 502, "Réponse de la recherche illisible : réessayez", "illisible");
       if (lu.erreur === "aucun_appareil") return jsonResponse({ ok: true, appareils: [] }, 200, req);
+
+      // Ce que la recherche n'a pas rapporté, lu dans la page du fabricant qu'elle a trouvée : la lecture web perd les
+      // photos rangées hors d'une balise d'image et les documents servis par un bouton de script (jolly-mec.it).
+      const pages = new Map<string, ReturnType<typeof extraireRessourcesPage> | null>();
+      const ressourcesDe = async (url: string) => {
+        if (!pages.has(url)) {
+          let lu2: ReturnType<typeof extraireRessourcesPage> | null = null;
+          try {
+            const r = await telecharger(url, PAGE_MAX, echeance);
+            if (r.type.includes("html")) lu2 = extraireRessourcesPage(new TextDecoder().decode(r.octets), r.url);
+          } catch (e) { console.warn("[equipment-model-enrich] page illisible", url, (e as Error).message); }
+          pages.set(url, lu2);
+        }
+        return pages.get(url) ?? null;
+      };
+      for (const a of lu.appareils) {
+        const page = a.source_urls[0];
+        if (!page || (a.photo_url && a.notice_url && a.fiche_url)) continue;
+        const res = await ressourcesDe(page);
+        if (!res) continue;
+        if (!a.photo_url) {
+          for (const photo of res.photos.slice(0, 2)) { if (!(await verifierPhoto(photo, echeance))) { a.photo_url = photo; break; } }
+        }
+        if (!a.notice_url && res.notice) a.notice_url = res.notice.url;
+        if (!a.fiche_url && res.fiche) a.fiche_url = res.fiche.url;
+      }
 
       const appareils = await Promise.all(lu.appareils.map(async (a) => {
         const [photo_refus, notice_refus, fiche_refus] = await Promise.all([

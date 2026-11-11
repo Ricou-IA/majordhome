@@ -205,6 +205,17 @@ export function lignesDevisAvecPieces(sections, choix, tva) {
 }
 
 /**
+ * true si la fiche peut porter une liste de pièces : seules les fiches relevées sur le site de pièces d'un fabricant en
+ * ont une ; une fiche trouvée sur le web ou créée depuis un article n'en aura jamais. Fiche pas encore chargée, ou sans
+ * origine (antérieure au référentiel) : vrai, on ne cache rien.
+ * @param {{ origin?: string|null } | null | undefined} model
+ * @returns {boolean}
+ */
+export function listePiecesDisponible(model) {
+  return !model?.origin || model.origin === 'releve_fabricant';
+}
+
+/**
  * Description pré-remplie d'une demande SAV ouverte depuis des pièces choisies (fiche client) : l'appareil, puis
  * « quantité × désignation (référence) ». Texte de départ, que l'utilisateur complète ou remplace.
  * @param {{ brand?: string|null, model?: string|null }|null} equipement

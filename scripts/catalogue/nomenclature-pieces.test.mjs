@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   cle, reperesSaisis, filtrerParReperes, chercherDansNomenclature, trierParRepere, mentionsPiece, prixPublicPiece, prixVentePiece, prixAchatPiece, ligneDevisDepuisPiece,
-  lignesDevisAvecPieces, descriptionSavDepuisPieces, classerModeles, filtrerModeles, rangerDocumentsModele, titreDocumentModele,
+  lignesDevisAvecPieces, descriptionSavDepuisPieces, listePiecesDisponible, classerModeles, filtrerModeles, rangerDocumentsModele, titreDocumentModele,
 } from '../../src/lib/catalogue/nomenclature.js';
 
 const L = (extra = {}) => ({
@@ -87,6 +87,14 @@ test('lignesDevisAvecPieces : pièces rangées sous le chapitre PIÈCES', () => 
   assert.equal(sansPieces[1].reference, 'F670108B'); // pas de chapitre « pièces » : sous le premier
   assert.equal(lignesDevisAvecPieces([], choix, 10).length, 2);
   assert.equal(lignesDevisAvecPieces(null, [], 10).length, 0);
+});
+
+test('listePiecesDisponible : seule une fiche relevée chez le fabricant porte une liste de pièces', () => {
+  assert.equal(listePiecesDisponible({ origin: 'releve_fabricant' }), true);
+  assert.equal(listePiecesDisponible({ origin: 'web' }), false);
+  assert.equal(listePiecesDisponible({ origin: 'catalogue' }), false);
+  assert.equal(listePiecesDisponible({}), true); // fiche sans origine (avant le référentiel) : relevée
+  assert.equal(listePiecesDisponible(null), true); // pas encore chargée : on ne cache rien
 });
 
 test('descriptionSavDepuisPieces : appareil puis quantité × désignation (référence)', () => {
