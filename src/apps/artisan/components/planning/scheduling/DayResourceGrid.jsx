@@ -117,6 +117,9 @@ export function DayResourceGrid({
   fixedDuration = null,
   fullDayClick = false,
   onToggleDay,
+  // Clic sur le prénom (hors journée entière) : aperçu de la tournée du jour de la personne
+  onMemberClick = null,
+  selectedMemberId = null,
 }) {
   const todayStr = formatDate(new Date());
   // État du drag : { memberId, startIndex, currentIndex }
@@ -429,6 +432,17 @@ export function DayResourceGrid({
                   onClick={() => toggleDay(m.id)}
                   className={`border-b border-r px-1 py-1.5 text-center transition-colors hover:bg-blue-50 ${posee ? 'bg-blue-50' : 'bg-gray-50'}`}
                   title={`${posee ? 'Retirer' : 'Poser'} la journée de ${m.display_name}`}
+                >
+                  <div className="flex items-center justify-center gap-1">{entete}</div>
+                </button>
+              ) : onMemberClick ? (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => onMemberClick(m.id)}
+                  aria-pressed={selectedMemberId === m.id}
+                  className={`border-b border-r px-1 py-1.5 text-center transition-colors hover:bg-blue-50 ${selectedMemberId === m.id ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : 'bg-gray-50'}`}
+                  title={`Voir la tournée de ${m.display_name} ce jour-là`}
                 >
                   <div className="flex items-center justify-center gap-1">{entete}</div>
                 </button>

@@ -119,6 +119,8 @@ export function SchedulingAssistant({
   sidePanel = null,
   // Contenu placé en bas de la colonne de droite (sideBySide) : parcours de la journée.
   sidePanelBas = null,
+  // Aperçu de la tournée d'une personne (clic sur son prénom) : ({ memberId, date } | null) => void
+  onApercuChange = null,
   onSlotsChange,
   initialDate = null,
   mergeOverlapping = false,
@@ -307,6 +309,12 @@ export function SchedulingAssistant({
     [expectedTeamSize, expectedDays, draftSlots],
   );
 
+  // Aperçu de la tournée : la personne cliquée (re-clic = fermer), le jour affiché suit la grille
+  const [apercuMemberId, setApercuMemberId] = useState(null);
+  useEffect(() => {
+    onApercuChange?.(apercuMemberId ? { memberId: apercuMemberId, date: selectedDate } : null);
+  }, [apercuMemberId, selectedDate, onApercuChange]);
+
   // --- Mode intégré (embedded) : remonte en continu les créneaux au host (EventModal),
   // sans bouton de confirmation interne. Objet/notes/subject sont gérés par le host. ---
   const emittedSlots = useMemo(
@@ -429,6 +437,8 @@ export function SchedulingAssistant({
         fixedDuration={fixedDuration}
         fullDayClick={fullDayClick}
         onToggleDay={handleToggleDay}
+        onMemberClick={onApercuChange ? (id) => setApercuMemberId((cur) => (cur === id ? null : id)) : null}
+        selectedMemberId={apercuMemberId}
       />
 
       {/* « Qui prend ce RDV ? » — filet quand le sélecteur d'un créneau a été vidé */}

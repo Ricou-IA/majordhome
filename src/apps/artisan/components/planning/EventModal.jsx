@@ -118,6 +118,8 @@ export function EventModal({
   // plusieurs RDV sur la même carte (chantier pas fini le jour prévu, 2ᵉ visite
   // d'entretien). Le RDV courant n'est pas touché.
   const [continuationMode, setContinuationMode] = useState(false);
+  // Aperçu de la tournée d'une personne (clic sur son prénom dans la grille) : { memberId, date } | null
+  const [apercu, setApercu] = useState(null);
   const navigate = useNavigate();
 
   const { isOrgAdmin } = useAuth();
@@ -391,20 +393,21 @@ export function EventModal({
   // Parcours de la journée de chaque personne d'un créneau posé, le RDV inséré à son heure.
   // Personne = team_members.id (techniciens, commerciaux du planning) ou commercials.id (VT du
   // pipeline : relié à sa ressource planning par le profil, pour son point de départ).
+  const personneDe = (id) => {
+    const tm = allTeamMembers.find((m) => m.id === id);
+    if (tm) return { key: id, ids: [id], displayName: tm.display_name || 'Technicien', color: tm.calendar_color };
+    const com = (attachContext?.commercials || []).find((x) => x.id === id);
+    const tmCom = com ? allTeamMembers.find((m) => m.user_id && m.user_id === com.profile_id) : null;
+    return {
+      key: id,
+      ids: tmCom ? [id, tmCom.id] : [id],
+      displayName: com?.full_name || com?.name || tmCom?.display_name || 'Commercial',
+      color: tmCom?.calendar_color,
+    };
+  };
   const personnesDuCreneau = (slot) => {
     const ids = slot.technicianIds?.length ? slot.technicianIds : (slot.assignedCommercialId ? [slot.assignedCommercialId] : []);
-    return ids.map((id) => {
-      const tm = allTeamMembers.find((m) => m.id === id);
-      if (tm) return { key: id, ids: [id], displayName: tm.display_name || 'Technicien', color: tm.calendar_color };
-      const com = (attachContext?.commercials || []).find((x) => x.id === id);
-      const tmCom = com ? allTeamMembers.find((m) => m.user_id && m.user_id === com.profile_id) : null;
-      return {
-        key: id,
-        ids: tmCom ? [id, tmCom.id] : [id],
-        displayName: com?.full_name || com?.name || tmCom?.display_name || 'Commercial',
-        color: tmCom?.calendar_color,
-      };
-    });
+    return ids.map(personneDe);
   };
   const rdvParcours = {
     appointment_type: formData.appointment_type,
@@ -414,8 +417,22 @@ export function EventModal({
     postal_code: formData.client_postal_code,
     city: formData.client_city,
   };
-  const parcours = !isFreeType && assistantSlots.length > 0 ? (
+  // Aperçu (clic sur un prénom) : la tournée telle qu'elle est, si ce n'est pas déjà la personne d'un créneau
+  const apercuDejaPose = apercu && assistantSlots.some((sl) => sl.date === apercu.date
+    && personnesDuCreneau(sl).some((pers) => pers.ids.includes(apercu.memberId)));
+  const parcours = !isFreeType && (assistantSlots.length > 0 || apercu) ? (
     <div className="space-y-3">
+      {apercu && !apercuDejaPose && (
+        <ParcoursJournee
+          key={`apercu-${apercu.memberId}-${apercu.date}`}
+          orgId={orgId}
+          slot={{ date: apercu.date, startTime: null }}
+          personne={personneDe(apercu.memberId)}
+          coords={null}
+          rdv={rdvParcours}
+          apercu
+        />
+      )}
       {assistantSlots.flatMap((slot) => personnesDuCreneau(slot).map((pers) => (
         <ParcoursJournee
           key={`${slot.date}-${slot.startTime}-${pers.key}`}
@@ -574,6 +591,7 @@ export function EventModal({
                     </div>
                   )}
                   sidePanelBas={parcours}
+                  onApercuChange={isFreeType ? null : setApercu}
                 />
               )}
 

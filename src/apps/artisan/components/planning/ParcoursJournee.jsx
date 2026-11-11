@@ -22,16 +22,17 @@ import { formatDureeRoute, formatKm } from '@/lib/feuilleDeRoute';
  * @param {{ ids: string[], displayName: string, color?: string }} p.personne
  * @param {{ lat: number, lng: number }|null} p.coords  lieu du RDV
  * @param {object} p.rdv                 { appointment_type, client_name, client_first_name, address, postal_code, city }
+ * @param {boolean} [p.apercu]           tournée telle qu'elle est (clic sur le prénom), sans ce RDV
  */
-export function ParcoursJournee({ orgId, slot, personne, coords, rdv }) {
-  const ajout = useMemo(() => (coords ? {
+export function ParcoursJournee({ orgId, slot, personne, coords, rdv, apercu = false }) {
+  const ajout = useMemo(() => (coords && !apercu ? {
     ...rdv,
     scheduled_date: slot.date,
     scheduled_start: slot.startTime,
     scheduled_end: slot.endTime || null,
     lat: coords.lat,
     lng: coords.lng,
-  } : null), [coords, rdv, slot.date, slot.startTime, slot.endTime]);
+  } : null), [coords, apercu, rdv, slot.date, slot.startTime, slot.endTime]);
   const person = useMemo(() => ({ displayName: personne.displayName, color: personne.color }), [personne.displayName, personne.color]);
 
   const { feuille, isLoading, sansDepot } = useFeuilleDeRoute({
@@ -53,11 +54,11 @@ export function ParcoursJournee({ orgId, slot, personne, coords, rdv }) {
     <div className={`rounded-lg border p-3 space-y-2 text-sm ${impossibles.length ? 'border-red-300 bg-red-50/40' : 'border-secondary-200 bg-secondary-50/50'}`}>
       <div className="flex items-center gap-2 font-medium text-secondary-800">
         <Route className="w-4 h-4 text-secondary-500" />
-        <span className="truncate">Parcours de {personne.displayName}</span>
+        <span className="truncate">{apercu ? `Tournée de ${personne.displayName} · sans ce RDV` : `Parcours de ${personne.displayName}`}</span>
         {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary-400 ml-auto" />}
       </div>
 
-      {!coords ? (
+      {!coords && !apercu ? (
         <p className="text-xs text-amber-700">Adresse du client non localisée : trajet non calculé.</p>
       ) : sansDepot ? (
         <p className="text-xs text-amber-700">Point de départ non renseigné (siège de l’organisation ou départ de la personne) : trajet non calculé.</p>
@@ -75,6 +76,9 @@ export function ParcoursJournee({ orgId, slot, personne, coords, rdv }) {
               {' '}({formatKm(nouveau.trajetAvant.km)})
               {suivant ? <> · ensuite {formatDureeRoute(suivant.minutes)}</> : null}
             </p>
+          )}
+          {apercu && feuille.items.length === 0 && (
+            <p className="text-xs text-secondary-500">Aucun RDV ce jour-là.</p>
           )}
           <ol className="space-y-1 text-xs">
             <li className="flex items-center gap-1.5 text-secondary-500"><MapPin className="w-3 h-3" />{feuille.departLabel}</li>
