@@ -44,7 +44,7 @@ import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { useSuppliers, useSupplierProducts } from '@hooks/useSuppliers';
 import { useDebounce } from '@hooks/useDebounce';
 import { useBrandRefs, useEquipmentModel } from '@hooks/useEquipmentModels';
-import { champsRattachement, saisieOrigine } from '@/lib/equipements/saisieAppareil';
+import { champsRattachement, saisieOrigine, saisieModifiee } from '@/lib/equipements/saisieAppareil';
 import { champsDuSchema } from '@/lib/catalogue/enrichissement';
 import { canonicalFieldsForCategory } from '@/shared/specs';
 import ChampsAppareil from './saisieAppareil/ChampsAppareil';
@@ -188,8 +188,13 @@ export function EquipmentFormModal({
   const showQuantity = selectedEquipType?.has_unit_pricing;
   const unitLabel = selectedEquipType?.unit_label || 'unité(s)';
 
+  // Détacher la fiche : on ne garde ni le rattachement ni la trace d'une saisie nettoyée qui n'a plus lieu
+  const detacher = () => { setFicheId(null); setSaisieAvant(null); setARemplir(null); };
+
   // Mise à jour d'un champ
   const handleChange = (field, value) => {
+    // une vraie modification de la marque détache l'appareil (sinon DEVILLE resterait rattaché à une fiche Invicta)
+    if (field === 'brand' && ficheId && saisieModifiee(form.brand, value)) detacher();
     setForm(prev => {
       const next = { ...prev, [field]: value };
       // Reset modèle et référence si la marque change
@@ -207,6 +212,7 @@ export function EquipmentFormModal({
 
   // Sélection d'un produit depuis la datalist modèle
   const handleModelSelect = (value) => {
+    if (ficheId && saisieModifiee(form.model, value)) detacher();
     const product = supplierProducts.find(p => p.name === value || `${p.name} (${p.reference})` === value);
     setForm(prev => ({
       ...prev,
@@ -335,7 +341,7 @@ export function EquipmentFormModal({
             onBrandReference={(name) => setForm((prev) => ({ ...prev, brand: name }))}
             suppliers={suppliers} supplierProducts={supplierProducts} suppliersLoading={suppliersLoading} marques={marques}
             ficheId={ficheId} fiche={fiche} ficheLoading={ficheLoading} onChoisirFiche={choisirFiche}
-            onRetirerFiche={() => setFicheId(null)} onChangerFiche={() => setFicheId(null)}
+            onRetirerFiche={detacher} onChangerFiche={detacher}
             verification typeLabel={selectedEquipType?.label || null} champs={champsWeb}
           />
 

@@ -86,6 +86,31 @@ export function saisieOrigine(equipement, par, le) {
   return { brand: equipement?.brand ?? null, model: equipement?.model ?? null, le, par };
 }
 
+/**
+ * true si la saisie a vraiment changé (casse, accents, espaces et ponctuation ignorés). Une vraie modification de la
+ * marque ou du modèle détache l'équipement de sa fiche : on ne garde pas un rattachement à un autre appareil.
+ * @param {string|null|undefined} avant
+ * @param {string|null|undefined} apres
+ * @returns {boolean}
+ */
+export function saisieModifiee(avant, apres) {
+  return cle(avant) !== cle(apres);
+}
+
+/**
+ * Message de la recherche dans la base locale : une erreur de lecture ne se dit jamais « rien trouvé » (elle pousserait
+ * vers une recherche web payante et une fiche en double). `null` quand il y a des résultats et pas d'erreur.
+ * @param {{ erreur?: unknown, nbFiches: number, nbArticles: number, brand: string, model: string }} etat
+ * @returns {string|null}
+ */
+export function messageBaseLocale({ erreur, nbFiches, nbArticles, brand, model }) {
+  const vide = !nbFiches && !nbArticles;
+  if (erreur && vide) return 'La base n\'a pas pu être lue : réessayez « Vérifier » avant de chercher sur le web.';
+  if (erreur) return 'Liste incomplète : une partie de la base n\'a pas pu être lue.';
+  if (vide) return `Rien de ressemblant dans la base pour « ${[brand, model].filter(Boolean).join(' ')} ».`;
+  return null;
+}
+
 const SUITE = 'enregistrez l\'appareil tel quel, il pourra être rattaché plus tard.';
 const MESSAGES_RPC = {
   fiche_fabricant: 'Une fiche relevée chez le fabricant ne se corrige pas ici.',

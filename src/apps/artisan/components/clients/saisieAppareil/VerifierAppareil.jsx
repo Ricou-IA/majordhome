@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Search, Loader2, Globe, Package, X } from 'lucide-react';
 import { useEquipmentModelsForBrand, useArticlesForEquipment, useEquipmentEnrichment } from '@hooks/useEquipmentModels';
-import { classerAppareils, classerArticles, messageErreurAppareil } from '@/lib/equipements/saisieAppareil';
+import { classerAppareils, classerArticles, messageErreurAppareil, messageBaseLocale } from '@/lib/equipements/saisieAppareil';
 import AppareilWebCarte from './AppareilWebCarte';
 
 const LIGNE = 'w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg border border-transparent hover:bg-gray-50 disabled:opacity-50';
@@ -21,13 +21,15 @@ const LIGNE = 'w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg bor
 export default function VerifierAppareil({ brand, model, equipmentTypeId = null, typeLabel = null, champs = [], onChoisir }) {
   const [ouvert, setOuvert] = useState(false);
   const [web, setWeb] = useState({ etat: 'idle', appareils: [] }); // idle | cherche | resultats
-  const { modeles, marqueReconnue, isLoading: chargeModeles } = useEquipmentModelsForBrand(brand, ouvert);
-  const { articles, isLoading: chargeArticles } = useArticlesForEquipment(brand, model, ouvert);
+  const { modeles, marqueReconnue, isLoading: chargeModeles, error: erreurModeles } = useEquipmentModelsForBrand(brand, ouvert);
+  const { articles, isLoading: chargeArticles, error: erreurArticles } = useArticlesForEquipment(brand, model, ouvert);
   const { searchWeb, createFromWeb, createFromCatalog, isSearching, isCreating } = useEquipmentEnrichment();
 
   const fiches = useMemo(() => (marqueReconnue ? classerAppareils(modeles, { model, equipmentTypeId }).slice(0, 8) : []), [modeles, marqueReconnue, model, equipmentTypeId]);
   const articlesProches = useMemo(() => classerArticles(articles, { model }).slice(0, 6), [articles, model]);
   const chargement = chargeModeles || chargeArticles;
+  // une erreur de lecture ne se dit jamais « rien trouvé » (messageBaseLocale)
+  const message = messageBaseLocale({ erreur: erreurModeles || erreurArticles, nbFiches: fiches.length, nbArticles: articlesProches.length, brand, model });
 
   const fermer = () => { setOuvert(false); setWeb({ etat: 'idle', appareils: [] }); };
 
@@ -108,8 +110,8 @@ export default function VerifierAppareil({ brand, model, equipmentTypeId = null,
         </div>
       )}
 
-      {!chargement && fiches.length === 0 && articlesProches.length === 0 && web.etat === 'idle' && (
-        <p className="text-xs text-gray-500">Rien de ressemblant dans la base pour « {brand} {model} ».</p>
+      {!chargement && message && web.etat === 'idle' && (
+        <p className={`text-xs ${erreurModeles || erreurArticles ? 'text-amber-800' : 'text-gray-500'}`}>{message}</p>
       )}
 
       {web.etat === 'cherche' && (

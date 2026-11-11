@@ -4,7 +4,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   marqueDeReference, classerAppareils, classerArticles, saisieOrigine, champsRattachement, messageErreurAppareil,
+  saisieModifiee, messageBaseLocale,
 } from '../../src/lib/equipements/saisieAppareil.js';
+
+test('saisieModifiee : seule une vraie modification compte (casse, espaces, ponctuation ignorées)', () => {
+  assert.equal(saisieModifiee('INVICTA', 'invicta '), false);
+  assert.equal(saisieModifiee('JOLLY MEC', 'jolly-mec'), false);
+  assert.equal(saisieModifiee('INVICTA', 'DEVILLE'), true);
+  assert.equal(saisieModifiee('ARATOS', 'ARATOS 8'), true);
+  assert.equal(saisieModifiee('', 'X'), true);
+});
+
+test('messageBaseLocale : erreur de lecture ≠ rien trouvé', () => {
+  assert.match(messageBaseLocale({ erreur: new Error('x'), nbFiches: 0, nbArticles: 0, brand: 'A', model: 'B' }), /n'a pas pu être lue/);
+  assert.match(messageBaseLocale({ erreur: null, nbFiches: 0, nbArticles: 0, brand: 'EDILKAMIN', model: 'Kelly' }), /Rien de ressemblant.*EDILKAMIN Kelly/);
+  assert.equal(messageBaseLocale({ erreur: null, nbFiches: 2, nbArticles: 0, brand: 'A', model: 'B' }), null);
+  assert.match(messageBaseLocale({ erreur: new Error('x'), nbFiches: 2, nbArticles: 0, brand: 'A', model: 'B' }), /incomplète/);
+});
 
 test('messageErreurAppareil : plafond, délai, droits, contrôle, défaut', () => {
   assert.match(messageErreurAppareil({ code: 'quota', message: '20 recherches web par jour atteintes' }), /20 recherches web par jour atteintes.*tel quel/);
