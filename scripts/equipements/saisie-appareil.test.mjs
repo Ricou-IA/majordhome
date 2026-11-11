@@ -1,0 +1,52 @@
+// Tests des règles pures de la saisie d'appareil (src/lib/equipements/saisieAppareil.js).
+// node --test scripts/equipements/saisie-appareil.test.mjs
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  marqueDeReference, classerAppareils, classerArticles, saisieOrigine, champsRattachement,
+} from '../../src/lib/equipements/saisieAppareil.js';
+
+const MARQUES = [{ name: 'JOLLY MEC', brand_key: 'jollymec' }, { name: 'EDILKAMIN', brand_key: 'edilkamin' }, { name: 'MCZ', brand_key: 'mcz' }];
+
+test('marqueDeReference : clé identique, faute d\'une lettre, rien', () => {
+  assert.deepEqual(marqueDeReference('Jollymec ', MARQUES), { name: 'JOLLY MEC', exacte: true });
+  assert.deepEqual(marqueDeReference('jolly-mec', MARQUES), { name: 'JOLLY MEC', exacte: true });
+  assert.deepEqual(marqueDeReference('Efilkamin', MARQUES), { name: 'EDILKAMIN', exacte: false });
+  assert.equal(marqueDeReference('MZC', MARQUES), null); // clé < 6 : pas de rapprochement approché
+  assert.equal(marqueDeReference('', MARQUES), null);
+  assert.equal(marqueDeReference('Palazzetti', MARQUES), null);
+});
+
+test('marqueDeReference : deux marques à une lettre près = pas de proposition', () => {
+  const M = [{ name: 'ABCDEF', brand_key: 'abcdef' }, { name: 'ABCDEG', brand_key: 'abcdeg' }];
+  assert.equal(marqueDeReference('abcdex', M), null);
+});
+
+const F = (id, model_name, extra = {}) => ({ id, model_name, name: `POELE ${model_name}`, reference: `P${id}`, is_active: true, merged_into: null, ...extra });
+
+test('classerAppareils : fusionnées exclues, même type en tête, scores nuls retirés', () => {
+  const fiches = [
+    F('1', 'LODI 10', { equipment_type_id: 'A' }),
+    F('2', 'LODI 10', { equipment_type_id: 'B' }),
+    F('3', 'LODI 10', { equipment_type_id: 'B', merged_into: '2' }),
+    F('4', 'OXANA'),
+  ];
+  assert.deepEqual(classerAppareils(fiches, { model: 'lodi 10', equipmentTypeId: 'B' }).map((f) => f.id), ['2', '1']);
+  assert.deepEqual(classerAppareils(fiches, { model: '' }).map((f) => f.id), []);
+});
+
+test('classerArticles : nom ou code, au moins 3 caractères', () => {
+  const articles = [{ id: 'a', name: 'ARATOS', code: 'P645344' }, { id: 'b', name: 'KAORI', code: null }];
+  assert.deepEqual(classerArticles(articles, { model: 'ar' }), []);
+  assert.deepEqual(classerArticles(articles, { model: 'aratos' }).map((a) => a.id), ['a']);
+  assert.deepEqual(classerArticles(articles, { model: '645344' }).map((a) => a.id), ['a']);
+});
+
+test('champsRattachement et saisieOrigine', () => {
+  assert.deepEqual(champsRattachement({ id: 'm1', brand: 'Invicta', model_name: 'ARATOS', catalog_source_product_id: 'sp1' }),
+    { brand: 'INVICTA', model: 'ARATOS', equipmentModelId: 'm1', supplierProductId: 'sp1' });
+  assert.equal(champsRattachement({ id: 'm2', brand: 'X', model_name: 'Y' }).supplierProductId, null);
+  assert.deepEqual(saisieOrigine({ brand: 'invicta', model: 'aratos 8' }, 'saisie terrain', '2026-11-12'),
+    { brand: 'invicta', model: 'aratos 8', le: '2026-11-12', par: 'saisie terrain' });
+  assert.deepEqual(saisieOrigine({}, 'x', '2026-11-12'), { brand: null, model: null, le: '2026-11-12', par: 'x' });
+});
