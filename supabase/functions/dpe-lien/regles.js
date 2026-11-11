@@ -108,6 +108,13 @@ export function projeterCandidat(ligne) {
 // Seuils PROVISOIRES : à remplacer par la mesure de scripts/dpe/mesure-rattachement-auto.mjs (plan, tâche 1).
 // ============================================================================
 
+/**
+ * Interrupteur du rattachement AUTOMATIQUE. Faux tant que la mesure de la tâche 1 n'a pas fixé les seuils
+ * (le géocodeur national répondait 504 le 2026-11-12, la mesure n'a pas pu tourner) : un DPE unique et sûr est
+ * alors PROPOSÉ en un clic, jamais rattaché seul. Spec §10 : pas d'automatique avant la mesure.
+ */
+export const RATTACHEMENT_AUTO_ACTIF = false;
+
 /** Score minimal du géocodage IGN de l'adresse du client (0 à 1). */
 export const SCORE_GEOCODAGE_MIN = 0.8;
 /** Types de résultat IGN acceptés : le numéro de la rue, jamais une rue ou une commune entière. */
@@ -119,11 +126,11 @@ export const FIABILITES_BDNB_ACCEPTEES = Object.freeze(['très fiable', 'fiable'
  * Décide du rattachement à partir du géocodage de l'adresse du client, des DPE du bâtiment et, quand il n'y en a
  * qu'un, de son dossier. La machine ne choisit JAMAIS entre plusieurs candidats.
  * @param {{ geocodage: { score?: number, type?: string } | null, candidats: unknown[],
- *   dossierUnique: { dossier?: Record<string, unknown> | null } | null, ecartes: string[] }} p
+ *   dossierUnique: { dossier?: Record<string, unknown> | null } | null, ecartes: string[], autoActif?: boolean }} p
  * @returns {{ etat: 'rattache' | 'candidats' | 'aucun_dpe' | 'adresse_non_trouvee', numero?: string,
  *   candidats: Record<string, unknown>[] }}
  */
-export function decisionRattachement({ geocodage, candidats, dossierUnique, ecartes }) {
+export function decisionRattachement({ geocodage, candidats, dossierUnique, ecartes, autoActif = RATTACHEMENT_AUTO_ACTIF }) {
   if (!geocodage) return { etat: 'adresse_non_trouvee', candidats: [] };
   const exclus = new Set(ecartes || []);
   const liste = (Array.isArray(candidats) ? candidats : [])
@@ -134,7 +141,8 @@ export function decisionRattachement({ geocodage, candidats, dossierUnique, ecar
 
   const [seul] = liste;
   const methode = String(dossierUnique?.dossier?.methode_application_dpe || '').toLowerCase();
-  const sur = typeof geocodage.score === 'number' && geocodage.score >= SCORE_GEOCODAGE_MIN
+  const sur = autoActif === true
+    && typeof geocodage.score === 'number' && geocodage.score >= SCORE_GEOCODAGE_MIN
     && TYPES_GEOCODAGE_ACCEPTES.includes(geocodage.type)
     && FIABILITES_BDNB_ACCEPTEES.includes(seul.fiabilite_geocodage)
     && Boolean(dossierUnique?.dossier)

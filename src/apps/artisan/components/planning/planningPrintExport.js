@@ -2,7 +2,7 @@
  * planningPrintExport.js — Point d'entrée unique de l'impression du planning hebdo
  * ============================================================================
  * Toute la chaîne (modèle, branding, rendu, nommage du fichier) vit ici — même
- * principe que `dpeSyntheseExport.js` et `rapportExport.js` : un 2ᵉ écran qui
+ * principe que `rapportExport.js` : un 2ᵉ écran qui
  * voudrait imprimer un planning passe par cette fonction, pas par sa propre chaîne.
  * ============================================================================
  */

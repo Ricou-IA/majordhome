@@ -147,7 +147,11 @@ test('actionALouverture : tentative sans DPE — même adresse ⇒ rien, adresse
   const sans = { dpe_number: null, origine: null, etat: 'aucun_dpe', adresse_tentee: ADR, carte: null, version_carte: null };
   assert.equal(ouvrir({ clientDpe: sans, dpeNumberFiche: '' }), 'rien');
   assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'candidats' }, dpeNumberFiche: '' }), 'rien');
-  assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'erreur' }, dpeNumberFiche: '' }), 'rien');
+  // Une panne (géocodeur, corpus) se retente après une heure, pas avant ; jamais si la date manque.
+  const maintenant = new Date('2026-11-12T12:00:00Z');
+  assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'erreur', tente_le: '2026-11-12T11:30:00Z' }, dpeNumberFiche: '', maintenant }), 'rien');
+  assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'erreur', tente_le: '2026-11-12T10:30:00Z' }, dpeNumberFiche: '', maintenant }), 'rattacher');
+  assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'erreur', tente_le: null }, dpeNumberFiche: '', maintenant }), 'rattacher');
   assert.equal(ouvrir({ clientDpe: sans, dpeNumberFiche: '', adresseFiche: '1 rue neuve 81600 gaillac' }), 'rattacher');
 });
 

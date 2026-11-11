@@ -7,6 +7,9 @@
 
 import { VERSION_CARTE } from './dpeCorpus.js';
 
+/** Délai avant de retenter un rattachement tombé sur une panne. */
+const DELAI_NOUVEL_ESSAI_MS = 60 * 60 * 1000;
+
 const FORME_NUMERO = /^[0-9A-Za-z]{13}$/;
 
 /** @param {unknown} n @returns {boolean} */
@@ -145,10 +148,10 @@ export function adresseNormalisee(client) {
  * - `rien`.
  * @param {{ adresseFiche: string|null, dpeNumberFiche?: string|null, peutModifier: boolean,
  *   clientDpe: { dpe_number?: string|null, origine?: string|null, etat?: string|null, adresse_tentee?: string|null,
- *   carte?: object|null, version_carte?: number|null } | null }} p
+ *   carte?: object|null, version_carte?: number|null, tente_le?: string|null } | null, maintenant?: Date }} p
  * @returns {'rien' | 'rattacher' | 'actualiser' | 'signaler_adresse'}
  */
-export function actionALouverture({ adresseFiche, dpeNumberFiche, peutModifier, clientDpe }) {
+export function actionALouverture({ adresseFiche, dpeNumberFiche, peutModifier, clientDpe, maintenant = new Date() }) {
   if (!peutModifier) return 'rien';
   const numeroFiche = (dpeNumberFiche || '').trim();
   if (!clientDpe) {
@@ -164,6 +167,11 @@ export function actionALouverture({ adresseFiche, dpeNumberFiche, peutModifier, 
     return 'signaler_adresse';
   }
   if (numeroLigne && (!clientDpe.carte || (clientDpe.version_carte ?? 0) < VERSION_CARTE)) return 'actualiser';
+  // Une panne (géocodeur, corpus) n'est pas une réponse : on retente, mais pas plus d'une fois par heure.
+  if (!numeroLigne && clientDpe.etat === 'erreur') {
+    const tente = Date.parse(clientDpe.tente_le || '');
+    if (!Number.isFinite(tente) || maintenant.getTime() - tente >= DELAI_NOUVEL_ESSAI_MS) return 'rattacher';
+  }
   return 'rien';
 }
 

@@ -8,7 +8,7 @@
  * ============================================================================
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -123,6 +123,21 @@ export default function ClientDetail() {
     setInitialData(data);
     setHasInitialized(true);
   }
+
+  // Le n° DPE est aussi écrit côté serveur (rattachement MonsieurDPE, cf. ClientLogementDpe) : le formulaire,
+  // initialisé une seule fois, doit suivre. Sans ça, un enregistrement de la fiche renverrait l'ANCIEN numéro et
+  // détacherait le DPE en silence. Une saisie en cours (numéro modifié par l'utilisateur) n'est pas écrasée.
+  const savedDpeNumber = client?.dpe_number || '';
+  useEffect(() => {
+    if (!hasInitialized) return;
+    setInitialData((prev) => (prev && prev.dpeNumber !== savedDpeNumber ? { ...prev, dpeNumber: savedDpeNumber } : prev));
+    setFormData((prev) => {
+      if (!prev || prev.dpeNumber === savedDpeNumber) return prev;
+      const enCoursDeSaisie = !isLocked && prev.dpeNumber !== (initialData?.dpeNumber ?? '');
+      return enCoursDeSaisie ? prev : { ...prev, dpeNumber: savedDpeNumber };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ne réagit qu'au numéro enregistré
+  }, [savedDpeNumber, hasInitialized]);
 
   const handleToggleLock = useCallback(() => {
     if (!isLocked) {
@@ -490,7 +505,7 @@ export default function ClientDetail() {
 
       {/* Contenu des onglets */}
       <div className="bg-white rounded-lg border border-secondary-200 shadow-card p-6">
-        {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} onInvestigate={() => setShowInvestigation(true)} savedLocation={{ lat: client?.latitude, lng: client?.longitude }} savedAddress={{ address: client?.address || '', postalCode: client?.postal_code || '', city: client?.city || '' }} savedDpeNumber={client?.dpe_number || ''} />}
+        {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} onInvestigate={() => setShowInvestigation(true)} savedLocation={{ lat: client?.latitude, lng: client?.longitude }} savedAddress={{ address: client?.address || '', postalCode: client?.postal_code || '', city: client?.city || '' }} client={client} onApplyDpe={handleApplyInvestigation} onCreateEquipment={handleCreateEquipmentFromDpe} />}
         {activeTab === 'contract' && <TabContrat clientId={id} orgId={organization?.id} userId={user?.id} client={client} />}
         {activeTab === 'devis-pl' && client.pennylane_account_number && <TabDevisPL clientId={id} orgId={organization?.id} />}
         {activeTab === 'devis-pl' && !client.pennylane_account_number && (
@@ -529,8 +544,6 @@ export default function ClientDetail() {
         client={client}
         isOpen={showInvestigation}
         onClose={() => setShowInvestigation(false)}
-        onApply={handleApplyInvestigation}
-        onCreateEquipment={handleCreateEquipmentFromDpe}
       />
 
       {/* Modale création RDV (pré-remplie avec les infos du client) */}

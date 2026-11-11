@@ -1,300 +1,62 @@
 /**
- * ClientInvestigationPanel.jsx — Donnée bâtiment publique d'un client
+ * ClientInvestigationPanel.jsx — Recherche dans les DPE publics (repli du bloc Logement)
  * ============================================================================
- * Panneau latéral ouvert par le bouton « Investiguer » de la fiche client.
- * Affiche les DPE trouvés à l'adresse (chauffage et son ancienneté, ECS, clim,
- * isolation, étiquette). Lecture seule, rien n'est écrit en base.
+ * Ouvert depuis le bloc Logement de la fiche (« Chercher dans les DPE publics ») quand le corpus MonsieurDPE ne
+ * trouve rien à l'adresse : interroge la BAN puis l'API publique de l'ADEME, à l'adresse puis dans le voisinage.
+ * Un DPE trouvé ici ne se rattache JAMAIS tout seul : « C'est ce logement » le rattache à la main (origine
+ * `choisi`, mention « voisinage » s'il vient d'un rayon), et la carte de la fiche est alors relue dans le corpus.
  *
- * Une adresse peut porter PLUSIEURS logements (immeuble) : on les liste tous,
- * on n'en élit aucun.
+ * Une adresse peut porter PLUSIEURS logements (immeuble) : on les liste tous, on n'en élit aucun.
+ * Spec : docs/superpowers/specs/2026-11-12-logement-monsieurdpe-fiche-client-design.md §9.
  * ============================================================================
  */
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  X, Loader2, Flame, Droplets, Snowflake, Wind, Home, AlertCircle,
-  RefreshCw, MapPin, Ruler, CalendarClock, ClipboardCheck, FileDown, Radius,
-  ChevronLeft, ChevronRight, Plus,
+  X, Loader2, Home, AlertCircle, RefreshCw, MapPin, Radius, ChevronLeft, ChevronRight, Check,
 } from 'lucide-react';
 import { useClientInvestigation } from '@hooks/useClientInvestigation';
-import { useOrgSettings } from '@hooks/useOrgSettings';
-import { logger } from '@/lib/logger';
-import { telechargerSyntheseDpe } from './dpeSyntheseExport';
+import { useAuth } from '@contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
+import { useDpeLien } from '@hooks/useDpeLien';
+import { messageErreurDpeLien } from '@lib/dpeLien';
 import { DpeNeighbourhoodMap } from './DpeNeighbourhoodMap';
-import {
-  isDpeExpired, toClientPatch, buildHeatLossBreakdown, buildCostBreakdown, assessMatch,
-  buildEquipmentDrafts, NEARBY_RADII_M,
-} from '@/lib/dpeApi';
-import { formatDateShortFR, formatEuro } from '@/lib/utils';
+import { DpeLogementCard } from './DpeLogementCard';
+import { assessMatch, NEARBY_RADII_M } from '@/lib/dpeApi';
 
-/**
- * Échelle bleu → ambre, jamais rouge/vert (convention deutan du projet, cf.
- * Thermique R12 / Solaire). La lettre reste affichée : la couleur ne porte
- * jamais l'information seule.
- */
-const DPE_TONE = {
-  A: 'bg-blue-100 text-blue-800 border-blue-200',
-  B: 'bg-blue-100 text-blue-800 border-blue-200',
-  C: 'bg-sky-100 text-sky-800 border-sky-200',
-  D: 'bg-secondary-100 text-secondary-700 border-secondary-200',
-  E: 'bg-amber-100 text-amber-800 border-amber-200',
-  F: 'bg-amber-200 text-amber-900 border-amber-300',
-  G: 'bg-amber-300 text-amber-950 border-amber-400',
-};
-
-function DpeBadge({ letter }) {
-  if (!letter) return null;
-  const tone = DPE_TONE[letter.toUpperCase()] || 'bg-secondary-100 text-secondary-700 border-secondary-200';
-  return (
-    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md border text-sm font-bold ${tone}`}>
-      {letter.toUpperCase()}
-    </span>
-  );
-}
-
-function Line({ icon: Icon, label, value }) {
-  if (!value) return null;
-  return (
-    <div className="flex items-start gap-2 text-sm">
-      <Icon className="w-4 h-4 mt-0.5 shrink-0 text-secondary-400" />
-      <span className="text-secondary-500 shrink-0">{label}</span>
-      <span className="text-secondary-800 font-medium">{value}</span>
-    </div>
-  );
-}
-
-function InsulationRow({ record }) {
-  const items = [
-    ['Murs', record.insulationWalls],
-    ['Menuiseries', record.insulationWindows],
-    ['Toiture', record.insulationRoof],
-    ['Enveloppe', record.insulationEnvelope],
-  ].filter(([, v]) => v);
-
-  if (items.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap gap-1.5 pt-1">
-      {items.map(([label, value]) => (
-        <span
-          key={label}
-          className="px-2 py-0.5 text-xs rounded-md bg-secondary-50 border border-secondary-200 text-secondary-600"
-        >
-          {label} · <span className="font-medium text-secondary-800">{value}</span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Répartition des déperditions. Barres en ambre (palette deutan du projet), et
- * le pourcentage est TOUJOURS écrit : la largeur ne porte jamais l'information
- * seule. Largeur = part réelle, pas normalisée sur le poste le plus lourd,
- * pour qu'un 62 % se lise bien comme 62 % de la piste.
- */
-function HeatLossBars({ record }) {
-  const posts = buildHeatLossBreakdown(record);
-  if (posts.length === 0) return null;
-
-  return (
-    <div className="pt-2.5 border-t border-secondary-100">
-      <p className="text-xs font-medium text-secondary-500 mb-2">
-        Où part la chaleur
-        {record.ubat && (
-          <span className="font-normal text-secondary-400"> · Ubat {record.ubat} W/m²·K</span>
-        )}
-      </p>
-      <div className="space-y-1">
-        {posts.map((p) => (
-          <div key={p.key} className="flex items-center gap-2">
-            <span className="w-32 shrink-0 text-xs text-secondary-600">{p.label}</span>
-            <div className="flex-1 h-2 bg-secondary-100 rounded-full overflow-hidden">
-              <div className="h-full bg-amber-400 rounded-full" style={{ width: `${p.share}%` }} />
-            </div>
-            <span className="w-9 shrink-0 text-right text-xs font-medium text-secondary-800">
-              {Math.round(p.share)}%
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Ventilation du coût annuel par usage. */
-function CostBreakdown({ record }) {
-  const items = buildCostBreakdown(record);
-  if (items.length === 0) return null;
-
-  return (
-    <div className="pt-2.5 border-t border-secondary-100">
-      <p className="text-xs font-medium text-secondary-500 mb-1.5">
-        Coût annuel
-        {record.costs?.total && (
-          <span className="text-secondary-800"> · {formatEuro(record.costs.total)}</span>
-        )}
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        {items.map((i) => (
-          <span
-            key={i.key}
-            className="px-2 py-0.5 text-xs rounded-md bg-secondary-50 border border-secondary-200 text-secondary-600"
-          >
-            {i.label} · <span className="font-medium text-secondary-800">{formatEuro(i.euros)}</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Équipements que le DPE permet de recenser. Le clic ouvre la modale d'ajout
- * pré-remplie dans l'onglet Équipements — **rien n'est créé sans validation**,
- * la donnée peut dater de plusieurs années.
- */
-function EquipmentDrafts({ record, onCreate }) {
-  const drafts = buildEquipmentDrafts(record);
-  if (drafts.length === 0 || !onCreate) return null;
-
-  return (
-    <div className="pt-2.5 border-t border-secondary-100">
-      <p className="text-xs font-medium text-secondary-500 mb-1.5">
-        Équipements identifiés — à recenser dans la fiche
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        {drafts.map((d) => (
-          <button
-            key={d.key}
-            onClick={() => onCreate(d)}
-            className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-md border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
-            title={`${d.source} — ouvre la modale d’ajout pré-remplie`}
-          >
-            <Plus className="w-3 h-3" />
-            {d.label}
-            {d.installationYear ? ` · ${d.installationYear}` : ''}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Libellés des champs de la fiche que ce DPE peut renseigner. */
-const PATCH_LABELS = { dpeNumber: 'n° DPE', surface: 'surface', housingType: 'type' };
-
-function RecordCard({ record, onApply, onExport, exportingId, matchMode, onCreateEquipment, clientAddress }) {
-  const expired = isDpeExpired(record);
-  const patch = toClientPatch(record);
-  const fillable = Object.keys(patch);
-  const isExporting = exportingId === record.id;
+function RecordCard({ record, matchMode, clientAddress, onChoose, choosing, chosenNumber }) {
   const match = assessMatch(record, { matchMode, clientAddress });
-
-  return (
-    <div className="rounded-xl border border-secondary-200 bg-white p-4 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <DpeBadge letter={record.dpeLabel} />
-          <span className="text-sm font-semibold text-secondary-900">
-            {record.surface ? `${record.surface} m²` : 'Surface inconnue'}
-          </span>
-          {record.buildingType && (
-            <span className="text-xs text-secondary-500">{record.buildingType}</span>
-          )}
-          {record.year && (
-            <span className="text-xs text-secondary-500">· construit en {record.year}</span>
-          )}
-        </div>
-        {record.distanceM > 0 && (
-          <span className="text-xs text-secondary-400 shrink-0">à {record.distanceM} m</span>
-        )}
-      </div>
-
-      {/* Adresse telle qu'écrite par le diagnostiqueur : c'est CE texte qu'il faut
-          comparer à la fiche. L'ADEME rattache parfois « Impasse de Laborie » à
-          « Impasse de la Borie » — deux rues différentes, même identifiant BAN. */}
+  const entete = (
+    <>
+      {/* Adresse telle qu'écrite par le diagnostiqueur : c'est CE texte qu'il faut comparer à la fiche. */}
       {record.rawAddress && (
         <p className="text-xs text-secondary-500 -mt-1">
           Adresse au diagnostic : <span className="text-secondary-700">{record.rawAddress}</span>
         </p>
       )}
-
       {match.level === 'a_verifier' && (
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
           Rattachement à vérifier — {match.reason}
           {Number.isFinite(record.banScore) && ` (indice ${record.banScore})`}.
-          Comparez l’adresse ci-dessus à celle de la fiche avant d’exploiter ces données.
+          Comparez l’adresse ci-dessus à celle de la fiche avant de choisir ce logement.
         </p>
       )}
-
-      <div className="space-y-1.5">
-        <Line
-          icon={Flame}
-          label="Chauffage"
-          value={
-            record.heatingGenerator
-              ? `${record.heatingGenerator}${record.heatingEnergy ? ` — ${record.heatingEnergy}` : ''}`
-              : record.heatingEnergy
-          }
-        />
-        <Line icon={Droplets} label="Eau chaude" value={record.ecsGenerator || record.ecsInstallation} />
-        <Line icon={Snowflake} label="Froid" value={record.coolingPeriod} />
-        <Line icon={Wind} label="Ventilation" value={record.ventilation} />
-        <Line
-          icon={Ruler}
-          label="Conso"
-          value={record.consoPerM2 ? `${Math.round(record.consoPerM2)} kWh/m²/an` : null}
-        />
-      </div>
-
-      <EquipmentDrafts record={record} onCreate={onCreateEquipment} />
-      <InsulationRow record={record} />
-      <HeatLossBars record={record} />
-      <CostBreakdown record={record} />
-
-      <div className="flex items-center justify-between gap-3 pt-2 border-t border-secondary-100">
-        {record.dpeDate ? (
-          <span className="flex items-center gap-1.5 text-xs text-secondary-400">
-            <CalendarClock className="w-3 h-3 shrink-0" />
-            DPE du {formatDateShortFR(record.dpeDate)}
-            {expired === true && <span className="text-amber-700 font-medium">· périmé</span>}
-          </span>
-        ) : (
-          <span />
-        )}
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          {onExport && (
-            <button
-              onClick={() => onExport(record)}
-              disabled={isExporting}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-secondary-700 bg-secondary-100 hover:bg-secondary-200 rounded-lg transition-colors disabled:opacity-50"
-              title="Générer le bilan énergétique à remettre au client (PDF brandé)"
-            >
-              {isExporting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <FileDown className="w-3.5 h-3.5" />
-              )}
-              Synthèse client
-            </button>
-          )}
-          {fillable.length > 0 && onApply && (
-            <button
-              onClick={() => onApply(patch)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
-              title={`Renseigne ${fillable.map((k) => PATCH_LABELS[k]).join(', ')} dans la fiche`}
-            >
-              <ClipboardCheck className="w-3.5 h-3.5" />
-              Renseigner la fiche
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+    </>
   );
+  const dejaChoisi = Boolean(record.dpeNumber) && record.dpeNumber === chosenNumber;
+  const actions = onChoose && record.dpeNumber ? (
+    <button
+      type="button"
+      onClick={() => onChoose(record, matchMode === 'proximity')}
+      disabled={choosing || dejaChoisi}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 transition-colors"
+    >
+      {choosing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+      {dejaChoisi ? 'Rattaché à la fiche' : 'C’est ce logement'}
+    </button>
+  ) : null;
+  return <DpeLogementCard record={record} entete={entete} actions={actions} />;
 }
 
 function EmptyState({ icon: Icon, title, children }) {
@@ -310,9 +72,9 @@ function EmptyState({ icon: Icon, title, children }) {
 }
 
 function Body({
-  result, isLoading, hasAddress, onRetry, onApply, onExport, exportingId,
+  result, isLoading, hasAddress, onRetry,
   onSearchNearby, nearbySearched, selectedId, onSelect, onStep,
-  nearbyRadius, onRadiusChange, onCreateEquipment, clientAddress,
+  nearbyRadius, onRadiusChange, clientAddress, onChoose, choosing, chosenNumber,
 }) {
   if (!hasAddress) {
     return (
@@ -371,8 +133,8 @@ function Body({
               Chercher dans le voisinage
             </button>
             <span className="block mt-2 text-xs text-secondary-400">
-              Les DPE trouvés seront ceux des logements alentour, pas celui de ce
-              client. À n’utiliser que pour se faire une idée du bâti du secteur.
+              Les DPE trouvés seront ceux des logements alentour : n’en rattachez un que si
+              vous savez que c’est bien le logement du client (adresse mal saisie, lieu-dit).
             </span>
           </>
         )}
@@ -385,8 +147,8 @@ function Body({
       {result.matchMode === 'proximity' && (
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           <span className="font-semibold">Ce ne sont PAS les DPE de ce client.</span> Aucun
-          diagnostic n’existe à son adresse ; voici ceux des logements alentour, pour se faire
-          une idée du bâti du secteur. La carte de chaque fiche montre d’où vient le diagnostic.
+          diagnostic n’existe à son adresse ; voici ceux des logements alentour. N’en rattachez un
+          que si vous savez que c’est bien son logement.
         </p>
       )}
       {/* Voisinage : la carte porte la sélection. Plusieurs DPE peuvent exister
@@ -466,12 +228,11 @@ function Body({
               <RecordCard
                 key={record.id}
                 record={record}
-                onApply={onApply}
-                onExport={onExport}
-                exportingId={exportingId}
                 matchMode={result.matchMode}
-                onCreateEquipment={onCreateEquipment}
                 clientAddress={clientAddress}
+                onChoose={onChoose}
+                choosing={choosing}
+                chosenNumber={chosenNumber}
               />
             ))}
         </>
@@ -487,12 +248,11 @@ function Body({
             <RecordCard
               key={record.id || i}
               record={record}
-              onApply={onApply}
-              onExport={onExport}
-              exportingId={exportingId}
               matchMode={result.matchMode}
-              onCreateEquipment={onCreateEquipment}
               clientAddress={clientAddress}
+              onChoose={onChoose}
+              choosing={choosing}
+              chosenNumber={chosenNumber}
             />
           ))}
         </>
@@ -510,13 +270,14 @@ function Body({
   );
 }
 
-export function ClientInvestigationPanel({ client, isOpen, onClose, onApply, onCreateEquipment }) {
+export function ClientInvestigationPanel({ client, isOpen, onClose }) {
   const {
     result, isLoading, hasAddress, refetch, tally,
     includeNearby, searchNearby, nearbyRadius, setNearbyRadius,
   } = useClientInvestigation(client, { enabled: isOpen });
-  const { settings } = useOrgSettings();
-  const [exportingId, setExportingId] = useState(null);
+  const { organization } = useAuth();
+  const { can } = useCanAccess();
+  const { ligne, choisir, enCours } = useDpeLien({ orgId: organization?.id, clientId: client?.id, actif: isOpen });
   const [pickedId, setPickedId] = useState(null);
 
   // À défaut de choix explicite sur la carte, le plus proche fait foi.
@@ -531,15 +292,14 @@ export function ClientInvestigationPanel({ client, isOpen, onClose, onApply, onC
     setPickedId(records[next].id);
   };
 
-  const handleExport = async (record) => {
-    setExportingId(record.id);
+  // Rattachement À LA MAIN d'un DPE trouvé ici : la carte de la fiche est relue dans le corpus par l'edge.
+  const handleChoose = async (record, voisinage) => {
     try {
-      await telechargerSyntheseDpe({ record, client, settings });
-    } catch (err) {
-      logger.error('[investigation] génération de la synthèse impossible', err);
-      toast.error('Impossible de générer la synthèse');
-    } finally {
-      setExportingId(null);
+      await choisir({ numero: record.dpeNumber, voisinage });
+      toast.success(`DPE ${record.dpeNumber} rattaché à la fiche`);
+      onClose();
+    } catch (e) {
+      toast.error(messageErreurDpeLien(e));
     }
   };
 
@@ -562,7 +322,7 @@ export function ClientInvestigationPanel({ client, isOpen, onClose, onApply, onC
         <header className="px-5 py-4 bg-white border-b border-secondary-200">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-base font-semibold text-secondary-900">Investigation bâtiment</h2>
+              <h2 className="text-base font-semibold text-secondary-900">Recherche dans les DPE publics</h2>
               <p className="mt-0.5 text-sm text-secondary-500 truncate">
                 {result?.ban?.label || [client?.address, client?.postal_code, client?.city].filter(Boolean).join(' ') || '—'}
               </p>
@@ -589,9 +349,6 @@ export function ClientInvestigationPanel({ client, isOpen, onClose, onApply, onC
             isLoading={isLoading}
             hasAddress={hasAddress}
             onRetry={refetch}
-            onApply={onApply}
-            onExport={handleExport}
-            exportingId={exportingId}
             onSearchNearby={searchNearby}
             nearbySearched={includeNearby}
             selectedId={selectedId}
@@ -600,7 +357,9 @@ export function ClientInvestigationPanel({ client, isOpen, onClose, onApply, onC
             nearbyRadius={nearbyRadius}
             onRadiusChange={setNearbyRadius}
             clientAddress={client}
-            onCreateEquipment={onCreateEquipment}
+            onChoose={can('clients', 'edit') ? handleChoose : null}
+            choosing={enCours}
+            chosenNumber={ligne?.dpe_number || null}
           />
         </div>
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Phone, MapPin, Home, FileText, ExternalLink, Link2, X, Search, Loader2, UserCheck, Users, Plus, ScanSearch } from 'lucide-react';
+import { User, Phone, MapPin, Home, FileText, ExternalLink, Link2, X, Search, Loader2, UserCheck, Users, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
@@ -8,7 +8,7 @@ import { CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@services/client
 import { useLinkedClients, useClientSearch } from '@hooks/useClients';
 import { ClientModal } from '@/apps/artisan/components/clients/ClientModal';
 import { ClientLocationMap } from '@/apps/artisan/components/clients/ClientLocationMap';
-import { ClientDpeLinkPanel } from '@/apps/artisan/components/clients/ClientDpeLinkPanel';
+import { ClientLogementDpe } from '@/apps/artisan/components/clients/ClientLogementDpe';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { getOrgHeadquarters } from '@lib/territoire-config';
 
@@ -296,7 +296,7 @@ function LinkedClientsSection({ clientId, orgId, isLocked }) {
 // COMPOSANT PRINCIPAL — TabInfo
 // ============================================================================
 
-export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onInvestigate, savedLocation, savedAddress, savedDpeNumber }) => {
+export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onInvestigate, savedLocation, savedAddress, client, onApplyDpe, onCreateEquipment }) => {
   const u = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }));
   const { settings } = useOrgSettings();
   const siege = getOrgHeadquarters(settings);
@@ -413,17 +413,6 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onIn
             <Home className="w-4 h-4 text-secondary-500" />
             Logement
           </h3>
-          {onInvestigate && (
-            <button
-              type="button"
-              onClick={onInvestigate}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-secondary-700 bg-secondary-100 hover:bg-secondary-200 rounded-lg transition-colors"
-              title="Interroger la donnée bâtiment publique (BAN + DPE) pour cette adresse"
-            >
-              <ScanSearch className="w-3.5 h-3.5" />
-              Investiguer
-            </button>
-          )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField label="Type">
@@ -452,13 +441,14 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onIn
             </div>
           </FormField>
         </div>
-        {/* Lien MonsieurDPE : ne rend rien si le module n'est pas ouvert pour l'organisation. */}
-        <ClientDpeLinkPanel
-          clientId={clientId}
-          savedDpeNumber={savedDpeNumber || ''}
-          formDpeNumber={formData.dpeNumber || ''}
-          adresseComplete={!!(savedAddress?.address?.trim() && (savedAddress?.postalCode?.trim() || savedAddress?.city?.trim()))}
-          onDpeNumberSaved={(numero) => u('dpeNumber', numero)}
+        {/* Logement MonsieurDPE : DPE rattaché, carte du logement, rapport au client. Rien si le module est fermé. */}
+        <ClientLogementDpe
+          client={client}
+          formHousingType={formData.housingType}
+          formSurface={formData.surface}
+          onApply={onApplyDpe}
+          onCreateEquipment={onCreateEquipment}
+          onRechercherVoisinage={onInvestigate}
         />
       </section>
 

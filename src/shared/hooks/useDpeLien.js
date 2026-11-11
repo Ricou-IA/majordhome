@@ -2,60 +2,89 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dpeLienService } from '@services/dpeLien.service';
 import { unwrapResult } from '@lib/serviceHelpers';
 import { numeroDpeValide } from '@lib/dpeLien';
-import { dpeLienKeys } from './cacheKeys';
+import { clientKeys, dpeLienKeys } from './cacheKeys';
 
 /**
- * Lien MonsieurDPE sur la fiche client.
+ * Logement MonsieurDPE d'un client : la ligne `client_dpe` (DPE rattaché + carte), l'accès au rapport, et les gestes.
  *
- * - `acces` : l'accès au rapport complet déjà émis pour ce numéro (lecture, tout membre) ;
- * - `verification` : le numéro est-il dans le corpus ? Interrogé seulement si `peutVerifier` (droit clients.edit)
- *   et qu'aucun accès n'existe encore — un accès émis prouve déjà que le numéro est connu ;
- * - `chercher` / `ouvrir` : mutations qui REJETTENT avec le code d'erreur de l'edge function en `message`.
+ * Toute mutation qui rend une ligne met à jour le cache de la ligne ET `clients.dpe_number` dans le cache de la
+ * fiche (l'edge l'a écrit en base dans la même transaction) : sans ça, la fiche verrait un écart entre son numéro
+ * et la ligne et redemanderait une actualisation inutile. Les mutations REJETTENT avec le code d'erreur de l'edge
+ * en `message` (contrat unwrapResult).
  *
- * @param {{ orgId?: string, clientId?: string, dpeNumber?: string, actif?: boolean, peutVerifier?: boolean }} p
+ * @param {{ orgId?: string, clientId?: string, actif?: boolean }} p
  */
-export function useDpeLien({ orgId, clientId, dpeNumber, actif = true, peutVerifier = false }) {
+export function useDpeLien({ orgId, clientId, actif = true }) {
   const queryClient = useQueryClient();
-  const numero = typeof dpeNumber === 'string' ? dpeNumber.trim() : '';
-  const numeroOk = numeroDpeValide(numero);
+  const enabled = !!orgId && !!clientId && actif;
+
+  const ligneQuery = useQuery({
+    queryKey: dpeLienKeys.client(orgId, clientId),
+    queryFn: () => unwrapResult(dpeLienService.getClientDpe(orgId, clientId)),
+    enabled,
+    staleTime: 60_000,
+  });
+  const ligne = ligneQuery.data ?? null;
+  const numero = (ligne?.dpe_number || '').trim();
 
   const accesQuery = useQuery({
     queryKey: dpeLienKeys.acces(orgId, numero),
     queryFn: () => unwrapResult(dpeLienService.getAcces(orgId, numero)),
-    enabled: !!orgId && actif && numeroOk,
+    enabled: enabled && numeroDpeValide(numero),
     staleTime: 5 * 60_000,
   });
 
-  const verificationQuery = useQuery({
-    queryKey: dpeLienKeys.verification(orgId, numero),
-    queryFn: () => unwrapResult(dpeLienService.verifier(orgId, numero)),
-    enabled: !!orgId && actif && numeroOk && peutVerifier && accesQuery.isSuccess && !accesQuery.data,
-    staleTime: 60 * 60_000,
-    retry: false,
+  const appliquerLigne = (nouvelle) => {
+    if (!nouvelle || typeof nouvelle !== 'object' || !('client_id' in nouvelle)) return;
+    queryClient.setQueryData(dpeLienKeys.client(orgId, clientId), nouvelle);
+    queryClient.setQueryData(clientKeys.detail(orgId, clientId), (old) =>
+      old?.data ? { ...old, data: { ...old.data, dpe_number: nouvelle.dpe_number ?? null } } : old);
+    queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
+  };
+
+  const rattacher = useMutation({
+    mutationFn: () => unwrapResult(dpeLienService.rattacher(orgId, clientId)),
+    onSuccess: appliquerLigne,
+  });
+  const choisir = useMutation({
+    mutationFn: ({ numero, voisinage = false }) => unwrapResult(dpeLienService.choisir(orgId, clientId, { numero, voisinage })),
+    onSuccess: appliquerLigne,
+  });
+  const detacher = useMutation({
+    mutationFn: () => unwrapResult(dpeLienService.detacher(orgId, clientId)),
+    onSuccess: appliquerLigne,
+  });
+  const actualiser = useMutation({
+    mutationFn: () => unwrapResult(dpeLienService.actualiser(orgId, clientId)),
+    onSuccess: appliquerLigne,
   });
 
-  const chercherMutation = useMutation({
-    mutationFn: () => unwrapResult(dpeLienService.chercher(orgId, clientId)),
+  const ouvrir = useMutation({
+    mutationFn: (extra) => unwrapResult(dpeLienService.ouvrir(orgId, clientId, extra)),
+    onSuccess: (data) => {
+      if (data?.numero) queryClient.invalidateQueries({ queryKey: dpeLienKeys.acces(orgId, data.numero) });
+    },
   });
-
-  const ouvrirMutation = useMutation({
-    mutationFn: (options) => unwrapResult(dpeLienService.ouvrir(orgId, clientId, options)),
+  const envoyer = useMutation({
+    mutationFn: () => unwrapResult(dpeLienService.envoyer(orgId, clientId)),
     onSuccess: (data) => {
       if (data?.numero) queryClient.invalidateQueries({ queryKey: dpeLienKeys.acces(orgId, data.numero) });
     },
   });
 
   return {
+    ligne,
+    ligneChargee: ligneQuery.isSuccess,
+    ligneErreur: ligneQuery.isError,
     acces: accesQuery.data ?? null,
-    accesEnCours: accesQuery.isLoading,
-    accesErreur: accesQuery.isError,
-    verification: verificationQuery.data ?? null,
-    verificationErreur: verificationQuery.error ?? null,
-    isVerifying: verificationQuery.isFetching,
-    reverifier: verificationQuery.refetch,
-    chercher: chercherMutation.mutateAsync,
-    isSearching: chercherMutation.isPending,
-    ouvrir: ouvrirMutation.mutateAsync,
-    isOpening: ouvrirMutation.isPending,
+    rattacher: rattacher.mutateAsync,
+    choisir: choisir.mutateAsync,
+    detacher: detacher.mutateAsync,
+    actualiser: actualiser.mutateAsync,
+    ouvrir: ouvrir.mutateAsync,
+    envoyer: envoyer.mutateAsync,
+    enCours: rattacher.isPending || choisir.isPending || detacher.isPending || actualiser.isPending,
+    isOpening: ouvrir.isPending,
+    isSending: envoyer.isPending,
   };
 }

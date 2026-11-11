@@ -71,13 +71,25 @@ test("projeterCandidat : ne laisse passer que les champs lus par l'écran", () =
 });
 
 // --- Refonte 2026-11-12 : décision de rattachement automatique ------------------------------------------------
-import { decisionRattachement, SCORE_GEOCODAGE_MIN, TYPES_GEOCODAGE_ACCEPTES, FIABILITES_BDNB_ACCEPTEES } from '../supabase/functions/dpe-lien/regles.js';
+import { decisionRattachement, SCORE_GEOCODAGE_MIN, TYPES_GEOCODAGE_ACCEPTES, FIABILITES_BDNB_ACCEPTEES, RATTACHEMENT_AUTO_ACTIF } from '../supabase/functions/dpe-lien/regles.js';
 
 const GEO = { score: Math.max(SCORE_GEOCODAGE_MIN, 0.95), type: TYPES_GEOCODAGE_ACCEPTES[0], cle_ban: '31570_0080_00423' };
 const CAND = (o = {}) => ({ identifiant_dpe: '2631E0482288Y', date_etablissement_dpe: '2026-02-18', etiquette_dpe: 'A',
   surface_habitable_logement: 114, type_batiment: 'dpe maison individuelle', fiabilite_geocodage: FIABILITES_BDNB_ACCEPTEES[0], ...o });
 const MAISON = { dossier: { methode_application_dpe: 'dpe maison individuelle' }, composants: [{}] };
-const decide = (o) => decisionRattachement({ geocodage: GEO, candidats: [CAND()], dossierUnique: MAISON, ecartes: [], ...o });
+const decide = (o) => decisionRattachement({ geocodage: GEO, candidats: [CAND()], dossierUnique: MAISON, ecartes: [], autoActif: true, ...o });
+
+test('decisionRattachement : automatique coupé ⇒ le DPE unique et sûr est PROPOSÉ, pas rattaché', () => {
+  const d = decide({ autoActif: false });
+  assert.equal(d.etat, 'candidats');
+  assert.equal(d.numero, undefined);
+  assert.equal(d.candidats.length, 1);
+});
+
+test('decisionRattachement : sans option, la constante RATTACHEMENT_AUTO_ACTIF décide', () => {
+  const d = decisionRattachement({ geocodage: GEO, candidats: [CAND()], dossierUnique: MAISON, ecartes: [] });
+  assert.equal(d.etat, RATTACHEMENT_AUTO_ACTIF ? 'rattache' : 'candidats');
+});
 
 test('decisionRattachement : un seul DPE, tout est sûr ⇒ rattaché automatiquement', () => {
   assert.deepEqual(decide({}), { etat: 'rattache', numero: '2631E0482288Y', candidats: [projeterCandidat(CAND())] });
