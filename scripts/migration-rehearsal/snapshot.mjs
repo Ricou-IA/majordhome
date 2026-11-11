@@ -99,6 +99,10 @@ const FUNCTIONS = [
   // 20261024_2 / 20261025_2 / 20261025_4 : catalogue fournisseur (écrivain unique) et secrets Vault par org — relus
   // de la prod pour répéter une migration qui ne fait que les remplacer (assert-catalogue-connexion.sql).
   'public.supplier_catalog_upsert(uuid, uuid, text, jsonb, jsonb)',
+  // 20261111_1 : relevé de pièces détachées — supplier_pieces_upsert enveloppe l'écrivain (qui appelle
+  // catalog_items_ensure), les modèles d'appareil dérivent leurs clés d'equipment_model_key
+  'public.catalog_items_ensure(uuid, integer)',
+  'majordhome.equipment_model_key(text)',
   // 20261026_1 : articles Majord'home — apply_mapping v3 remplace la v2, les RPC des rapprochements sont droppées par 20261026_2
   'public.supplier_catalog_apply_mapping(uuid)',
   'majordhome.catalog_item_merge_impl(uuid, uuid)', // 20261028_2 : recréée avec la reprise du code (dernière définition : 20261027_2)
