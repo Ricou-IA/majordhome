@@ -1,0 +1,2598 @@
+{
+ "source": "ATRIERS Invicta Net (1).pdf",
+ "titre": "TARIF NET ATRIERS 2026/2027 Valable du 01/03/2026 jusqu'au 28/02/2027 Edition dé",
+ "valable_du": "01/03/2026",
+ "valable_au": "28/02/2027",
+ "articles": [
+  {
+   "reference": "P942111",
+   "name": "OVE PLUG-IN Auto anthracite sortie fumées droite",
+   "gamme": "Poêles à Granulés Plug-In",
+   "ean": "3244339421113",
+   "marqueurs": [
+    "Exc"
+   ],
+   "taxes": [
+    1.75,
+    2.57
+   ],
+   "brut_ht": 4237.62,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 2754.45,
+   "public_ttc": 5085.0
+  },
+  {
+   "reference": "P942112",
+   "name": "OVE PLUG-IN Auto anthracite sortie fumées gauche",
+   "gamme": "Poêles à Granulés Plug-In",
+   "ean": "3244339421120",
+   "marqueurs": [
+    "Exc"
+   ],
+   "taxes": [
+    1.75,
+    2.57
+   ],
+   "brut_ht": 4237.62,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 2754.45,
+   "public_ttc": 5085.0
+  },
+  {
+   "reference": "P643598",
+   "name": "DAGLAN 9 Slim gris",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336435984",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.49
+   ],
+   "brut_ht": 1967.01,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1278.56,
+   "public_ttc": 2360.0
+  },
+  {
+   "reference": "P643597",
+   "name": "DAGLAN 9 Slim rouge",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336435977",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.49
+   ],
+   "brut_ht": 1967.01,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1278.56,
+   "public_ttc": 2360.0
+  },
+  {
+   "reference": "P941948",
+   "name": "LODI 6 étanche Wi-Fi SDC gris",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244339419486",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.85
+   ],
+   "brut_ht": 2762.5,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1795.63,
+   "public_ttc": 3315.0
+  },
+  {
+   "reference": "P941944",
+   "name": "LODI 6 étanche Wi-Fi SDC noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244339419448",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.85
+   ],
+   "brut_ht": 2762.5,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1795.63,
+   "public_ttc": 3315.0
+  },
+  {
+   "reference": "P941958",
+   "name": "LODI 8 étanche Wi-Fi SDC gris",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244339419585",
+   "marqueurs": [
+    "Exc"
+   ],
+   "taxes": [
+    1.75,
+    1.85
+   ],
+   "brut_ht": 2882.5,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1873.63,
+   "public_ttc": 3459.0
+  },
+  {
+   "reference": "P941954",
+   "name": "LODI 8 étanche Wi-Fi SDC noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244339419547",
+   "marqueurs": [
+    "Exc"
+   ],
+   "taxes": [
+    1.75,
+    1.85
+   ],
+   "brut_ht": 2882.5,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1873.63,
+   "public_ttc": 3459.0
+  },
+  {
+   "reference": "P941988",
+   "name": "LODI 8 étanche Wi-Fi gris",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244339419882",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.62
+   ],
+   "brut_ht": 2355.97,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1531.38,
+   "public_ttc": 2827.0
+  },
+  {
+   "reference": "P941984",
+   "name": "LODI 8 étanche Wi-Fi noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244339419844",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.62
+   ],
+   "brut_ht": 2355.97,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1531.38,
+   "public_ttc": 2827.0
+  },
+  {
+   "reference": "P941978",
+   "name": "LODI 10 Wi-Fi gris",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244339419783",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.44
+   ],
+   "brut_ht": 2211.41,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1437.42,
+   "public_ttc": 2654.0
+  },
+  {
+   "reference": "P941974",
+   "name": "LODI 10 Wi-Fi noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244339419745",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.44
+   ],
+   "brut_ht": 2211.41,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1437.42,
+   "public_ttc": 2654.0
+  },
+  {
+   "reference": "P644714",
+   "name": "MIRA 8 étanche Wi-Fi noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336447147",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.75,
+    1.64
+   ],
+   "brut_ht": 2665.83,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1732.79,
+   "public_ttc": 3199.0
+  },
+  {
+   "reference": "P644724",
+   "name": "MIRA 8 étanche Wi-Fi SDC noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336447246",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.75,
+    1.77
+   ],
+   "brut_ht": 2999.17,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1949.46,
+   "public_ttc": 3599.0
+  },
+  {
+   "reference": "P644704",
+   "name": "MIRA 10 Wi-Fi noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336447048",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.75,
+    1.64
+   ],
+   "brut_ht": 2415.83,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1570.29,
+   "public_ttc": 2899.0
+  },
+  {
+   "reference": "P644588",
+   "name": "MIRANO 8 Wi-Fi gris",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336445884",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.16
+   ],
+   "brut_ht": 975.46,
+   "remise_pct": 15.0,
+   "remise_deduite": true,
+   "net_ht": 829.14,
+   "public_ttc": 1171.0
+  },
+  {
+   "reference": "P641878",
+   "name": "NOLA 7 gris",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336418789",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.35
+   ],
+   "brut_ht": 1070.94,
+   "remise_pct": 15.0,
+   "remise_deduite": true,
+   "net_ht": 910.3,
+   "public_ttc": 1285.0
+  },
+  {
+   "reference": "P641874",
+   "name": "NOLA 7 noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336418741",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.35
+   ],
+   "brut_ht": 1070.94,
+   "remise_pct": 15.0,
+   "remise_deduite": true,
+   "net_ht": 910.3,
+   "public_ttc": 1285.0
+  },
+  {
+   "reference": "P641877",
+   "name": "NOLA 7 rouge",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336418772",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.35
+   ],
+   "brut_ht": 1070.94,
+   "remise_pct": 15.0,
+   "remise_deduite": true,
+   "net_ht": 910.3,
+   "public_ttc": 1285.0
+  },
+  {
+   "reference": "P641818",
+   "name": "NOLA 10 gris",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336418185",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.35
+   ],
+   "brut_ht": 1757.56,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1142.41,
+   "public_ttc": 2109.0
+  },
+  {
+   "reference": "P641814",
+   "name": "NOLA 10 noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336418147",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.35
+   ],
+   "brut_ht": 1757.56,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1142.41,
+   "public_ttc": 2109.0
+  },
+  {
+   "reference": "P644684",
+   "name": "NOLA STYLE 8 étanche Wi-Fi noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336446843",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.64
+   ],
+   "brut_ht": 1890.08,
+   "remise_pct": 20.7,
+   "remise_deduite": true,
+   "net_ht": 1498.83,
+   "public_ttc": 2268.0
+  },
+  {
+   "reference": "P641414",
+   "name": "TALO 11 canalisable noir",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336414149",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.88
+   ],
+   "brut_ht": 2083.39,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1354.2,
+   "public_ttc": 2500.0
+  },
+  {
+   "reference": "P641418",
+   "name": "TALO 11 canalisable gris",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244336414187",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.88
+   ],
+   "brut_ht": 2083.39,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1354.2,
+   "public_ttc": 2500.0
+  },
+  {
+   "reference": "C02270",
+   "name": "Kit Wi-Fi WINET pour Plug-IN auto, Daglan, Nola, Talo",
+   "gamme": "Poêles à Granulés Monoblocs",
+   "ean": "3244330920080",
+   "marqueurs": [],
+   "taxes": [
+    0.01
+   ],
+   "brut_ht": 186.22,
+   "remise_pct": 45.0,
+   "remise_deduite": false,
+   "net_ht": 102.42,
+   "public_ttc": 223.0
+  },
+  {
+   "reference": "P643714",
+   "name": "MELFI 8",
+   "gamme": "Insert à Granulés",
+   "ean": "3244336437148",
+   "marqueurs": [],
+   "taxes": [
+    1.75,
+    1.31
+   ],
+   "brut_ht": 2850.0,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1852.5,
+   "public_ttc": 3420.0
+  },
+  {
+   "reference": "P697002",
+   "name": "CHAISE SUPPORT pour insert MELFI 8",
+   "gamme": "Insert à Granulés",
+   "ean": "3244336970027",
+   "marqueurs": [],
+   "taxes": [
+    0.11
+   ],
+   "brut_ht": 299.29,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 194.54,
+   "public_ttc": 359.0
+  },
+  {
+   "reference": "C02237",
+   "name": "Kit AERATION pour insert MELFI 8",
+   "gamme": "Insert à Granulés",
+   "ean": "3244330920110",
+   "marqueurs": [],
+   "taxes": [
+    0.08
+   ],
+   "brut_ht": 455.72,
+   "remise_pct": 45.0,
+   "remise_deduite": false,
+   "net_ht": 250.65,
+   "public_ttc": 547.0
+  },
+  {
+   "reference": "P697003",
+   "name": "Kit GRILLE ENCADREMENT pour insert MELFI 8",
+   "gamme": "Insert à Granulés",
+   "ean": "3244336970034",
+   "marqueurs": [],
+   "taxes": [
+    0.08
+   ],
+   "brut_ht": 127.48,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 82.86,
+   "public_ttc": 153.0
+  },
+  {
+   "reference": "P697004",
+   "name": "TREMIE DE CHARGEMENT pour insert MELFI 8",
+   "gamme": "Insert à Granulés",
+   "ean": "3244336970041",
+   "marqueurs": [],
+   "taxes": [
+    0.3
+   ],
+   "brut_ht": 321.46,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 208.95,
+   "public_ttc": 386.0
+  },
+  {
+   "reference": "P610744",
+   "name": "ALCOR étanche",
+   "gamme": "Poêles à Bûches en Fonte Etanches",
+   "ean": "3244336107447",
+   "marqueurs": [
+    "(",
+    "Exc",
+    "F"
+   ],
+   "taxes": [
+    2.97
+   ],
+   "brut_ht": 3145.11,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 2044.32,
+   "public_ttc": 3774.0
+  },
+  {
+   "reference": "P610264",
+   "name": "ELO M étanche anthracite",
+   "gamme": "Poêles à Bûches en Fonte Etanches",
+   "ean": "3244336102640",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.65
+   ],
+   "brut_ht": 993.55,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 645.81,
+   "public_ttc": 1192.0
+  },
+  {
+   "reference": "P610334",
+   "name": "ALTARA 6 raccordable",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336103340",
+   "marqueurs": [
+    "(",
+    "N"
+   ],
+   "taxes": [
+    2.03
+   ],
+   "brut_ht": 2088.73,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1357.67,
+   "public_ttc": 2506.0
+  },
+  {
+   "reference": "P610344",
+   "name": "ALTARA 7 raccordable",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336103449",
+   "marqueurs": [],
+   "taxes": [
+    2.03
+   ],
+   "brut_ht": 1989.27,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1293.03,
+   "public_ttc": 2387.0
+  },
+  {
+   "reference": "P648144",
+   "name": "BRIO raccordable",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336481448",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.77
+   ],
+   "brut_ht": 1830.39,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1189.75,
+   "public_ttc": 2196.0
+  },
+  {
+   "reference": "P648124",
+   "name": "BRIO sur GRAND BANC raccordable",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336481240",
+   "marqueurs": [
+    "Exc"
+   ],
+   "taxes": [
+    2.25
+   ],
+   "brut_ht": 3514.83,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 2284.64,
+   "public_ttc": 4218.0
+  },
+  {
+   "reference": "P648125",
+   "name": "BRIO sur PETIT BANC raccordable",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336481257",
+   "marqueurs": [
+    "Exc"
+   ],
+   "taxes": [
+    2.18
+   ],
+   "brut_ht": 3098.76,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 2014.19,
+   "public_ttc": 3719.0
+  },
+  {
+   "reference": "P648114",
+   "name": "BRIO sur PIED raccordable",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336481141",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.07
+   ],
+   "brut_ht": 2026.63,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1317.31,
+   "public_ttc": 2432.0
+  },
+  {
+   "reference": "P916234",
+   "name": "CAROLO 7",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244339162344",
+   "marqueurs": [
+    "(",
+    "N"
+   ],
+   "taxes": [
+    1.58
+   ],
+   "brut_ht": 1038.11,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 674.77,
+   "public_ttc": 1246.0
+  },
+  {
+   "reference": "P916244",
+   "name": "CAROLO 8",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244339162443",
+   "marqueurs": [],
+   "taxes": [
+    1.58
+   ],
+   "brut_ht": 988.68,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 642.64,
+   "public_ttc": 1186.0
+  },
+  {
+   "reference": "P696200",
+   "name": "Kit RACCORDABILITE pour CAROLO",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336962008",
+   "marqueurs": [],
+   "taxes": [
+    0.08
+   ],
+   "brut_ht": 130.84,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 85.05,
+   "public_ttc": 157.0
+  },
+  {
+   "reference": "P616249",
+   "name": "CAROLO ZEN  raccordable",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336162491",
+   "marqueurs": [],
+   "taxes": [
+    1.67
+   ],
+   "brut_ht": 1142.59,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 742.68,
+   "public_ttc": 1371.0
+  },
+  {
+   "reference": "P648324",
+   "name": "DORSEN",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336483244",
+   "marqueurs": [
+    "(",
+    "Ex",
+    "N"
+   ],
+   "taxes": [
+    1.82
+   ],
+   "brut_ht": 1550.41,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1007.77,
+   "public_ttc": 1860.0
+  },
+  {
+   "reference": "P918064",
+   "name": "MANDOR",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244339180645",
+   "marqueurs": [],
+   "taxes": [
+    1.89
+   ],
+   "brut_ht": 1550.52,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1007.84,
+   "public_ttc": 1861.0
+  },
+  {
+   "reference": "P696200",
+   "name": "Kit RACCORDABILITE pour MANDOR",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336962008",
+   "marqueurs": [],
+   "taxes": [
+    0.08
+   ],
+   "brut_ht": 130.84,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 85.05,
+   "public_ttc": 157.0
+  },
+  {
+   "reference": "P648314",
+   "name": "MANDORIN 7",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336483145",
+   "marqueurs": [
+    "(",
+    "Exc",
+    "N"
+   ],
+   "taxes": [
+    1.77
+   ],
+   "brut_ht": 1479.93,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 961.95,
+   "public_ttc": 1776.0
+  },
+  {
+   "reference": "P648304",
+   "name": "MANDORIN 8",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336483046",
+   "marqueurs": [],
+   "taxes": [
+    1.77
+   ],
+   "brut_ht": 1409.46,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 916.15,
+   "public_ttc": 1691.0
+  },
+  {
+   "reference": "P696200",
+   "name": "Kit RACCORDABILITE pour MANDORIN",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336962008",
+   "marqueurs": [],
+   "taxes": [
+    0.08
+   ],
+   "brut_ht": 130.84,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 85.05,
+   "public_ttc": 157.0
+  },
+  {
+   "reference": "P914944",
+   "name": "ODE",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244339149444",
+   "marqueurs": [],
+   "taxes": [
+    2.51
+   ],
+   "brut_ht": 2260.09,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1469.06,
+   "public_ttc": 2712.0
+  },
+  {
+   "reference": "P696201",
+   "name": "Kit RACCORDABILITE pour ODE",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336962015",
+   "marqueurs": [],
+   "taxes": [
+    0.08
+   ],
+   "brut_ht": 102.0,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 66.3,
+   "public_ttc": 122.0
+  },
+  {
+   "reference": "P917044",
+   "name": "SIAM",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244339170448",
+   "marqueurs": [],
+   "taxes": [
+    1.88
+   ],
+   "brut_ht": 1063.03,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 690.97,
+   "public_ttc": 1276.0
+  },
+  {
+   "reference": "P696200",
+   "name": "Kit RACCORDABILITE pour SIAM",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336962008",
+   "marqueurs": [],
+   "taxes": [
+    0.08
+   ],
+   "brut_ht": 130.84,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 85.05,
+   "public_ttc": 157.0
+  },
+  {
+   "reference": "P648234",
+   "name": "WILSON 9 à POSER raccordable",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336482346",
+   "marqueurs": [],
+   "taxes": [
+    1.89
+   ],
+   "brut_ht": 1494.4,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 971.36,
+   "public_ttc": 1793.0
+  },
+  {
+   "reference": "P648254",
+   "name": "WILSON 9 sur BANC raccordable",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336482544",
+   "marqueurs": [],
+   "taxes": [
+    2.31
+   ],
+   "brut_ht": 1999.0,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1299.35,
+   "public_ttc": 2399.0
+  },
+  {
+   "reference": "P648244",
+   "name": "WILSON 9 sur PIED raccordable",
+   "gamme": "Poêles à Bûches en Fonte Raccordable",
+   "ean": "3244336482445",
+   "marqueurs": [],
+   "taxes": [
+    2.16
+   ],
+   "brut_ht": 1734.31,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1127.3,
+   "public_ttc": 2081.0
+  },
+  {
+   "reference": "P912904",
+   "name": "AARON double face à poser",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339129040",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.78
+   ],
+   "brut_ht": 2287.19,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1486.67,
+   "public_ttc": 2745.0
+  },
+  {
+   "reference": "P696131",
+   "name": "BANC de 1 M finition epoxy noir sable pour AARON",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336961315",
+   "marqueurs": [],
+   "taxes": [
+    0.89
+   ],
+   "brut_ht": 864.07,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 561.65,
+   "public_ttc": 1037.0
+  },
+  {
+   "reference": "P696128",
+   "name": "BANC de 1,6 M finition epoxy noir sable pour AARON",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336961285",
+   "marqueurs": [],
+   "taxes": [
+    1.07
+   ],
+   "brut_ht": 1076.88,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 699.97,
+   "public_ttc": 1292.0
+  },
+  {
+   "reference": "P916634",
+   "name": "ALTEA 7",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339166342",
+   "marqueurs": [
+    "(",
+    "N"
+   ],
+   "taxes": [
+    2.0
+   ],
+   "brut_ht": 1116.18,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 725.52,
+   "public_ttc": 1339.0
+  },
+  {
+   "reference": "P916644",
+   "name": "ALTEA 8",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339166441",
+   "marqueurs": [],
+   "taxes": [
+    2.0
+   ],
+   "brut_ht": 1063.03,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 690.97,
+   "public_ttc": 1276.0
+  },
+  {
+   "reference": "P916624",
+   "name": "ALTELYS",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339166243",
+   "marqueurs": [
+    "(",
+    "Ex",
+    "N"
+   ],
+   "taxes": [
+    1.92
+   ],
+   "brut_ht": 1169.33,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 760.06,
+   "public_ttc": 1403.0
+  },
+  {
+   "reference": "P610574",
+   "name": "ANEKI 6",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336105740",
+   "marqueurs": [
+    "(",
+    "Ex",
+    "N"
+   ],
+   "taxes": [
+    1.7
+   ],
+   "brut_ht": 1482.13,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 963.38,
+   "public_ttc": 1779.0
+  },
+  {
+   "reference": "P918644",
+   "name": "ANGOR",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339186449",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.3
+   ],
+   "brut_ht": 1650.71,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1072.96,
+   "public_ttc": 1981.0
+  },
+  {
+   "reference": "P611444",
+   "name": "ANTAYA",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336114445",
+   "marqueurs": [],
+   "taxes": [
+    2.82
+   ],
+   "brut_ht": 2403.63,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1562.36,
+   "public_ttc": 2884.0
+  },
+  {
+   "reference": "P645344",
+   "name": "ARATOS",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336453445",
+   "marqueurs": [],
+   "taxes": [
+    1.85
+   ],
+   "brut_ht": 1406.96,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 914.52,
+   "public_ttc": 1688.0
+  },
+  {
+   "reference": "P915144",
+   "name": "ARGOS",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339151447",
+   "marqueurs": [],
+   "taxes": [
+    2.54
+   ],
+   "brut_ht": 2525.51,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1641.58,
+   "public_ttc": 3031.0
+  },
+  {
+   "reference": "P917344",
+   "name": "BRADFORD anthracite",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339173449",
+   "marqueurs": [],
+   "taxes": [
+    2.51
+   ],
+   "brut_ht": 1645.31,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1069.45,
+   "public_ttc": 1974.0
+  },
+  {
+   "reference": "P917346",
+   "name": "BRADFORD email ivoire",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339173463",
+   "marqueurs": [],
+   "taxes": [
+    2.51
+   ],
+   "brut_ht": 2395.01,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1556.76,
+   "public_ttc": 2874.0
+  },
+  {
+   "reference": "P917347",
+   "name": "BRADFORD email rouge",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339173470",
+   "marqueurs": [],
+   "taxes": [
+    2.51
+   ],
+   "brut_ht": 2395.01,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1556.76,
+   "public_ttc": 2874.0
+  },
+  {
+   "reference": "P614744",
+   "name": "CASSINE",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336147443",
+   "marqueurs": [],
+   "taxes": [
+    1.55
+   ],
+   "brut_ht": 1103.65,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 717.37,
+   "public_ttc": 1324.0
+  },
+  {
+   "reference": "P615614",
+   "name": "CHAMANE 10",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336156148",
+   "marqueurs": [],
+   "taxes": [
+    2.4
+   ],
+   "brut_ht": 1550.52,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1007.84,
+   "public_ttc": 1861.0
+  },
+  {
+   "reference": "P613744",
+   "name": "CHÂTEL",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336137444",
+   "marqueurs": [],
+   "taxes": [
+    1.2
+   ],
+   "brut_ht": 838.2,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 544.83,
+   "public_ttc": 1006.0
+  },
+  {
+   "reference": "P912744",
+   "name": "ELTON",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339127442",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    3.15
+   ],
+   "brut_ht": 2354.86,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1530.66,
+   "public_ttc": 2826.0
+  },
+  {
+   "reference": "P610584",
+   "name": "EKINOR 6",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336105849",
+   "marqueurs": [
+    "(",
+    "Exc",
+    "N"
+   ],
+   "taxes": [
+    1.79
+   ],
+   "brut_ht": 1549.5,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1007.18,
+   "public_ttc": 1859.0
+  },
+  {
+   "reference": "P647954",
+   "name": "FIFTY PLUS ARCHE anthracite",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336479544",
+   "marqueurs": [],
+   "taxes": [
+    2.63
+   ],
+   "brut_ht": 2138.19,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1389.82,
+   "public_ttc": 2566.0
+  },
+  {
+   "reference": "P647956",
+   "name": "FIFTY PLUS ARCHE email ivoire",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336479568",
+   "marqueurs": [],
+   "taxes": [
+    2.63
+   ],
+   "brut_ht": 2566.59,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1668.28,
+   "public_ttc": 3080.0
+  },
+  {
+   "reference": "P647957",
+   "name": "FIFTY PLUS ARCHE  email rouge",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336479575",
+   "marqueurs": [],
+   "taxes": [
+    2.63
+   ],
+   "brut_ht": 2566.59,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1668.28,
+   "public_ttc": 3080.0
+  },
+  {
+   "reference": "P648054",
+   "name": "FIFTY PLUS PIED anthracite",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336480540",
+   "marqueurs": [],
+   "taxes": [
+    2.63
+   ],
+   "brut_ht": 2084.06,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1354.64,
+   "public_ttc": 2501.0
+  },
+  {
+   "reference": "P648056",
+   "name": "FIFTY PLUS PIED porte email ivoire",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336480564",
+   "marqueurs": [],
+   "taxes": [
+    2.63
+   ],
+   "brut_ht": 2512.46,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1633.1,
+   "public_ttc": 3015.0
+  },
+  {
+   "reference": "P648057",
+   "name": "FIFTY PLUS PIED porte email rouge",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336480571",
+   "marqueurs": [],
+   "taxes": [
+    2.63
+   ],
+   "brut_ht": 2512.46,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1633.1,
+   "public_ttc": 3015.0
+  },
+  {
+   "reference": "P615844",
+   "name": "GOMONT",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336158449",
+   "marqueurs": [],
+   "taxes": [
+    1.92
+   ],
+   "brut_ht": 1266.14,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 822.99,
+   "public_ttc": 1519.0
+  },
+  {
+   "reference": "P611044",
+   "name": "ITAYA",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336110447",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.81
+   ],
+   "brut_ht": 2227.6,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1447.94,
+   "public_ttc": 2673.0
+  },
+  {
+   "reference": "P610644",
+   "name": "IWAKI",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336106440",
+   "marqueurs": [],
+   "taxes": [
+    1.77
+   ],
+   "brut_ht": 1145.0,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 744.25,
+   "public_ttc": 1374.0
+  },
+  {
+   "reference": "P647844",
+   "name": "KAORI",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336478448",
+   "marqueurs": [],
+   "taxes": [
+    2.28
+   ],
+   "brut_ht": 1604.66,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1043.03,
+   "public_ttc": 1926.0
+  },
+  {
+   "reference": "P647849",
+   "name": "KAORI  ZEN",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336478493",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.3
+   ],
+   "brut_ht": 1732.02,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1125.81,
+   "public_ttc": 2078.0
+  },
+  {
+   "reference": "P610444",
+   "name": "KAZAN",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336104446",
+   "marqueurs": [],
+   "taxes": [
+    2.36
+   ],
+   "brut_ht": 1420.52,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 923.34,
+   "public_ttc": 1705.0
+  },
+  {
+   "reference": "P610443",
+   "name": "KAZAN GA",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336104439",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.43
+   ],
+   "brut_ht": 1631.78,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1060.66,
+   "public_ttc": 1958.0
+  },
+  {
+   "reference": "P610449",
+   "name": "KAZAN ZEN",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336104491",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.45
+   ],
+   "brut_ht": 1557.58,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1012.43,
+   "public_ttc": 1869.0
+  },
+  {
+   "reference": "P614544",
+   "name": "MAIRY",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336145449",
+   "marqueurs": [],
+   "taxes": [
+    1.61
+   ],
+   "brut_ht": 1203.84,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 782.5,
+   "public_ttc": 1445.0
+  },
+  {
+   "reference": "P613644",
+   "name": "MESNIL",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336136447",
+   "marqueurs": [],
+   "taxes": [
+    1.32
+   ],
+   "brut_ht": 946.55,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 615.26,
+   "public_ttc": 1136.0
+  },
+  {
+   "reference": "P917544",
+   "name": "MODENA anthracite",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339175443",
+   "marqueurs": [],
+   "taxes": [
+    2.55
+   ],
+   "brut_ht": 1596.54,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1037.75,
+   "public_ttc": 1916.0
+  },
+  {
+   "reference": "P917546",
+   "name": "MODENA email ivoire",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339175467",
+   "marqueurs": [],
+   "taxes": [
+    2.55
+   ],
+   "brut_ht": 2346.24,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1525.06,
+   "public_ttc": 2815.0
+  },
+  {
+   "reference": "P917547",
+   "name": "MODENA email rouge",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339175474",
+   "marqueurs": [],
+   "taxes": [
+    2.55
+   ],
+   "brut_ht": 2346.24,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1525.06,
+   "public_ttc": 2815.0
+  },
+  {
+   "reference": "P912944",
+   "name": "NELSON double face",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339129446",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    3.02
+   ],
+   "brut_ht": 2525.51,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1641.58,
+   "public_ttc": 3031.0
+  },
+  {
+   "reference": "P912034",
+   "name": "NOGAR",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339120344",
+   "marqueurs": [
+    "(",
+    "Exc",
+    "N"
+   ],
+   "taxes": [
+    1.52
+   ],
+   "brut_ht": 1260.41,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 819.27,
+   "public_ttc": 1512.0
+  },
+  {
+   "reference": "P912134",
+   "name": "NORIK 5",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339121341",
+   "marqueurs": [
+    "(",
+    "N"
+   ],
+   "taxes": [
+    1.56
+   ],
+   "brut_ht": 1203.12,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 782.03,
+   "public_ttc": 1444.0
+  },
+  {
+   "reference": "P912144",
+   "name": "NORIK 6",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339121440",
+   "marqueurs": [],
+   "taxes": [
+    1.56
+   ],
+   "brut_ht": 1145.83,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 744.79,
+   "public_ttc": 1375.0
+  },
+  {
+   "reference": "P610564",
+   "name": "OKINO 6",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336105641",
+   "marqueurs": [
+    "(",
+    "Ex",
+    "N"
+   ],
+   "taxes": [
+    1.68
+   ],
+   "brut_ht": 1414.76,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 919.59,
+   "public_ttc": 1698.0
+  },
+  {
+   "reference": "P610544",
+   "name": "OKINO 7",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336105443",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.68
+   ],
+   "brut_ht": 1347.39,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 875.8,
+   "public_ttc": 1617.0
+  },
+  {
+   "reference": "P614904",
+   "name": "OVATIO",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336149041",
+   "marqueurs": [],
+   "taxes": [
+    2.06
+   ],
+   "brut_ht": 1916.14,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1245.49,
+   "public_ttc": 2299.0
+  },
+  {
+   "reference": "P915044",
+   "name": "PHAROS 360°",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339150440",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.51
+   ],
+   "brut_ht": 2782.79,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1808.81,
+   "public_ttc": 3339.0
+  },
+  {
+   "reference": "P912804",
+   "name": "PRESTON à poser",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339128043",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.69
+   ],
+   "brut_ht": 2119.26,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1377.52,
+   "public_ttc": 2543.0
+  },
+  {
+   "reference": "P696131",
+   "name": "BANC de 1 M finition epoxy noir sable pour PRESTON",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336961315",
+   "marqueurs": [],
+   "taxes": [
+    0.89
+   ],
+   "brut_ht": 864.07,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 561.65,
+   "public_ttc": 1037.0
+  },
+  {
+   "reference": "P696128",
+   "name": "BANC de 1,6 M finition epoxy noir sable pour PRESTON",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336961285",
+   "marqueurs": [],
+   "taxes": [
+    1.07
+   ],
+   "brut_ht": 1076.88,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 699.97,
+   "public_ttc": 1292.0
+  },
+  {
+   "reference": "P914744",
+   "name": "SAMARA 5",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339147440",
+   "marqueurs": [
+    "(",
+    "N"
+   ],
+   "taxes": [
+    1.34
+   ],
+   "brut_ht": 1038.11,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 674.77,
+   "public_ttc": 1246.0
+  },
+  {
+   "reference": "P914844",
+   "name": "SAMARA 6",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339148447",
+   "marqueurs": [],
+   "taxes": [
+    1.34
+   ],
+   "brut_ht": 988.68,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 642.64,
+   "public_ttc": 1186.0
+  },
+  {
+   "reference": "P917244",
+   "name": "SEDAN L",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339172442",
+   "marqueurs": [],
+   "taxes": [
+    2.47
+   ],
+   "brut_ht": 1664.27,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1081.78,
+   "public_ttc": 1997.0
+  },
+  {
+   "reference": "P916044",
+   "name": "SEDAN M",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339160449",
+   "marqueurs": [],
+   "taxes": [
+    1.89
+   ],
+   "brut_ht": 1271.55,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 826.51,
+   "public_ttc": 1526.0
+  },
+  {
+   "reference": "P945044",
+   "name": "SEDAN S",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339450441",
+   "marqueurs": [],
+   "taxes": [
+    1.26
+   ],
+   "brut_ht": 1022.4,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 664.56,
+   "public_ttc": 1227.0
+  },
+  {
+   "reference": "P945034",
+   "name": "SEDORIA",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244339450342",
+   "marqueurs": [
+    "(",
+    "Ex",
+    "N"
+   ],
+   "taxes": [
+    1.26
+   ],
+   "brut_ht": 1124.64,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 731.02,
+   "public_ttc": 1350.0
+  },
+  {
+   "reference": "P619254",
+   "name": "SEVILLE 8 anthracite",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336192542",
+   "marqueurs": [],
+   "taxes": [
+    1.49
+   ],
+   "brut_ht": 905.92,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 588.85,
+   "public_ttc": 1087.0
+  },
+  {
+   "reference": "P619256",
+   "name": "SEVILLE 8 email ivoire",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336192566",
+   "marqueurs": [],
+   "taxes": [
+    1.49
+   ],
+   "brut_ht": 1655.62,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1076.15,
+   "public_ttc": 1987.0
+  },
+  {
+   "reference": "P611544",
+   "name": "SYMPHONIA",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336115442",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.99
+   ],
+   "brut_ht": 3080.7,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 2002.46,
+   "public_ttc": 3697.0
+  },
+  {
+   "reference": "P615344",
+   "name": "TIPI",
+   "gamme": "Poêles à Bûches en Fonte",
+   "ean": "3244336153444",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.15
+   ],
+   "brut_ht": 2544.45,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1653.89,
+   "public_ttc": 3053.0
+  },
+  {
+   "reference": "P648801",
+   "name": "BOREE",
+   "gamme": "Poêles à Bûches en Acier",
+   "ean": "3244336488010",
+   "marqueurs": [],
+   "taxes": [
+    1.17
+   ],
+   "brut_ht": 758.19,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 492.82,
+   "public_ttc": 910.0
+  },
+  {
+   "reference": "P648804",
+   "name": "CALCIAS 6 étanche raccordable",
+   "gamme": "Poêles à Bûches en Acier",
+   "ean": "3244336488041",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.18
+   ],
+   "brut_ht": 1986.25,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1291.06,
+   "public_ttc": 2384.0
+  },
+  {
+   "reference": "P948836",
+   "name": "NEOSEN PLUS raccordable",
+   "gamme": "Poêles à Bûches en Acier",
+   "ean": "3244339488369",
+   "marqueurs": [],
+   "taxes": [
+    1.86
+   ],
+   "brut_ht": 1268.3,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 824.4,
+   "public_ttc": 1522.0
+  },
+  {
+   "reference": "P948837",
+   "name": "NEOSEN PLUS 3V raccordable",
+   "gamme": "Poêles à Bûches en Acier",
+   "ean": "3244339488376",
+   "marqueurs": [],
+   "taxes": [
+    1.74
+   ],
+   "brut_ht": 1675.84,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1089.3,
+   "public_ttc": 2011.0
+  },
+  {
+   "reference": "P948838",
+   "name": "NEOSEN PLUS étanche raccordable",
+   "gamme": "Poêles à Bûches en Acier",
+   "ean": "3244339488383",
+   "marqueurs": [],
+   "taxes": [
+    1.92
+   ],
+   "brut_ht": 1986.89,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1291.48,
+   "public_ttc": 2384.0
+  },
+  {
+   "reference": "P696301",
+   "name": "ACCUMULATEUR pour poêle NEOSEN PLUS",
+   "gamme": "Poêles à Bûches en Acier",
+   "ean": "3244336963012",
+   "marqueurs": [],
+   "taxes": [
+    0.72
+   ],
+   "brut_ht": 731.34,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 475.37,
+   "public_ttc": 878.0
+  },
+  {
+   "reference": "P627372",
+   "name": "700 ANGLE vitre Droite avec Volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244336273722",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.52
+   ],
+   "brut_ht": 2082.5,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1353.63,
+   "public_ttc": 2499.0
+  },
+  {
+   "reference": "P627373",
+   "name": "700 ANGLE vitre Gauche avec Volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244336273739",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.52
+   ],
+   "brut_ht": 2082.5,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1353.63,
+   "public_ttc": 2499.0
+  },
+  {
+   "reference": "P927854",
+   "name": "700 DOUBLE FACE avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339278540",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.09
+   ],
+   "brut_ht": 1347.39,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 875.8,
+   "public_ttc": 1617.0
+  },
+  {
+   "reference": "P977002",
+   "name": "700 EOS raccordable (commande par 2)",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339770020",
+   "marqueurs": [],
+   "taxes": [
+    1.64
+   ],
+   "brut_ht": 524.29,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 340.79,
+   "public_ttc": 629.0
+  },
+  {
+   "reference": "P927093",
+   "name": "700 GRAND ANGLE avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339270933",
+   "marqueurs": [
+    "Exc"
+   ],
+   "taxes": [
+    2.0
+   ],
+   "brut_ht": 1320.31,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 858.2,
+   "public_ttc": 1584.0
+  },
+  {
+   "reference": "P699701A",
+   "name": "Grille 9701 pour foyer 700 grand angle",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244336997017",
+   "marqueurs": [],
+   "taxes": [
+    0.02
+   ],
+   "brut_ht": 46.05,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 29.93,
+   "public_ttc": 55.0
+  },
+  {
+   "reference": "P927095",
+   "name": "700 GRANDE VISION avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339270957",
+   "marqueurs": [],
+   "taxes": [
+    2.0
+   ],
+   "brut_ht": 1095.53,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 712.09,
+   "public_ttc": 1315.0
+  },
+  {
+   "reference": "P699701A",
+   "name": "Grille 9701 pour foyer 700 grande vision",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244336997017",
+   "marqueurs": [],
+   "taxes": [
+    0.02
+   ],
+   "brut_ht": 46.05,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 29.93,
+   "public_ttc": 55.0
+  },
+  {
+   "reference": "P677175",
+   "name": "700 OPTIMISE avec volet (commande par 2)",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244336771754",
+   "marqueurs": [],
+   "taxes": [
+    0.9
+   ],
+   "brut_ht": 454.25,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 295.26,
+   "public_ttc": 545.0
+  },
+  {
+   "reference": "P977104",
+   "name": "700 PHILOS raccordable avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339771041",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.65
+   ],
+   "brut_ht": 752.62,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 489.2,
+   "public_ttc": 903.0
+  },
+  {
+   "reference": "P977105",
+   "name": "700 PHILOS GA raccordable avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339771058",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.65
+   ],
+   "brut_ht": 872.24,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 566.96,
+   "public_ttc": 1047.0
+  },
+  {
+   "reference": "P976975",
+   "name": "700 SELENIC avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339769758",
+   "marqueurs": [],
+   "taxes": [
+    1.88
+   ],
+   "brut_ht": 838.2,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 544.83,
+   "public_ttc": 1006.0
+  },
+  {
+   "reference": "P628372",
+   "name": "800 ANGLE vitre Droite avec Volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244336283721",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.86
+   ],
+   "brut_ht": 2499.17,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1624.46,
+   "public_ttc": 2999.0
+  },
+  {
+   "reference": "P628373",
+   "name": "800 ANGLE vitre Gauche avec Volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244336283738",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    1.86
+   ],
+   "brut_ht": 2499.17,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1624.46,
+   "public_ttc": 2999.0
+  },
+  {
+   "reference": "P928244",
+   "name": "800 DOUBLE FACE avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339282448",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.48
+   ],
+   "brut_ht": 1555.92,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1011.35,
+   "public_ttc": 1867.0
+  },
+  {
+   "reference": "P928575",
+   "name": "800 GRAND ANGLE avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339285753",
+   "marqueurs": [
+    "Exc"
+   ],
+   "taxes": [
+    2.45
+   ],
+   "brut_ht": 1908.02,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1240.21,
+   "public_ttc": 2290.0
+  },
+  {
+   "reference": "P928175",
+   "name": "800 GRANDE VISION avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339281755",
+   "marqueurs": [],
+   "taxes": [
+    2.45
+   ],
+   "brut_ht": 1415.1,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 919.82,
+   "public_ttc": 1698.0
+  },
+  {
+   "reference": "P978775",
+   "name": "800 PRIMO avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339787752",
+   "marqueurs": [],
+   "taxes": [
+    2.31
+   ],
+   "brut_ht": 958.06,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 622.74,
+   "public_ttc": 1150.0
+  },
+  {
+   "reference": "P928485",
+   "name": "840 HORIZONTAL avec volet",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244339284855",
+   "marqueurs": [
+    "(",
+    "F"
+   ],
+   "taxes": [
+    1.88
+   ],
+   "brut_ht": 927.6,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 602.94,
+   "public_ttc": 1113.0
+  },
+  {
+   "reference": "P699701A",
+   "name": "Grille 9701 pour foyer 840 horizontal",
+   "gamme": "Foyers à Bûches en Fonte",
+   "ean": "3244336997017",
+   "marqueurs": [],
+   "taxes": [
+    0.02
+   ],
+   "brut_ht": 46.05,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 29.93,
+   "public_ttc": 55.0
+  },
+  {
+   "reference": "P666014",
+   "name": "600 GRANDE VISION turbo",
+   "gamme": "Inserts à Bûches en Fonte",
+   "ean": "3244336660140",
+   "marqueurs": [],
+   "taxes": [
+    1.5
+   ],
+   "brut_ht": 1041.36,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 676.88,
+   "public_ttc": 1250.0
+  },
+  {
+   "reference": "P967008",
+   "name": "700 ABSOLU turbo",
+   "gamme": "Inserts à Bûches en Fonte",
+   "ean": "3244339670085",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.1
+   ],
+   "brut_ht": 1924.23,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1250.75,
+   "public_ttc": 2309.0
+  },
+  {
+   "reference": "P967001",
+   "name": "700 ALIZEO turbo",
+   "gamme": "Inserts à Bûches en Fonte",
+   "ean": "3244339670016",
+   "marqueurs": [],
+   "taxes": [
+    2.03
+   ],
+   "brut_ht": 1239.5,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 805.68,
+   "public_ttc": 1487.0
+  },
+  {
+   "reference": "P967009",
+   "name": "700 AUSTRAL convection naturelle",
+   "gamme": "Inserts à Bûches en Fonte",
+   "ean": "3244339670092",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.04
+   ],
+   "brut_ht": 1139.54,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 740.7,
+   "public_ttc": 1367.0
+  },
+  {
+   "reference": "P967010",
+   "name": "700 AUSTRAL turbo",
+   "gamme": "Inserts à Bûches en Fonte",
+   "ean": "3244339670108",
+   "marqueurs": [
+    "Ex"
+   ],
+   "taxes": [
+    2.1
+   ],
+   "brut_ht": 1409.44,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 916.14,
+   "public_ttc": 1691.0
+  },
+  {
+   "reference": "P967011",
+   "name": "700 AUSTRAL PLUS turbo",
+   "gamme": "Inserts à Bûches en Fonte",
+   "ean": "3244339670115",
+   "marqueurs": [
+    "Exc"
+   ],
+   "taxes": [
+    2.1
+   ],
+   "brut_ht": 1749.3,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1137.05,
+   "public_ttc": 2099.0
+  },
+  {
+   "reference": "P902840",
+   "name": "800 COMPACT turbo",
+   "gamme": "Inserts à Bûches en Fonte",
+   "ean": "3244339028404",
+   "marqueurs": [],
+   "taxes": [
+    2.19
+   ],
+   "brut_ht": 1528.86,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 993.76,
+   "public_ttc": 1835.0
+  },
+  {
+   "reference": "P968843",
+   "name": "800 GRAND ANGLE turbo",
+   "gamme": "Inserts à Bûches en Fonte",
+   "ean": "3244339688431",
+   "marqueurs": [],
+   "taxes": [
+    2.42
+   ],
+   "brut_ht": 1908.02,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1240.21,
+   "public_ttc": 2290.0
+  },
+  {
+   "reference": "P968244",
+   "name": "800 VISION TOTALE turbo",
+   "gamme": "Inserts à Bûches en Fonte",
+   "ean": "3244339682446",
+   "marqueurs": [],
+   "taxes": [
+    2.27
+   ],
+   "brut_ht": 1672.4,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 1087.06,
+   "public_ttc": 2007.0
+  },
+  {
+   "reference": "P690080",
+   "name": "Kit MANCHETTES pour insert",
+   "gamme": "Inserts à Bûches en Fonte",
+   "ean": "3244336900802",
+   "marqueurs": [],
+   "taxes": [
+    0.08
+   ],
+   "brut_ht": 26.17,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 17.01,
+   "public_ttc": 31.0
+  },
+  {
+   "reference": "P691800",
+   "name": "AEROSOLS DE PEINTURE PLP anthracite (carton 12)",
+   "gamme": "Accessoires",
+   "ean": "3244336918005",
+   "marqueurs": [],
+   "taxes": [
+    0.01
+   ],
+   "brut_ht": 311.52,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 202.49,
+   "public_ttc": 374.0
+  },
+  {
+   "reference": "P691801",
+   "name": "AEROSOLS DE PEINTURE WBR anthracite (carton 12)",
+   "gamme": "Accessoires",
+   "ean": "3244336918012",
+   "marqueurs": [],
+   "taxes": [
+    0.01
+   ],
+   "brut_ht": 351.24,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 228.31,
+   "public_ttc": 421.0
+  },
+  {
+   "reference": "P694347",
+   "name": "GRILLE D'AERATION : grand format 218 x 108 x 20 mm",
+   "gamme": "Accessoires",
+   "ean": "3244336943472",
+   "marqueurs": [],
+   "taxes": [
+    0.01
+   ],
+   "brut_ht": 17.61,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 11.45,
+   "public_ttc": 21.0
+  },
+  {
+   "reference": "P690030",
+   "name": "Kit VOLET DE BUSE  avec câble - diamètre 200 mm",
+   "gamme": "Accessoires",
+   "ean": "3244336900307",
+   "marqueurs": [],
+   "taxes": [
+    0.09
+   ],
+   "brut_ht": 197.72,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 128.52,
+   "public_ttc": 237.0
+  },
+  {
+   "reference": "P690010",
+   "name": "Kit VOLET DE BUSE avec tringlerie - diamètre 200 mm",
+   "gamme": "Accessoires",
+   "ean": "3244336900109",
+   "marqueurs": [],
+   "taxes": [
+    0.08
+   ],
+   "brut_ht": 86.67,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 56.34,
+   "public_ttc": 104.0
+  },
+  {
+   "reference": "P720109",
+   "name": "Liquide ALLUME FEU par 12 bouteilles",
+   "gamme": "Accessoires",
+   "ean": "3244337201090",
+   "marqueurs": [
+    "(",
+    "F"
+   ],
+   "taxes": [],
+   "brut_ht": 92.28,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 59.98,
+   "public_ttc": 111.0
+  },
+  {
+   "reference": "P694680",
+   "name": "Plaque de PROTECTION MURALE 800x460 mm",
+   "gamme": "Accessoires",
+   "ean": "3244336946800",
+   "marqueurs": [],
+   "taxes": [
+    0.09
+   ],
+   "brut_ht": 226.14,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 146.99,
+   "public_ttc": 271.0
+  },
+  {
+   "reference": "P699680",
+   "name": "Plaque de PROTECTION MURALE 800x960 mm",
+   "gamme": "Accessoires",
+   "ean": "3244336996805",
+   "marqueurs": [],
+   "taxes": [
+    0.17
+   ],
+   "brut_ht": 324.99,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 211.24,
+   "public_ttc": 390.0
+  },
+  {
+   "reference": "P692004",
+   "name": "Plaque en VERRE 1050x1200 mm",
+   "gamme": "Accessoires",
+   "ean": "3244336920046",
+   "marqueurs": [],
+   "taxes": [
+    0.26
+   ],
+   "brut_ht": 197.72,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 128.52,
+   "public_ttc": 237.0
+  },
+  {
+   "reference": "P692003",
+   "name": "Plaque en VERRE 1100x1100x572x572 mm",
+   "gamme": "Accessoires",
+   "ean": "3244336920039",
+   "marqueurs": [],
+   "taxes": [
+    0.27
+   ],
+   "brut_ht": 197.72,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 128.52,
+   "public_ttc": 237.0
+  },
+  {
+   "reference": "P692001",
+   "name": "Plaque en VERRE 1200x1000 mm",
+   "gamme": "Accessoires",
+   "ean": "3244336920015",
+   "marqueurs": [],
+   "taxes": [
+    0.27
+   ],
+   "brut_ht": 197.72,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 128.52,
+   "public_ttc": 237.0
+  },
+  {
+   "reference": "P692002",
+   "name": "Plaque en VERRE 1200x1000 mm",
+   "gamme": "Accessoires",
+   "ean": "3244336920022",
+   "marqueurs": [],
+   "taxes": [
+    0.27
+   ],
+   "brut_ht": 197.72,
+   "remise_pct": 35.0,
+   "remise_deduite": false,
+   "net_ht": 128.52,
+   "public_ttc": 237.0
+  }
+ ]
+}
