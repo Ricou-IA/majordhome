@@ -217,6 +217,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
   // Équipements rangés sous le contrat ou à part (sans liens contrat ↔ équipements : tous à part)
   const equipementsSousContrat = idsSousContrat ? equipementsClient.filter((eq) => idsSousContrat.has(eq.id)) : [];
   const autresEquipements = idsSousContrat ? equipementsClient.filter((eq) => !idsSousContrat.has(eq.id)) : equipementsClient;
+  // SAV : colonnes flex (gap, pas space-y) pour que `mt-auto` cale description et notes en bas
+  const colonneClass = item.intervention_type === 'sav' ? 'flex flex-col gap-6' : 'space-y-6';
 
   // --- Handlers ---
   const handleTransition = async (newStatus) => {
@@ -594,7 +596,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
             <>
               {/* SAV : deux colonnes (client, urgence, problème | devis, pièces, notes) — pas d'ascenseur sur un écran de bureau */}
               <div className={isSav ? 'space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8' : 'space-y-6'}>
-              <div className="space-y-6">
+              {/* Colonnes en flex : description (gauche) et notes (droite) calées en bas, zones de saisie alignées */}
+              <div className={colonneClass}>
               {/* Infos client */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-gray-700">
@@ -698,7 +701,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
 
               {/* Description SAV */}
               {type === 'sav' && (
-                <div className="space-y-3">
+                <div className="space-y-3 md:mt-auto">
                   <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
                     <Wrench className="w-4 h-4" />
                     Description du problème
@@ -718,7 +721,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
               </div>
 
               {/* Colonne droite (SAV) : devis d'abord, la commande de pièces en découle */}
-              <div className="space-y-6">
+              <div className={colonneClass}>
               {/* Section Devis (SAV uniquement) */}
               {type === 'sav' && (
                 <SAVDevisSection
@@ -793,7 +796,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
               )}
 
               {/* Notes */}
-              <div className="space-y-3">
+              <div className={`space-y-3 ${isSav ? 'md:mt-auto' : ''}`}>
                 <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Notes internes
