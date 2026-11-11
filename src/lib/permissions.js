@@ -40,6 +40,7 @@ export const RESOURCES = [
   { key: 'voice_recorder', label: 'Compte-rendu vocal (PWA)' },
   { key: 'pv_calculator', label: 'Calculateur solaire' },
   { key: 'thermal_study', label: 'Étude thermique' },
+  { key: 'assistant_pieces', label: 'Assistant pièces' },
   { key: 'maintenance', label: 'Maintenance' },
   { key: 'settings',   label: 'Paramètres' },
 ];

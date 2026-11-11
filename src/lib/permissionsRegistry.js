@@ -106,6 +106,11 @@ export const REGISTRY = {
   thermal_study: { label: 'Étude thermique', tables: {}, actions: {
     view: { sql: null, default: d([1, 1, 0]) },
   } },
+  // Assistant pièces (module `assistant`, opt-in) : recherche web d'une pièce depuis la fiche
+  // d'un appareil. Aucune table gouvernée ; ouvert à tous les rôles par défaut.
+  assistant_pieces: { label: 'Assistant pièces (recherche web)', tables: {}, actions: {
+    use: { sql: null, default: d([1, 1, 1]) },
+  } },
   // Module Maintenance (opt-in) : suivi/historique ouverts à tous (le compte borne est un
   // simple membre) ; unités & tâches réservées à l'org_admin (bypass). Écritures DB : RLS
   // org_admin + RPC signées (migration 20260925_1) — `tables` vide, rien à gouverner ici.

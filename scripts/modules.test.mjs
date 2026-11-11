@@ -98,7 +98,7 @@ test('modulesVisibles : la tuile Fournisseurs & catalogue suit le droit articles
 
 test('modulesEffectifs : état de chaque module du catalogue, défauts appliqués', () => {
   assert.deepEqual(modulesEffectifs({ modules: { maintenance: true, crm: false } }), {
-    crm: false, entretiens: true, communication: false, solaire: true, thermique: true, maintenance: true, dpe: false,
+    crm: false, entretiens: true, communication: false, solaire: true, thermique: true, maintenance: true, dpe: false, assistant: false,
   });
 });
 
