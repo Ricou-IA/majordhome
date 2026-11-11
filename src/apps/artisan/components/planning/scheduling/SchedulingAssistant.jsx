@@ -26,7 +26,12 @@ import { toast } from 'sonner';
 import { DayResourceGrid } from './DayResourceGrid';
 import { SlotDraftList } from './SlotDraftList';
 import { AssignSlotModal } from './AssignSlotModal';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTeamDayAvailability } from '@hooks/useAppointments';
+import { appointmentKeys } from '@hooks/cacheKeys';
+import { appointmentsService } from '@services/appointments.service';
+import { patchDeplacement, patchRetour } from '@/lib/deplacementRdv';
+import { logger } from '@lib/logger';
 import { findMemberConflicts } from '@/lib/scheduleConflicts';
 import { fusionnerCreneau, basculerJournee, etatCommande } from '@/lib/installOrder';
 import { formatDateForInput } from '@/lib/utils';
@@ -124,6 +129,8 @@ export function SchedulingAssistant({
   sidePanelClient = null,
   // Aperçu de la tournée d'une personne (clic sur son prénom) : ({ memberId, date } | null) => void
   onApercuChange = null,
+  // Glisser les RDV existants de la grille pour réorganiser la journée (enregistré tout de suite)
+  allowMoveExisting = false,
   onSlotsChange,
   initialDate = null,
   mergeOverlapping = false,
@@ -212,6 +219,42 @@ export function SchedulingAssistant({
 
   // RDV du jour sélectionné (avec technician_ids) pour les colonnes.
   const { dayAppointments } = useTeamDayAvailability(orgId, selectedDate);
+
+  // Déplacer un RDV existant : enregistré tout de suite (comme le glisser du planning), avec
+  // « Annuler » dans la notification. Parcours, colonnes et planning se rafraîchissent.
+  const queryClient = useQueryClient();
+  const appliquer = useCallback(async (aptId, { horaire, reaffectation }) => {
+    const { error } = await appointmentsService.moveAppointment(aptId, horaire);
+    if (error) throw error;
+    if (reaffectation) {
+      const { error: errPers } = await appointmentsService.updateAppointment(aptId, reaffectation);
+      if (errPers) throw errPers;
+    }
+  }, []);
+  const handleMoveAppointment = useCallback(async ({ apt, ...vers }) => {
+    const patch = patchDeplacement(apt, vers);
+    if (patch.inchange) return;
+    const rafraichir = () => queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+    try {
+      await appliquer(apt.id, patch);
+      rafraichir();
+      const qui = [apt.client_name, apt.client_first_name].filter(Boolean).join(' ') || apt.subject || 'RDV';
+      toast.success(`${qui} déplacé à ${vers.startTime}`, {
+        action: {
+          label: 'Annuler',
+          onClick: async () => {
+            try { await appliquer(apt.id, patchRetour(apt, patch.reaffectation)); }
+            catch (err) { logger.error('[SchedulingAssistant] annulation déplacement', err); toast.error('Annulation impossible'); }
+            rafraichir();
+          },
+        },
+      });
+    } catch (err) {
+      logger.error('[SchedulingAssistant] déplacement RDV', err);
+      toast.error('Déplacement refusé');
+      rafraichir();
+    }
+  }, [appliquer, queryClient, orgId]);
 
   // --- Poser un créneau depuis la grille (toujours dans la colonne d'une personne) ---
   const handlePlaceSlot = useCallback(({ memberId, date, startTime, endTime, duration }) => {
@@ -444,6 +487,7 @@ export function SchedulingAssistant({
         fullDayClick={fullDayClick}
         onToggleDay={handleToggleDay}
         onMemberClick={onApercuChange ? (id) => setApercuMemberId((cur) => (cur === id ? null : id)) : null}
+        onMoveAppointment={allowMoveExisting ? handleMoveAppointment : null}
         selectedMemberId={apercuMemberId}
       />
 

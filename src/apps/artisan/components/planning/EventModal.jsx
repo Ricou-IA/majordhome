@@ -591,6 +591,7 @@ export function EventModal({
                   sidePanelClient={sectionClient}
                   sidePanelBas={parcours}
                   onApercuChange={isFreeType ? null : setApercu}
+                  allowMoveExisting
                 />
               )}
 

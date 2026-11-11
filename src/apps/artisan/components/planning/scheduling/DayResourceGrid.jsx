@@ -17,6 +17,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, AlertTriangle, CalendarDays, Check } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@services/appointments.service';
+import { peutDeplacer } from '@/lib/deplacementRdv';
 import { formatDateForInput } from '@/lib/utils';
 import { findMemberConflicts, memberWorkingHoursForDate, timeToMinutes } from '@/lib/scheduleConflicts';
 
@@ -120,10 +121,15 @@ export function DayResourceGrid({
   // Clic sur le prénom (hors journée entière) : aperçu de la tournée du jour de la personne
   onMemberClick = null,
   selectedMemberId = null,
+  // Glisser un RDV existant (heure, ou autre colonne = autre personne) : ({ apt, fromMemberId,
+  // toMemberId, date, startTime, endTime, duration }) => void. Absent = RDV existants fixes.
+  onMoveAppointment = null,
 }) {
   const todayStr = formatDate(new Date());
   // État du drag : { memberId, startIndex, currentIndex }
   const [dragState, setDragState] = useState(null);
+  // RDV existant en cours de glissement : { apt, fromMemberId, slotCount, prise, toMemberId, toStartIdx }
+  const [moveState, setMoveState] = useState(null);
 
   // --- Bande semaine (Lun-Ven) ---
   const monday = useMemo(() => getMonday(date ? new Date(date + 'T00:00:00') : new Date()), [date]);
@@ -172,6 +178,7 @@ export function DayResourceGrid({
           slotCount,
           color: cfg.color,
           label: apt.subject || cfg.label,
+          apt,
         });
       });
     });
@@ -265,7 +272,23 @@ export function DayResourceGrid({
     setDragState({ memberId, startIndex: slotIndex, currentIndex: slotIndex });
   }, [isOccupied, fixedDuration, date, onPlaceSlot]);
 
+  // --- Glisser un RDV existant ---
+  const handleBlockMouseDown = useCallback((e, memberId, block) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Créneau attrapé dans le bloc : le bloc suit le pointeur depuis ce point
+    const prise = Math.max(0, Math.min(block.slotCount - 1, Math.floor((e.clientY - e.currentTarget.getBoundingClientRect().top) / SLOT_HEIGHT)));
+    setMoveState({ apt: block.apt, fromMemberId: memberId, slotCount: block.slotCount, prise, toMemberId: memberId, toStartIdx: block.startIdx });
+  }, []);
+
   const handleSlotMouseEnter = useCallback((memberId, slotIndex) => {
+    if (moveState) {
+      const toStartIdx = Math.max(0, Math.min(TOTAL_SLOTS - moveState.slotCount, slotIndex - moveState.prise));
+      if (memberId !== moveState.toMemberId || toStartIdx !== moveState.toStartIdx) {
+        setMoveState((prev) => ({ ...prev, toMemberId: memberId, toStartIdx }));
+      }
+      return;
+    }
     if (!dragState) return;
     if (memberId !== dragState.memberId) return; // même colonne uniquement
     if (slotIndex <= dragState.startIndex) return; // vers le bas uniquement
@@ -274,7 +297,7 @@ export function DayResourceGrid({
       if (isOccupied(memberId, i)) return;
     }
     setDragState((prev) => ({ ...prev, currentIndex: slotIndex }));
-  }, [dragState, isOccupied]);
+  }, [dragState, isOccupied, moveState]);
 
   // Journée entière d'une personne (fullDayClick) : ses horaires du jour, ou 08:00–18:00
   // à défaut (même repli que memberWorkingHoursForDate pour un jour sans réglage).
@@ -310,6 +333,27 @@ export function DayResourceGrid({
     window.addEventListener('mouseup', onGlobalMouseUp);
     return () => window.removeEventListener('mouseup', onGlobalMouseUp);
   }, [dragState, handleDragEnd]);
+
+  // Fin du glissement d'un RDV existant (relâché n'importe où) : au host d'enregistrer
+  useEffect(() => {
+    if (!moveState) return;
+    const fin = () => {
+      const m = moveState;
+      setMoveState(null);
+      const origine = timeToSlotIndex(m.apt.scheduled_start);
+      if (m.toMemberId === m.fromMemberId && m.toStartIdx === origine) return; // rien bougé
+      const duration = m.apt.duration_minutes || m.slotCount * SLOT_MINUTES;
+      const debutMin = START_HOUR * 60 + m.toStartIdx * SLOT_MINUTES;
+      const finMin = debutMin + duration;
+      const hm = (x) => `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`;
+      onMoveAppointment?.({
+        apt: m.apt, fromMemberId: m.fromMemberId, toMemberId: m.toMemberId,
+        date, startTime: hm(debutMin), endTime: hm(finMin), duration,
+      });
+    };
+    window.addEventListener('mouseup', fin);
+    return () => window.removeEventListener('mouseup', fin);
+  }, [moveState, onMoveAppointment, date]);
 
   // Plancher bas (56 px) : toutes les colonnes doivent TENIR dans le panneau EventModal
   // (max-w-2xl → 622 px utiles, soit 10 colonnes). Avec 96 px, « Autre » (tous les
@@ -477,6 +521,9 @@ export function DayResourceGrid({
 
                   // Bloc occupé démarrant sur ce créneau
                   const busyBlock = (blocksByMember.get(m.id) || []).find((b) => b.startIdx === slot.index);
+                  const deplacable = onMoveAppointment && busyBlock ? peutDeplacer(busyBlock.apt) : null;
+                  const enMouvement = moveState && busyBlock && moveState.apt.id === busyBlock.apt.id;
+                  const fantome = moveState && moveState.toMemberId === m.id && moveState.toStartIdx === slot.index;
                   // Bloc draft démarrant sur ce créneau
                   const draftBlock = (draftsByMember.get(m.id) || []).find((b) => b.startIdx === slot.index);
 
@@ -496,7 +543,7 @@ export function DayResourceGrid({
                     >
                       {/* Heure survolée écrite DANS la case : l'infobulle native s'affichait sous
                           le pointeur, une demi-heure plus bas (« 8 h 00 tombe sur 8 h 30 », 2026-10-31). */}
-                      {!occupied && !inDrag && (
+                      {!occupied && !inDrag && !moveState && (
                         <span className="pointer-events-none absolute inset-0 hidden items-center pl-1 text-[9px] leading-none text-blue-600 group-hover:flex">
                           {slot.time}{off ? ' · hors horaires' : ''}
                         </span>
@@ -504,7 +551,13 @@ export function DayResourceGrid({
                       {/* Bloc occupé (rendu sur la cellule de début, hauteur = nb créneaux) */}
                       {busyBlock && (
                         <div
-                          className="absolute inset-x-0.5 top-0.5 rounded-sm px-1 overflow-hidden pointer-events-none z-10 opacity-80"
+                          onMouseDown={deplacable?.ok ? (e) => handleBlockMouseDown(e, m.id, busyBlock) : undefined}
+                          title={deplacable
+                            ? (deplacable.ok ? 'Glisser pour déplacer ce RDV (heure, ou vers une autre personne)' : `${deplacable.raison} : se déplace depuis le planning`)
+                            : undefined}
+                          className={`absolute inset-x-0.5 top-0.5 rounded-sm px-1 overflow-hidden z-10 ${
+                            deplacable?.ok ? 'cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-blue-400' : 'pointer-events-none'
+                          } ${enMouvement ? 'opacity-30' : 'opacity-80'} ${moveState ? 'pointer-events-none' : ''}`}
                           style={{
                             height: `${busyBlock.slotCount * SLOT_HEIGHT - 4}px`,
                             backgroundColor: busyBlock.color,
@@ -512,6 +565,18 @@ export function DayResourceGrid({
                         >
                           <span className="text-[9px] text-white font-medium leading-tight line-clamp-2">
                             {busyBlock.label}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Fantôme du RDV en cours de glissement, à sa future place */}
+                      {fantome && (
+                        <div
+                          className="absolute inset-x-0.5 top-0.5 rounded-sm px-1 overflow-hidden pointer-events-none z-30 border-2 border-dashed border-blue-600 bg-blue-100/80"
+                          style={{ height: `${moveState.slotCount * SLOT_HEIGHT - 4}px` }}
+                        >
+                          <span className="text-[9px] font-semibold text-blue-800 leading-tight line-clamp-2">
+                            {slotIndexToTime(moveState.toStartIdx)} · {moveState.apt.subject || 'RDV'}
                           </span>
                         </div>
                       )}
@@ -555,6 +620,9 @@ export function DayResourceGrid({
           <span className="w-2.5 h-2.5 bg-amber-400 rounded-sm" />
           Conflit (planif. quand même)
         </span>
+        {onMoveAppointment && (
+          <span className="text-gray-400 italic">Glisser un RDV existant pour le déplacer ·</span>
+        )}
         <span className="text-gray-400 italic">
           {fullDayClick
             ? 'Cliquer sur une personne = sa journée · glisser = une partie de journée'
