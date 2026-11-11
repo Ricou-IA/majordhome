@@ -64,6 +64,7 @@ const MESSAGES = {
   client_sans_numero: "Aucun numéro de DPE n'est enregistré sur cette fiche.",
   numero_mal_forme: 'Ce numéro de DPE ne fait pas 13 caractères (chiffres et lettres).',
   numero_absent: "Ce numéro n'est pas dans le corpus MonsieurDPE (DPE tertiaire, neuf, ou antérieur à juillet 2021) : l'analyse complète n'est pas disponible.",
+  sans_rapport_complet: "MonsieurDPE n'a pas d'analyse complète pour ce DPE : son détail n'a pas été archivé, ou son étiquette est dérivée de l'immeuble entier.",
   corpus_indisponible: 'Le corpus MonsieurDPE ne répond pas pour le moment. Réessayez dans quelques minutes.',
   partenaire_indisponible: "MonsieurDPE n'a pas pu ouvrir l'analyse pour le moment. Réessayez dans quelques minutes.",
   enregistrement_impossible: "L'accès n'a pas pu être enregistré. Réessayez, et prévenez-nous si cela se reproduit.",
@@ -82,8 +83,8 @@ export function messageErreurDpeLien(code) {
 
 /**
  * Où en est le lien pour ce client. Un accès déjà émis prime sur la vérification.
- * @param {{ dpeNumber?: string | null, verification?: { present?: boolean } | null, acces?: { report_url?: string } | null }} p
- * @returns {'sans_numero' | 'mal_forme' | 'a_verifier' | 'absent_du_corpus' | 'pret' | 'emis'}
+ * @param {{ dpeNumber?: string | null, verification?: { present?: boolean, rapport_complet?: boolean } | null, acces?: { report_url?: string } | null }} p
+ * @returns {'sans_numero' | 'mal_forme' | 'a_verifier' | 'absent_du_corpus' | 'sans_rapport_complet' | 'pret' | 'emis'}
  */
 export function etatDuLien({ dpeNumber, verification, acces }) {
   const numero = typeof dpeNumber === 'string' ? dpeNumber.trim() : '';
@@ -91,7 +92,9 @@ export function etatDuLien({ dpeNumber, verification, acces }) {
   if (!numeroDpeValide(numero)) return 'mal_forme';
   if (acces?.report_url) return 'emis';
   if (!verification) return 'a_verifier';
-  return verification.present === true ? 'pret' : 'absent_du_corpus';
+  if (verification.present !== true) return 'absent_du_corpus';
+  // `rapport_complet` absent se lit « possible » : la porte partenaire tranche de toute façon.
+  return verification.rapport_complet === false ? 'sans_rapport_complet' : 'pret';
 }
 
 /**

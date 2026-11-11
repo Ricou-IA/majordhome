@@ -84,6 +84,9 @@ test('etatDuLien : sans numéro / mal formé / à vérifier / absent du corpus /
   assert.equal(etatDuLien({ dpeNumber: '2662E2065219C', verification: undefined, acces: null }), 'a_verifier');
   assert.equal(etatDuLien({ dpeNumber: '2662E2065219C', verification: { present: false }, acces: null }), 'absent_du_corpus');
   assert.equal(etatDuLien({ dpeNumber: '2662E2065219C', verification: { present: true }, acces: null }), 'pret');
+  assert.equal(etatDuLien({ dpeNumber: '2662E2065219C', verification: { present: true, rapport_complet: true }, acces: null }), 'pret');
+  // Présent dans le corpus mais sans rapport complet possible : aucun lien à proposer.
+  assert.equal(etatDuLien({ dpeNumber: '2662E2065219C', verification: { present: true, rapport_complet: false }, acces: null }), 'sans_rapport_complet');
   // Un accès déjà émis prime : le lien existe, la vérification n'a plus rien à dire.
   assert.equal(etatDuLien({ dpeNumber: '2662E2065219C', verification: undefined, acces: { report_url: 'https://x' } }), 'emis');
 });

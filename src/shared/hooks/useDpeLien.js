@@ -39,7 +39,7 @@ export function useDpeLien({ orgId, clientId, dpeNumber, actif = true, peutVerif
   });
 
   const ouvrirMutation = useMutation({
-    mutationFn: () => unwrapResult(dpeLienService.ouvrir(orgId, clientId)),
+    mutationFn: (options) => unwrapResult(dpeLienService.ouvrir(orgId, clientId, options)),
     onSuccess: (data) => {
       if (data?.numero) queryClient.invalidateQueries({ queryKey: dpeLienKeys.acces(orgId, data.numero) });
     },
@@ -47,10 +47,12 @@ export function useDpeLien({ orgId, clientId, dpeNumber, actif = true, peutVerif
 
   return {
     acces: accesQuery.data ?? null,
-    accesInconnu: accesQuery.isLoading || accesQuery.isError,
+    accesEnCours: accesQuery.isLoading,
+    accesErreur: accesQuery.isError,
     verification: verificationQuery.data ?? null,
     verificationErreur: verificationQuery.error ?? null,
     isVerifying: verificationQuery.isFetching,
+    reverifier: verificationQuery.refetch,
     chercher: chercherMutation.mutateAsync,
     isSearching: chercherMutation.isPending,
     ouvrir: ouvrirMutation.mutateAsync,

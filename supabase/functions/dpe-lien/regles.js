@@ -4,7 +4,7 @@
 /** Les codes d'erreur que l'edge function rend au front (traduits par src/lib/dpeLien.js). */
 export const CODES = Object.freeze([
   'module_ferme', 'droit_requis', 'action_inconnue', 'client_introuvable', 'adresse_incomplete',
-  'client_sans_numero', 'numero_mal_forme', 'numero_absent', 'corpus_indisponible',
+  'client_sans_numero', 'numero_mal_forme', 'numero_absent', 'sans_rapport_complet', 'corpus_indisponible',
   'partenaire_indisponible', 'enregistrement_impossible',
 ]);
 
@@ -71,4 +71,31 @@ export function resumeDossier(dossier) {
     surface: nombre('surface_habitable_logement'),
     type: texte('type_bien', 'type_batiment'),
   };
+}
+
+/**
+ * Le rapport complet MonsieurDPE existe-t-il pour ce dossier ? Réponse de GET /dossier/{numero}.
+ * MÊMES règles que la page du site (C:/Dev/DPE/site, `sansDetailArchive` et `estImmeubleDerive`) : aucun
+ * composant archivé (la plupart des DPE de 2021-2022), ou étiquette dérivée de l'immeuble entier (27 % de la
+ * base), et la page refuse avant même le mur. La porte partenaire applique la règle qui fait foi ; celle-ci
+ * sert à ne pas PROPOSER le bouton.
+ * @param {{ dossier?: Record<string, unknown> | null, composants?: unknown } | null | undefined} data
+ * @returns {boolean}
+ */
+export function rapportCompletPossible(data) {
+  if (!data || !Array.isArray(data.composants) || data.composants.length === 0) return false;
+  const methode = data.dossier?.methode_application_dpe;
+  return !(typeof methode === 'string' && methode.toLowerCase().startsWith('dpe appartement généré'));
+}
+
+const CHAMPS_CANDIDAT = ['identifiant_dpe', 'date_etablissement_dpe', 'etiquette_dpe', 'surface_habitable_logement', 'type_batiment', 'fiabilite_geocodage'];
+
+/**
+ * Un DPE candidat tel qu'il part vers le navigateur : les seuls champs que l'écran lit, pas la ligne brute du corpus.
+ * @param {unknown} ligne
+ * @returns {Record<string, unknown> | null}
+ */
+export function projeterCandidat(ligne) {
+  if (!ligne || typeof ligne !== 'object') return null;
+  return Object.fromEntries(CHAMPS_CANDIDAT.filter((c) => c in ligne).map((c) => [c, ligne[c]]));
 }

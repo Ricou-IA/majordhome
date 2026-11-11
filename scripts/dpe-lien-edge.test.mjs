@@ -1,7 +1,7 @@
 // node --test scripts/dpe-lien-edge.test.mjs — règles pures de l'edge function dpe-lien.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { numeroValide, adresseDeRecherche, codeDepuisCorpus, resumeDossier, CODES } from '../supabase/functions/dpe-lien/regles.js';
+import { numeroValide, adresseDeRecherche, codeDepuisCorpus, resumeDossier, rapportCompletPossible, projeterCandidat, CODES } from '../supabase/functions/dpe-lien/regles.js';
 
 test('numeroValide : 13 alphanumériques oui, 12 non, espace non, non-chaîne non', () => {
   assert.equal(numeroValide('2662E2065219C'), true);
@@ -49,4 +49,23 @@ test('resumeDossier : champs lus, champs absents ⇒ null et jamais undefined', 
   );
   assert.deepEqual(resumeDossier({}), { etiquette: null, date: null, surface: null, type: null });
   assert.deepEqual(resumeDossier(null), { etiquette: null, date: null, surface: null, type: null });
+});
+
+test("rapportCompletPossible : faux sans composant, faux pour un appartement dérivé de l'immeuble, vrai sinon", () => {
+  assert.equal(rapportCompletPossible({ dossier: { methode_application_dpe: 'dpe maison individuelle' }, composants: [{}] }), true);
+  assert.equal(rapportCompletPossible({ dossier: { methode_application_dpe: 'dpe maison individuelle' }, composants: [] }), false);
+  assert.equal(rapportCompletPossible({ dossier: { methode_application_dpe: 'DPE appartement généré à partir des données DPE immeuble' }, composants: [{}] }), false);
+  assert.equal(rapportCompletPossible({ dossier: {}, composants: [{}] }), true);
+  assert.equal(rapportCompletPossible(null), false);
+});
+
+test("projeterCandidat : ne laisse passer que les champs lus par l'écran", () => {
+  assert.deepEqual(
+    projeterCandidat({ identifiant_dpe: '2662E2065219C', date_etablissement_dpe: '2022-03-01', etiquette_dpe: 'D',
+      surface_habitable_logement: 96, type_batiment: 'dpe maison individuelle', fiabilite_geocodage: 'fiable',
+      batiment_groupe_id: 'bdnb-bg-X', champ_futur: 'secret' }),
+    { identifiant_dpe: '2662E2065219C', date_etablissement_dpe: '2022-03-01', etiquette_dpe: 'D',
+      surface_habitable_logement: 96, type_batiment: 'dpe maison individuelle', fiabilite_geocodage: 'fiable' },
+  );
+  assert.deepEqual(projeterCandidat('pas un objet'), null);
 });

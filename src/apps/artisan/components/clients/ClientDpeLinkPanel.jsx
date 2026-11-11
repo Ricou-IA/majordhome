@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Loader2, ExternalLink, Copy, FileSearch, X } from 'lucide-react';
+import { Search, Loader2, ExternalLink, Copy, FileSearch, RefreshCw, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -32,7 +32,7 @@ export function ClientDpeLinkPanel({ clientId, savedDpeNumber, formDpeNumber, ad
   const { updateClient, isUpdating } = useClient(actif ? clientId : null);
   const numero = (savedDpeNumber || '').trim();
   const {
-    acces, accesInconnu, verification, verificationErreur, isVerifying,
+    acces, accesEnCours, accesErreur, verification, verificationErreur, isVerifying, reverifier,
     chercher, isSearching, ouvrir, isOpening,
   } = useDpeLien({ orgId, clientId, dpeNumber: numero, actif, peutVerifier: peutModifier });
 
@@ -76,9 +76,24 @@ export function ClientDpeLinkPanel({ clientId, savedDpeNumber, formDpeNumber, ad
     try {
       const url = await obtenirLien();
       if (!url) throw new Error('partenaire_indisponible');
-      if (onglet) onglet.location.href = url; else window.location.assign(url);
+      if (onglet) {
+        onglet.location.href = url;
+      } else {
+        // Fenêtre bloquée par le navigateur : on ne quitte PAS la fiche (saisie en cours perdue), on le dit.
+        toast.error("Le navigateur a bloqué l'ouverture de l'analyse : autorisez les fenêtres pour ce site, ou utilisez « Copier le lien ».");
+      }
     } catch (e) {
       onglet?.close();
+      toast.error(messageErreurDpeLien(e));
+    }
+  };
+
+  /** Redemande le lien à MonsieurDPE (accès révoqué de leur côté, lien qui ne s'ouvre plus). */
+  const regenererLien = async () => {
+    try {
+      await ouvrir({ forcer: true });
+      toast.success("Lien de l'analyse régénéré");
+    } catch (e) {
       toast.error(messageErreurDpeLien(e));
     }
   };
@@ -112,12 +127,15 @@ export function ClientDpeLinkPanel({ clientId, savedDpeNumber, formDpeNumber, ad
           <p className="text-xs text-secondary-500">
             {etat === 'sans_numero' && 'Aucun DPE rattaché à cette fiche.'}
             {etat === 'mal_forme' && 'Le numéro enregistré ne fait pas 13 caractères.'}
-            {etat === 'a_verifier' && (isVerifying || accesInconnu
+            {etat === 'a_verifier' && (isVerifying || accesEnCours
               ? 'Vérification du numéro dans le corpus…'
-              : verificationErreur
-                ? messageErreurDpeLien(verificationErreur)
-                : `DPE ${numero} enregistré.`)}
+              : accesErreur
+                ? "L'état du lien n'a pas pu être lu. Rechargez la fiche."
+                : verificationErreur
+                  ? messageErreurDpeLien(verificationErreur)
+                  : `DPE ${numero} enregistré.`)}
             {etat === 'absent_du_corpus' && messageErreurDpeLien('numero_absent')}
+            {etat === 'sans_rapport_complet' && messageErreurDpeLien('sans_rapport_complet')}
             {etat === 'pret' && `DPE ${numero} retrouvé dans le corpus${verification?.resume?.etiquette ? ` · étiquette ${verification.resume.etiquette}` : ''}.`}
             {etat === 'emis' && `Analyse complète disponible pour le DPE ${numero}.`}
           </p>
@@ -130,6 +148,18 @@ export function ClientDpeLinkPanel({ clientId, savedDpeNumber, formDpeNumber, ad
             {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
             {numero ? 'Rechercher un autre DPE' : 'Rechercher le DPE'}
           </button>
+          {etat === 'a_verifier' && verificationErreur && !isVerifying && (
+            <button type="button" className={boutonSecondaire} onClick={() => reverifier()}>
+              <RefreshCw className="w-3.5 h-3.5" />
+              Réessayer
+            </button>
+          )}
+          {etat === 'emis' && peutModifier && (
+            <button type="button" className={boutonSecondaire} onClick={regenererLien} disabled={isOpening} title="À utiliser si le lien de l'analyse ne s'ouvre plus">
+              <RefreshCw className="w-3.5 h-3.5" />
+              Régénérer le lien
+            </button>
+          )}
           {peutOuvrir && (
             <>
               <button type="button" className={boutonPrincipal} onClick={ouvrirAnalyse} disabled={isOpening}>

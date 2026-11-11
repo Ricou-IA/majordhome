@@ -8,7 +8,7 @@
 //   - chercher : { org_id, client_id } → les DPE rattachés au bâtiment de l'adresse du client (GET /dossier-batiment).
 //                Rien n'est enregistré : un humain confirme le DPE, jamais la machine.
 //   - verifier : { org_id, numero }    → ce numéro est-il dans le corpus ? (GET /dossier/{numero})
-//   - ouvrir   : { org_id, client_id } → le lien du rapport complet MonsieurDPE pour le dpe_number du client.
+//   - ouvrir   : { org_id, client_id, forcer? } → le lien du rapport complet MonsieurDPE pour le dpe_number du client.
 //                Émis une fois par (org, numéro) par la porte partenaire du site, puis relu en base.
 //
 // Réponses : HTTP 200 { data, error } où `error` est un CODE (regles.js::CODES), traduit côté écran. Les refus
@@ -18,7 +18,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOrgMembership, jsonResponse, buildCorsHeaders, sanitizeError } from "../_shared/auth.ts";
-import { numeroValide, adresseDeRecherche, codeDepuisCorpus, resumeDossier } from "./regles.js";
+import { numeroValide, adresseDeRecherche, codeDepuisCorpus, resumeDossier, rapportCompletPossible, projeterCandidat } from "./regles.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
       return ok({
         adresse: d.adresse ?? null,
         batiment_trouve: d.batiment != null,
-        candidats: Array.isArray(d.dpe) ? d.dpe : [],
+        candidats: Array.isArray(d.dpe) ? d.dpe.map(projeterCandidat).filter(Boolean) : [],
       });
     }
 
@@ -119,9 +119,13 @@ Deno.serve(async (req) => {
       const numero = typeof body.numero === "string" ? body.numero.trim() : "";
       if (!numeroValide(numero)) return refus("numero_mal_forme");
       const r = await corpus(`/dossier/${encodeURIComponent(numero)}`);
-      if (r.code === "numero_absent") return ok({ present: false, resume: null });
+      if (r.code === "numero_absent") return ok({ present: false, rapport_complet: false, resume: null });
       if (r.code) return refus(r.code);
-      return ok({ present: true, resume: resumeDossier((r.data?.dossier ?? null) as Record<string, unknown> | null) });
+      return ok({
+        present: true,
+        rapport_complet: rapportCompletPossible(r.data),
+        resume: resumeDossier((r.data?.dossier ?? null) as Record<string, unknown> | null),
+      });
     }
 
     if (action === "ouvrir") {
@@ -131,11 +135,15 @@ Deno.serve(async (req) => {
       if (!numero) return refus("client_sans_numero");
       if (!numeroValide(numero)) return refus("numero_mal_forme");
 
-      // Déjà émis pour cette organisation : on relit, MonsieurDPE n'est pas rappelé.
-      const { data: existant, error: errLecture } = await auth.supabase.from("majordhome_dpe_report_accesses")
-        .select("report_url").eq("org_id", orgId).eq("dpe_number", numero).maybeSingle();
-      if (errLecture) return refus("enregistrement_impossible");
-      if (existant?.report_url) return ok({ url: existant.report_url, numero, deja_emis: true });
+      // Déjà émis pour cette organisation : on relit, MonsieurDPE n'est pas rappelé — sauf `forcer`, qui
+      // redemande le lien (accès révoqué côté MonsieurDPE, adresse du site changée). La porte rend alors le
+      // jeton en vigueur, ou un jeton neuf si l'ancien était révoqué, et la RPC remplace la ligne.
+      if (body.forcer !== true) {
+        const { data: existant, error: errLecture } = await auth.supabase.from("majordhome_dpe_report_accesses")
+          .select("report_url").eq("org_id", orgId).eq("dpe_number", numero).maybeSingle();
+        if (errLecture) return refus("enregistrement_impossible");
+        if (existant?.report_url) return ok({ url: existant.report_url, numero, deja_emis: true });
+      }
 
       if (!SITE_URL || !PARTENAIRE_SECRET) {
         console.error("[dpe-lien] MDH_DPE_SITE_URL ou MDH_DPE_PARTENAIRE_SECRET absent");
@@ -152,6 +160,7 @@ Deno.serve(async (req) => {
         const corps = (await r.json().catch(() => null)) as { data: { jeton?: string; url?: string } | null; error: string | null } | null;
         if (corps?.error === "numero_absent") return refus("numero_absent");
         if (corps?.error === "numero_mal_forme") return refus("numero_mal_forme");
+        if (corps?.error === "sans_rapport_complet") return refus("sans_rapport_complet");
         if (!r.ok || !corps?.data) {
           console.error(`[dpe-lien] porte partenaire HTTP ${r.status} (${corps?.error ?? "sans code"})`);
           return refus("partenaire_indisponible");

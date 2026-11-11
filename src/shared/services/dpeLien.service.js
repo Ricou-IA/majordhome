@@ -24,8 +24,8 @@ export const dpeLienService = {
   },
 
   /** Le lien du rapport complet pour le DPE enregistré sur la fiche. Émis une fois, relu ensuite. */
-  async ouvrir(orgId, clientId) {
-    return withErrorHandling(() => appeler(orgId, 'ouvrir', { client_id: clientId }), 'dpeLien.ouvrir');
+  async ouvrir(orgId, clientId, { forcer = false } = {}) {
+    return withErrorHandling(() => appeler(orgId, 'ouvrir', { client_id: clientId, forcer }), 'dpeLien.ouvrir');
   },
 
   /** L'accès déjà émis pour ce numéro dans l'organisation (lecture seule, tout membre). */
