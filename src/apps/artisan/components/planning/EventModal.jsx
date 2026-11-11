@@ -79,8 +79,11 @@ import { EventModalHeader, EventModalFooter } from './EventModalFrame';
  * @param {boolean} props.isSaving
  * @param {Object|null} [props.attachContext] - Rattachement direct depuis un kanban : { leadId?, interventionId?, lockedType? }. Le type est figé et la carte pré-liée.
  *   Options de la carte d'origine : subjectLabel (objet « SAV + Entretien »), multi (plusieurs créneaux),
- *   mergeOverlapping + plannedOrder { teamSize, days, onChange, disabled } (pers. × jours d'un SAV / chantier).
- * @param {(slots: object[]) => Promise<void>|void} [props.onCreated] - suites de l'écran d'origine après création
+ *   mergeOverlapping + plannedOrder { teamSize, days, onChange, disabled } (pers. × jours d'un SAV / chantier),
+ *   chantierId (RDV d'installation), fullDayClick (un clic = la journée), defaultDuration (minutes),
+ *   commercials + fixedAssigneeId (VT du pipeline : la colonne du commercial de la carte, ids `commercials`),
+ *   submitSlots(slots) (création confiée à l'appelant, ex. scheduleEntretien), sideExtra (bloc ajouté à droite).
+ * @param {(slots: object[], created: object[]) => Promise<void>|void} [props.onCreated] - suites de l'écran d'origine après création
  */
 export function EventModal({
   isOpen,
@@ -384,11 +387,11 @@ export function EventModal({
     <>
       {/* Overlay transparent — laisse passer les clics sur le calendrier. Ouverte depuis une
           carte (attachContext) : voile qui bloque l'écran derrière (un clic ouvrirait une autre carte). */}
-      <div className={`fixed inset-0 z-40 ${attachContext ? 'bg-black/40' : 'pointer-events-none'}`} />
+      <div className={`fixed inset-0 ${attachContext ? 'z-[60] bg-black/40' : 'z-40 pointer-events-none'}`} />
 
       {/* Panel modale — taille uniforme pour tous les types de RDV (largeur de la grille assistant).
           Sous `sm` (téléphone) le gabarit partagé MODAL_PANEL_PHONE le passe en plein écran. */}
-      <div className={`fixed sm:inset-y-4 sm:left-auto sm:right-4 sm:w-full ${usesAssistant ? 'max-w-6xl' : 'max-w-2xl'} bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
+      <div className={`fixed sm:inset-y-4 sm:left-auto sm:right-4 sm:w-full ${usesAssistant ? 'max-w-6xl' : 'max-w-2xl'} bg-white rounded-xl shadow-2xl ${attachContext ? 'z-[61]' : 'z-50'} flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
         <EventModalHeader
           typeConfig={typeConfig}
           title={continuationMode ? 'Programmer une suite' : (isEdit ? 'Modifier le RDV' : 'Nouveau RDV')}
@@ -478,12 +481,12 @@ export function EventModal({
                   lead={schedulingLead}
                   orgId={orgId}
                   assigneeType={assistantAssigneeType}
-                  fixedAssigneeId={null}
-                  commercials={commercialMembers}
+                  fixedAssigneeId={attachContext?.fixedAssigneeId || null}
+                  commercials={attachContext?.commercials || commercialMembers}
                   members={assistantMembers}
                   appointmentTypeLabel={typeConfig.label}
                   appointmentTypeValue={formData.appointment_type}
-                  defaultDuration={dureeContratClient || dureeImposee(formData.appointment_type) || Number(formData.duration_minutes) || 60}
+                  defaultDuration={attachContext?.defaultDuration || dureeContratClient || dureeImposee(formData.appointment_type) || Number(formData.duration_minutes) || 60}
                   // Bloc entier au clic : entretien = durée du contrat, VT = 1 h (dureeImposee).
                   fixedDuration={formData.appointment_type === 'maintenance' ? dureeContratClient : dureeImposee(formData.appointment_type)}
                   initialDate={(rescheduleMode || continuationMode)
@@ -492,7 +495,7 @@ export function EventModal({
                     : (!isEdit ? defaultDate : null)}
                   // Installation : N jours ; Congés : N jours d'absence en une saisie, un clic
                   // sur la personne = sa journée (une partie de journée reste possible au glisser).
-                  fullDayClick={isLeave}
+                  fullDayClick={isLeave || !!attachContext?.fullDayClick}
                   // Congés : un RDV par personne, chacun sur SES horaires (jamais l'horaire
                   // du premier cliqué pour tous : la fin de journée des autres restait libre).
                   regrouperJournees={!isLeave}
@@ -506,6 +509,7 @@ export function EventModal({
                   sidePanel={(
                     <div className="space-y-4">
                       {sectionType}
+                      {attachContext?.sideExtra}
                       {plannedOrder && (
                         <PlannedOrderFields
                           teamSize={plannedOrder.teamSize}

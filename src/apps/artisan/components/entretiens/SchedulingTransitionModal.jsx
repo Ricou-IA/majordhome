@@ -1,169 +1,105 @@
 /**
  * SchedulingTransitionModal.jsx - Majord'home Artisan
  * ============================================================================
- * Modale plein écran déclenchée au drag vers "Planifié" ou via bouton transition.
- * Wrapper autour de SchedulingAssistant (Bloc B) avec :
- * - Toggle "Réaliser l'entretien" (SAV uniquement)
- * - Affichage montant total si entretien inclus
- * - Multi-créneau (slots[]) remonté via onConfirm(slots, includesEntretien)
- *
- * @version 2.0.0 - Bloc B (assistant créneaux multi-technicien)
+ * Planifier une carte entretien / SAV au glisser-déposer vers « Planifié » (kanban) ou
+ * depuis la fiche contrat. Depuis le 2026-11-11 : la fenêtre unique « Nouveau RDV »
+ * (EventModal), rattachée à la carte, avec à droite :
+ * - la souplesse du RDV ;
+ * - « Réaliser l'entretien » (SAV uniquement) et le montant total.
+ * La création reste à l'appelant (onConfirm(slots, includesEntretien, { timeFlexMinutes })
+ * → savService.scheduleEntretien, voie unique de planification entretien / SAV).
  * ============================================================================
  */
 
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ClipboardCheck, Check } from 'lucide-react';
 import { SouplesseSelect } from '@/apps/artisan/components/shared/SouplesseSelect';
-import { useState, useMemo, useCallback } from 'react';
-import { X, ClipboardCheck, Check } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTeamMembers } from '@hooks/useAppointments';
-import { useDureeContrat } from '@hooks/useTournees';
 import { formatEuro } from '@/lib/utils';
-import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
-
-// ============================================================================
-// COMPOSANT
-// ============================================================================
+import { EventModal } from '@apps/artisan/components/planning/EventModal';
 
 export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, souplesseDefaut = 30 }) {
+  const { user } = useAuth();
   const { members: teamMembers } = useTeamMembers(orgId);
-
   const [includesEntretien, setIncludesEntretien] = useState(item?.includes_entretien || false);
-  const [loading, setLoading] = useState(false);
   // Souplesse du RDV (spec 2026-09-12) : null = défaut d'org, 0 = figé.
   const [timeFlexMinutes, setTimeFlexMinutes] = useState(null);
-  // Bloc contrat (R5) : un entretien se pose à la durée du contrat, d'un clic.
-  const { dureeMinutes: dureeContratMinutes } = useDureeContrat(
-    orgId, item?.intervention_type === 'entretien' ? (item?.effective_contract_id || item?.contract_id || null) : null,
-  );
-
-  // Objet "lead-like" pour le SchedulingAssistant — déclaré AVANT early return
-  // (règle React Hooks : ordre stable des hooks à chaque render).
-  const schedulingLead = useMemo(() => ({
-    last_name: item?.client_last_name || item?.client_name || '',
-    first_name: item?.client_first_name || '',
-    phone: item?.client_phone || '',
-    email: item?.client_email || '',
-    address: item?.client_address || '',
-    city: item?.client_city || '',
-    postal_code: item?.client_postal_code || '',
-    assigned_user_id: null,
-  }), [item]);
-
-  // Confirmation planning — déclaré AVANT early return.
-  // L'assistant remonte `slots[]` (multi-créneau) ; on relaie au parent
-  // avec le flag includesEntretien (le parent appelle createAppointmentBatch).
-  const handleConfirmScheduling = useCallback(async (slots) => {
-    setLoading(true);
-    try {
-      // null = l'opérateur garde le défaut d'org : le RDV le suit (NULL en base).
-      await onConfirm(slots, includesEntretien, { timeFlexMinutes });
-    } finally {
-      setLoading(false);
-    }
-  }, [onConfirm, includesEntretien, timeFlexMinutes]);
 
   if (!item) return null;
 
-  const type = item.intervention_type;
-  const isSAV = type === 'sav';
+  const isSAV = item.intervention_type === 'sav';
   const name = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim() || 'Sans nom';
-
   const contractAmount = Number(item.contract_amount) || 0;
   const devisAmount = Number(item.devis_amount) || 0;
   const totalAmount = isSAV && includesEntretien ? devisAmount + contractAmount : devisAmount;
 
-  // Props contextuelles du SchedulingAssistant
-  const appointmentTypeLabel = isSAV
-    ? (includesEntretien ? 'SAV + Entretien' : 'SAV')
-    : 'Entretien';
-  const appointmentTypeValue = isSAV ? 'service' : 'maintenance';
-  const defaultSubjectPrefix = appointmentTypeLabel;
-
-  const fixedDuration = !isSAV && dureeContratMinutes ? dureeContratMinutes : null;
-  const defaultDuration = fixedDuration || (item.estimated_time
-    ? Math.round(Number(item.estimated_time) * 60)
-    : 60);
-
-  // Toggle entretien
-  const handleToggleEntretien = () => {
-    setIncludesEntretien(prev => !prev);
-  };
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-[60]" onClick={onCancel} />
-
-      {/* Modal */}
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-full max-w-2xl max-h-[calc(100vh-4rem)] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
-          <h2 className="text-base font-semibold text-gray-900">
-            Planifier — {name}
-          </h2>
+  const sideExtra = (
+    <div className="space-y-3">
+      {/* Souplesse du RDV : jusqu'où son heure peut glisser pour la tournée. */}
+      <div className="rounded-lg border border-secondary-200 p-3 space-y-2">
+        <p className="text-xs font-medium text-secondary-600">Souplesse du rendez-vous</p>
+        <SouplesseSelect value={timeFlexMinutes} onChange={setTimeFlexMinutes} defaut={souplesseDefaut} compact />
+      </div>
+      {isSAV && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
           <button
-            onClick={onCancel}
-            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+            type="button"
+            onClick={() => setIncludesEntretien((prev) => !prev)}
+            className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-all w-full justify-center ${
+              includesEntretien
+                ? 'text-blue-700 bg-blue-100 border-blue-300'
+                : 'text-blue-700 bg-white border-blue-200 hover:bg-blue-50'
+            }`}
           >
-            <X className="h-4 w-4" />
+            {includesEntretien ? <Check className="w-4 h-4" /> : <ClipboardCheck className="w-4 h-4" />}
+            {includesEntretien ? 'Entretien inclus' : 'Ajouter l’entretien'}
           </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {/* Souplesse du RDV : jusqu'où son heure peut glisser pour la tournée. */}
-          <div className="rounded-lg border border-secondary-200 p-3 space-y-2">
-            <p className="text-xs font-medium text-secondary-600">Souplesse du rendez-vous</p>
-            <SouplesseSelect value={timeFlexMinutes} onChange={setTimeFlexMinutes} defaut={souplesseDefaut} compact />
-          </div>
-          {/* Toggle Entretien (SAV uniquement) */}
-          {isSAV && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
-              <button
-                type="button"
-                onClick={handleToggleEntretien}
-                className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-all w-full justify-center ${
-                  includesEntretien
-                    ? 'text-blue-700 bg-blue-100 border-blue-300'
-                    : 'text-blue-700 bg-white border-blue-200 hover:bg-blue-50'
-                }`}
-              >
-                {includesEntretien ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <ClipboardCheck className="w-4 h-4" />
-                )}
-                {includesEntretien ? 'Entretien inclus' : 'Réaliser l\'entretien'}
-              </button>
-
-              {includesEntretien && contractAmount > 0 && (
-                <div className="flex items-center justify-between text-xs text-blue-700">
-                  <span>Montant total (devis + entretien)</span>
-                  <span className="font-bold">{formatEuro(totalAmount)}</span>
-                </div>
-              )}
+          {includesEntretien && contractAmount > 0 && (
+            <div className="flex items-center justify-between text-xs text-blue-700">
+              <span>Montant total (devis + entretien)</span>
+              <span className="font-bold">{formatEuro(totalAmount)}</span>
             </div>
           )}
-
-          {/* Assistant créneaux (Bloc B) — multi-créneau + colonnes par technicien */}
-          <SchedulingAssistant
-            lead={schedulingLead}
-            orgId={orgId}
-            commercials={[]}
-            onConfirm={handleConfirmScheduling}
-            onCancel={onCancel}
-            isLoading={loading}
-            appointmentTypeLabel={appointmentTypeLabel}
-            appointmentTypeValue={appointmentTypeValue}
-            assigneeType="technician"
-            members={teamMembers || []}
-            defaultDuration={defaultDuration}
-            fixedDuration={fixedDuration}
-            defaultSubjectPrefix={defaultSubjectPrefix}
-            multi
-          />
         </div>
-      </div>
-    </>
+      )}
+    </div>
+  );
+
+  return createPortal(
+    <EventModal
+      isOpen
+      mode="create"
+      prefillClient={{
+        id: item.client_id || null,
+        display_name: name,
+        last_name: item.client_last_name || item.client_name || '',
+        first_name: item.client_first_name || '',
+        phone: item.client_phone || '',
+        email: item.client_email || '',
+        address: item.client_address || '',
+        postal_code: item.client_postal_code || '',
+        city: item.client_city || '',
+      }}
+      members={teamMembers || []}
+      orgId={orgId}
+      userId={user?.id}
+      attachContext={{
+        interventionId: item.id,
+        lockedType: isSAV ? 'service' : 'maintenance',
+        subjectLabel: isSAV ? (includesEntretien ? 'SAV + Entretien' : 'SAV') : 'Entretien',
+        multi: true,
+        defaultDuration: isSAV && item.estimated_time ? Math.round(Number(item.estimated_time) * 60) : null,
+        sideExtra,
+        submitSlots: (slots) => onConfirm(slots, includesEntretien, { timeFlexMinutes }),
+      }}
+      onClose={onCancel}
+      onSave={async () => false}
+      onDelete={async () => {}}
+      onCancel={async () => {}}
+    />,
+    document.body,
   );
 }
 

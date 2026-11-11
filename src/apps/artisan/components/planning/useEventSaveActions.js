@@ -207,10 +207,20 @@ export function useEventSaveActions({
       const subjectFor = (s) => (isLeave && prenomsDe(s.technicianIds) ? `${typeLabel} — ${prenomsDe(s.technicianIds)}` : autoSubject);
       const slots = assistantSlots.map((s) => ({ ...s, subject: subjectFor(s), notes: null }));
 
-      const { error: batchErr } = await appointmentsService.createAppointmentBatch(slots, {
+      // Création confiée à l'écran d'origine (glisser-déposer kanban, fiche contrat) :
+      // savService.scheduleEntretien reste la voie unique de planification entretien / SAV
+      // (souplesse, voisins). Il ferme la fenêtre lui-même en cas de succès.
+      if (attachContext?.submitSlots) {
+        try { await attachContext.submitSlots(slots); } finally { setBatchSaving(false); }
+        return;
+      }
+
+      const { data: createdRdv, error: batchErr } = await appointmentsService.createAppointmentBatch(slots, {
         coreOrgId: orgId,
         appointment_type: formData.appointment_type,
         lead_id: act.leadId,
+        // Chantier d'origine (fiche chantier) : un lead peut en porter plusieurs
+        chantier_id: attachContext?.chantierId || null,
         intervention_id: act.interventionId,
         client_id: selectedClient?.id || null,
         client_name: formData.client_name?.trim() || null,
@@ -249,7 +259,7 @@ export function useEventSaveActions({
       // Suites propres à l'écran d'origine (fiche SAV : date de la carte, fiche web confirmée).
       // Le RDV existe : un échec ici se dit sans le défaire.
       if (onCreated) {
-        try { await onCreated(slots); } catch (err) { logger.error('[EventModal] onCreated error:', err); }
+        try { await onCreated(slots, createdRdv || []); } catch (err) { logger.error('[EventModal] onCreated error:', err); }
       }
       onClose();
     } catch (err) {

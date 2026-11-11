@@ -1,12 +1,12 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Phone, CalendarPlus, XCircle, PhoneForwarded } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { callCampaignsService } from '@services/callCampaigns.service';
-import { appointmentsService } from '@services/appointments.service';
 import { entretiensService } from '@services/entretiens.service';
 import { useTeamMembers } from '@hooks/useAppointments';
-import { SchedulingAssistant } from '../planning/scheduling/SchedulingAssistant';
+import { EventModal } from '../planning/EventModal';
+import { createPortal } from 'react-dom';
 
 /**
  * Screen-pop affiché quand un transfert d'appel est accepté.
@@ -18,7 +18,6 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
   const { user } = useAuth();
   const [ctx, setCtx] = useState(null);
   const [mode, setMode] = useState(null); // null | 'rdv' | 'refus'
-  const [slots, setSlots] = useState([]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -31,46 +30,9 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
     return () => { alive = false; };
   }, [contact.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Techniciens disponibles pour l'assistant créneaux
+  // Équipe pour la fenêtre « Nouveau RDV »
   const { members } = useTeamMembers(orgId);
-  const technicians = useMemo(
-    () => (members || []).filter((m) => m.role === 'technician'),
-    [members],
-  );
 
-  // Lead minimal pour l'assistant (pré-remplit le contact)
-  const schedulingLead = useMemo(
-    () => ({
-      last_name: contact.name || '',
-      first_name: '',
-      phone: contact.phone || '',
-      email: '',
-      address: '',
-      city: '',
-      postal_code: '',
-      assigned_user_id: null,
-    }),
-    [contact.name, contact.phone],
-  );
-
-  const bookRdv = async () => {
-    if (slots.length === 0) { toast.error('Choisissez un créneau'); return; }
-    setBusy(true);
-    const { error } = await appointmentsService.createAppointmentBatch(slots, {
-      coreOrgId: orgId,
-      appointment_type: 'maintenance',
-      intervention_id: contact.id,        // carte entretien connue → carte passe en "Planifié" (Bloc A)
-      lead_id: null,
-      client_id: ctx?.client_id ?? null,
-      client_name: contact.name || null,
-      client_phone: contact.phone || null,
-      subjectPrefix: contact.name ? `Entretien — ${contact.name}` : 'Entretien',
-    });
-    setBusy(false);
-    if (error) { toast.error('Erreur création RDV'); return; }
-    toast.success('RDV planifié');
-    onClosed({ result: 'rdv_booked' });   // hook journalise rdv_booked + avance la file
-  };
 
   const refuse = async () => {
     if (!ctx?.contract_id) {
@@ -98,7 +60,7 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
 
   const callback = () => onClosed({ result: 'callback' });
 
-  const goBack = () => { setMode(null); setSlots([]); };
+  const goBack = () => { setMode(null); };
 
   return (
     <div className="rounded-xl border bg-white shadow-lg p-5 overflow-y-auto max-h-[85vh]">
@@ -152,29 +114,23 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
         </button>
       )}
 
-      {/* Panneau RDV — assistant créneaux unifié */}
-      {mode === 'rdv' && (
-        <div className="mt-3 border-t pt-3">
-          <SchedulingAssistant
-            embedded
-            orgId={orgId}
-            lead={schedulingLead}
-            members={technicians}
-            assigneeType="technician"
-            fixedAssigneeId={null}
-            appointmentTypeLabel="Entretien"
-            defaultDuration={60}
-            multi={false}
-            onSlotsChange={setSlots}
-          />
-          <button
-            disabled={busy || slots.length === 0}
-            onClick={bookRdv}
-            className="mt-3 w-full py-2 rounded-lg bg-emerald-600 text-white font-medium disabled:opacity-50"
-          >
-            {busy ? 'Enregistrement…' : 'Confirmer le RDV'}
-          </button>
-        </div>
+      {/* RDV = la fenêtre unique « Nouveau RDV », rattachée à la carte entretien (elle passe en Planifié) */}
+      {mode === 'rdv' && createPortal(
+        <EventModal
+          isOpen
+          mode="create"
+          prefillClient={{ id: ctx?.client_id ?? null, last_name: contact.name || '', phone: contact.phone || '' }}
+          members={members || []}
+          orgId={orgId}
+          userId={user?.id}
+          attachContext={{ interventionId: contact.id, lockedType: 'maintenance' }}
+          onCreated={() => onClosed({ result: 'rdv_booked' })}   // hook journalise rdv_booked + avance la file
+          onClose={() => setMode(null)}
+          onSave={async () => false}
+          onDelete={async () => {}}
+          onCancel={async () => {}}
+        />,
+        document.body,
       )}
 
       {/* Panneau Refus — inchangé */}

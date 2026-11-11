@@ -182,6 +182,25 @@ export function useLeadStatusTransitions({
     }
   };
 
+  // VT posée depuis la fenêtre unique « Nouveau RDV » (rattachée au lead) : elle a créé le(s)
+  // RDV ; ici, ce qui est propre à la carte — formulaire enregistré, lead en « RDV planifié »
+  // avec le PREMIER RDV créé (même suite que handleConfirmScheduling).
+  const handleVtPosee = async (slots, created) => {
+    if (!pendingRdvStatusId || !slots?.length) return;
+    try {
+      await persistForm();
+      await updateLeadStatus(leadId, pendingRdvStatusId, userId, {
+        appointmentDate: slots[0].date,
+        appointmentId: created?.[0]?.id || null,
+      });
+      setPendingRdvStatusId(null);
+      done();
+    } catch (err) {
+      logger.error('[LeadModal] Erreur passage RDV planifié:', err);
+      toast.error('RDV posé, mais le lead n’a pas pu passer en « RDV planifié »');
+    }
+  };
+
   // Confirmer transition vers Contacté (depuis bouton statut)
   const handleConfirmContact = async (callData) => {
     if (!pendingContactStatusId) return;
@@ -354,7 +373,7 @@ export function useLeadStatusTransitions({
     followupModalOpen, setFollowupModalOpen, followupLoading,
     pendingQuoteStatusId, setPendingQuoteStatusId, quoteLoading,
     showQuoteCandidates, setShowQuoteCandidates, showMarkWon, setShowMarkWon,
-    handleStatusChange, handleConfirmLost, handleConfirmScheduling, handleConfirmContact,
+    handleStatusChange, handleConfirmLost, handleConfirmScheduling, handleVtPosee, handleConfirmContact,
     handleConfirmQuote, handleSendDevis, handleLogCall, handleLogFollowup, handleConvert,
   };
 }

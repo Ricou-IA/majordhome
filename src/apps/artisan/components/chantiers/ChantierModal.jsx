@@ -40,8 +40,8 @@ import { CreateContractModal } from '../entretiens/CreateContractModal';
 import { ChantierReceptionSection } from './ChantierReceptionSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';
 import { GroupChantiersDialog } from './GroupChantiersDialog';
-import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
-import { PlannedOrderFields } from '@apps/artisan/components/planning/scheduling/PlannedOrderFields';
+import { EventModal } from '@apps/artisan/components/planning/EventModal';
+import { createPortal } from 'react-dom';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { logger } from '@lib/logger';
 
@@ -87,7 +87,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
   // Planification installation (assistant créneaux)
   const [showScheduler, setShowScheduler] = useState(false);
-  const [isSchedulingInstall, setIsSchedulingInstall] = useState(false);
 
   // Commande « personnes × jours » (spec 2026-09-21) : persistée sur le chantier,
   // l'assistant et le badge J i/N en dérivent. Sauvegarde au blur, sans bloquer.
@@ -234,52 +233,14 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     }
   };
 
-  // Objet « lead-like » pour l'assistant (pré-remplit le nom dans l'objet du RDV).
-  const schedulingLead = {
-    last_name: chantier.last_name || '',
-    first_name: chantier.first_name || '',
-    assigned_user_id: null,
-  };
-
-  // Planifier des jours d'installation : l'assistant remonte slots[] → N appointments
-  // `installation` (chantier_id = chantier, lead_id = son lead). createAppointment → syncCardStateOnCreate avance
-  // le chantier en « planification » (forward-only, Bloc A) ; onUpdated rafraîchit le kanban.
-  const handleConfirmInstallation = async (slots) => {
-    if (!slots || slots.length === 0) return;
-    setIsSchedulingInstall(true);
-    try {
-      const { error } = await appointmentsService.createAppointmentBatch(slots, {
-        coreOrgId: orgId,
-        appointment_type: 'installation',
-        chantier_id: chantier.id,
-        lead_id: chantier.lead_id,
-        client_id: chantier.client_id || null,
-        client_name: chantier.last_name || 'Sans nom',
-        client_first_name: chantier.first_name || null,
-        // Photo de contact complète sur le RDV (le téléphone manquait sur les installations).
-        client_phone: chantier.phone || null,
-        client_email: chantier.email || null,
-        address: chantier.address || null,
-        city: chantier.city || null,
-        postal_code: chantier.postal_code || null,
-        subjectPrefix: 'Installation',
-      });
-      if (error) {
-        logger.error('[ChantierModal] createAppointmentBatch error:', error);
-        toast.error('Erreur lors de la planification');
-        return;
-      }
-      setShowScheduler(false);
-      refreshInstallAppointments();
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
-      onUpdated?.();
-      toast.success(slots.length > 1 ? `${slots.length} jours planifiés` : 'Installation planifiée');
-    } catch (err) {
-      logger.error('[ChantierModal] handleConfirmInstallation error:', err);
-      toast.error('Une erreur est survenue');
-    } finally {
-      setIsSchedulingInstall(false);
-    }
+  // Jours d'installation posés depuis la fenêtre unique « Nouveau RDV » (rattachée au chantier :
+  // chantier_id + lead_id ; createAppointment → syncCardStateOnCreate avance le chantier en
+  // « planification »). Ici, ce qui est propre à la fiche : sa liste de jours et le kanban.
+  const handleInstallationPosee = async () => {
+    setShowScheduler(false);
+    refreshInstallAppointments();
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+    onUpdated?.();
   };
 
   // Supprimer un jour d'installation (throw en cas d'erreur → la section catch + toast).
@@ -426,35 +387,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
           </>)}
 
           {/* Section installation (Bloc B stage 4 : jours = appointments `installation`) */}
-          {showScheduler ? (
-            <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-3 space-y-3">
-              {/* Commande « personnes × jours » : saisie ici, persistée sur le chantier */}
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <PlannedOrderFields
-                  teamSize={plannedOrder.teamSize}
-                  days={plannedOrder.days}
-                  onChange={handlePlannedOrderChange}
-                />
-              </div>
-              <SchedulingAssistant
-                lead={schedulingLead}
-                orgId={orgId}
-                assigneeType="technician"
-                members={members}
-                appointmentTypeLabel="Installation"
-                appointmentTypeValue="installation"
-                defaultDuration={480}
-                multi
-                mergeOverlapping
-                fullDayClick
-                expectedTeamSize={plannedOrder.teamSize}
-                expectedDays={plannedOrder.days}
-                onConfirm={handleConfirmInstallation}
-                onCancel={() => setShowScheduler(false)}
-                isLoading={isSchedulingInstall}
-              />
-            </div>
-          ) : (
             <ChantierInterventionSection
               appointments={installAppointments}
               plannedOrder={plannedOrder}
@@ -463,7 +395,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
               provisoire={poseProvisoire(chantier)}
               disabled={!canEditChantier}
             />
-          )}
 
           {/* PV de réception — visible dès planification */}
           {['planification', 'realise', 'facture'].includes(chantier.chantier_status) && (
@@ -696,6 +627,45 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
         }
       }}
     />
+
+    {/* Planifier l'installation = la fenêtre unique « Nouveau RDV », rattachée au chantier */}
+    {showScheduler && createPortal(
+      <EventModal
+        isOpen
+        mode="create"
+        prefillClient={{
+          id: chantier.client_id || null,
+          last_name: chantier.last_name || '',
+          first_name: chantier.first_name || '',
+          phone: chantier.phone || '',
+          email: chantier.email || '',
+          address: chantier.address || '',
+          postal_code: chantier.postal_code || '',
+          city: chantier.city || '',
+        }}
+        members={members || []}
+        orgId={orgId}
+        userId={user?.id}
+        attachContext={{
+          leadId: chantier.lead_id,
+          chantierId: chantier.id,
+          lockedType: 'installation',
+          multi: true,
+          mergeOverlapping: true,
+          fullDayClick: true,
+          defaultDuration: 480,
+          plannedOrder: {
+            teamSize: plannedOrder.teamSize, days: plannedOrder.days, onChange: handlePlannedOrderChange,
+          },
+        }}
+        onCreated={handleInstallationPosee}
+        onClose={() => setShowScheduler(false)}
+        onSave={async () => false}
+        onDelete={async () => {}}
+        onCancel={async () => {}}
+      />,
+      document.body,
+    )}
     </>
   );
 }

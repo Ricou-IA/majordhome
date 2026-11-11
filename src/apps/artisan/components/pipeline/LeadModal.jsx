@@ -42,7 +42,6 @@ import { leadsService } from '@services/leads.service';
 import { logger } from '@lib/logger';
 import { hasPhoneNumber } from '@/lib/phoneUtils';
 import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
-import { dureeImposee } from '@/lib/planningEvents';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
 
 // Sous-composants extraits
@@ -62,7 +61,8 @@ import { useLeadClientLinking } from './useLeadClientLinking';
 import { LeadHardDeleteDialog } from './LeadHardDeleteDialog';
 import { LeadModalHeader, LeadModalFooter } from './LeadModalFrame';
 import SectionDevis from '../devis/SectionDevis';
-import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
+import { EventModal } from '@apps/artisan/components/planning/EventModal';
+import { createPortal } from 'react-dom';
 import { FicheTechniqueModal } from './FicheTechniqueModal';
 import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
@@ -208,7 +208,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     followupModalOpen, setFollowupModalOpen, followupLoading,
     pendingQuoteStatusId, setPendingQuoteStatusId, quoteLoading,
     showQuoteCandidates, setShowQuoteCandidates, showMarkWon, setShowMarkWon,
-    handleStatusChange, handleConfirmLost, handleConfirmScheduling, handleConfirmContact,
+    handleStatusChange, handleConfirmLost, handleConfirmScheduling, handleVtPosee, handleConfirmContact,
     handleConfirmQuote, handleSendDevis, handleLogCall, handleLogFollowup, handleConvert,
   } = useLeadStatusTransitions({
     leadId, isEditing, orgId, userId, form, setForm, statuses, linkedClientId: linkedClient?.id,
@@ -426,7 +426,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           currentStatus={currentStatus}
           pennylaneActive={pennylaneActive}
           onAttachQuotes={() => setShowQuoteCandidates(true)}
-          scheduling={!!pendingRdvStatusId}
+          scheduling={false}
           contactName={`${form.first_name || ''} ${form.last_name || ''}`}
           onBack={cancelScheduling}
           onClose={onClose}
@@ -438,26 +438,6 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
             </div>
-          ) : pendingRdvStatusId ? (
-            /* ── Mode planification RDV (VT) : overlay plein body ──
-               Assistant en mode commercial — affiche la dispo du SEUL commercial
-               assigné à la carte (figé), 1 créneau, sortie assigned_commercial_id. */
-            <SchedulingAssistant
-              assigneeType="commercial"
-              fixedAssigneeId={lead?.assigned_user_id || form?.assigned_user_id || null}
-              multi={false}
-              commercials={commercials}
-              appointmentTypeLabel="Visite technique"
-              appointmentTypeValue="rdv_technical"
-              // Une VT se pose en bloc de 1 h au clic (Eric, 2026-10-10), comme depuis le planning.
-              defaultDuration={dureeImposee('rdv_technical')}
-              fixedDuration={dureeImposee('rdv_technical')}
-              lead={lead || form}
-              orgId={orgId}
-              onConfirm={handleConfirmScheduling}
-              onCancel={cancelScheduling}
-              isLoading={schedulingLoading}
-            />
           ) : (
             <>
               {/* PR 4/5 bridge — devis Pennylane attachés (read-only) */}
@@ -741,6 +721,39 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         }}
         onCancel={() => setDuplicateCandidates(null)}
       />
+      {/* Planifier la VT = la fenêtre unique « Nouveau RDV », rattachée au lead, sur la colonne
+          du commercial de la carte (ids `commercials`, comme avant). */}
+      {pendingRdvStatusId && createPortal(
+        <EventModal
+          isOpen
+          mode="create"
+          prefillClient={{
+            id: linkedClient?.id || null,
+            last_name: form.last_name || '',
+            first_name: form.first_name || '',
+            phone: form.phone || '',
+            email: form.email || '',
+            address: form.address || '',
+            postal_code: form.postal_code || '',
+            city: form.city || '',
+          }}
+          members={[]}
+          orgId={orgId}
+          userId={userId}
+          attachContext={{
+            leadId,
+            lockedType: 'rdv_technical',
+            commercials,
+            fixedAssigneeId: lead?.assigned_user_id || form?.assigned_user_id || null,
+          }}
+          onCreated={handleVtPosee}
+          onClose={cancelScheduling}
+          onSave={async () => false}
+          onDelete={async () => {}}
+          onCancel={async () => {}}
+        />,
+        document.body,
+      )}
     </>
   );
 }
