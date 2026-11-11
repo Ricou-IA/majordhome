@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { appareilDepuisApi, controlerReleve } from './invicta-pieces-releve.js';
 import { piecesDepuisReleveInvicta, nomModele, lotsParModele, CATEGORIE_PIECE } from './invicta-pieces.js';
+import { typeDocument, extensionDepuisMime, cleContenu, cheminImage, cheminDocument, nomFichierDocument, fichiersACopier, fichiersPourModeles } from './invicta-pieces-fichiers.js';
 import { CATEGORIE_PIECE_DETACHEE, exclurePiecesDetachees, referenceLigneArticle, remisePiecesValide, connectorConfigAvecPieces } from '../../src/lib/catalogue/piecesDetachees.js';
 
 // Réponse réduite de GET products/{publicId} (forme relevée sur le site le 2026-11-11).
@@ -282,6 +283,75 @@ test('remisePiecesValide et connectorConfigAvecPieces', () => {
   // pas de réglage de pièces : rien n'est inventé
   assert.deepEqual(connectorConfigAvecPieces({ sca_path: '/a' }, null, '30'), { sca_path: '/a' });
   assert.deepEqual(connectorConfigAvecPieces({}, undefined, ''), {});
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Copie des fichiers (photos, vues éclatées, documents)
+// ---------------------------------------------------------------------------------------------------------------
+const ORG_T = '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+const releveFichiers = () => {
+  const r = FIXTURE();
+  r.appareils[0].photo = { url: 'https://cdn/p1', fileId: 'p1', width: 763, height: 800 };
+  r.appareils[0].vues_eclatees = [{ url: 'https://cdn/v1', fileId: 'v1', width: 692, height: 787 }, { url: 'https://cdn/v2', fileId: 'v2', width: 1200, height: 900 }];
+  r.appareils[0].documents = [
+    { id: 'd1', type: 'Notice', label: 'Notice', fileKey: 'k1', publicFileKey: 'k1' },
+    { id: 'd2', type: 'Datasheet', label: 'datasheet', fileKey: 'k2', publicFileKey: 'k2' },
+    { id: 'd3', type: 'Program', label: 'THERA', fileKey: 'k3', publicFileKey: 'k3' },
+  ];
+  r.appareils[1].photo = { url: 'https://cdn/p1', fileId: 'p1', width: 763, height: 800 }; // même photo que l'autre appareil
+  r.appareils[1].documents = [{ id: 'd4', type: 'Procedure', label: 'Mise en service : NOLA 8 / (2)', fileKey: 'k4', publicFileKey: 'k4' }];
+  return r;
+};
+
+test('types, extensions, clé de contenu, chemins, nom de fichier', () => {
+  assert.deepEqual(['Notice', 'Datasheet', 'Procedure', 'Program', undefined].map(typeDocument), ['notice', 'fiche_technique', 'procedure', null, null]);
+  assert.equal(extensionDepuisMime('application/pdf'), 'pdf');
+  assert.equal(extensionDepuisMime('image/webp; charset=binary'), 'webp');
+  assert.equal(extensionDepuisMime('application/zip'), null);
+  assert.equal(cleContenu('"c45f8dc9b1f26c399404d14f085f35a8"'), 'c45f8dc9b1f26c399404d14f085f35a8');
+  assert.equal(cleContenu('W/"ABC-12"'), 'abc-12');
+  assert.equal(cleContenu(null), null);
+  assert.equal(cheminImage(ORG_T, 'f1', 'webp'), `${ORG_T}/equipment-models/site/img-f1.webp`);
+  assert.equal(cheminDocument(ORG_T, 'abc', 'pdf'), `${ORG_T}/equipment-models/site/doc-abc.pdf`);
+  assert.equal(nomFichierDocument('Mise en service : NOLA 8 / (2)', 'Procedure', 'pdf'), 'Mise en service NOLA 8 (2).pdf');
+  assert.equal(nomFichierDocument('Notice.PDF', 'Notice', 'pdf'), 'Notice.PDF');
+  assert.equal(nomFichierDocument('', 'Notice', 'pdf'), 'Notice.pdf');
+});
+
+test('fichiersACopier : une image par fichier, micrologiciels ignorés et comptés', () => {
+  const f = fichiersACopier(releveFichiers());
+  assert.deepEqual(f.images.map((i) => i.fileId), ['p1', 'v1', 'v2']);
+  assert.deepEqual(f.documents.map((d) => d.id + ':' + d.type), ['d1:notice', 'd2:fiche_technique', 'd4:procedure']);
+  assert.deepEqual(f.ignores, { Program: 1 });
+});
+
+test('fichiersPourModeles : tout déposé', () => {
+  const deposes = {
+    images: new Map([['p1', { path: 'o/p1' }], ['v1', { path: 'o/v1' }], ['v2', { path: 'o/v2' }]]),
+    documents: new Map([['d1', { path: 'o/d1', size: 10, mime: 'application/pdf', ext: 'pdf' }], ['d2', { path: 'o/d2', size: 20, mime: 'application/pdf', ext: 'pdf' }], ['d4', { path: 'o/d4', size: 30, mime: 'application/pdf', ext: 'pdf' }]]),
+  };
+  const { fichiers, bilan } = fichiersPourModeles(releveFichiers(), deposes);
+  assert.equal(fichiers.length, 2);
+  assert.equal(fichiers[0].source_id, 'pub-P601314');
+  assert.equal(fichiers[0].photo_path, 'o/p1');
+  assert.deepEqual(fichiers[0].exploded_views, [{ path: 'o/v1', width: 692, height: 787 }, { path: 'o/v2', width: 1200, height: 900 }]);
+  assert.deepEqual(fichiers[0].documents.map((d) => [d.id, d.type, d.file_name, d.storage_path, d.file_size, d.fileKey]), [['d1', 'notice', 'Notice.pdf', 'o/d1', 10, 'k1'], ['d2', 'fiche_technique', 'datasheet.pdf', 'o/d2', 20, 'k2']]);
+  assert.equal(fichiers[1].photo_path, 'o/p1');
+  assert.deepEqual(fichiers[1].exploded_views, []);
+  assert.deepEqual(bilan, { images_manquantes: 0, documents_manquants: 0, documents_absents: 0, modeles_documents_incomplets: 0, documents_ecrits: 3 });
+});
+
+test('fichiersPourModeles : rien d’approximatif — vue manquante, document en échec, document absent du site', () => {
+  const deposes = {
+    images: new Map([['v1', { path: 'o/v1' }]]), // photo p1 et vue v2 en échec
+    documents: new Map([['d1', { path: 'o/d1', size: 10, mime: 'application/pdf', ext: 'pdf' }], ['d4', { absent: true }]]), // d2 en échec, d4 lien mort
+  };
+  const { fichiers, bilan } = fichiersPourModeles(releveFichiers(), deposes);
+  assert.equal(fichiers[0].photo_path, null);            // photo non déposée : laissée telle quelle en base
+  assert.deepEqual(fichiers[0].exploded_views, []);      // une vue sur deux : on n'écrit pas une liste partielle
+  assert.equal(fichiers[0].documents, null);             // un document en échec : la liste du modèle n'est pas touchée
+  assert.deepEqual(fichiers[1].documents, []);           // seul document = lien mort : liste complète, vide
+  assert.deepEqual(bilan, { images_manquantes: 3, documents_manquants: 1, documents_absents: 1, modeles_documents_incomplets: 1, documents_ecrits: 0 });
 });
 
 // ---------------------------------------------------------------------------------------------------------------

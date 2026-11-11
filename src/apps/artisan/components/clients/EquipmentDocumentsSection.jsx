@@ -25,7 +25,7 @@ import { logger } from '@lib/logger';
 const ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp';
 const MAX_SIZE = 20 * 1024 * 1024; // limite du bucket product-documents
 
-const TYPE_ICON = { notice: BookOpen, vue_eclatee: Layers, autre: FileText };
+const TYPE_ICON = { notice: BookOpen, vue_eclatee: Layers, fiche_technique: FileText, procedure: FileText, autre: FileText };
 
 
 function DocumentRow({ doc, badge, canDelete, onDelete }) {
@@ -239,7 +239,9 @@ export function EquipmentDocumentsSection({
       {total > 0 ? (
         <div className="mt-1.5 -mx-2">
           {modelDocuments.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} canDelete={canDelete && !!onDelete} onDelete={setDeleting} />
+            // document relevé sur le site du fabricant : son type en pastille, pas de retrait ici (le relevé suivant le remettrait)
+            <DocumentRow key={doc.id} doc={doc} badge={doc.from_site ? equipmentDocumentTypeLabel(doc.document_type) : null}
+              canDelete={canDelete && !!onDelete && !doc.from_site} onDelete={setDeleting} />
           ))}
           {productDocuments.map((doc) => (
             <DocumentRow key={`p-${doc.id}`} doc={{ ...doc, label: doc.file_name, document_type: 'autre' }} badge={doc.document_type || 'Fournisseur'} />

@@ -379,6 +379,24 @@ Relevé réel : 470 appareils, 1 771 pièces distinctes, 13 974 lignes de nomenc
 - Une pièce désactivée par un relevé garde son article actif (limite connue : la recherche d'articles ne propose
   que les articles ayant une offre active, donc elle disparaît bien du devis).
 
+## 7 quater. Tranche 2 (fichiers) — faits et décisions (2026-11-11)
+
+- **Les fichiers du site sont publics** (images sur `cdn.prod.platform.invicta-group.fr`, documents sur
+  `/media/documents/{fileKey}`, servis par CloudFront sans session) : la copie se fait par un script Node, sans
+  aucun identifiant. Le § 5.4 laissait le choix ouvert.
+- **Un objet Storage par contenu, pas par document** : le site publie la même procédure sous un identifiant
+  différent pour chaque appareil (973 documents = 1,4 Go, 299 contenus distincts = environ 600 Mo). L'identité d'un
+  contenu est l'ETag du site. Conséquence : un document relevé ne supprime jamais son objet ; l'écran ne propose pas
+  de retirer un document relevé (le relevé suivant le remettrait).
+- **Rien d'approximatif** : vues éclatées en tout ou rien par appareil ; la liste des documents d'un modèle n'est
+  réécrite que si chaque document a été déposé ou est définitivement écarté (lien mort, ou autre format qu'un PDF —
+  un `.docx` au relevé).
+- **Photo des articles du tarif** : adresse publique du CDN du fabricant (comme les autres relevés de catalogue),
+  posée seulement sur un article sans photo — 75 articles ; les autres poêles du tarif n'ont pas de photo sur le
+  site de pièces.
+- Résultat : 274 modèles avec photo, 394 avec vue éclatée, 243 notices, 108 fiches techniques, 621 procédures.
+  Projet Supabase en offre Pro : le volume n'est pas une contrainte.
+
 ## 8. Laissé au constructeur
 
 Noms exacts des colonnes et des vues, découpage des composants, forme du champ de repère, taille des lots SQL,

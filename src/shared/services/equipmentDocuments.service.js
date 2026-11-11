@@ -11,6 +11,10 @@
  *
  * Fichiers : bucket product-documents, chemin `${orgId}/equipment-models/…`
  * (policies Storage org existantes).
+ *
+ * Depuis 20261111_3, la même vue rend aussi les documents RELEVÉS sur le site du
+ * fabricant (notice, fiche technique, procédures) pour un équipement rattaché à
+ * son modèle fabricant (`from_site`) : lecture seule ici, écrits par l'import.
  * ============================================================================
  */
 
@@ -24,8 +28,16 @@ const EQUIPMENT_DOCUMENT_BUCKET = 'product-documents';
 export const EQUIPMENT_DOCUMENT_TYPES = [
   { value: 'notice', label: 'Notice technique' },
   { value: 'vue_eclatee', label: 'Vue éclatée' },
+  { value: 'fiche_technique', label: 'Fiche technique' },
+  { value: 'procedure', label: 'Procédure' },
   { value: 'autre', label: 'Autre' },
 ];
+
+/**
+ * Un document RELEVÉ sur le site du fabricant (`from_site` de la vue par équipement, ou `equipment_model_id`
+ * renseigné) partage son fichier avec d'autres modèles : le retirer retire la ligne, jamais le fichier.
+ */
+export const estDocumentReleve = (doc) => doc?.from_site === true || !!doc?.equipment_model_id;
 
 export const equipmentDocumentTypeLabel = (value) =>
   EQUIPMENT_DOCUMENT_TYPES.find((t) => t.value === value)?.label || 'Document';
@@ -125,7 +137,8 @@ export const equipmentDocumentsService = {
         .select('id');
       if (error) throw error;
       if (!data?.length) throw new Error('equipment_document_delete_refused');
-      if (doc.storage_path) await storageService.deleteFile(EQUIPMENT_DOCUMENT_BUCKET, doc.storage_path);
+      // fichier d'un document relevé = partagé par contenu avec d'autres modèles (migration 20261111_3) : on le garde
+      if (doc.storage_path && !estDocumentReleve(doc)) await storageService.deleteFile(EQUIPMENT_DOCUMENT_BUCKET, doc.storage_path);
       return true;
     }, 'equipmentDocuments.remove');
   },
