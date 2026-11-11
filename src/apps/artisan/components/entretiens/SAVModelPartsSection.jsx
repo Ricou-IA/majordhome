@@ -20,6 +20,7 @@ import { leadDepuisCarteSav } from '@/lib/savDevis';
 import { libelleEquipement } from '@/lib/equipmentReferential';
 import { EquipmentPartsSection } from '../equipements/EquipmentPartsSection';
 import CreateDevisModal from '../devis/CreateDevisModal';
+import TrouverPieceButton from '../assistant/TrouverPieceButton';
 
 const nomEquipement = (eq, referentiel) => [libelleEquipement(eq, referentiel), eq.brand, eq.model].filter(Boolean).join(' · ');
 
@@ -88,6 +89,7 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
           selectionVersion={versionSelection}
         />
       )}
+      {equipement && <TrouverPieceButton key={`assistant-${equipement.id}`} equipment={equipement} interventionId={item.id} />}
       {equipement && !equipement.equipment_model_id && !canEdit && (
         <p className="text-xs text-gray-500">Le modèle fabricant de cet appareil n&apos;a pas encore été choisi.</p>
       )}
