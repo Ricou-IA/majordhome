@@ -4,6 +4,8 @@
 // Règle qui tient tout le module : la machine PROPOSE des DPE, elle n'en rattache jamais un. Aucune fonction
 // d'ici ne choisit un candidat, même quand il est seul.
 
+import { VERSION_CARTE } from './dpeCorpus.js';
+
 const FORME_NUMERO = /^[0-9A-Za-z]{13}$/;
 
 /** @param {unknown} n @returns {boolean} */
@@ -104,4 +106,70 @@ export function etatDuLien({ dpeNumber, verification, acces }) {
  */
 export function lienObservatoire(numero) {
   return numeroDpeValide(numero) ? `https://observatoire-dpe-audit.ademe.fr/afficher-dpe/${numero.trim()}` : null;
+}
+
+// ============================================================================
+// Refonte 2026-11-12 (spec 2026-11-12-logement-monsieurdpe-fiche-client-design.md) : ce que la fiche fait à
+// l'ouverture, et la disponibilité de l'envoi du rapport au client.
+// ============================================================================
+
+/**
+ * Adresse de la fiche, normalisée pour détecter un changement (casse, accents, espaces). Null si incomplète :
+ * rue obligatoire, et code postal ou commune.
+ * @param {{ address?: string|null, postal_code?: string|null, city?: string|null } | null | undefined} client
+ * @returns {string | null}
+ */
+export function adresseNormalisee(client) {
+  const p = (v) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const rue = p(client?.address);
+  const cp = p(client?.postal_code);
+  const ville = p(client?.city);
+  if (!rue || (!cp && !ville)) return null;
+  return [rue, cp, ville].filter(Boolean).join(' ');
+}
+
+/**
+ * Que faire à l'ouverture de la fiche ? Une seule décision par montage, appliquée par l'edge dpe-lien.
+ * - `rattacher` : chercher le DPE à l'adresse (première fois, ou adresse changée sur un rattachement auto) ;
+ * - `actualiser` : relire la carte du numéro de la fiche (numéro tapé à la main, carte absente ou périmée) ;
+ * - `signaler_adresse` : l'adresse a changé depuis un rattachement choisi ou saisi — on garde et on le dit ;
+ * - `rien`.
+ * @param {{ adresseFiche: string|null, dpeNumberFiche?: string|null, peutModifier: boolean,
+ *   clientDpe: { dpe_number?: string|null, origine?: string|null, etat?: string|null, adresse_tentee?: string|null,
+ *   carte?: object|null, version_carte?: number|null } | null }} p
+ * @returns {'rien' | 'rattacher' | 'actualiser' | 'signaler_adresse'}
+ */
+export function actionALouverture({ adresseFiche, dpeNumberFiche, peutModifier, clientDpe }) {
+  if (!peutModifier) return 'rien';
+  const numeroFiche = (dpeNumberFiche || '').trim();
+  if (!clientDpe) {
+    if (numeroFiche) return 'actualiser';
+    return adresseFiche ? 'rattacher' : 'rien';
+  }
+  const numeroLigne = (clientDpe.dpe_number || '').trim();
+  if (numeroFiche !== numeroLigne) return 'actualiser';
+
+  const adresseChangee = Boolean(adresseFiche && clientDpe.adresse_tentee && clientDpe.adresse_tentee !== adresseFiche);
+  if (adresseChangee) {
+    if (!numeroLigne || clientDpe.origine === 'auto') return 'rattacher';
+    return 'signaler_adresse';
+  }
+  if (numeroLigne && (!clientDpe.carte || (clientDpe.version_carte ?? 0) < VERSION_CARTE)) return 'actualiser';
+  return 'rien';
+}
+
+/**
+ * Le bouton « Envoyer le rapport au client » : visible avec le module Communication et le droit de modifier
+ * la fiche ; grisé avec sa raison quand un prérequis manque. L'edge refuse de toute façon les mêmes cas.
+ * @param {{ communicationActive: boolean, peutModifier: boolean, emailClient?: string|null,
+ *   rapportComplet: boolean, expediteurConfigure: boolean }} p
+ * @returns {{ visible: boolean, actif: boolean, raison: string | null }}
+ */
+export function disponibiliteEnvoi({ communicationActive, peutModifier, emailClient, rapportComplet, expediteurConfigure }) {
+  if (!communicationActive || !peutModifier) return { visible: false, actif: false, raison: null };
+  const non = (raison) => ({ visible: true, actif: false, raison });
+  if (!(emailClient || '').trim()) return non("Aucune adresse e-mail sur la fiche du client.");
+  if (!rapportComplet) return non("MonsieurDPE n'a pas d'analyse complète pour ce DPE.");
+  if (!expediteurConfigure) return non("L'adresse d'expédition des e-mails n'est pas configurée : Paramètres → Emails.");
+  return { visible: true, actif: true, raison: null };
 }

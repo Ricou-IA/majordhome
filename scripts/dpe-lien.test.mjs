@@ -95,3 +95,71 @@ test('lienObservatoire : lien profond ADEME pour un numéro valide, null sinon',
   assert.equal(lienObservatoire('2662E2065219C'), 'https://observatoire-dpe-audit.ademe.fr/afficher-dpe/2662E2065219C');
   assert.equal(lienObservatoire('a b'), null);
 });
+
+// --- Refonte 2026-11-12 : décision à l'ouverture de la fiche, disponibilité de l'envoi -----------------------
+import { actionALouverture, adresseNormalisee, disponibiliteEnvoi } from '../src/lib/dpeLien.js';
+import { VERSION_CARTE } from '../src/lib/dpeCorpus.js';
+
+const FICHE = { address: '423 Chemin de Caroulet', postal_code: '31340', city: 'VACQUIERS' };
+const ADR = adresseNormalisee(FICHE);
+const LIGNE = { dpe_number: '2631E0482288Y', origine: 'auto', etat: 'rattache', adresse_tentee: ADR, carte: {}, version_carte: VERSION_CARTE };
+const ouvrir = (o) => actionALouverture({ adresseFiche: ADR, dpeNumberFiche: '2631E0482288Y', peutModifier: true, clientDpe: LIGNE, ...o });
+
+test('adresseNormalisee : casse, accents et espaces neutralisés ; adresse incomplète ⇒ null', () => {
+  assert.equal(adresseNormalisee({ address: ' 423  Chemin de Caroulet ', postal_code: '31340', city: 'Vacquiers' }), ADR);
+  assert.equal(adresseNormalisee({ address: '1 rue Été', postal_code: '', city: 'Gaillac' }), '1 rue ete gaillac');
+  assert.equal(adresseNormalisee({ address: '', postal_code: '31340', city: 'X' }), null);
+  assert.equal(adresseNormalisee({ address: '1 rue X', postal_code: '', city: '' }), null);
+  assert.equal(adresseNormalisee(null), null);
+});
+
+test('actionALouverture : première ouverture sans numéro ⇒ rattacher ; avec numéro tapé ⇒ actualiser', () => {
+  assert.equal(ouvrir({ clientDpe: null, dpeNumberFiche: '' }), 'rattacher');
+  assert.equal(ouvrir({ clientDpe: null }), 'actualiser');
+});
+
+test('actionALouverture : rien sans droit, sans adresse, ou quand tout est à jour', () => {
+  assert.equal(ouvrir({ peutModifier: false, clientDpe: null, dpeNumberFiche: '' }), 'rien');
+  assert.equal(ouvrir({ adresseFiche: null, clientDpe: null, dpeNumberFiche: '' }), 'rien');
+  assert.equal(ouvrir({}), 'rien');
+});
+
+test('actionALouverture : numéro de la fiche différent de la ligne (saisi à la main) ⇒ actualiser', () => {
+  assert.equal(ouvrir({ dpeNumberFiche: '2481E2082752C' }), 'actualiser');
+  assert.equal(ouvrir({ dpeNumberFiche: '' }), 'actualiser');
+});
+
+test('actionALouverture : carte absente ou d\'une version antérieure ⇒ actualiser', () => {
+  assert.equal(ouvrir({ clientDpe: { ...LIGNE, origine: 'choisi', carte: null } }), 'actualiser');
+  assert.equal(ouvrir({ clientDpe: { ...LIGNE, version_carte: 0 } }), 'actualiser');
+});
+
+test('actionALouverture : adresse changée — auto ⇒ rattacher, choisi / saisi ⇒ signaler', () => {
+  const autre = adresseNormalisee({ ...FICHE, address: '12 Rue Neuve' });
+  assert.equal(ouvrir({ adresseFiche: autre }), 'rattacher');
+  assert.equal(ouvrir({ adresseFiche: autre, clientDpe: { ...LIGNE, origine: 'choisi' } }), 'signaler_adresse');
+  assert.equal(ouvrir({ adresseFiche: autre, clientDpe: { ...LIGNE, origine: 'saisi' } }), 'signaler_adresse');
+  // Adresse de tentative inconnue (reprise de l'existant) : ce n'est pas un changement.
+  assert.equal(ouvrir({ clientDpe: { ...LIGNE, origine: 'choisi', adresse_tentee: null } }), 'rien');
+});
+
+test('actionALouverture : tentative sans DPE — même adresse ⇒ rien, adresse changée ⇒ rattacher', () => {
+  const sans = { dpe_number: null, origine: null, etat: 'aucun_dpe', adresse_tentee: ADR, carte: null, version_carte: null };
+  assert.equal(ouvrir({ clientDpe: sans, dpeNumberFiche: '' }), 'rien');
+  assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'candidats' }, dpeNumberFiche: '' }), 'rien');
+  assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'erreur' }, dpeNumberFiche: '' }), 'rien');
+  assert.equal(ouvrir({ clientDpe: sans, dpeNumberFiche: '', adresseFiche: '1 rue neuve 81600 gaillac' }), 'rattacher');
+});
+
+test('disponibiliteEnvoi : invisible sans module Communication ou sans droit ; raisons sinon', () => {
+  const base = { communicationActive: true, peutModifier: true, emailClient: 'a@b.fr', rapportComplet: true, expediteurConfigure: true };
+  assert.deepEqual(disponibiliteEnvoi(base), { visible: true, actif: true, raison: null });
+  assert.equal(disponibiliteEnvoi({ ...base, communicationActive: false }).visible, false);
+  assert.equal(disponibiliteEnvoi({ ...base, peutModifier: false }).visible, false);
+  for (const [cle, val] of [['emailClient', '  '], ['rapportComplet', false], ['expediteurConfigure', false]]) {
+    const d = disponibiliteEnvoi({ ...base, [cle]: val });
+    assert.equal(d.visible, true);
+    assert.equal(d.actif, false);
+    assert.ok(d.raison && d.raison.length > 10, cle);
+  }
+});
