@@ -409,14 +409,15 @@ export function EventModal({
     const ids = slot.technicianIds?.length ? slot.technicianIds : (slot.assignedCommercialId ? [slot.assignedCommercialId] : []);
     return ids.map(personneDe);
   };
-  const rdvParcours = {
+  const rdvParcours = useMemo(() => ({
     appointment_type: formData.appointment_type,
     client_name: formData.client_name,
     client_first_name: formData.client_first_name,
     address: formData.client_address,
     postal_code: formData.client_postal_code,
     city: formData.client_city,
-  };
+  }), [formData.appointment_type, formData.client_name, formData.client_first_name,
+    formData.client_address, formData.client_postal_code, formData.client_city]);
   // Aperçu (clic sur un prénom) : la tournée telle qu'elle est, si ce n'est pas déjà la personne d'un créneau
   const apercuDejaPose = apercu && assistantSlots.some((sl) => sl.date === apercu.date
     && personnesDuCreneau(sl).some((pers) => pers.ids.includes(apercu.memberId)));
@@ -425,7 +426,6 @@ export function EventModal({
       {apercu && !apercuDejaPose && (
         <ParcoursJournee
           key={`apercu-${apercu.memberId}-${apercu.date}`}
-          orgId={orgId}
           slot={{ date: apercu.date, startTime: null }}
           personne={personneDe(apercu.memberId)}
           coords={null}
@@ -436,7 +436,6 @@ export function EventModal({
       {assistantSlots.flatMap((slot) => personnesDuCreneau(slot).map((pers) => (
         <ParcoursJournee
           key={`${slot.date}-${slot.startTime}-${pers.key}`}
-          orgId={orgId}
           slot={slot}
           personne={pers}
           coords={coordsRdv}

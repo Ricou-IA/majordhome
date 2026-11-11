@@ -2,8 +2,11 @@
  * FeuilleDeRouteSection.jsx — Interventions du jour + itinéraire d'une personne
  * ============================================================================
  * Affichage seul : tout vient de `useFeuilleDeRoute` (modèle partagé avec le
- * PDF). Monté dans le panneau de remplissage (techniciens en tournée) et dans
- * `FeuilleDeRoutePanel` (techniciens planifiés à la main).
+ * PDF). SEUL affichage d'un itinéraire de journée : panneau de remplissage
+ * (techniciens en tournée), `FeuilleDeRoutePanel` (planifiés à la main) et, en
+ * variante `compact` avec le RDV en cours de pose (`ajout`), la fenêtre « Nouveau RDV »
+ * (`ParcoursJournee`). Partout : carte, heures de départ / retour, décalages
+ * (« arrivée au plus tôt », `retardsDeLaJournee`).
  *
  * Départ / Arrivée : un responsable peut imposer l'agence pour CE jour quand le
  * technicien part / rentre d'ailleurs (exception enregistrée, lue aussi par le
@@ -13,7 +16,7 @@
  * ============================================================================
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle, Car, Crosshair, Loader2, MapPin, Navigation, Printer, Home, X } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
@@ -83,15 +86,16 @@ function Simulation({ cote, simule, onSimuler }) {
  * Ligne « Départ · … » / « Arrivée · … ». Avec un point personnel et le droit de
  * choisir : deux boutons Agence / Domicile ; sinon le libellé seul.
  */
-function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange, disabled, simule, onSimuler }) {
+function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange, disabled, simule, onSimuler, heure, sansReglage = false }) {
   // Libellé du point personnel seul (sans siège) — null s'il n'y en a pas.
   const perso = resoudreExtremites({ siege: null, membre })[cote];
   const libelle = point?.label || 'Agence';
-  const simulation = <Simulation cote={cote} simule={simule} onSimuler={onSimuler} />;
-  if (simule || !peutChoisir || !perso) {
+  const simulation = sansReglage ? null : <Simulation cote={cote} simule={simule} onSimuler={onSimuler} />;
+  const heureEl = heure ? <span className="tabular-nums font-semibold text-gray-800">{heure}</span> : null;
+  if (sansReglage || simule || !peutChoisir || !perso) {
     return (
       <li className="flex items-center gap-1.5 text-xs font-medium text-gray-600 flex-wrap">
-        <Home className="h-3.5 w-3.5" /> {LIBELLE_COTE[cote]} · {!simule && <>{libelle} </>}{simulation}
+        <Home className="h-3.5 w-3.5" /> {heureEl} {LIBELLE_COTE[cote]} · {!simule && <>{libelle} </>}{simulation}
       </li>
     );
   }
@@ -120,7 +124,7 @@ function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange,
   );
   return (
     <li className="flex items-center gap-1.5 text-xs font-medium text-gray-600 flex-wrap">
-      <Home className="h-3.5 w-3.5" /> {LIBELLE_COTE[cote]}
+      <Home className="h-3.5 w-3.5" /> {heureEl} {LIBELLE_COTE[cote]}
       <span className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5">
         {bouton('perso', perso.label)}
         {bouton('agence', 'Agence')}
@@ -143,9 +147,15 @@ function Troncon({ troncon, label, estime }) {
 }
 
 /**
- * @param {{ date: string, memberIds: string[], person: { displayName: string, color?: string } }} props
+ * @param {object} props
+ * @param {string} props.date
+ * @param {string[]} props.memberIds
+ * @param {{ displayName: string, color?: string }} props.person
+ * @param {object|null} [props.ajout]  RDV en cours de pose, inséré à son heure (fenêtre « Nouveau RDV »)
+ * @param {boolean} [props.compact]    variante étroite : sans impression, sans choix ni simulation du
+ *   départ, arrêts sur une ligne (la fenêtre RDV) ; impossibilités dues à `ajout` en tête
  */
-export function FeuilleDeRouteSection({ date, memberIds, person }) {
+export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, compact = false }) {
   const { organization } = useAuth();
   const { settings } = useOrgSettings();
   // Simulation propre à CETTE journée de CETTE personne : changer de jour l'efface.
@@ -165,7 +175,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
     feuille, lienMaps, carteUrl, sansDepot, isLoading, error,
     depart, retour, membre, exception, setException, isSavingException, peutChoisir,
   } = useFeuilleDeRoute({
-    orgId: organization?.id, date, memberIds, person, simulation,
+    orgId: organization?.id, date, memberIds, person, simulation, ajout,
   });
 
   const changerExtremites = async (next) => {
@@ -177,7 +187,21 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
   };
   const choixProps = {
     membre, exception, peutChoisir, onChange: changerExtremites, disabled: isSavingException, onSimuler: simuler,
+    sansReglage: compact,
   };
+  // Impossibilités dues au RDV en cours de pose : on n'y arrive pas à l'heure, ou le suivant ne tient plus
+  const impossibles = useMemo(() => {
+    if (!feuille || !ajout) return [];
+    const i = feuille.items.findIndex((it) => it.nouveau);
+    if (i < 0) return [];
+    const nouveau = feuille.items[i];
+    const apres = feuille.items.slice(i + 1).find((it) => it.localise) || null;
+    const debut = (it) => it.time.split(' – ')[0];
+    return [
+      nouveau.retard && `Arrivée au plus tôt à ${nouveau.retard.arriveeAuPlusTot} pour un début à ${debut(nouveau)} (${formatDureeRoute(nouveau.retard.retardMinutes)} de retard).`,
+      apres?.retard && `Le RDV suivant (${apres.clientName || apres.typeLabel}, ${debut(apres)}) ne tient plus : arrivée au plus tôt à ${apres.retard.arriveeAuPlusTot}.`,
+    ].filter(Boolean);
+  }, [feuille, ajout]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [carteKo, setCarteKo] = useState(false);
 
@@ -220,7 +244,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
             </span>
           )}
         </p>
-        {n > 0 && (
+        {n > 0 && !compact && (
           <div className="flex items-center gap-2">
             {lienMaps && (
               <a
@@ -245,6 +269,12 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
         )}
       </div>
 
+      {impossibles.length > 0 && (
+        <div className="rounded-lg bg-red-50 border border-red-300 px-2 py-1.5 text-xs text-red-800 space-y-0.5">
+          <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />Impossible à cette heure</p>
+          {impossibles.map((m) => <p key={m}>{m}</p>)}
+        </div>
+      )}
       {sansDepot && n > 0 && (
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
           Configurez le siège dans <strong>Réglages → Organisation → Territoire</strong> pour calculer l&apos;itinéraire.
@@ -290,7 +320,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
 
       {n > 0 && (
         <ol className="text-sm">
-          <ExtremiteChoix cote="depart" point={depart} simule={simulation?.depart} {...choixProps} />
+          <ExtremiteChoix cote="depart" point={depart} simule={simulation?.depart} heure={feuille.heureDepart} {...choixProps} />
           {feuille.items.map((it) => (
             <li key={it.id}>
               {it.localise
@@ -300,23 +330,32 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
                     <MapPin className="h-3.5 w-3.5" /> Adresse non localisée — hors itinéraire
                   </div>
                 )}
-              <div className="flex gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+              <div className={`flex gap-2 rounded-lg border ${compact ? 'p-1.5' : 'p-2'} ${it.nouveau ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200' : 'border-gray-200 bg-gray-50'}`}>
                 <span
                   className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${it.localise ? 'bg-blue-600' : 'bg-gray-400'}`}
                 >
                   {it.rang}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-gray-900">
-                    <span className="tabular-nums">{it.time}</span> · {it.typeLabel}
+                  <p className={`font-medium text-gray-900 ${compact ? 'text-xs' : ''}`}>
+                    <span className="tabular-nums">{it.time}</span>
+                    {it.nouveau ? <span className="text-primary-800"> · Ce RDV</span> : <> · {it.typeLabel}</>}
                     {it.clientName && <span> · {it.clientName}</span>}
                   </p>
-                  {it.address && <p className="text-xs text-gray-600">{it.address}</p>}
-                  <p className="text-xs text-gray-500">
-                    {[it.phone, it.sector && `Secteur ${it.sector}`].filter(Boolean).join(' · ')}
-                  </p>
-                  {it.equipments.length > 0 && (
+                  {!compact && it.address && <p className="text-xs text-gray-600">{it.address}</p>}
+                  {!compact && (
+                    <p className="text-xs text-gray-500">
+                      {[it.phone, it.sector && `Secteur ${it.sector}`].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                  {!compact && it.equipments.length > 0 && (
                     <p className="text-xs text-gray-500">Équipements : {it.equipments.join(' · ')}</p>
+                  )}
+                  {it.retard && (
+                    <p className="flex items-center gap-1 text-xs text-red-700">
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      Arrivée au plus tôt {it.retard.arriveeAuPlusTot} (+{formatDureeRoute(it.retard.retardMinutes)})
+                    </p>
                   )}
                 </div>
               </div>
@@ -325,7 +364,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
           {feuille.retour && (
             <li><Troncon troncon={feuille.retour} label="Retour" estime={feuille.estime} /></li>
           )}
-          <ExtremiteChoix cote="retour" point={retour} simule={simulation?.retour} {...choixProps} />
+          <ExtremiteChoix cote="retour" point={retour} simule={simulation?.retour} heure={feuille.heureRetour} {...choixProps} />
         </ol>
       )}
     </div>
