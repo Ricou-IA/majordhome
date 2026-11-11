@@ -78,60 +78,86 @@ function hhmm(minutes) {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
+/** Durée prévue d'un arrêt en minutes (fin − début, sinon `duration_minutes`). */
+function dureeArret(a) {
+  const debut = minutesDe(a.scheduled_start);
+  const fin = minutesDe(a.scheduled_end);
+  if (debut != null && fin != null && fin >= debut) return fin - debut;
+  return Number(a.duration_minutes) > 0 ? Number(a.duration_minutes) : null;
+}
+
 /**
- * Enchaînements impossibles d'une journée : pour chaque arrêt localisé précédé d'un autre
- * arrêt localisé, arrivée au plus tôt = fin prévue du précédent + trajet. Au-delà du début
- * prévu, l'arrêt est en retard (le RDV ne peut pas tenir à cette heure). Chaque paire est
- * jugée sur les heures PRÉVUES (un retard n'est pas propagé) ; le premier arrêt (depuis le
- * départ) n'est pas jugé, faute d'heure de départ.
- * @param {Array} arrets   arrêts dans l'ordre (scheduled_start / scheduled_end, lat / lng)
- * @param {Array|null} troncons  un par paire de `pointsItineraire`
- * @returns {Map<string, { retardMinutes: number, arriveeAuPlusTot: string }>} par id d'arrêt
+ * Déroulé simulé de la journée, retards PROPAGÉS (Eric 2026-11-11 : « ça doit montrer tout le
+ * décalage, y compris celui du retour ») : un arrêt commence à son heure prévue ou à l'arrivée
+ * au plus tôt si elle est plus tardive, et dure sa durée prévue ; le suivant part de là. Le
+ * premier arrêt n'est pas jugé (pas d'heure de départ imposée). Arrêts non localisés sautés.
+ * @param {Array} arrets
+ * @param {Array|null} troncons  un par paire de `pointsItineraire` (le dernier = retour)
+ * @returns {{ retards: Map<string, { retardMinutes: number, arriveeAuPlusTot: string }>,
+ *   finPrevue: number|null, finSimulee: number|null }}  fins du dernier arrêt localisé (minutes)
  */
-export function retardsDeLaJournee(arrets = [], troncons = null) {
+function simulerJournee(arrets, troncons) {
   const retards = new Map();
-  if (!Array.isArray(troncons) || troncons.length === 0) return retards;
+  let finPrevue = null;
+  let finSimulee = null;
+  if (!Array.isArray(troncons) || troncons.length === 0) return { retards, finPrevue, finSimulee };
   let leg = 0;
-  let precedentFin = null;
   for (const a of arrets) {
     if (!coordValide(a.lat, a.lng)) continue;
     const trajet = troncons[leg];
     leg += 1;
     const debut = minutesDe(a.scheduled_start);
-    if (precedentFin != null && debut != null && trajet && Number.isFinite(trajet.minutes)) {
-      const arrivee = precedentFin + trajet.minutes;
-      if (arrivee > debut) retards.set(a.id, { retardMinutes: arrivee - debut, arriveeAuPlusTot: hhmm(arrivee) });
+    const duree = dureeArret(a);
+    let debutSimule = debut;
+    if (finSimulee != null && debut != null && trajet && Number.isFinite(trajet.minutes)) {
+      const arrivee = finSimulee + trajet.minutes;
+      if (arrivee > debut) {
+        retards.set(a.id, { retardMinutes: arrivee - debut, arriveeAuPlusTot: hhmm(arrivee) });
+        debutSimule = arrivee;
+      }
     }
-    const fin = minutesDe(a.scheduled_end);
-    precedentFin = fin ?? (debut != null && Number(a.duration_minutes) > 0 ? debut + Number(a.duration_minutes) : null);
+    finPrevue = debut != null && duree != null ? debut + duree : null;
+    finSimulee = debutSimule != null && duree != null ? debutSimule + duree : null;
   }
-  return retards;
+  return { retards, finPrevue, finSimulee };
+}
+
+/**
+ * Enchaînements impossibles d'une journée : arrivée au plus tôt = fin (déjà décalée) du
+ * précédent + trajet ; au-delà du début prévu, l'arrêt est en retard. Le retard se propage
+ * (cf. simulerJournee).
+ * @param {Array} arrets   arrêts dans l'ordre (scheduled_start / scheduled_end, lat / lng)
+ * @param {Array|null} troncons  un par paire de `pointsItineraire`
+ * @returns {Map<string, { retardMinutes: number, arriveeAuPlusTot: string }>} par id d'arrêt
+ */
+export function retardsDeLaJournee(arrets = [], troncons = null) {
+  return simulerJournee(arrets, troncons).retards;
 }
 
 /**
  * Heures de départ et de retour de la tournée : départ = début du premier arrêt localisé
- * moins son trajet depuis le point de départ ; retour = fin du dernier arrêt localisé plus
- * le trajet retour. null quand l'heure ou le trajet manque.
+ * moins son trajet depuis le point de départ ; retour = fin SIMULÉE du dernier arrêt (retards
+ * propagés) plus le trajet retour, avec le retard sur le retour prévu. null quand l'heure ou
+ * le trajet manque.
  * @param {Array} arrets
  * @param {Array|null} troncons  un par paire de `pointsItineraire` (le dernier = retour)
- * @returns {{ depart: string|null, retour: string|null }}
+ * @returns {{ depart: string|null, retour: string|null, retourPrevu: string|null, retourRetardMinutes: number }}
  */
 export function heuresDeTournee(arrets = [], troncons = null) {
-  const vide = { depart: null, retour: null };
+  const vide = { depart: null, retour: null, retourPrevu: null, retourRetardMinutes: 0 };
   if (!Array.isArray(troncons) || troncons.length === 0) return vide;
   const localises = arrets.filter((a) => coordValide(a.lat, a.lng));
   if (localises.length === 0) return vide;
-  const premier = localises[0];
-  const dernier = localises[localises.length - 1];
-  const debut = minutesDe(premier.scheduled_start);
+  const debut = minutesDe(localises[0].scheduled_start);
   const aller = troncons[0]?.minutes;
-  const finDernier = minutesDe(dernier.scheduled_end)
-    ?? (minutesDe(dernier.scheduled_start) != null && Number(dernier.duration_minutes) > 0
-      ? minutesDe(dernier.scheduled_start) + Number(dernier.duration_minutes) : null);
   const retour = troncons[troncons.length - 1]?.minutes;
+  const { finPrevue, finSimulee } = simulerJournee(arrets, troncons);
+  const okRetour = Number.isFinite(retour);
   return {
     depart: debut != null && Number.isFinite(aller) ? hhmm(debut - aller) : null,
-    retour: finDernier != null && Number.isFinite(retour) ? hhmm(finDernier + retour) : null,
+    retour: finSimulee != null && okRetour ? hhmm(finSimulee + retour) : null,
+    retourPrevu: finPrevue != null && okRetour ? hhmm(finPrevue + retour) : null,
+    retourRetardMinutes: finSimulee != null && finPrevue != null ? Math.max(0, finSimulee - finPrevue) : 0,
   };
 }
 
@@ -366,6 +392,8 @@ export function buildFeuilleDeRoute({
     departLabel: depart?.label || 'Agence',
     heureDepart: heures.depart,
     heureRetour: heures.retour,
+    heureRetourPrevue: heures.retourPrevu,
+    retourRetardMinutes: heures.retourRetardMinutes,
     retourLabel: (pointRetour || depart)?.label || 'Agence',
     depotLabel: depart?.label || 'Agence',
     items,

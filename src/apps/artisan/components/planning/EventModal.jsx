@@ -421,7 +421,10 @@ export function EventModal({
   // Aperçu (clic sur un prénom) : la tournée telle qu'elle est, si ce n'est pas déjà la personne d'un créneau
   const apercuDejaPose = apercu && assistantSlots.some((sl) => sl.date === apercu.date
     && personnesDuCreneau(sl).some((pers) => pers.ids.includes(apercu.memberId)));
-  const parcours = !isFreeType && (assistantSlots.length > 0 || apercu) ? (
+  // Rendu en deux blocs (Eric 2026-11-11) : la carte sous le type, la liste en colonne de droite.
+  // Même hook, même cache : les deux blocs lisent la même journée.
+  const avecParcours = !isFreeType && (assistantSlots.length > 0 || apercu);
+  const rendreParcours = (partie) => (
     <div className="space-y-3">
       {apercu && !apercuDejaPose && (
         <ParcoursJournee
@@ -431,6 +434,7 @@ export function EventModal({
           coords={null}
           rdv={rdvParcours}
           apercu
+          partie={partie}
         />
       )}
       {assistantSlots.flatMap((slot) => personnesDuCreneau(slot).map((pers) => (
@@ -440,10 +444,13 @@ export function EventModal({
           personne={pers}
           coords={coordsRdv}
           rdv={rdvParcours}
+          partie={partie}
         />
       ))).slice(0, 4)}
     </div>
-  ) : null;
+  );
+  const parcours = avecParcours ? rendreParcours('liste') : null;
+  const parcoursCarte = avecParcours ? rendreParcours('carte') : null;
 
   // Si fermée, on ne rend rien
   if (!isOpen) return null;
@@ -590,6 +597,7 @@ export function EventModal({
                   )}
                   sidePanelClient={sectionClient}
                   sidePanelBas={parcours}
+                  sidePanelCarte={parcoursCarte}
                   onApercuChange={isFreeType ? null : setApercu}
                   allowMoveExisting
                 />

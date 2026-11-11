@@ -17,8 +17,9 @@ import { FeuilleDeRouteSection } from './FeuilleDeRouteSection';
  * @param {{ lat: number, lng: number }|null} p.coords  lieu du RDV
  * @param {object} p.rdv  { appointment_type, client_name, client_first_name, address, postal_code, city }
  * @param {boolean} [p.apercu]  tournée telle qu'elle est, sans ce RDV
+ * @param {'tout'|'liste'|'carte'} [p.partie]  bloc affiché (la fenêtre « Nouveau RDV » sépare carte et liste)
  */
-export function ParcoursJournee({ slot, personne, coords, rdv, apercu = false }) {
+export function ParcoursJournee({ slot, personne, coords, rdv, apercu = false, partie = 'tout' }) {
   const ajout = useMemo(() => (coords && !apercu ? {
     ...rdv,
     scheduled_date: slot.date,
@@ -35,12 +36,15 @@ export function ParcoursJournee({ slot, personne, coords, rdv, apercu = false })
     <div className="rounded-lg border border-secondary-200 bg-white p-2.5 space-y-2">
       <p className="flex items-center gap-2 text-sm font-medium text-secondary-800">
         <Route className="w-4 h-4 text-secondary-500 shrink-0" />
-        <span className="truncate">{apercu ? `Tournée de ${personne.displayName} · sans ce RDV` : `Parcours de ${personne.displayName}`}</span>
+        <span className="truncate">
+          {partie === 'carte' ? 'Carte · ' : ''}
+          {apercu ? `Tournée de ${personne.displayName} · sans ce RDV` : `Parcours de ${personne.displayName}`}
+        </span>
       </p>
-      {!coords && !apercu && (
+      {partie !== 'carte' && !coords && !apercu && (
         <p className="text-xs text-amber-700">Adresse du client non localisée : ce RDV est hors itinéraire.</p>
       )}
-      <FeuilleDeRouteSection date={slot.date} memberIds={memberIds} person={person} ajout={ajout} compact carteACote />
+      <FeuilleDeRouteSection date={slot.date} memberIds={memberIds} person={person} ajout={ajout} compact partie={partie} />
     </div>
   );
 }

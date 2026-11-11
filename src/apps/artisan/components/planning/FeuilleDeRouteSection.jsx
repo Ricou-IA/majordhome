@@ -152,11 +152,12 @@ function Troncon({ troncon, label, estime }) {
  * @param {string[]} props.memberIds
  * @param {{ displayName: string, color?: string }} props.person
  * @param {object|null} [props.ajout]  RDV en cours de pose, inséré à son heure (fenêtre « Nouveau RDV »)
+ * @param {'tout'|'liste'|'carte'} [props.partie]  n'afficher que la carte, ou tout sauf la carte
  * @param {boolean} [props.carteACote]  itinéraire à gauche, carte à droite (fenêtre « Nouveau RDV », sous la grille)
  * @param {boolean} [props.compact]    variante étroite : sans impression, sans choix ni simulation du
  *   départ, arrêts sur une ligne (la fenêtre RDV) ; impossibilités dues à `ajout` en tête
  */
-export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, compact = false, carteACote = false }) {
+export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, compact = false, carteACote = false, partie = 'tout' }) {
   const { organization } = useAuth();
   const { settings } = useOrgSettings();
   // Simulation propre à CETTE journée de CETTE personne : changer de jour l'efface.
@@ -201,6 +202,12 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
     return [
       nouveau.retard && `Arrivée au plus tôt à ${nouveau.retard.arriveeAuPlusTot} pour un début à ${debut(nouveau)} (${formatDureeRoute(nouveau.retard.retardMinutes)} de retard).`,
       apres?.retard && `Le RDV suivant (${apres.clientName || apres.typeLabel}, ${debut(apres)}) ne tient plus : arrivée au plus tôt à ${apres.retard.arriveeAuPlusTot}.`,
+      (() => {
+        const decales = feuille.items.slice(i + 1).filter((it) => it.retard).length;
+        return decales > 1 ? `${decales} RDV décalés derrière celui-ci.` : null;
+      })(),
+      feuille.retourRetardMinutes > 0 && feuille.heureRetour
+        && `Retour à ${feuille.retourLabel} à ${feuille.heureRetour} au lieu de ${feuille.heureRetourPrevue} (+${formatDureeRoute(feuille.retourRetardMinutes)}).`,
     ].filter(Boolean);
   }, [feuille, ajout]);
   const [isPrinting, setIsPrinting] = useState(false);
@@ -241,6 +248,18 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
   }
 
   const n = feuille.items.length;
+  const imageCarte = carteSrc && !carteActuelle.ko ? (
+    <img
+      src={carteSrc}
+      alt={`Itinéraire de ${feuille.personName}`}
+      onError={carteEnErreur}
+      className={`w-full rounded-lg border border-gray-200 ${carteACote ? 'md:order-2 md:sticky md:top-0' : ''}`}
+    />
+  ) : null;
+  // Carte seule (fenêtre « Nouveau RDV » : la liste est dans sa propre colonne)
+  if (partie === 'carte') {
+    return imageCarte || <p className="text-xs text-gray-500">Carte indisponible pour cette journée.</p>;
+  }
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -318,14 +337,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
       )}
 
       <div className={carteACote ? 'grid gap-3 md:grid-cols-2 md:items-start' : 'space-y-2'}>
-      {carteSrc && !carteActuelle.ko && (
-        <img
-          src={carteSrc}
-          alt={`Itinéraire de ${feuille.personName}`}
-          onError={carteEnErreur}
-          className={`w-full rounded-lg border border-gray-200 ${carteACote ? 'md:order-2 md:sticky md:top-0' : ''}`}
-        />
-      )}
+      {partie !== 'liste' && imageCarte}
 
       {n > 0 && (
         <ol className="text-sm">
@@ -374,6 +386,12 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
             <li><Troncon troncon={feuille.retour} label="Retour" estime={feuille.estime} /></li>
           )}
           <ExtremiteChoix cote="retour" point={retour} simule={simulation?.retour} heure={feuille.heureRetour} {...choixProps} />
+          {feuille.retourRetardMinutes > 0 && (
+            <li className="flex items-center gap-1 pl-5 text-xs text-red-700">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              Prévu {feuille.heureRetourPrevue} (+{formatDureeRoute(feuille.retourRetardMinutes)})
+            </li>
+          )}
         </ol>
       )}
       </div>

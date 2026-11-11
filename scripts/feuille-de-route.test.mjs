@@ -181,11 +181,17 @@ test('retardsDeLaJournee : fin prévue + trajet au-delà du début = retard ; le
   const r = retardsDeLaJournee(arrets, troncons);
   assert.equal(r.has('a'), false);
   assert.deepEqual(r.get('b'), { retardMinutes: 19, arriveeAuPlusTot: '10:19' });
-  assert.deepEqual(r.get('n'), { retardMinutes: 123, arriveeAuPlusTot: '13:33' });
-  assert.deepEqual(r.get('c'), { retardMinutes: 87, arriveeAuPlusTot: '13:57' });
+  // Retard propagé : b décalé à 10:19, fini 11:19 ; n arrive 11:19 + 153 = 13:52, fini 14:22 ;
+  // c arrive 14:22 + 117 = 16:19
+  assert.deepEqual(r.get('n'), { retardMinutes: 142, arriveeAuPlusTot: '13:52' });
+  assert.deepEqual(r.get('c'), { retardMinutes: 229, arriveeAuPlusTot: '16:19' });
   assert.equal(retardsDeLaJournee(arrets, null).size, 0);
   const feuille = buildFeuilleDeRoute({ date: '2026-11-12', person: { displayName: 'Ludovic' }, depart: depot, arrets, troncons });
-  assert.equal(feuille.items.find((i) => i.id === 'n').retard.arriveeAuPlusTot, '13:33');
+  assert.equal(feuille.items.find((i) => i.id === 'n').retard.arriveeAuPlusTot, '13:52');
+  // c finit 16:19 + 90 = 17:49, retour 30 min → 18:19 au lieu de 14:30
+  assert.equal(feuille.heureRetour, '18:19');
+  assert.equal(feuille.heureRetourPrevue, '14:30');
+  assert.equal(feuille.retourRetardMinutes, 229);
 });
 
 test('retardsDeLaJournee : un arrêt non localisé est sauté sans décaler les tronçons', () => {
@@ -204,8 +210,8 @@ test('heuresDeTournee : départ = 1er RDV − trajet aller, retour = fin du dern
     { id: 'x', scheduled_start: '11:00', scheduled_end: '11:30', lat: null, lng: null },
     { id: 'c', scheduled_start: '14:00:00', scheduled_end: '16:15:00', lat: 43.8, lng: 1.8 },
   ];
-  assert.deepEqual(heuresDeTournee(arrets, [{ minutes: 20 }, { minutes: 30 }, { minutes: 51 }]), { depart: '08:10', retour: '17:06' });
-  assert.deepEqual(heuresDeTournee(arrets, null), { depart: null, retour: null });
+  assert.deepEqual(heuresDeTournee(arrets, [{ minutes: 20 }, { minutes: 30 }, { minutes: 51 }]), { depart: '08:10', retour: '17:06', retourPrevu: '17:06', retourRetardMinutes: 0 });
+  assert.deepEqual(heuresDeTournee(arrets, null), { depart: null, retour: null, retourPrevu: null, retourRetardMinutes: 0 });
   const feuille = buildFeuilleDeRoute({ date: '2026-11-12', person: { displayName: 'Ludovic' }, depart: depot, arrets, troncons: [{ minutes: 20 }, { minutes: 30 }, { minutes: 51 }] });
   assert.equal(feuille.heureDepart, '08:10');
   assert.equal(feuille.heureRetour, '17:06');

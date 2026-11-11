@@ -124,6 +124,8 @@ export function SchedulingAssistant({
   sidePanel = null,
   // Contenu placé sous la grille (sideBySide) : parcours de la journée (itinéraire + carte).
   sidePanelBas = null,
+  // Carte du parcours, sous le type et les créneaux (sideBySide) — la liste reste en colonne
+  sidePanelCarte = null,
   // Colonne client, entre la grille et la colonne type (sideBySide) : saisie du client quand il
   // n'est pas connu (« Nouveau RDV » du planning) — la colonne de droite garde type, créneaux et déroulé.
   sidePanelClient = null,
@@ -225,10 +227,10 @@ export function SchedulingAssistant({
   // passe sous la grille. Classes écrites en entier : Tailwind ne lit pas les noms composés.
   const grilleColonnes = sidePanelClient
     ? (sidePanelBas
-      ? 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem] 2xl:grid-cols-[minmax(22rem,1fr)_17rem_17rem_34rem]'
+      ? 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem] 2xl:grid-cols-[minmax(0,1fr)_17rem_17rem_19rem]'
       : 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem]')
     : (sidePanelBas
-      ? 'lg:grid-cols-[minmax(0,1fr)_17rem] xl:grid-cols-[minmax(22rem,1fr)_17rem_34rem]'
+      ? 'lg:grid-cols-[minmax(0,1fr)_17rem] xl:grid-cols-[minmax(0,1fr)_17rem_19rem]'
       : 'lg:grid-cols-[minmax(0,1fr)_17rem]');
 
   // Déplacer un RDV existant : enregistré tout de suite (comme le glisser du planning), avec
@@ -585,6 +587,7 @@ export function SchedulingAssistant({
           {totalConflicts} conflit(s) de disponibilité détecté(s) — la planification reste possible.
         </p>
       )}
+      {sideBySide && sidePanelCarte}
       </div>
       {/* Parcours (itinéraire + carte) : colonne de droite quand l'écran est assez large — la
           fenêtre s'élargit ; sinon sous la grille. Placement explicite par point de rupture. */}
