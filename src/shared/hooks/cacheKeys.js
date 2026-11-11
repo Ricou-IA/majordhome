@@ -313,6 +313,9 @@ export const equipmentModelKeys = {
   parts: (orgId, modelId) => [...equipmentModelKeys.all(orgId), 'parts', modelId],
   images: (orgId, modelId) => [...equipmentModelKeys.all(orgId), 'images', modelId],
   forBrand: (orgId, brandKey) => [...equipmentModelKeys.all(orgId), 'for-brand', brandKey || ''],
+  brandRefs: (orgId) => [...equipmentModelKeys.all(orgId), 'brand-refs'],
+  articles: (orgId, brandKey, modelKey) => [...equipmentModelKeys.all(orgId), 'articles', brandKey || '', modelKey || ''],
+  toReview: (orgId) => [...equipmentModelKeys.all(orgId), 'to-review'],
 };
 
 export const catalogItemKeys = {

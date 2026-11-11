@@ -104,6 +104,9 @@ export const equipmentsService = {
           supplier_product_id: equipmentData.supplierProductId || null,
           unit_count: equipmentData.unitCount ? parseInt(equipmentData.unitCount) : 1,
           notes: equipmentData.notes,
+          // Fiche du référentiel choisie à la saisie (la saisie d'avant nettoyage est gardée dans metadata)
+          equipment_model_id: equipmentData.equipmentModelId || null,
+          ...(equipmentData.saisieOrigine ? { metadata: { saisie_origine: equipmentData.saisieOrigine } } : {}),
         })
         .select()
         .single();
@@ -157,6 +160,14 @@ export const equipmentsService = {
       if (updates.notes !== undefined) updateData.notes = updates.notes;
       if (updates.nameplatePhotoPath !== undefined) updateData.nameplate_photo_path = updates.nameplatePhotoPath || null;
       if (updates.status !== undefined) updateData.status = updates.status;
+      if (updates.equipmentModelId !== undefined) updateData.equipment_model_id = updates.equipmentModelId || null;
+      // Saisie d'avant nettoyage : gardée une seule fois (la première), fusionnée dans le metadata existant
+      if (updates.saisieOrigine) {
+        const { data: actuel, error: errLecture } = await supabase.from('majordhome_equipments').select('metadata').eq('id', equipmentId).maybeSingle();
+        if (errLecture) throw errLecture;
+        const metadata = actuel?.metadata && typeof actuel.metadata === 'object' ? actuel.metadata : {};
+        if (!metadata.saisie_origine) updateData.metadata = { ...metadata, saisie_origine: updates.saisieOrigine };
+      }
 
       const { data, error } = await supabase
         .from('majordhome_equipments')

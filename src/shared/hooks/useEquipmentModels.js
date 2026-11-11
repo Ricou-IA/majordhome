@@ -74,6 +74,85 @@ export function useEquipmentModelsForBrand(brand, enabled = true) {
   return { modeles: data?.modeles || [], marqueReconnue: !!data?.marqueReconnue, isLoading, error };
 }
 
+/** `{ marques, isLoading }` — marques de référence de l'org (« JOLLY MEC »…). */
+export function useBrandRefs(enabled = true) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { data, isLoading } = useQuery({
+    queryKey: equipmentModelKeys.brandRefs(orgId),
+    queryFn: lire(() => equipmentModelsService.listBrandRefs(orgId)),
+    enabled: !!orgId && enabled,
+    staleTime: 10 * 60 * 1000,
+  });
+  return { marques: data || [], isLoading };
+}
+
+/** `{ articles, isLoading, error }` — articles du catalogue qui pourraient être l'appareil saisi. */
+export function useArticlesForEquipment(brand, model, enabled = true) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { data, isLoading, error } = useQuery({
+    queryKey: equipmentModelKeys.articles(orgId, cle(brand), cle(model)),
+    queryFn: lire(() => equipmentModelsService.searchArticles(orgId, brand, model)),
+    enabled: !!orgId && enabled && cle(model).length >= 3,
+    staleTime: 5 * 60 * 1000,
+  });
+  return { articles: data || [], isLoading, error };
+}
+
+/**
+ * `{ searchWeb, createFromWeb, createFromCatalog, isSearching, isCreating }` — recherche web (rien n'est écrit),
+ * création de la fiche validée sur place, fiche depuis un article. Chaque appel résout avec la donnée et REJETTE sur
+ * refus (le message de l'edge est gardé dans `error.message`).
+ */
+export function useEquipmentEnrichment() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const queryClient = useQueryClient();
+  const invalider = () => queryClient.invalidateQueries({ queryKey: equipmentModelKeys.all(orgId) });
+  const recherche = useMutation({ mutationFn: (saisie) => unwrapResult(equipmentModelsService.searchWeb(orgId, saisie)) });
+  const web = useMutation({
+    mutationFn: ({ appareil, equipmentTypeId, champs }) => unwrapResult(equipmentModelsService.createFromWeb(orgId, appareil, { equipmentTypeId, champs })),
+    onSuccess: invalider,
+  });
+  const catalogue = useMutation({
+    mutationFn: (catalogItemId) => unwrapResult(equipmentModelsService.createFromCatalog(catalogItemId)),
+    onSuccess: invalider,
+  });
+  return {
+    searchWeb: recherche.mutateAsync, createFromWeb: web.mutateAsync, createFromCatalog: catalogue.mutateAsync,
+    isSearching: recherche.isPending, isCreating: web.isPending || catalogue.isPending,
+  };
+}
+
+/** `{ fiches, isLoading, error }` — file de contrôle des fiches créées sur le terrain (org_admin). */
+export function useModelsToReview(enabled = true) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { data, isLoading, error } = useQuery({
+    queryKey: equipmentModelKeys.toReview(orgId),
+    queryFn: lire(() => equipmentModelsService.listToReview(orgId)),
+    enabled: !!orgId && enabled,
+    staleTime: 60 * 1000,
+  });
+  return { fiches: data || [], isLoading, error };
+}
+
+/** `{ review, merge, isSaving }` — valider / corriger, fusionner (org_admin). */
+export function useModelReview() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const queryClient = useQueryClient();
+  const invalider = () => {
+    queryClient.invalidateQueries({ queryKey: equipmentModelKeys.all(orgId) });
+    queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
+    queryClient.invalidateQueries({ queryKey: equipmentDocumentKeys.all(orgId) });
+  };
+  const controle = useMutation({ mutationFn: ({ modelId, patch }) => unwrapResult(equipmentModelsService.review(modelId, patch)), onSuccess: invalider });
+  const fusion = useMutation({ mutationFn: ({ absorbedId, survivorId }) => unwrapResult(equipmentModelsService.merge(absorbedId, survivorId)), onSuccess: invalider });
+  return { review: controle.mutateAsync, merge: fusion.mutateAsync, isSaving: controle.isPending || fusion.isPending };
+}
+
 /** `{ setModel, isSaving }` — rattache / détache un équipement ; rafraîchit équipements du client et documents. */
 export function useSetEquipmentModel() {
   const { organization } = useAuth();
