@@ -561,3 +561,10 @@ export const webshopSettingsKeys = {
   shippingRates: (orgId) => [...webshopSettingsKeys.all(orgId), 'shippingRates'],
   pickupPoints: (orgId) => [...webshopSettingsKeys.all(orgId), 'pickupPoints'],
 };
+
+// --- Assistant « Trouver une pièce » : recherches web par appareil (module `assistant`) ---
+export const assistantPiecesKeys = {
+  all: (orgId) => ['assistant-pieces', orgId],
+  parEquipement: (orgId, equipmentId) => [...assistantPiecesKeys.all(orgId), 'equipement', equipmentId],
+  detail: (orgId, id) => [...assistantPiecesKeys.all(orgId), 'detail', id],
+};

@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { EquipmentDocumentsSection } from './EquipmentDocumentsSection';
 import { EquipmentPartsSection } from '../equipements/EquipmentPartsSection';
+import TrouverPieceButton from '../assistant/TrouverPieceButton';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { indexReferentiel, libelleEquipement } from '@/lib/equipmentReferential';
 import { formatDateShortFR } from '@/lib/utils';
@@ -382,6 +383,9 @@ const EquipmentCard = ({
           quoteLabel="Créer un devis SAV"
           className="mt-3"
         />
+
+        {/* Recherche d'une pièce par l'assistant (module `assistant` + droit) */}
+        <TrouverPieceButton equipment={equipment} className="mt-3" />
 
         {/* Bouton détails */}
         <button
