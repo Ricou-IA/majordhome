@@ -350,16 +350,19 @@ AS $$
 DECLARE
   v_count int;
   v_today date := (now() AT TIME ZONE 'UTC')::date;
+  -- Limite NULL (un `null` JS explicite n'est pas omis : le DEFAULT ne joue pas) ou < 1 : ramenée à 10.
+  v_limite int := CASE WHEN COALESCE(p_daily_limit, 0) < 1 THEN 10 ELSE p_daily_limit END;
 BEGIN
   IF p_user_id IS NULL OR p_org_id IS NULL THEN RAISE EXCEPTION 'user_and_org_required' USING ERRCODE = '22023'; END IF;
   INSERT INTO majordhome.assistant_quotas (user_id, org_id, date, count, last_at)
   VALUES (p_user_id, p_org_id, v_today, 1, now())
   ON CONFLICT (user_id, org_id, date) DO UPDATE SET count = majordhome.assistant_quotas.count + 1, last_at = now()
   RETURNING count INTO v_count;
-  IF v_count > p_daily_limit THEN
+  -- Garde positive : le plafond n'est franchi que si le compte est explicitement sous la limite (NULL ⇒ refus).
+  IF (v_count <= v_limite) IS NOT TRUE THEN
     RAISE EXCEPTION 'assistant_quota_exceeded' USING ERRCODE = 'P0001', HINT = 'assistant_quota_exceeded';
   END IF;
-  RETURN jsonb_build_object('count', v_count, 'limit', p_daily_limit, 'date', v_today);
+  RETURN jsonb_build_object('count', v_count, 'limit', v_limite, 'date', v_today);
 END;
 $$;
 REVOKE EXECUTE ON FUNCTION public.increment_assistant_quota(uuid, uuid, int) FROM PUBLIC, anon, authenticated;

@@ -257,6 +257,17 @@ BEGIN
   EXCEPTION WHEN SQLSTATE 'P0001' THEN v_ok := (SQLERRM = 'assistant_quota_exceeded');
   END;
   IF NOT v_ok THEN RAISE EXCEPTION '(7) le 11ᵉ appel du jour passe'; END IF;
+  -- 7 bis. limite NULL explicite (un `null` JS n'est pas omis : le DEFAULT ne joue pas) → ramenée à 10, plafond fermé.
+  -- Compteur distinct (autre utilisateur, autre org) pour repartir de zéro.
+  FOR i IN 1..10 LOOP
+    PERFORM public.increment_assistant_quota(v_etranger, v_autre, NULL);
+  END LOOP;
+  v_ok := false;
+  BEGIN
+    PERFORM public.increment_assistant_quota(v_etranger, v_autre, NULL);
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN v_ok := (SQLERRM = 'assistant_quota_exceeded');
+  END;
+  IF NOT v_ok THEN RAISE EXCEPTION '(7 bis) limite NULL : le 11ᵉ appel du jour passe'; END IF;
 
   -- ── 8. droit assistant_pieces/use vrai pour les trois rôles ────────────────────────────────────────────
   IF (SELECT count(*) FROM majordhome.app_role_permissions
@@ -266,7 +277,7 @@ BEGIN
 
   -- ── Nettoyage ────────────────────────────────────────────────────────────────────────────────────────────
   DELETE FROM majordhome.assistant_recherches WHERE equipment_id = v_eq;
-  DELETE FROM majordhome.assistant_quotas WHERE user_id = v_membre AND org_id = v_mayer;
+  DELETE FROM majordhome.assistant_quotas WHERE (user_id = v_membre AND org_id = v_mayer) OR (user_id = v_etranger AND org_id = v_autre);
   DELETE FROM majordhome.interventions WHERE id IN (v_inter, v_inter_a, v_inter_ct);
   DELETE FROM majordhome.contracts WHERE id = v_ct;
   RAISE NOTICE 'assert-assistant-pieces : OK';
