@@ -223,7 +223,21 @@ export function SchedulingAssistant({
   }, [fixedDuration]);
 
   // RDV du jour sélectionné (avec technician_ids) pour les colonnes.
-  const { dayAppointments } = useTeamDayAvailability(orgId, selectedDate);
+  const { dayAppointments: rdvsDuJour } = useTeamDayAvailability(orgId, selectedDate);
+  // Déplacements en cours d'écriture, affichés AVANT la réponse de la base (Eric 2026-11-11 :
+  // « une latence qui crée une sensation ça n'a pas marché ») : id → champs à substituer,
+  // retirés une fois la base relue, ou à l'échec (le RDV revient alors à sa place).
+  const [enCours, setEnCours] = useState({});
+  const dayAppointments = useMemo(() => (Object.keys(enCours).length
+    ? (rdvsDuJour || []).map((a) => (enCours[a.id] ? { ...a, ...enCours[a.id] } : a))
+    : rdvsDuJour), [rdvsDuJour, enCours]);
+  const afficherTout = useCallback((id, champs) => {
+    setEnCours((prev) => {
+      const next = { ...prev };
+      if (champs) next[id] = champs; else delete next[id];
+      return next;
+    });
+  }, []);
 
   // Colonnes de la fenêtre (sideBySide) : grille · client (si non rattaché) · type · parcours.
   // Le parcours prend une colonne quand l'écran le permet (xl sans client, 2xl avec), sinon il
@@ -251,7 +265,18 @@ export function SchedulingAssistant({
   const handleMoveAppointment = useCallback(async ({ apt, ...vers }) => {
     const patch = patchDeplacement(apt, vers);
     if (patch.inchange) return;
-    const rafraichir = () => queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+    // Affiché à sa nouvelle place tout de suite, pendant l'écriture
+    const affichage = (pt) => ({
+      scheduled_date: pt.horaire.scheduled_date,
+      scheduled_start: pt.horaire.scheduled_start,
+      scheduled_end: pt.horaire.scheduled_end,
+      duration_minutes: pt.horaire.duration_minutes,
+      ...(pt.reaffectation?.technicianIds ? { technician_ids: pt.reaffectation.technicianIds } : {}),
+      ...(pt.reaffectation && 'assigned_commercial_id' in pt.reaffectation ? { assigned_commercial_id: pt.reaffectation.assigned_commercial_id } : {}),
+    });
+    afficherTout(apt.id, affichage(patch));
+    const rafraichir = () => queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) })
+      .finally(() => afficherTout(apt.id, null));
     try {
       await appliquer(apt.id, patch);
       rafraichir();
@@ -260,7 +285,9 @@ export function SchedulingAssistant({
         action: {
           label: 'Annuler',
           onClick: async () => {
-            try { await appliquer(apt.id, patchRetour(apt, patch.reaffectation)); }
+            const retour = patchRetour(apt, patch.reaffectation);
+            afficherTout(apt.id, affichage(retour));
+            try { await appliquer(apt.id, retour); }
             catch (err) { logger.error('[SchedulingAssistant] annulation déplacement', err); toast.error('Annulation impossible'); }
             rafraichir();
           },
@@ -268,10 +295,11 @@ export function SchedulingAssistant({
       });
     } catch (err) {
       logger.error('[SchedulingAssistant] déplacement RDV', err);
+      afficherTout(apt.id, null);
       toast.error('Déplacement refusé');
       rafraichir();
     }
-  }, [appliquer, queryClient, orgId]);
+  }, [appliquer, queryClient, orgId, afficherTout]);
 
   // --- Poser un créneau depuis la grille (toujours dans la colonne d'une personne) ---
   const handlePlaceSlot = useCallback(({ memberId, date, startTime, endTime, duration }) => {
