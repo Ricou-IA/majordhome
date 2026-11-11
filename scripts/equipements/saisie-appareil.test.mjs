@@ -3,8 +3,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  marqueDeReference, classerAppareils, classerArticles, saisieOrigine, champsRattachement,
+  marqueDeReference, classerAppareils, classerArticles, saisieOrigine, champsRattachement, messageErreurAppareil,
 } from '../../src/lib/equipements/saisieAppareil.js';
+
+test('messageErreurAppareil : plafond, délai, droits, contrôle, défaut', () => {
+  assert.match(messageErreurAppareil({ code: 'quota', message: '20 recherches web par jour atteintes' }), /20 recherches web par jour atteintes.*tel quel/);
+  assert.match(messageErreurAppareil({ code: 'delai' }), /trop de temps/);
+  assert.match(messageErreurAppareil({ code: 'droit' }), /droit/i);
+  assert.match(messageErreurAppareil({ message: 'fiche_fabricant' }), /relevée chez le fabricant/);
+  assert.match(messageErreurAppareil({ message: 'fiche_fabricant_survit' }), /fabricant ne peut pas être absorbée/);
+  assert.match(messageErreurAppareil({ message: 'org_admin_required' }), /administrateur/);
+  assert.match(messageErreurAppareil(new Error('boom')), /n'a pas abouti.*tel quel/);
+  assert.match(messageErreurAppareil(null), /n'a pas abouti/);
+});
 
 const MARQUES = [{ name: 'JOLLY MEC', brand_key: 'jollymec' }, { name: 'EDILKAMIN', brand_key: 'edilkamin' }, { name: 'MCZ', brand_key: 'mcz' }];
 

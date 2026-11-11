@@ -43,6 +43,17 @@ import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { useSuppliers, useSupplierProducts } from '@hooks/useSuppliers';
 import { useDebounce } from '@hooks/useDebounce';
+import { useBrandRefs, useEquipmentModel } from '@hooks/useEquipmentModels';
+import { champsRattachement, saisieOrigine } from '@/lib/equipements/saisieAppareil';
+import { champsDuSchema } from '@/lib/catalogue/enrichissement';
+import { canonicalFieldsForCategory } from '@/shared/specs';
+import ChampsAppareil from './saisieAppareil/ChampsAppareil';
+
+/** Date du jour AAAA-MM-JJ (heure locale), pour la trace de la saisie d'origine. */
+const aujourdhui = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 // ============================================================================
 // UTILITAIRES
@@ -94,6 +105,13 @@ export function EquipmentFormModal({
   isUploadingNameplate = false,
 }) {
   const [form, setForm] = useState(INITIAL_FORM);
+  // Fiche du référentiel des appareils rattachée ; saisie d'avant nettoyage ; fiche choisie à l'instant (ses
+  // marque et modèle remplacent la saisie une fois chargée)
+  const [ficheId, setFicheId] = useState(null);
+  const [saisieAvant, setSaisieAvant] = useState(null);
+  const [aRemplir, setARemplir] = useState(null);
+  const { model: fiche, isLoading: ficheLoading } = useEquipmentModel(ficheId);
+  const { marques } = useBrandRefs(isOpen);
   const { url: nameplateUrl } = useCertificatsSignedUrl(equipment?.nameplate_photo_path);
   const { suppliers, isLoading: suppliersLoading } = useSuppliers(orgId);
   const { equipmentTypes, index: referentiel, isLoading: typesLoading } = useEquipmentReferential();
@@ -138,14 +156,34 @@ export function EquipmentFormModal({
       } else {
         setForm(INITIAL_FORM);
       }
+      setFicheId(equipment?.equipment_model_id || null);
+      setSaisieAvant(null);
+      setARemplir(null);
     }
   }, [isOpen, equipment]);
+
+  // Fiche choisie : sa marque de référence et son modèle remplacent la saisie (gardée dans saisieAvant)
+  useEffect(() => {
+    if (!fiche || fiche.id !== aRemplir) return;
+    const champs = champsRattachement(fiche);
+    setForm((prev) => ({ ...prev, brand: champs.brand, model: champs.model, supplierProductId: champs.supplierProductId || prev.supplierProductId }));
+    setARemplir(null);
+  }, [fiche, aRemplir]);
+
+  const choisirFiche = (modelId) => {
+    setSaisieAvant((prev) => prev || { brand: form.brand || null, model: form.model || null });
+    setFicheId(modelId);
+    setARemplir(modelId);
+  };
 
   // Type sélectionné (pour afficher le champ quantité si has_unit_pricing)
   const selectedEquipType = useMemo(() => {
     if (!form.equipmentTypeId) return null;
     return equipmentTypes.find(t => t.id === form.equipmentTypeId) || null;
   }, [form.equipmentTypeId, equipmentTypes]);
+
+  // Caractéristiques demandées à la recherche web : schéma de la catégorie du type (vide si pas de schéma)
+  const champsWeb = useMemo(() => champsDuSchema(canonicalFieldsForCategory(selectedEquipType?.category)), [selectedEquipType]);
 
   const showQuantity = selectedEquipType?.has_unit_pricing;
   const unitLabel = selectedEquipType?.unit_label || 'unité(s)';
@@ -193,6 +231,8 @@ export function EquipmentFormModal({
       installationType: form.installationType || null,
       supplierProductId: form.supplierProductId || null,
       notes: form.notes || null,
+      equipmentModelId: ficheId || null,
+      saisieOrigine: saisieAvant ? saisieOrigine(saisieAvant, 'saisie terrain', aujourdhui()) : null,
     });
   };
 
@@ -289,52 +329,15 @@ export function EquipmentFormModal({
             </div>
           )}
 
-          {/* Marque (combobox : suggestions fournisseurs + saisie libre) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Marque
-            </label>
-            <input
-              type="text"
-              list="brand-suggestions"
-              value={form.brand}
-              onChange={(e) => handleChange('brand', e.target.value)}
-              disabled={suppliersLoading}
-              placeholder="Saisir ou sélectionner une marque..."
-              autoComplete="off"
-              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm disabled:bg-gray-50 disabled:text-gray-400"
-            />
-            <datalist id="brand-suggestions">
-              {suppliers.map(s => (
-                <option key={s.id} value={s.name} />
-              ))}
-            </datalist>
-          </div>
-
-          {/* Modèle (combobox : suggestions produits fournisseur + saisie libre) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Modèle
-            </label>
-            <input
-              type="text"
-              list="model-suggestions"
-              value={form.model}
-              onChange={(e) => handleModelSelect(e.target.value)}
-              placeholder={form.brand ? 'Saisir ou sélectionner un modèle...' : 'Saisir un modèle...'}
-              autoComplete="off"
-              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
-            />
-            {supplierProducts.length > 0 && (
-              <datalist id="model-suggestions">
-                {supplierProducts.map(p => (
-                  <option key={p.id} value={p.name}>
-                    {p.reference ? `Réf: ${p.reference}` : ''}
-                  </option>
-                ))}
-              </datalist>
-            )}
-          </div>
+          {/* Marque, modèle, rattachement au référentiel des appareils (saisie pas à pas) */}
+          <ChampsAppareil
+            form={form} onChange={handleChange} onModelChange={handleModelSelect}
+            onBrandReference={(name) => setForm((prev) => ({ ...prev, brand: name }))}
+            suppliers={suppliers} supplierProducts={supplierProducts} suppliersLoading={suppliersLoading} marques={marques}
+            ficheId={ficheId} fiche={fiche} ficheLoading={ficheLoading} onChoisirFiche={choisirFiche}
+            onRetirerFiche={() => setFicheId(null)} onChangerFiche={() => setFicheId(null)}
+            verification typeLabel={selectedEquipType?.label || null} champs={champsWeb}
+          />
 
           {/* N° Série */}
           <div>

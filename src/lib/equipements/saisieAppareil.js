@@ -86,6 +86,33 @@ export function saisieOrigine(equipement, par, le) {
   return { brand: equipement?.brand ?? null, model: equipement?.model ?? null, le, par };
 }
 
+const SUITE = 'enregistrez l\'appareil tel quel, il pourra être rattaché plus tard.';
+const MESSAGES_RPC = {
+  fiche_fabricant: 'Une fiche relevée chez le fabricant ne se corrige pas ici.',
+  fiche_fabricant_survit: 'Une fiche relevée chez le fabricant ne peut pas être absorbée : fusionnez dans l\'autre sens.',
+  fiche_fusionnee: 'Cette fiche a déjà été fusionnée.',
+  org_admin_required: 'Réservé à l\'administrateur.',
+  clients_edit_required: 'Vous n\'avez pas le droit de modifier les fiches client.',
+  marque_vide: 'La marque ne peut pas être vide.',
+};
+
+/**
+ * Message à afficher pour un échec de la recherche web, de la création ou du contrôle d'une fiche. Ne lève jamais.
+ * @param {{ code?: string|null, message?: string|null } | null | undefined} err
+ * @returns {string}
+ */
+export function messageErreurAppareil(err) {
+  const code = err?.code || null;
+  const message = String(err?.message || '');
+  if (code === 'quota') return `${message || 'Plafond de recherches web atteint'} : ${SUITE}`;
+  if (code === 'delai') return `La recherche a pris trop de temps : réessayez, ou ${SUITE}`;
+  if (code === 'droit') return 'Vous n\'avez pas le droit de modifier les fiches client.';
+  // la clé la plus longue d'abord : « fiche_fabricant_survit » contient « fiche_fabricant »
+  const cles = Object.keys(MESSAGES_RPC).sort((a, b) => b.length - a.length);
+  for (const cleRpc of cles) if (message.includes(cleRpc)) return MESSAGES_RPC[cleRpc];
+  return `La recherche n'a pas abouti : ${SUITE}`;
+}
+
 /**
  * Champs écrits sur l'équipement quand il se rattache à une fiche : marque de référence (majuscules), nom du modèle
  * de la fiche, et ligne fournisseur d'origine de l'article lié s'il y en a un.

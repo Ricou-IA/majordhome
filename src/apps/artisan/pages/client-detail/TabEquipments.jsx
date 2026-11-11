@@ -154,6 +154,8 @@ export const TabEquipments = ({ clientId, client = null, prefillDraft = null, on
         supplierProductId: formData.supplierProductId,
         unitCount: formData.quantity || 1,
         notes: formData.notes,
+        equipmentModelId: formData.equipmentModelId || null,
+        saisieOrigine: formData.saisieOrigine || null,
       };
 
       const result = await addEquipment(payload);
@@ -232,6 +234,8 @@ export const TabEquipments = ({ clientId, client = null, prefillDraft = null, on
         supplierProductId: formData.supplierProductId,
         unitCount: formData.quantity || 1,
         notes: formData.notes,
+        equipmentModelId: formData.equipmentModelId || null,
+        saisieOrigine: formData.saisieOrigine || null,
       });
       toast.success('Équipement mis à jour');
       invalidateAll();
