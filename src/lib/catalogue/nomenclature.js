@@ -215,6 +215,35 @@ export function listePiecesDisponible(model) {
   return !model?.origin || model.origin === 'releve_fabricant';
 }
 
+/** Adresse web http(s) bien formée, sinon null. */
+function adresseWeb(u) {
+  if (typeof u !== 'string' || !u) return null;
+  try {
+    const url = new URL(u);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+  } catch { return null; }
+}
+
+/**
+ * Liens vers le site du fabricant d'une fiche trouvée sur le web, à ouvrir dans le navigateur : les fichiers que la
+ * recherche a trouvés sans pouvoir les copier (un site qui refuse les téléchargements automatiques — jolly-mec.it), puis
+ * la page du fabricant. Ordre : notice, fiche technique, photo, page. Une adresse non web est écartée ; une même adresse
+ * n'apparaît qu'une fois. Une fiche relevée chez le fabricant n'en a pas.
+ * @param {{ source?: { liens?: { photo?: string|null, notice?: { url: string, label?: string }|null, fiche?: { url: string, label?: string }|null } }|null, source_urls?: string[]|null } | null | undefined} model
+ * @returns {Array<{ type: 'notice'|'fiche'|'photo'|'page', label: string, url: string }>}
+ */
+export function liensFabricant(model) {
+  const liens = model?.source?.liens || {};
+  const candidats = [
+    { type: 'notice', label: liens.notice?.label || 'Notice', url: adresseWeb(liens.notice?.url) },
+    { type: 'fiche', label: liens.fiche?.label || 'Fiche technique', url: adresseWeb(liens.fiche?.url) },
+    { type: 'photo', label: 'Photo', url: adresseWeb(liens.photo) },
+    { type: 'page', label: 'Page du fabricant', url: adresseWeb((model?.source_urls || [])[0]) },
+  ];
+  const vus = new Set();
+  return candidats.filter((c) => c.url && !vus.has(c.url) && vus.add(c.url));
+}
+
 /**
  * Description pré-remplie d'une demande SAV ouverte depuis des pièces choisies (fiche client) : l'appareil, puis
  * « quantité × désignation (référence) ». Texte de départ, que l'utilisateur complète ou remplace.

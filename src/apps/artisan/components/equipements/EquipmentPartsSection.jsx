@@ -12,9 +12,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronUp, Wrench, Loader2, Search, Maximize2, ShoppingCart, AlertTriangle, Minus, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Wrench, Loader2, Search, Maximize2, ShoppingCart, AlertTriangle, Minus, Plus, ExternalLink } from 'lucide-react';
 import { useEquipmentModel, useEquipmentModelParts, useEquipmentModelImages, useSetEquipmentModel } from '@hooks/useEquipmentModels';
-import { chercherDansNomenclature, trierParRepere, mentionsPiece, prixPublicPiece, listePiecesDisponible } from '@/lib/catalogue/nomenclature';
+import { chercherDansNomenclature, trierParRepere, mentionsPiece, prixPublicPiece, listePiecesDisponible, liensFabricant } from '@/lib/catalogue/nomenclature';
 import { formatEuro } from '@/lib/utils';
 import EquipmentModelPicker from './EquipmentModelPicker';
 import ExplodedViewViewer from './ExplodedViewViewer';
@@ -107,11 +107,24 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
 
   // Fiche trouvée sur le web ou créée depuis un article : jamais de liste de pièces — une ligne, pas un tableau vide
   if (model && !listePiecesDisponible(model)) {
+    const liens = liensFabricant(model);
     return (
-      <div className={`flex items-center gap-2 text-xs text-secondary-500 ${className}`}>
-        <Wrench className="w-3.5 h-3.5 flex-shrink-0" />
-        <span>Pièces détachées : pas de liste de pièces pour cet appareil.</span>
-        {canEdit && <button type="button" onClick={() => setChoixModele(true)} className="text-indigo-600 hover:text-indigo-800">Changer</button>}
+      <div className={`space-y-1.5 text-xs text-secondary-500 ${className}`}>
+        {liens.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-medium text-secondary-600">Site du fabricant :</span>
+            {liens.map((l) => (
+              <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800">
+                <ExternalLink className="w-3 h-3" />{l.label}
+              </a>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <Wrench className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>Pièces détachées : pas de liste de pièces pour cet appareil.</span>
+          {canEdit && <button type="button" onClick={() => setChoixModele(true)} className="text-indigo-600 hover:text-indigo-800">Changer</button>}
+        </div>
         {choixModele && (
           <EquipmentModelPicker equipment={equipment} currentModelId={modelId} isSaving={isSaving} onSelect={choisirModele} onClose={() => setChoixModele(false)} />
         )}

@@ -158,11 +158,9 @@ Deno.serve(async (req) => {
           a.notice_url ? verifierFiche(a.notice_url, echeance, "aucune notice trouvée") : Promise.resolve(null),
           a.fiche_url ? verifierFiche(a.fiche_url, echeance) : Promise.resolve(null),
         ]);
-        return {
-          ...a,
-          photo_url: photo_refus ? null : a.photo_url, notice_url: notice_refus ? null : a.notice_url, fiche_url: fiche_refus ? null : a.fiche_url,
-          photo_refus, notice_refus, fiche_refus,
-        };
+        // Les adresses refusées à la vérification sont GARDÉES (avec la raison) : un site qui refuse les téléchargements
+        // automatiques sert quand même le navigateur ; à la création, un fichier non copié devient un lien (source.liens).
+        return { ...a, photo_refus, notice_refus, fiche_refus };
       }));
       return jsonResponse({ ok: true, appareils, modele: final?.model ?? MODEL }, 200, req);
     }
@@ -206,12 +204,20 @@ Deno.serve(async (req) => {
       } catch (e) { avertissements.push(`${libelle} : ${(e as Error).message}`); }
     }
 
+    // Fichiers trouvés mais non copiés (site qui refuse les téléchargements automatiques) : gardés en liens, ouverts
+    // dans le navigateur depuis la carte équipement (décision d'Eric, 2026-11-11). On ne contourne pas le refus.
+    const copies = new Set(documents.map((d) => d.document_type));
+    const liens: Record<string, unknown> = {};
+    if (a.photo_url && !photoPath) liens.photo = a.photo_url;
+    if (a.notice_url && !copies.has("notice")) liens.notice = { url: a.notice_url, label: "Notice" };
+    if (a.fiche_url && !copies.has("fiche_technique")) liens.fiche = { url: a.fiche_url, label: "Fiche technique" };
+
     const retirerDeposes = async () => { if (deposes.length) await admin.storage.from(BUCKET).remove(deposes); };
     const { data: res, error: errRpc } = await admin.rpc("equipment_model_create_from_web", {
       p_org_id: orgId, p_user_id: auth.userId,
       p_fiche: {
         brand: a.brand, model_name: a.model_name, reference: a.reference, category: a.category, en_vente: a.en_vente,
-        equipment_type_id: typeId, specs: a.specs, source_urls: a.source_urls,
+        equipment_type_id: typeId, specs: a.specs, source_urls: a.source_urls, liens,
       },
       p_files: { photo_path: photoPath, documents },
     });

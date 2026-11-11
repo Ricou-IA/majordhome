@@ -46,6 +46,9 @@ export default function AppareilWebCarte({ appareil, champs = [], isCreating = f
           </a>
         ))}
       </div>
+      {(appareil.photo_refus && appareil.photo_url) || (appareil.notice_refus && appareil.notice_url) || (appareil.fiche_refus && appareil.fiche_url) ? (
+        <p className="text-xs text-gray-500">Le site du fabricant ne laisse pas copier certains fichiers : ils resteront des liens à ouvrir sur son site.</p>
+      ) : null}
       <div className="flex justify-end">
         <button
           type="button" disabled={isCreating || !modelName.trim()}

@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   cle, reperesSaisis, filtrerParReperes, chercherDansNomenclature, trierParRepere, mentionsPiece, prixPublicPiece, prixVentePiece, prixAchatPiece, ligneDevisDepuisPiece,
-  lignesDevisAvecPieces, descriptionSavDepuisPieces, listePiecesDisponible, classerModeles, filtrerModeles, rangerDocumentsModele, titreDocumentModele,
+  lignesDevisAvecPieces, descriptionSavDepuisPieces, listePiecesDisponible, liensFabricant, classerModeles, filtrerModeles, rangerDocumentsModele, titreDocumentModele,
 } from '../../src/lib/catalogue/nomenclature.js';
 
 const L = (extra = {}) => ({
@@ -95,6 +95,26 @@ test('listePiecesDisponible : seule une fiche relevée chez le fabricant porte u
   assert.equal(listePiecesDisponible({ origin: 'catalogue' }), false);
   assert.equal(listePiecesDisponible({}), true); // fiche sans origine (avant le référentiel) : relevée
   assert.equal(listePiecesDisponible(null), true); // pas encore chargée : on ne cache rien
+});
+
+test('liensFabricant : notice, fiche, photo puis page du fabricant ; adresses non web écartées, sans doublon', () => {
+  const page = 'https://jolly-mec.it/fr/produit/bridge-6-kw/12/';
+  const liens = liensFabricant({
+    source_urls: [page, 'https://autre.fr/x'],
+    source: { liens: {
+      photo: 'https://jolly-mec.it/p.jpg',
+      notice: { url: 'https://jolly-mec.it/frontend/products/download/3030/', label: 'Manuel' },
+      fiche: { url: 'javascript:alert(1)', label: 'Fiche produit' },
+    } },
+  });
+  assert.deepEqual(liens, [
+    { type: 'notice', label: 'Manuel', url: 'https://jolly-mec.it/frontend/products/download/3030/' },
+    { type: 'photo', label: 'Photo', url: 'https://jolly-mec.it/p.jpg' },
+    { type: 'page', label: 'Page du fabricant', url: page },
+  ]);
+  assert.deepEqual(liensFabricant({ source_urls: [page], source: { liens: { notice: { url: page, label: 'Notice' } } } }).map((l) => l.type), ['notice']);
+  assert.deepEqual(liensFabricant({ source: { site: 'https://pieces.invicta' } }), []); // fiche relevée : rien
+  assert.deepEqual(liensFabricant(null), []);
 });
 
 test('descriptionSavDepuisPieces : appareil puis quantité × désignation (référence)', () => {
