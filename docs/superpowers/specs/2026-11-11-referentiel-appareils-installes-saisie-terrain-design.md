@@ -110,9 +110,11 @@ Pas à pas, sans perdre la saisie entre les étapes :
 4. **« Rien ne correspond — chercher sur le web »** (clic explicite) : la recherche renvoie une fiche proposée (marque,
    nom exact, référence fabricant, catégorie, caractéristiques, photo, notice, pages sources), ou plusieurs candidats
    si l'appareil est ambigu (tailles, coloris). L'intervenant choisit « C'est cet appareil » → la fiche entre au
-   référentiel `a_controler` et apparaît dans la file de contrôle ; l'équipement s'y rattache à l'enregistrement du
-   formulaire (en ajout, il n'existe pas encore). Saisie abandonnée : la fiche reste dans la file, « installée chez :
-   aucun client », à valider ou fusionner.
+   référentiel `a_controler` ; l'équipement s'y rattache à l'enregistrement du formulaire (en ajout, il n'existe pas
+   encore). **La fiche n'entre dans la file de contrôle qu'une fois un équipement enregistré dessus (Eric,
+   2026-11-11 : « sinon je vais me retrouver avec plein de validations à faire sur des équipements pas validés »).**
+   Saisie abandonnée : la fiche reste au référentiel (proposée aux recherches suivantes), hors de la file. Côté
+   intervenant, l'état s'affiche « Indexation à venir dans la base » (Eric).
    Il peut corriger le nom ou la référence avant de valider.
 5. **« Aucun de ceux-là »** ou recherche en échec → l'équipement s'enregistre tel que saisi, sans rattachement.
    **(mon choix)** Pas de fiche créée, pas d'élément dans la file : on ne remplit pas le référentiel de saisies non
