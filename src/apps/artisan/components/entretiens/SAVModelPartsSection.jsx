@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom';
 import { Wrench } from 'lucide-react';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useOrgSettings } from '@hooks/useOrgSettings';
+import { moduleActif } from '@lib/modules';
 import { buildDefaultSections } from '@services/devis.service';
 import { buildDevisConfig, famillesActives, tvaFamille } from '@/lib/devisConfig';
 import { lignesDevisAvecPieces } from '@/lib/catalogue/nomenclature';
@@ -60,8 +61,25 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
   };
 
   if (!liste.length) return null;
-  // Rien à montrer à qui ne peut pas choisir un modèle, quand aucun équipement n'en a.
-  if (!canEdit && !liste.some((e) => e.equipment_model_id)) return null;
+  const selecteur = liste.length > 1 && (
+    <select
+      value={choisi || ''} onChange={(e) => setChoisi(e.target.value)} aria-label="Appareil concerné"
+      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+    >
+      {liste.map((e) => <option key={e.id} value={e.id}>{nomEquipement(e, referentiel)}{e.id === item?.equipment_id ? ' (appareil du SAV)' : ''}</option>)}
+    </select>
+  );
+  // Rien à montrer de la nomenclature à qui ne peut pas choisir un modèle, quand aucun équipement n'en a.
+  // L'assistant « Trouver une pièce » n'en dépend pas : module ouvert + droit suffisent (état local, rien d'enregistré).
+  if (!canEdit && !liste.some((e) => e.equipment_model_id)) {
+    if (!equipement || !moduleActif(settings, 'assistant') || !can('assistant_pieces', 'use')) return null;
+    return (
+      <div className="space-y-2">
+        {selecteur}
+        <TrouverPieceButton key={`assistant-${equipement.id}`} equipment={equipement} interventionId={item.id} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
@@ -69,14 +87,7 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
         <Wrench className="w-4 h-4" />
         Pièces détachées de l&apos;appareil
       </h3>
-      {liste.length > 1 && (
-        <select
-          value={choisi || ''} onChange={(e) => setChoisi(e.target.value)} aria-label="Appareil concerné"
-          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-        >
-          {liste.map((e) => <option key={e.id} value={e.id}>{nomEquipement(e, referentiel)}{e.id === item?.equipment_id ? ' (appareil du SAV)' : ''}</option>)}
-        </select>
-      )}
+      {selecteur}
       {liste.length === 1 && equipement && <p className="text-sm text-gray-600">{nomEquipement(equipement, referentiel)}</p>}
       {equipement && (
         <EquipmentPartsSection
