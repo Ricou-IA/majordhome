@@ -18,7 +18,7 @@
  */
 
 import { estTypeAdaptable } from '@/lib/souplesse';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CertificatsSection } from '@/apps/artisan/components/entretiens/CertificatsSection';
 import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES, FREE_TYPES } from '@services/appointments.service';
@@ -120,6 +120,8 @@ export function EventModal({
   const [continuationMode, setContinuationMode] = useState(false);
   // Aperçu de la tournée d'une personne (clic sur son prénom dans la grille) : { memberId, date } | null
   const [apercu, setApercu] = useState(null);
+  // Gestes « Choisir / Ajouter / Retirer » sous les parcours, branchés par l'assistant
+  const slotActionsRef = useRef(null);
   const navigate = useNavigate();
 
   const { isOrgAdmin } = useAuth();
@@ -418,27 +420,21 @@ export function EventModal({
     city: formData.client_city,
   }), [formData.appointment_type, formData.client_name, formData.client_first_name,
     formData.client_address, formData.client_postal_code, formData.client_city]);
-  // Aperçu (clic sur un prénom) : la tournée telle qu'elle est, si ce n'est pas déjà la personne d'un créneau
-  const apercuDejaPose = apercu && assistantSlots.some((sl) => sl.date === apercu.date
-    && personnesDuCreneau(sl).some((pers) => pers.ids.includes(apercu.memberId)));
-  // Rendu en deux blocs (Eric 2026-11-11) : la carte sous le type, la liste en colonne de droite.
-  // Même hook, même cache : les deux blocs lisent la même journée.
-  const avecParcours = !isFreeType && (assistantSlots.length > 0 || apercu);
+  // Comparaison (clic sur des prénoms, Eric 2026-11-11) : avec un créneau posé ce jour-là,
+  // chaque personne comparée voit sa journée AVEC ce RDV et peut être retenue (« Choisir ») ou
+  // ajoutée (intervention à plusieurs) ; sans créneau, sa tournée telle qu'elle est.
+  const comparees = apercu?.memberIds || [];
+  const creneauxDuJour = apercu
+    ? assistantSlots.map((slot, index) => ({ slot, index })).filter(({ slot }) => slot.date === apercu.date)
+    : [];
+  const avecParcours = !isFreeType && (assistantSlots.length > 0 || comparees.length > 0);
+  const boutonPied = 'rounded-md px-2 py-1 text-xs font-medium transition-colors';
   // Les itinéraires se lisent côte à côte (comparer deux personnes) ; les cartes s'empilent.
-  const rendreParcours = (partie) => (
-    <div className={partie === 'liste' ? 'flex flex-wrap items-start gap-3 [&>*]:w-[19rem] [&>*]:shrink-0' : 'space-y-3'}>
-      {apercu && !apercuDejaPose && (
-        <ParcoursJournee
-          key={`apercu-${apercu.memberId}-${apercu.date}`}
-          slot={{ date: apercu.date, startTime: null }}
-          personne={personneDe(apercu.memberId)}
-          coords={null}
-          rdv={rdvParcours}
-          apercu
-          partie={partie}
-        />
-      )}
-      {assistantSlots.flatMap((slot) => personnesDuCreneau(slot).map((pers) => (
+  const rendreParcours = (partie) => {
+    const blocs = [];
+    assistantSlots.forEach((slot, index) => {
+      const retenus = personnesDuCreneau(slot);
+      retenus.forEach((pers) => blocs.push(
         <ParcoursJournee
           key={`${slot.date}-${slot.startTime}-${pers.key}`}
           slot={slot}
@@ -446,10 +442,69 @@ export function EventModal({
           coords={coordsRdv}
           rdv={rdvParcours}
           partie={partie}
-        />
-      ))).slice(0, 4)}
-    </div>
-  );
+        >
+          <div className="flex items-center justify-between gap-2 border-t border-secondary-100 pt-2">
+            <span className="text-xs font-medium text-emerald-700">Retenu{retenus.length > 1 ? ' · à plusieurs' : ''}</span>
+            {retenus.length > 1 && (
+              <button type="button" onClick={() => slotActionsRef.current?.retirer(index, pers.key)}
+                className={`${boutonPied} text-secondary-600 hover:bg-secondary-100`}>
+                Retirer
+              </button>
+            )}
+          </div>
+        </ParcoursJournee>,
+      ));
+    });
+    comparees.forEach((memberId) => {
+      const pers = personneDe(memberId);
+      if (creneauxDuJour.length === 0) {
+        blocs.push(
+          <ParcoursJournee
+            key={`apercu-${memberId}-${apercu.date}`}
+            slot={{ date: apercu.date, startTime: null }}
+            personne={pers}
+            coords={null}
+            rdv={rdvParcours}
+            apercu
+            partie={partie}
+          />,
+        );
+        return;
+      }
+      creneauxDuJour.forEach(({ slot, index }) => {
+        if (personnesDuCreneau(slot).some((p) => p.ids.includes(memberId))) return;
+        blocs.push(
+          <ParcoursJournee
+            key={`option-${slot.date}-${slot.startTime}-${memberId}`}
+            slot={slot}
+            personne={pers}
+            coords={coordsRdv}
+            rdv={rdvParcours}
+            partie={partie}
+            titre={`Option · ${pers.displayName}`}
+          >
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-secondary-100 pt-2">
+              <button type="button" onClick={() => slotActionsRef.current?.choisir(index, memberId)}
+                className={`${boutonPied} bg-primary-600 text-white hover:bg-primary-700`}>
+                Choisir {pers.displayName.split(' ')[0]}
+              </button>
+              {!isCommercialType && (
+                <button type="button" onClick={() => slotActionsRef.current?.ajouter(index, memberId)}
+                  className={`${boutonPied} border border-primary-300 text-primary-700 hover:bg-primary-50`}>
+                  Ajouter (à plusieurs)
+                </button>
+              )}
+            </div>
+          </ParcoursJournee>,
+        );
+      });
+    });
+    return (
+      <div className={partie === 'liste' ? 'flex flex-wrap items-start gap-3 [&>*]:w-[19rem] [&>*]:shrink-0' : 'space-y-3'}>
+        {blocs.slice(0, 6)}
+      </div>
+    );
+  };
   const parcours = avecParcours ? rendreParcours('liste') : null;
   const parcoursCarte = avecParcours ? rendreParcours('carte') : null;
 
@@ -600,6 +655,7 @@ export function EventModal({
                   sidePanelBas={parcours}
                   sidePanelCarte={parcoursCarte}
                   onApercuChange={isFreeType ? null : setApercu}
+                  actionsRef={slotActionsRef}
                   allowMoveExisting
                 />
               )}

@@ -484,9 +484,9 @@ export function DayResourceGrid({
                   key={m.id}
                   type="button"
                   onClick={() => onMemberClick(m.id)}
-                  aria-pressed={selectedMemberId === m.id}
-                  className={`border-b border-r px-1 py-1.5 text-center transition-colors hover:bg-blue-50 ${selectedMemberId === m.id ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : 'bg-gray-50'}`}
-                  title={`Voir la tournée de ${m.display_name} ce jour-là`}
+                  aria-pressed={[].concat(selectedMemberId).includes(m.id)}
+                  className={`border-b border-r px-1 py-1.5 text-center transition-colors hover:bg-blue-50 ${[].concat(selectedMemberId).includes(m.id) ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : 'bg-gray-50'}`}
+                  title={`Comparer la tournée de ${m.display_name} (re-cliquer pour retirer)`}
                 >
                   <div className="flex items-center justify-center gap-1">{entete}</div>
                 </button>

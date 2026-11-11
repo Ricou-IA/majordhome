@@ -129,8 +129,11 @@ export function SchedulingAssistant({
   // Colonne client, entre la grille et la colonne type (sideBySide) : saisie du client quand il
   // n'est pas connu (« Nouveau RDV » du planning) — la colonne de droite garde type, créneaux et déroulé.
   sidePanelClient = null,
-  // Aperçu de la tournée d'une personne (clic sur son prénom) : ({ memberId, date } | null) => void
+  // Personnes comparées (clic sur leur prénom) : ({ memberIds, date } | null) => void
   onApercuChange = null,
+  // Ref remplie des gestes sur un créneau posé (index dans les créneaux remontés) :
+  // { choisir(i, memberId), ajouter(i, memberId), retirer(i, memberId) } — boutons sous les parcours
+  actionsRef = null,
   // Glisser les RDV existants de la grille pour réorganiser la journée (enregistré tout de suite)
   allowMoveExisting = false,
   onSlotsChange,
@@ -369,11 +372,15 @@ export function SchedulingAssistant({
     [expectedTeamSize, expectedDays, draftSlots],
   );
 
-  // Aperçu de la tournée : la personne cliquée (re-clic = fermer), le jour affiché suit la grille
-  const [apercuMemberId, setApercuMemberId] = useState(null);
+  // Comparaison : les personnes cliquées (re-clic = retirer), le jour affiché suit la grille.
+  // Avec un créneau posé, chacune voit sa journée AVEC ce RDV ; sans créneau, telle qu'elle est.
+  const [comparaison, setComparaison] = useState([]);
   useEffect(() => {
-    onApercuChange?.(apercuMemberId ? { memberId: apercuMemberId, date: selectedDate } : null);
-  }, [apercuMemberId, selectedDate, onApercuChange]);
+    onApercuChange?.(comparaison.length ? { memberIds: comparaison, date: selectedDate } : null);
+  }, [comparaison, selectedDate, onApercuChange]);
+  const basculerComparaison = useCallback((id) => {
+    setComparaison((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  }, []);
 
   // --- Mode intégré (embedded) : remonte en continu les créneaux au host (EventModal),
   // sans bouton de confirmation interne. Objet/notes/subject sont gérés par le host. ---
@@ -391,6 +398,22 @@ export function SchedulingAssistant({
   useEffect(() => {
     if (embedded) onSlotsChange?.(emittedSlots);
   }, [embedded, emittedSlots, onSlotsChange]);
+
+  // Gestes depuis les parcours : retenir une personne (seule), l'ajouter (intervention à
+  // plusieurs), la retirer — jamais un créneau sans personne.
+  useEffect(() => {
+    if (!actionsRef) return;
+    const changer = (i, f) => {
+      const id = assignedSlots[i]?.id;
+      if (!id) return;
+      setDraftSlots((prev) => prev.map((s) => (s.id === id ? { ...s, technicianIds: f(s.technicianIds || []) } : s)));
+    };
+    actionsRef.current = {
+      choisir: (i, memberId) => changer(i, () => [memberId]),
+      ajouter: (i, memberId) => changer(i, (ids) => (ids.includes(memberId) ? ids : [...ids, memberId])),
+      retirer: (i, memberId) => changer(i, (ids) => (ids.length > 1 ? ids.filter((x) => x !== memberId) : ids)),
+    };
+  }, [actionsRef, assignedSlots]);
 
   // --- Confirmation : remonte les slots[] au format du contrat ---
   // slots = [{ date, startTime, endTime, duration, technicianIds, assignedCommercialId, subject, notes }]
@@ -500,9 +523,9 @@ export function SchedulingAssistant({
         fixedDuration={fixedDuration}
         fullDayClick={fullDayClick}
         onToggleDay={handleToggleDay}
-        onMemberClick={onApercuChange ? (id) => setApercuMemberId((cur) => (cur === id ? null : id)) : null}
+        onMemberClick={onApercuChange ? basculerComparaison : null}
         onMoveAppointment={allowMoveExisting ? handleMoveAppointment : null}
-        selectedMemberId={apercuMemberId}
+        selectedMemberId={comparaison}
       />
 
       {/* « Qui prend ce RDV ? » — filet quand le sélecteur d'un créneau a été vidé */}
