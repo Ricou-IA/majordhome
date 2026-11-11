@@ -59,9 +59,11 @@ export const SectionType = ({
   <div>
     <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
       <Tag className="w-4 h-4 text-gray-500" />
-      Type
+      Type de RDV
+      <span className="text-red-500 -ml-1">*</span>
     </h3>
-    <FormField label="Type de RDV" required error={errors.appointment_type}>
+    {/* Sans libellé de champ : le titre le porte, et le sélecteur s'aligne sur la recherche client */}
+    <FormField label={null} error={errors.appointment_type} className="[&>label]:hidden">
       <SelectInput
         value={formData.appointment_type}
         onChange={(v) => updateField('appointment_type', v)}
