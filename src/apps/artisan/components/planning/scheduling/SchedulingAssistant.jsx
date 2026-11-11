@@ -224,13 +224,14 @@ export function SchedulingAssistant({
 
   // Colonnes de la fenêtre (sideBySide) : grille · client (si non rattaché) · type · parcours.
   // Le parcours prend une colonne quand l'écran le permet (xl sans client, 2xl avec), sinon il
-  // passe sous la grille. Classes écrites en entier : Tailwind ne lit pas les noms composés.
+  // passe sous la grille ; la carte prend la sienne un cran plus large (2xl / 1800 px), sinon
+  // elle reste sous les créneaux. Classes écrites en entier : Tailwind ne lit pas les noms composés.
   const grilleColonnes = sidePanelClient
     ? (sidePanelBas
-      ? 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem] 2xl:grid-cols-[minmax(0,1fr)_17rem_17rem_19rem]'
+      ? 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem] 2xl:grid-cols-[minmax(0,1fr)_17rem_17rem_19rem] min-[1800px]:grid-cols-[minmax(0,1fr)_17rem_17rem_19rem_24rem]'
       : 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem]')
     : (sidePanelBas
-      ? 'lg:grid-cols-[minmax(0,1fr)_17rem] xl:grid-cols-[minmax(0,1fr)_17rem_19rem]'
+      ? 'lg:grid-cols-[minmax(0,1fr)_17rem] xl:grid-cols-[minmax(0,1fr)_17rem_19rem] 2xl:grid-cols-[minmax(0,1fr)_17rem_19rem_24rem]'
       : 'lg:grid-cols-[minmax(0,1fr)_17rem]');
 
   // Déplacer un RDV existant : enregistré tout de suite (comme le glisser du planning), avec
@@ -587,7 +588,10 @@ export function SchedulingAssistant({
           {totalConflicts} conflit(s) de disponibilité détecté(s) — la planification reste possible.
         </p>
       )}
-      {sideBySide && sidePanelCarte}
+      {/* Écran étroit : la carte reste sous les créneaux ; large : sa propre colonne à droite */}
+      {sideBySide && sidePanelCarte && (
+        <div className={sidePanelClient ? 'min-[1800px]:hidden' : '2xl:hidden'}>{sidePanelCarte}</div>
+      )}
       </div>
       {/* Parcours (itinéraire + carte) : colonne de droite quand l'écran est assez large — la
           fenêtre s'élargit ; sinon sous la grille. Placement explicite par point de rupture. */}
@@ -597,6 +601,11 @@ export function SchedulingAssistant({
           : 'lg:col-start-1 lg:row-start-2 lg:pt-3 xl:col-start-auto xl:row-start-auto xl:pt-0'}
         >
           {sidePanelBas}
+        </div>
+      )}
+      {sideBySide && sidePanelCarte && (
+        <div className={sidePanelClient ? 'hidden min-[1800px]:block min-[1800px]:sticky min-[1800px]:top-0' : 'hidden 2xl:block 2xl:sticky 2xl:top-0'}>
+          {sidePanelCarte}
         </div>
       )}
       </div>
