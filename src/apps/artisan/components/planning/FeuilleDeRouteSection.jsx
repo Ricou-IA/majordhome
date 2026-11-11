@@ -135,11 +135,11 @@ function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange,
   );
 }
 
-function Troncon({ troncon, label, estime }) {
+function Troncon({ troncon, label, estime, compact = false }) {
   if (!troncon) return null;
   return (
-    <div className="flex items-center gap-1.5 pl-3 py-1 text-xs text-gray-500">
-      <Car className="h-3.5 w-3.5" />
+    <div className={`flex items-center gap-1.5 pl-3 text-gray-500 ${compact ? 'py-0.5 text-[11px] leading-tight' : 'py-1 text-xs'}`}>
+      <Car className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
       {label} {formatDureeRoute(troncon.minutes)} · {formatKm(troncon.km)}
       {estime && <span className="text-amber-700">(estimé)</span>}
     </div>
@@ -345,22 +345,23 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
           {feuille.items.map((it) => (
             <li key={it.id}>
               {it.localise
-                ? <Troncon troncon={it.trajetAvant} label="" estime={feuille.estime} />
+                ? <Troncon troncon={it.trajetAvant} label="" estime={feuille.estime} compact={compact} />
                 : (
                   <div className="flex items-center gap-1.5 pl-3 py-1 text-xs text-amber-700">
                     <MapPin className="h-3.5 w-3.5" /> Adresse non localisée — hors itinéraire
                   </div>
                 )}
-              <div className={`flex gap-2 rounded-lg border ${compact ? 'p-1.5' : 'p-2'} ${it.nouveau ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200' : 'border-gray-200 bg-gray-50'}`}>
+              <div className={`flex gap-2 rounded-lg border ${compact ? 'px-1.5 py-1 items-center' : 'p-2'} ${it.nouveau ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200' : 'border-gray-200 bg-gray-50'}`}>
                 <span
-                  className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${it.localise ? 'bg-blue-600' : 'bg-gray-400'}`}
+                  className={`flex ${compact ? 'h-5 w-5 text-[11px]' : 'h-6 w-6 text-xs'} flex-shrink-0 items-center justify-center rounded-full font-semibold text-white ${it.localise ? 'bg-blue-600' : 'bg-gray-400'}`}
                 >
                   {it.rang}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className={`font-medium text-gray-900 ${compact ? 'text-xs' : ''}`}>
+                  {/* Compact : une ligne (heure + client), le type en infobulle */}
+                  <p className={`font-medium text-gray-900 ${compact ? 'text-xs truncate' : ''}`} title={compact ? `${it.time} · ${it.typeLabel}${it.clientName ? ` · ${it.clientName}` : ''}` : undefined}>
                     <span className="tabular-nums">{it.time}</span>
-                    {it.nouveau ? <span className="text-primary-800"> · Ce RDV</span> : <> · {it.typeLabel}</>}
+                    {it.nouveau ? <span className="text-primary-800"> · Ce RDV</span> : !compact && <> · {it.typeLabel}</>}
                     {it.clientName && <span> · {it.clientName}</span>}
                   </p>
                   {!compact && it.address && <p className="text-xs text-gray-600">{it.address}</p>}
@@ -373,7 +374,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
                     <p className="text-xs text-gray-500">Équipements : {it.equipments.join(' · ')}</p>
                   )}
                   {it.retard && (
-                    <p className="flex items-center gap-1 text-xs text-red-700">
+                    <p className={`flex items-center gap-1 text-red-700 ${compact ? 'text-[11px] leading-tight' : 'text-xs'}`}>
                       <AlertTriangle className="h-3 w-3 shrink-0" />
                       Arrivée au plus tôt {it.retard.arriveeAuPlusTot} (+{formatDureeRoute(it.retard.retardMinutes)})
                     </p>
@@ -383,7 +384,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
             </li>
           ))}
           {feuille.retour && (
-            <li><Troncon troncon={feuille.retour} label="Retour" estime={feuille.estime} /></li>
+            <li><Troncon troncon={feuille.retour} label="Retour" estime={feuille.estime} compact={compact} /></li>
           )}
           <ExtremiteChoix cote="retour" point={retour} simule={simulation?.retour} heure={feuille.heureRetour} {...choixProps} />
           {feuille.retourRetardMinutes > 0 && (

@@ -35,7 +35,7 @@ export function ParcoursJournee({ slot, personne, coords, rdv, apercu = false, p
   const memberIds = useMemo(() => idsKey.split(','), [idsKey]);
 
   return (
-    <div className="rounded-lg border border-secondary-200 bg-white p-2.5 space-y-2">
+    <div className="rounded-lg border border-secondary-200 bg-white p-2 space-y-1.5">
       <p className="flex items-center gap-2 text-sm font-medium text-secondary-800">
         <Route className="w-4 h-4 text-secondary-500 shrink-0" />
         <span className="truncate">
