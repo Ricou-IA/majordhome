@@ -214,6 +214,10 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
 
   const name = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim() || 'Sans nom';
 
+  // Équipements rangés sous le contrat ou à part (sans liens contrat ↔ équipements : tous à part)
+  const equipementsSousContrat = idsSousContrat ? equipementsClient.filter((eq) => idsSousContrat.has(eq.id)) : [];
+  const autresEquipements = idsSousContrat ? equipementsClient.filter((eq) => !idsSousContrat.has(eq.id)) : equipementsClient;
+
   // --- Handlers ---
   const handleTransition = async (newStatus) => {
     // Intercepter "planifie" → ouvrir le panneau de planification
@@ -495,6 +499,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
   const forwardTransitions = allTransitions.filter((t) => {
     // Bloquer transition → réalisé pour entretiens (certificat obligatoire)
     if (type === 'entretien' && t === 'realise') return false;
+    // SAV : « Devis envoyé » suit le devis (créé depuis la fiche, statut reporté sur la carte), plus un bouton
+    if (type === 'sav' && t === 'devis_envoye') return false;
     const col = KANBAN_COLUMNS.find(c => c.value === t);
     // Statut hors-Kanban (ex: facturé) = toujours forward
     if (!col) return true;
@@ -507,7 +513,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Contenu */}
-      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${showScheduling ? 'max-w-2xl' : 'max-w-lg'} ${MODAL_PANEL_PHONE}`}>
+      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${showScheduling ? 'max-w-2xl' : isSav ? 'max-w-4xl' : 'max-w-lg'} ${MODAL_PANEL_PHONE}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-3 min-w-0">
@@ -586,6 +592,9 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
             </div>
           ) : (
             <>
+              {/* SAV : deux colonnes (client, urgence, problème | devis, pièces, notes) — pas d'ascenseur sur un écran de bureau */}
+              <div className={isSav ? 'space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8' : 'space-y-6'}>
+              <div className="space-y-6">
               {/* Infos client */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-gray-700">
@@ -612,76 +621,56 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                     className="text-sm text-gray-500 [&>svg]:text-gray-400 [&>svg]:h-4 [&>svg]:w-4"
                   />
                 )}
+                {/* Téléphone et e-mail cliquables (appel / messagerie depuis le téléphone) */}
                 {item.client_phone && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <a href={`tel:${item.client_phone.replace(/[^\d+]/g, '')}`} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 w-fit">
                     <Phone className="w-4 h-4 text-gray-400" />
                     <span>{item.client_phone}</span>
-                  </div>
+                  </a>
                 )}
                 {item.client_email && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <a href={`mailto:${item.client_email}`} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 w-fit break-all">
                     <Mail className="w-4 h-4 text-gray-400" />
                     <span>{item.client_email}</span>
+                  </a>
+                )}
+
+                {/* Contrat : ses équipements et le dernier entretien, puis les autres équipements à part
+                    (recette Eric 2026-11-11 : plus de code couleur à décoder). Contrat legacy sans liens
+                    d'équipement : impossible de distinguer, tout part dans « Équipements ». */}
+                {item.contract_number && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <FileText className="w-4 h-4 text-gray-400" />
+                      <span>Contrat {item.contract_number}</span>
+                      {item.contract_amount > 0 && (
+                        <span className="ml-auto text-sm font-semibold text-emerald-700">
+                          {formatEuro(item.contract_amount)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="pl-6 space-y-1.5">
+                      {equipementsSousContrat.length > 0 && (
+                        <ChipsEquipements equipements={equipementsSousContrat} referentiel={referentiel} />
+                      )}
+                      <DernierEntretien date={lastEntretienDate} />
+                    </div>
                   </div>
                 )}
-                {item.contract_number && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <FileText className="w-4 h-4 text-gray-400" />
-                    <span>Contrat {item.contract_number}</span>
-                    {item.contract_amount > 0 && (
-                      <span className="ml-auto text-sm font-semibold text-emerald-700">
-                        {formatEuro(item.contract_amount)}
-                      </span>
-                    )}
+                {!item.contract_number && <DernierEntretien date={lastEntretienDate} icone />}
+
+                {autresEquipements.length > 0 && (
+                  <div className="flex items-start gap-2 text-sm text-gray-500">
+                    <Wrench className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div className="space-y-1">
+                      <span>{idsSousContrat && item.contract_number ? 'Autres équipements' : 'Équipements'}</span>
+                      <ChipsEquipements equipements={autresEquipements} referentiel={referentiel} />
+                    </div>
                   </div>
                 )}
 
                 {/* Pièces de rechange : détail + toggle « Offert » (team_leader+) */}
                 <EntretienPartsSection item={item} orgId={item.org_id} />
-
-                {/* Équipements du client : type · marque modèle ; vert = sous contrat, ambre = hors contrat */}
-                {equipementsClient.length > 0 && (
-                  <div className="flex items-start gap-2 text-sm text-gray-500">
-                    <Wrench className="w-4 h-4 text-gray-400 mt-0.5" />
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {equipementsClient.map((eq) => {
-                        const sousContrat = idsSousContrat ? idsSousContrat.has(eq.id) : null;
-                        const marqueModele = [eq.brand, eq.model].filter(Boolean).join(' ');
-                        const classe = sousContrat === null
-                          ? 'bg-gray-100 text-gray-700'
-                          : sousContrat ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200';
-                        return (
-                          <span
-                            key={eq.id}
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classe}`}
-                            title={sousContrat === null ? undefined : sousContrat ? 'Sous contrat' : 'Hors contrat'}
-                          >
-                            {libelleEquipement(eq, referentiel)}
-                            {marqueModele && <span className="font-normal">&nbsp;· {marqueModele}</span>}
-                          </span>
-                        );
-                      })}
-                      {idsSousContrat && (
-                        <span className="text-[10px] text-gray-400">vert = sous contrat · ambre = hors contrat</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Date du dernier entretien */}
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Calendar className="w-4 h-4 text-gray-400" />
-                  <span>
-                    Dernier entretien :{' '}
-                    {lastEntretienDate ? (
-                      <span className="font-medium text-gray-700">
-                        {formatDateShortFR(lastEntretienDate)}
-                      </span>
-                    ) : (
-                      <span className="italic text-gray-400">Aucun</span>
-                    )}
-                  </span>
-                </div>
 
                 {/* CTA Compléter fiche client (contacts Web) */}
                 {item.tags?.includes('Web') && item.client_id && (
@@ -692,27 +681,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                   >
                     <UserPlus className="w-4 h-4" />
                     Compléter la fiche client
-                  </button>
-                )}
-
-                {/* Toggle Réaliser Entretien (SAV uniquement) */}
-                {type === 'sav' && canEditSAV && (
-                  <button
-                    type="button"
-                    onClick={handleToggleEntretien}
-                    className={`mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                      includesEntretien
-                        ? 'text-blue-700 bg-blue-100 border-blue-300'
-                        : 'text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100'
-                    }`}
-                    title={includesEntretien ? 'Entretien inclus — cliquer pour retirer' : 'Programmer un entretien en même temps'}
-                  >
-                    {includesEntretien ? (
-                      <Check className="w-3.5 h-3.5" />
-                    ) : (
-                      <ClipboardCheck className="w-3.5 h-3.5" />
-                    )}
-                    {includesEntretien ? 'Entretien à faire' : 'Réaliser Entretien'}
                   </button>
                 )}
               </div>
@@ -747,15 +715,10 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                 </div>
               )}
 
-              {/* Section Pièces (SAV uniquement) */}
-              {type === 'sav' && (
-                <SAVPartsSection
-                  partsOrderStatus={partsOrder}
-                  onChange={setPartsOrder}
-                  disabled={!canEditSAV || clotureSeule}
-                />
-              )}
+              </div>
 
+              {/* Colonne droite (SAV) : devis d'abord, la commande de pièces en découle */}
+              <div className="space-y-6">
               {/* Section Devis (SAV uniquement) */}
               {type === 'sav' && (
                 <SAVDevisSection
@@ -772,8 +735,33 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                     canEdit={canEditSAV && !clotureSeule}
                     onUpdated={onUpdated}
                     onCardSynced={setDevisStatus}
+                    actions={canEditSAV && !clotureSeule ? (
+                      // Entretien fait pendant le passage SAV (début de saison) : tag la carte, ajoute le montant du contrat
+                      <button
+                        type="button"
+                        onClick={handleToggleEntretien}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-all ${
+                          includesEntretien
+                            ? 'text-blue-700 bg-blue-100 border-blue-300'
+                            : 'text-blue-700 bg-white border-blue-200 hover:bg-blue-50'
+                        }`}
+                        title={includesEntretien ? 'Entretien inclus — cliquer pour retirer' : 'Faire l’entretien pendant le même passage'}
+                      >
+                        {includesEntretien ? <Check className="w-4 h-4" /> : <ClipboardCheck className="w-4 h-4" />}
+                        {includesEntretien ? 'Entretien inclus' : 'Ajouter l’entretien'}
+                      </button>
+                    ) : null}
                   />
                 </SAVDevisSection>
+              )}
+
+              {/* Section Pièces (SAV uniquement) — après le devis */}
+              {type === 'sav' && (
+                <SAVPartsSection
+                  partsOrderStatus={partsOrder}
+                  onChange={setPartsOrder}
+                  disabled={!canEditSAV || clotureSeule}
+                />
               )}
 
               {/* Anomalie constatée sur un certificat (lecture seule : la source reste le certificat) */}
@@ -821,6 +809,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                   />
                 </FormField>
               </div>
+              </div>
+              </div>
 
               {/* Section certificats multi-équipements (entretien uniquement) */}
               {showCertificatsSection && (
@@ -833,29 +823,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
         {/* Footer : Enregistrer + transitions (masqué en mode planification) */}
         {!showScheduling && (
           <div className={`px-5 py-3 border-t bg-gray-50 rounded-b-xl space-y-2 ${MODAL_FOOTER_PHONE}`}>
-            {/* Bouton Enregistrer */}
-            {canEditSAV && (
-              <div className="flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={!isDirty || isSavingFields}
-                  className={`inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
-                    isDirty
-                      ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  }`}
-                >
-                  {isSavingFields ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  {isSavingFields ? 'Enregistrement...' : 'Enregistrer'}
-                </button>
-              </div>
-            )}
-
             {/* CTA Envoyer par mail (entretien réalisé avec email client) */}
             {isEntretien && item.workflow_status === 'realise' && item.client_email && (
               <div className="flex items-center justify-center">
@@ -870,9 +837,9 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
               </div>
             )}
 
-            {/* Boutons transition */}
-            {canEditSAV && (backTransitions.length > 0 || forwardTransitions.length > 0 || peutCloturerSansPlanifier(item)) && (
-              <div className="flex items-center gap-2 flex-wrap pt-1">
+            {/* Une seule ligne : retours et rangement à gauche, Enregistrer puis les avancées à droite */}
+            {canEditSAV && (
+              <div className="flex items-center gap-2 flex-wrap">
                 {/* Retour arrière à gauche */}
                 {backTransitions.map((targetStatus) => {
                   const col = KANBAN_COLUMNS.find(c => c.value === targetStatus)
@@ -921,6 +888,20 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                 )}
 
                 <div className="flex-1" />
+
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!isDirty || isSavingFields}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg border transition-all ${
+                    isDirty
+                      ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                      : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {isSavingFields ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  {isSavingFields ? 'Enregistrement...' : 'Enregistrer'}
+                </button>
 
                 {/* SAV traité sans planification : clôture + inscription au planning après coup */}
                 {peutCloturerSansPlanifier(item) && (
@@ -972,6 +953,38 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
           onDone={() => { onUpdated?.(); onClose(); }}
         />
       )}
+    </div>
+  );
+}
+
+/** Pastilles d'équipements : type · marque modèle. */
+function ChipsEquipements({ equipements, referentiel }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {equipements.map((eq) => {
+        const marqueModele = [eq.brand, eq.model].filter(Boolean).join(' ');
+        return (
+          <span key={eq.id} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+            {libelleEquipement(eq, referentiel)}
+            {marqueModele && <span className="font-normal">&nbsp;· {marqueModele}</span>}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/** « Dernier entretien : date » (icône calendrier hors bloc contrat). */
+function DernierEntretien({ date, icone = false }) {
+  return (
+    <div className="flex items-center gap-2 text-sm text-gray-500">
+      {icone && <Calendar className="w-4 h-4 text-gray-400" />}
+      <span>
+        Dernier entretien :{' '}
+        {date
+          ? <span className="font-medium text-gray-700">{formatDateShortFR(date)}</span>
+          : <span className="italic text-gray-400">Aucun</span>}
+      </span>
     </div>
   );
 }

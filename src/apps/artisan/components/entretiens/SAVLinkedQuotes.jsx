@@ -29,8 +29,9 @@ import DevisModal from '../devis/DevisModal';
  * @param {boolean} [props.canEdit]
  * @param {() => void} [props.onUpdated] rafraîchir le kanban (montant et statut de la carte)
  * @param {(devisStatus: string) => void} [props.onCardSynced] statut de devis reporté sur la carte
+ * @param {import('react').ReactNode} [props.actions] autres gestes posés sur la ligne de « Créer un devis » (« Ajouter l'entretien »)
  */
-export function SAVLinkedQuotes({ item, canEdit = true, onUpdated, onCardSynced }) {
+export function SAVLinkedQuotes({ item, canEdit = true, onUpdated, onCardSynced, actions = null }) {
   const { can } = useCanAccess();
   // Le détail d'un devis (prix, marge) suit le droit « devis.view » : un technicien ne l'a pas par défaut.
   const peutVoir = can('devis', 'view');
@@ -61,7 +62,7 @@ export function SAVLinkedQuotes({ item, canEdit = true, onUpdated, onCardSynced 
     }
   };
 
-  if (!peutVoir && !peutCreer) return null;
+  if (!peutVoir && !peutCreer) return actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null;
 
   return (
     <div className="space-y-2">
@@ -103,6 +104,8 @@ export function SAVLinkedQuotes({ item, canEdit = true, onUpdated, onCardSynced 
         </ul>
       )}
 
+      {(peutCreer || actions) && (
+      <div className="flex flex-wrap items-center gap-2">
       {peutCreer && (
         <button
           type="button"
@@ -114,6 +117,9 @@ export function SAVLinkedQuotes({ item, canEdit = true, onUpdated, onCardSynced 
           <FilePlus2 className="w-4 h-4" />
           {quotes.length > 0 ? 'Créer un autre devis' : 'Créer un devis'}
         </button>
+      )}
+      {actions}
+      </div>
       )}
 
       {/* Fenêtres de devis rendues hors de la fiche SAV (portail) : son corps défile, et une
