@@ -114,6 +114,8 @@ export function useFeuilleDeRoute({ orgId, date, memberIds = [], person, simulat
     feuille,
     lienMaps: lienGoogleMapsTournee(depart, arrets, retour),
     carteUrl: urlCarteStatique({ points, geometry: legsQuery.data?.geometry || null, token: MAPBOX_CONFIG.accessToken }),
+    // Repli si l'image avec tracé ne charge pas : les seuls repères
+    carteUrlSansTrace: urlCarteStatique({ points, geometry: null, token: MAPBOX_CONFIG.accessToken }),
     sansDepot: !depart,
     depart,
     retour,

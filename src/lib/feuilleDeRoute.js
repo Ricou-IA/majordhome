@@ -26,6 +26,7 @@ import { formatItem } from './planningPrintModel.js';
 
 const FACTEUR_ROUTE = 1.4; // même rallonge route / vol d'oiseau que tournee/matrice.js
 const MAX_POINTS_DIRECTIONS = 25; // plafond Mapbox Directions
+const MAX_URL_CARTE = 8000; // plafond Mapbox Static Images : 8 192 caractères
 const ARRET_COLOR = '#2563EB';
 const DEPOT_COLOR = '#334155';
 
@@ -282,8 +283,12 @@ export function urlCarteStatique({ points = [], geometry = null, token = '', wid
   rest.slice(0, -1).forEach((p, i) => {
     overlays.push(`pin-s-${i + 1}+${hex(ARRET_COLOR)}(${pin(p)})`);
   });
-  return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlays.join(',')}`
+  const url = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlays.join(',')}`
     + `/auto/${width}x${height}@2x?padding=40&access_token=${token}`;
+  // Mapbox Static refuse une URL de plus de 8 192 caractères : un long tracé (grands trajets)
+  // la dépasse. On retombe alors sur les seuls repères, plutôt que pas de carte du tout.
+  if (url.length > MAX_URL_CARTE && geometry) return urlCarteStatique({ points, geometry: null, token, width, height });
+  return url;
 }
 
 /** 95 → « 1 h 35 », 40 → « 40 min ». */

@@ -172,7 +172,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
     });
   };
   const {
-    feuille, lienMaps, carteUrl, sansDepot, isLoading, error,
+    feuille, lienMaps, carteUrl, carteUrlSansTrace, sansDepot, isLoading, error,
     depart, retour, membre, exception, setException, isSavingException, peutChoisir,
   } = useFeuilleDeRoute({
     orgId: organization?.id, date, memberIds, person, simulation, ajout,
@@ -203,7 +203,14 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
     ].filter(Boolean);
   }, [feuille, ajout]);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [carteKo, setCarteKo] = useState(false);
+  // Carte : avec tracé, puis sans tracé si l'image échoue ; un nouvel itinéraire repart du début
+  // (avant : un seul échec masquait la carte pour toute la vie du composant).
+  const [echecCarte, setEchecCarte] = useState({ url: null, sansTrace: false, ko: false });
+  const carteActuelle = echecCarte.url === carteUrl ? echecCarte : { url: carteUrl, sansTrace: false, ko: false };
+  const carteSrc = carteActuelle.sansTrace ? carteUrlSansTrace : carteUrl;
+  const carteEnErreur = () => setEchecCarte((carteActuelle.sansTrace || carteUrlSansTrace === carteUrl)
+    ? { url: carteUrl, sansTrace: true, ko: true }
+    : { url: carteUrl, sansTrace: true, ko: false });
 
   const imprimer = async () => {
     if (!feuille) return;
@@ -309,11 +316,11 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
         </p>
       )}
 
-      {carteUrl && !carteKo && (
+      {carteSrc && !carteActuelle.ko && (
         <img
-          src={carteUrl}
+          src={carteSrc}
           alt={`Itinéraire de ${feuille.personName}`}
-          onError={() => setCarteKo(true)}
+          onError={carteEnErreur}
           className="w-full rounded-lg border border-gray-200"
         />
       )}

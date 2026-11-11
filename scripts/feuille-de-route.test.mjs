@@ -210,3 +210,13 @@ test('heuresDeTournee : départ = 1er RDV − trajet aller, retour = fin du dern
   assert.equal(feuille.heureDepart, '08:10');
   assert.equal(feuille.heureRetour, '17:06');
 });
+
+test('urlCarteStatique : un tracé trop long pour l\'URL Mapbox est abandonné, les repères restent', () => {
+  const points = [{ lat: 43.9, lng: 1.9 }, { lat: 43.8, lng: 1.8 }, { lat: 43.9, lng: 1.9 }];
+  const court = urlCarteStatique({ points, geometry: 'abc', token: 'tk' });
+  assert.ok(court.includes('path-4'));
+  const long = urlCarteStatique({ points, geometry: 'x'.repeat(9000), token: 'tk' });
+  assert.ok(long.length < 8000);
+  assert.ok(!long.includes('path-4'));
+  assert.ok(long.includes('pin-s-1'));
+});
