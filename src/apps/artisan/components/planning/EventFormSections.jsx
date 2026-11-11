@@ -520,7 +520,8 @@ export const SectionClient = ({
           />
         </FormField>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      {/* Téléphone et e-mail chacun sur sa ligne : une adresse e-mail ne tient pas en demi-colonne */}
+      <div className="space-y-3">
         <FormField label="Téléphone" required={PHONE_REQUIRED_TYPES.includes(formData.appointment_type)} error={errors.client_phone}>
           <TextInput
             value={formData.client_phone}
