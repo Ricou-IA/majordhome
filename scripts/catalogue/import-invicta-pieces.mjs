@@ -137,10 +137,11 @@ BEGIN
 END $$;
 `);
 
-const { references_deja_au_tarif: dejaAuTarif, ...resume } = compteRendu;
+const { references_deja_au_tarif: dejaAuTarif, references_sans_piece: sansPiece, ...resume } = compteRendu;
 console.log(`${nom} / ${marque} — relevé du ${releve.fetched_at}`);
 console.table(resume);
 if (dejaAuTarif.length) console.log(`Références déjà au tarif (non réécrites) : ${dejaAuTarif.join(', ')}`);
+if (sansPiece.length) console.warn(`⚠ ${sansPiece.length} appareil(s) sans aucune pièce au relevé (nomenclature existante conservée en base) : ${sansPiece.join(', ')}`);
 if (reglee == null) console.log(`Remise non réglée sur la fiche fournisseur : ${compteRendu.remise_pct} % inscrits par cet import.`);
 for (const a of compteRendu.avertissements) console.warn(`⚠ ${a}`);
 console.log(`${sorties.length} fichiers SQL → scripts/catalogue/out/${version}_*.sql (${lots.length} lots de modèles)`);

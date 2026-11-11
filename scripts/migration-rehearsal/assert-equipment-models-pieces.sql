@@ -211,6 +211,46 @@ BEGIN
   IF (SELECT is_active FROM majordhome.equipment_models WHERE org_id = v_org AND brand_key = 'testmarque' AND source_id = 'SRC2') THEN RAISE EXCEPTION '(8) modèle absent non désactivé'; END IF;
   IF (SELECT equipment_model_id FROM public.majordhome_equipments WHERE id = v_e1) IS DISTINCT FROM v_m THEN RAISE EXCEPTION '(8) la vue majordhome_equipments ne rend pas equipment_model_id'; END IF;
 
+  -- (9) relecture (20261111_2) — l'article est jugé sur SON prix, pas sur celui de la ligne
+  --   A : article ajusté à 99 (ligne restée au prix public 13) → la ligne suit, l'article reste, compté
+  UPDATE majordhome.catalog_items ci SET selling_price_ht = 99
+  FROM majordhome.supplier_products p WHERE p.catalog_item_id = ci.id AND p.supplier_id = v_sup AND p.reference = 'TPA';
+  UPDATE majordhome.supplier_products SET selling_price_ht = 13 WHERE supplier_id = v_sup AND reference = 'TPA';
+  v_res := public.supplier_pieces_upsert(v_org, v_sup, 'v6', 'TestMarque',
+    '[{"reference":"TPA","name":"TEST pièce A","brand":"TestMarque","category":"piece_detachee","product_kind":"accessory","purchase_price_ht":9.8,"selling_price_ht_defaut":14,"tarif_public":14,"taux_remise":30,"specs":{"source_version":"v6","canonical":{}}}]'::jsonb);
+  IF (SELECT selling_price_ht FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = 'TPA') <> 14 THEN RAISE EXCEPTION '(9A) ligne non suivie'; END IF;
+  SELECT ci.selling_price_ht INTO v_num FROM majordhome.catalog_items ci JOIN majordhome.supplier_products p ON p.catalog_item_id = ci.id WHERE p.supplier_id = v_sup AND p.reference = 'TPA';
+  IF v_num <> 99 THEN RAISE EXCEPTION '(9A) article ajusté à la main écrasé : %', v_num; END IF;
+  IF (v_res ->> 'prix_ajustes_non_suivis')::int <> 1 THEN RAISE EXCEPTION '(9A) article ajusté non compté : %', v_res; END IF;
+  --   B : ligne ajustée à 50, article resté au prix public 14 → l'article suit à 16, la ligne reste à 50
+  UPDATE majordhome.catalog_items ci SET selling_price_ht = 14
+  FROM majordhome.supplier_products p WHERE p.catalog_item_id = ci.id AND p.supplier_id = v_sup AND p.reference = 'TPA';
+  UPDATE majordhome.supplier_products SET selling_price_ht = 50 WHERE supplier_id = v_sup AND reference = 'TPA';
+  v_res := public.supplier_pieces_upsert(v_org, v_sup, 'v7', 'TestMarque',
+    '[{"reference":"TPA","name":"TEST pièce A","brand":"TestMarque","category":"piece_detachee","product_kind":"accessory","purchase_price_ht":11.2,"selling_price_ht_defaut":16,"tarif_public":16,"taux_remise":30,"specs":{"source_version":"v7","canonical":{}}}]'::jsonb);
+  SELECT ci.selling_price_ht INTO v_num FROM majordhome.catalog_items ci JOIN majordhome.supplier_products p ON p.catalog_item_id = ci.id WHERE p.supplier_id = v_sup AND p.reference = 'TPA';
+  IF v_num <> 16 THEN RAISE EXCEPTION '(9B) article non suivi alors qu''il était au prix public : %', v_num; END IF;
+  IF (SELECT selling_price_ht FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = 'TPA') <> 50 THEN RAISE EXCEPTION '(9B) ligne ajustée écrasée'; END IF;
+
+  -- (10) un modèle reçu sans aucune ligne garde sa nomenclature et est nommé
+  v_res := public.equipment_models_upsert(v_org, v_sup, 'TestMarque', 'v5',
+    '[{"source_id":"SRC1","reference":"P601314","name":"POELE TESTOX - P601314","model_name":"TESTOX","category":"Poêles","lifecycle":"en_vente","source":{}}]'::jsonb,
+    '[]'::jsonb);
+  IF (SELECT count(*) FROM majordhome.equipment_model_parts WHERE equipment_model_id = v_m) <> 1 THEN RAISE EXCEPTION '(10) nomenclature effacée par un modèle reçu vide'; END IF;
+  IF v_res -> 'nomenclatures_conservees' <> '["P601314"]'::jsonb THEN RAISE EXCEPTION '(10) modèle vide non signalé : %', v_res; END IF;
+
+  -- (11) un relevé du TARIF par l'écrivain générique (désactivation des absents active) ne désactive aucune pièce
+  v_n := (SELECT count(*) FROM majordhome.supplier_products WHERE supplier_id = v_sup AND category = 'piece_detachee' AND is_active);
+  IF v_n = 0 THEN RAISE EXCEPTION '(11) fixture : aucune pièce active'; END IF;
+  v_res := public.supplier_catalog_upsert(v_org, v_sup, 'tarif1',
+    '[{"reference":"TP100","name":"TEST poêle un","category":"poele","purchase_price_ht":1000,"specs":{"source_version":"tarif1"}}]'::jsonb, '{}'::jsonb);
+  IF (SELECT count(*) FROM majordhome.supplier_products WHERE supplier_id = v_sup AND category = 'piece_detachee' AND is_active) <> v_n THEN
+    RAISE EXCEPTION '(11) un relevé du tarif a désactivé des pièces détachées';
+  END IF;
+  IF (SELECT is_active FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = 'TP200') THEN
+    RAISE EXCEPTION '(11) la ligne du tarif absente du relevé n''a pas été désactivée (régression de l''écrivain)';
+  END IF;
+
   -- nettoyage
   DELETE FROM majordhome.equipments WHERE id IN (v_e1, v_e2);
   DELETE FROM core.projects WHERE id = v_proj;

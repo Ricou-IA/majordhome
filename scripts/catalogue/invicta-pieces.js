@@ -81,6 +81,7 @@ export function piecesDepuisReleveInvicta(releve, opts) {
   const modeles = [];
   const nomenclature = [];
   const refsModeles = new Set();
+  const sansPieces = [];
 
   for (const a of appareils) {
     if (!a.reference) throw new Error(`appareil sans référence (${a.publicId || a.name || '?'})`);
@@ -97,6 +98,7 @@ export function piecesDepuisReleveInvicta(releve, opts) {
       documents: a.documents || [],
       source: { site, publicId: a.publicId, version },
     });
+    if (!(a.items || []).length) sansPieces.push(a.reference);
     (a.items || []).forEach((it, i) => {
       const p = it.piece || {};
       if (!p.reference) throw new Error(`pièce sans référence sur l'appareil ${a.reference} (repère ${it.repere})`);
@@ -114,9 +116,11 @@ export function piecesDepuisReleveInvicta(releve, opts) {
 
   const compte = { sans_prix: 0, prix_selon_appareil: 0, arretees: 0, remplacees: 0, kits: 0, somme: 0 };
   const pieces = [...parRef.values()].map((p) => {
-    const prix = [...prixVus.get(p.reference)];
+    // Seuls les prix RÉELS comptent : une pièce à 12,50 € sur trente appareils et sans prix sur un autre reste à
+    // 12,50 € (l'occurrence sans prix est gardée telle quelle sur sa ligne de nomenclature).
+    const prix = [...prixVus.get(p.reference)].filter((x) => x != null);
     const variable = prix.length > 1;
-    const vendable = !variable && prix[0] != null;
+    const vendable = prix.length === 1;
     const publicHt = vendable ? prix[0] : 0;
     const cycle = CYCLES[p.lifecycleStage] || (p.lifecycleStage ? String(p.lifecycleStage).toLowerCase() : 'en_vente');
     const kit = !!(p.isBundle || p.isVirtualKit);
@@ -147,6 +151,7 @@ export function piecesDepuisReleveInvicta(releve, opts) {
     pieces, modeles, nomenclature,
     compteRendu: {
       marque, version, appareils: modeles.length, pieces: pieces.length, lignes_nomenclature: nomenclature.length,
+      appareils_sans_piece: sansPieces.length, references_sans_piece: sansPieces.sort(),
       deja_au_tarif: dejaAuTarif.size, references_deja_au_tarif: [...dejaAuTarif].sort(),
       sans_prix: compte.sans_prix, prix_selon_appareil: compte.prix_selon_appareil, arretees: compte.arretees, remplacees: compte.remplacees, kits: compte.kits,
       somme_prix_public: centime(compte.somme), remise_pct: remise, avertissements,

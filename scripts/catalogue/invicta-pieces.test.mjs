@@ -167,6 +167,26 @@ test('référence déjà au tarif : pas réécrite, comptée, toujours dans la n
   assert.equal(r.nomenclature.filter((l) => l.piece_reference === 'F670108B').length, 2);
 });
 
+test('pièce avec un prix sur un appareil et sans prix sur un autre : le prix réel est gardé', () => {
+  const rel = FIXTURE();
+  rel.appareils[1].items[0].piece.price = null;
+  const r = piecesDepuisReleveInvicta(rel, OPTS);
+  const p = r.pieces.find((x) => x.reference === 'F670108B');
+  assert.equal(p.tarif_public, 79.84);
+  assert.equal(p.purchase_price_ht, 55.89);
+  assert.equal(p.specs.canonical.prix_selon_appareil, false);
+  assert.deepEqual(r.nomenclature.filter((l) => l.piece_reference === 'F670108B').map((l) => l.prix_public), [79.84, null]);
+  assert.equal(r.compteRendu.prix_selon_appareil, 0);
+});
+
+test('appareil sans aucune pièce : compté et nommé', () => {
+  const rel = FIXTURE();
+  rel.appareils.push(appareil('P999', 'POELE VIDE - P999', []));
+  const c = piecesDepuisReleveInvicta(rel, OPTS).compteRendu;
+  assert.equal(c.appareils_sans_piece, 1);
+  assert.deepEqual(c.references_sans_piece, ['P999']);
+});
+
 test('pièce sans prix ou non achetable : relevée à 0, non vendue seule', () => {
   const r = piecesDepuisReleveInvicta(FIXTURE(), OPTS);
   const p = r.pieces.find((x) => x.reference === 'GRATIS');
