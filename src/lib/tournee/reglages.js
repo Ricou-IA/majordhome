@@ -22,10 +22,15 @@ export const REGLAGES_DEFAUT = {
   // Souplesse (spec 2026-09-12 « fenêtres d'abord, heures ensuite ») :
   // tolérance par défaut d'un RDV sans souplesse renseignée (appointments.time_flex_minutes NULL).
   souplesse_defaut_minutes: 30,
+  // Souplesses proposées à la prise d'un RDV, choisies dans le catalogue fermé
+  // CATALOGUE_SOUPLESSES (src/lib/souplesse.js) — jamais une valeur libre. 0 (figé)
+  // est toujours proposé ; le défaut ci-dessus doit en faire partie.
+  souplesses_proposees: [0, 15, 30, 240],
   // En dessous, le temps restant après une insertion est du temps de technicien
   // perdu (plus petite visite + un trajet) : pénalisé dans le classement.
   reste_utile_min_minutes: 75,
-  // Fenêtres « demi-journée » (time_flex_minutes = 240), en heures.
+  // Fenêtres « demi-journée » (time_flex_minutes = 240), en heures, par demi-heure
+  // (Settings → Entretiens → Tournées).
   demi_journee: { matin: [8, 12], apres_midi: [13, 18] },
   // Trajet maximum entre DEUX CLIENTS pour qu'une insertion soit raisonnable
   // (décision Eric 2026-09-12 : « tout rentre » ≠ « c'est raisonnable »). Les

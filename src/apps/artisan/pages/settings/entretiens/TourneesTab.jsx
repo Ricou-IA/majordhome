@@ -11,7 +11,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { REGLAGES_DEFAUT } from '@/lib/tournee/reglages.js';
-import { SOUPLESSES } from '@/lib/souplesse';
+import { CATALOGUE_SOUPLESSES, optionSouplesse, erreurSouplesses, erreurDemiJournee } from '@/lib/souplesse';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -37,6 +37,12 @@ function depuisSettings(settings) {
   out.pause_debut = Number(fen[0]);
   out.pause_fin = Number(fen[1]);
   out.auto_rdv = { ...REGLAGES_DEFAUT.auto_rdv, ...(t.auto_rdv || {}) };
+  // Souplesses proposées (catalogue fermé, figé toujours) et bornes de la demi-journée
+  const prop = Array.isArray(t.souplesses_proposees) && t.souplesses_proposees.length
+    ? t.souplesses_proposees : REGLAGES_DEFAUT.souplesses_proposees;
+  out.souplesses_proposees = [...new Set([0, ...prop.map(Number).filter((v) => CATALOGUE_SOUPLESSES.includes(v))])].sort((a, b) => a - b);
+  const dj = t.demi_journee || REGLAGES_DEFAUT.demi_journee;
+  out.demi_journee = { matin: [...(dj.matin || REGLAGES_DEFAUT.demi_journee.matin)], apres_midi: [...(dj.apres_midi || REGLAGES_DEFAUT.demi_journee.apres_midi)] };
   return out;
 }
 
@@ -72,11 +78,27 @@ function validate(form) {
   if (!errors.pause_debut && !errors.pause_fin && Number(form.pause_fin) * 60 - Number(form.pause_debut) * 60 < Number(form.pause_minutes || 0)) {
     errors.pause_fin = 'La fenêtre doit contenir la pause entière';
   }
+  const errSouplesse = erreurSouplesses(form.souplesses_proposees, form.souplesse_defaut_minutes);
+  if (errSouplesse) errors.souplesses_proposees = errSouplesse;
+  const errDemi = erreurDemiJournee(form.demi_journee);
+  if (errDemi) errors.demi_journee = errDemi;
   for (const [k, min, max] of AUTO_RDV_ENTIERS) {
     const v = Number(form.auto_rdv?.[k]);
     if (!Number.isInteger(v) || v < min || v > max) errors[`auto_rdv.${k}`] = `Entier entre ${min} et ${max}`;
   }
   return errors;
+}
+
+/** Heures proposées pour les bornes de la demi-journée : 6 h → 21 h, par demi-heure. */
+const HEURES_DEMI = Array.from({ length: 31 }, (_, i) => 6 + i / 2);
+const libelleHeure = (h) => `${Math.floor(h)} h${h % 1 ? ' 30' : ''}`;
+
+function ChoixHeure({ valeur, onChange }) {
+  return (
+    <select value={valeur} onChange={(e) => onChange(Number(e.target.value))} className={INPUT_CLASS}>
+      {HEURES_DEMI.map((h) => <option key={h} value={h}>{libelleHeure(h)}</option>)}
+    </select>
+  );
 }
 
 function ChampMinutes({ label, valeur, onChange, hint, error, min, max, unite = 'min' }) {
@@ -133,10 +155,37 @@ export default function TourneesTab() {
       <section>
         <h3 className={SECTION_TITLE}>Rendez-vous adaptables</h3>
         <div className="grid sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
+            <label className={LABEL_CLASS}>Souplesses proposées à la prise d’un rendez-vous</label>
+            <div className="flex flex-wrap gap-1.5">
+              {CATALOGUE_SOUPLESSES.map((v) => {
+                const on = form.souplesses_proposees.includes(v);
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    disabled={v === 0}
+                    onClick={() => set('souplesses_proposees')(on
+                      ? form.souplesses_proposees.filter((x) => x !== v)
+                      : [...form.souplesses_proposees, v].sort((a, b) => a - b))}
+                    className={`rounded-full border px-3 py-1 text-sm transition-colors ${on
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-white text-secondary-700 border-secondary-300 hover:border-primary-400'} ${v === 0 ? 'opacity-80 cursor-default' : ''}`}
+                    title={v === 0 ? 'Toujours proposé : le client exige son heure' : optionSouplesse(v).aide}
+                  >
+                    {optionSouplesse(v).label}
+                  </button>
+                );
+              })}
+            </div>
+            {errors.souplesses_proposees
+              ? <p className={ERROR_CLASS}>{errors.souplesses_proposees}</p>
+              : <p className={HINT_CLASS}>Les boutons de souplesse de la prise de RDV. Valeurs d’un catalogue fixe ; « Figé » est toujours proposé.</p>}
+          </div>
           <div>
             <label className={LABEL_CLASS}>Souplesse par défaut d’un rendez-vous</label>
             <select value={form.souplesse_defaut_minutes ?? 30} onChange={(e) => set('souplesse_defaut_minutes')(Number(e.target.value))} className={INPUT_CLASS}>
-              {SOUPLESSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              {form.souplesses_proposees.map((v) => <option key={v} value={v}>{optionSouplesse(v).label}</option>)}
             </select>
             <p className={HINT_CLASS}>Appliquée aux entretiens et SAV sans souplesse renseignée. Figer reste un geste sur le rendez-vous.</p>
           </div>
@@ -145,6 +194,26 @@ export default function TourneesTab() {
             error={errors.reste_utile_min_minutes}
             hint="En dessous, le temps qui reste dans une journée est perdu (plus petite visite + un trajet). C’est aussi le seuil « journée pleine »."
           />
+          <div className="sm:col-span-2">
+            <label className={LABEL_CLASS}>Demi-journée (souplesse « Demi-journée » et annonce au client)</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[['matin', 0, 'Matin de'], ['matin', 1, 'à'], ['apres_midi', 0, 'Après-midi de'], ['apres_midi', 1, 'à']].map(([moment, i, texte]) => (
+                <div key={`${moment}-${i}`}>
+                  <span className="block text-[11px] text-secondary-500 mb-0.5">{texte}</span>
+                  <ChoixHeure
+                    valeur={form.demi_journee[moment][i]}
+                    onChange={(h) => set('demi_journee')({
+                      ...form.demi_journee,
+                      [moment]: form.demi_journee[moment].map((x, j) => (j === i ? h : x)),
+                    })}
+                  />
+                </div>
+              ))}
+            </div>
+            {errors.demi_journee
+              ? <p className={ERROR_CLASS}>{errors.demi_journee}</p>
+              : <p className={HINT_CLASS}>Un RDV « Demi-journée » peut glisser dans la sienne ; il commence au plus tard quand la moitié de son travail tient encore dedans.</p>}
+          </div>
         </div>
       </section>
 

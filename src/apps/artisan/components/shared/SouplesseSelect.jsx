@@ -7,8 +7,11 @@
 //
 // Valeurs, libellés, phrase d'annonce : src/lib/souplesse.js (module pur).
 // ============================================================================
+import { useMemo } from 'react';
 import { Lock, MoveHorizontal } from 'lucide-react';
-import { SOUPLESSES } from '@/lib/souplesse';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { construireReglages } from '@/lib/tournee/reglages.js';
+import { souplessesProposees, optionSouplesse } from '@/lib/souplesse';
 
 /**
  * @param {object} props
@@ -20,9 +23,18 @@ import { SOUPLESSES } from '@/lib/souplesse';
  */
 export function SouplesseSelect({ value, onChange, defaut = 30, disabled = false, compact = false }) {
   const effectif = value ?? defaut;
+  // Choix de l'organisation (Settings → Entretiens → Tournées) ; la valeur portée par un RDV
+  // et retirée depuis des choix reste affichée, pour ne jamais la changer en silence.
+  const { settings } = useOrgSettings();
+  const options = useMemo(() => {
+    const base = souplessesProposees(construireReglages(settings));
+    return base.some((o) => o.value === effectif) || effectif == null
+      ? base
+      : [...base, optionSouplesse(effectif)].sort((a, b) => a.value - b.value);
+  }, [settings, effectif]);
   return (
     <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Souplesse du rendez-vous">
-      {SOUPLESSES.map((s) => {
+      {options.map((s) => {
         const on = s.value === effectif;
         return (
           <button
