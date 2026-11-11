@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cle, reperesSaisis, filtrerParReperes, mentionsPiece, prixPublicPiece, prixVentePiece, prixAchatPiece, ligneDevisDepuisPiece,
+  cle, reperesSaisis, filtrerParReperes, trierParRepere, mentionsPiece, prixPublicPiece, prixVentePiece, prixAchatPiece, ligneDevisDepuisPiece,
   lignesDevisAvecPieces, classerModeles, filtrerModeles, rangerDocumentsModele, titreDocumentModele,
 } from '../../src/lib/catalogue/nomenclature.js';
 
@@ -136,4 +136,11 @@ test('titreDocumentModele : libellé générique du site remplacé par le type',
   assert.equal(titreDocumentModele({ document_type: 'notice', label: 'Notice' }, type), 'Notice technique');
   assert.equal(titreDocumentModele({ document_type: 'notice', label: 'NOLA 8 (2)-LODI 8 (2)' }, type), 'NOLA 8 (2)-LODI 8 (2)');
   assert.equal(titreDocumentModele({ document_type: 'procedure', label: '' }, type), 'Procédure');
+});
+
+test('trierParRepere : ordre numérique, plages, non numériques puis sans repère, variantes dans l\u2019ordre d\u2019origine', () => {
+  const l = (repere, id) => ({ repere, id });
+  const tri = trierParRepere([l('35', 1), l('21', 2), l('10', 3), l('7-14', 4), l('2', 5), l('A2', 6), l('', 7), l('10', 8), l('100', 9), l(null, 10)]);
+  assert.deepEqual(tri.map((x) => x.id), [5, 4, 3, 8, 2, 1, 9, 6, 7, 10]);
+  assert.deepEqual(trierParRepere(null), []);
 });

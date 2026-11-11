@@ -36,6 +36,25 @@ function repereCorrespond(repere, cherche) {
 }
 
 /**
+ * Lignes de nomenclature dans l'ordre des repères (1, 2, 10, 17… puis les repères non numériques, puis les lignes
+ * sans repère) : le site les rend dans un ordre quelconque. Une plage « 7-14 » se range à 7. L'ordre d'origine est
+ * gardé entre deux lignes de même repère (variantes d'une même pièce).
+ * @param {object[]} lignes
+ * @returns {object[]}
+ */
+export function trierParRepere(lignes) {
+  const rang = (l) => {
+    const r = String(l?.repere || '').trim();
+    if (!r) return [2, 0, ''];
+    const m = r.match(/^(\d+)/);
+    return m ? [0, Number(m[1]), r.toLowerCase()] : [1, 0, r.toLowerCase()];
+  };
+  return (lignes || []).map((l, i) => ({ l, i, k: rang(l) }))
+    .sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1] || a.k[2].localeCompare(b.k[2], 'fr') || a.i - b.i)
+    .map((x) => x.l);
+}
+
+/**
  * Lignes de nomenclature dont le repère est l'un des repères saisis ; saisie vide = toutes.
  * @param {object[]} lignes
  * @param {string} saisie

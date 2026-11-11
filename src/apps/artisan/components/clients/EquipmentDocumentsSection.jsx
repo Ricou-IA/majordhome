@@ -241,10 +241,10 @@ export function EquipmentDocumentsSection({
 
       {total > 0 ? (
         <div className="mt-1.5 -mx-2">
-          {/* Document relevé sur le site du fabricant : son type en pastille, pas de retrait ici (le relevé suivant
+          {/* Document relevé sur le site du fabricant : pastille « Fabricant », pas de retrait ici (le relevé suivant
               le remettrait). Les procédures (une dizaine sur un poêle à granulés) sont repliées. */}
           {ranges.principaux.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} badge={doc.from_site ? equipmentDocumentTypeLabel(doc.document_type) : null}
+            <DocumentRow key={doc.id} doc={doc} badge={doc.from_site ? 'Fabricant' : null}
               canDelete={canDelete && !!onDelete && !doc.from_site} onDelete={setDeleting} />
           ))}
           {ranges.procedures.length > 0 && (

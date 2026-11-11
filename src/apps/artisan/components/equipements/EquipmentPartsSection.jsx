@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Wrench, Loader2, Search, Maximize2, ShoppingCart, AlertTriangle, Minus, Plus } from 'lucide-react';
 import { useEquipmentModel, useEquipmentModelParts, useEquipmentModelImages, useSetEquipmentModel } from '@hooks/useEquipmentModels';
-import { filtrerParReperes, mentionsPiece, prixPublicPiece } from '@/lib/catalogue/nomenclature';
+import { filtrerParReperes, trierParRepere, mentionsPiece, prixPublicPiece } from '@/lib/catalogue/nomenclature';
 import { formatEuro } from '@/lib/utils';
 import EquipmentModelPicker from './EquipmentModelPicker';
 import ExplodedViewViewer from './ExplodedViewViewer';
@@ -58,7 +58,7 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
   const { vues, manquantes, isLoading: chargementImages } = useEquipmentModelImages(model, ouvert);
   const { setModel, isSaving } = useSetEquipmentModel();
 
-  const lignes = useMemo(() => filtrerParReperes(parts, reperes), [parts, reperes]);
+  const lignes = useMemo(() => filtrerParReperes(trierParRepere(parts), reperes), [parts, reperes]);
   const choisies = useMemo(() => parts.filter((l) => quantites[l.id] > 0), [parts, quantites]);
 
   const choisirModele = async (id) => {
@@ -160,7 +160,7 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-secondary-400" />
               <input
                 type="text" value={reperes} onChange={(e) => setReperes(e.target.value)}
-                placeholder="Numéro de repère (ex. 12, 30)"
+                placeholder="Repère (ex. 12, 30)"
                 aria-label="Numéro de repère"
                 className="pl-8 pr-3 py-1.5 w-56 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
