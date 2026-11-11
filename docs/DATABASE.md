@@ -245,6 +245,24 @@ Documents du **modèle** d'appareil (notice technique, vue éclatée, autre), pa
 
 RLS : lecture tout membre ; INSERT/UPDATE `role_can(org, 'clients', 'edit')` ; DELETE `role_can(org, 'clients', 'delete')` (org_admin seul). Vues : `majordhome_equipment_documents` (miroir updatable, écriture front) et `majordhome_equipment_model_documents` (lecture par `equipment_id`, jointure par clés + `project_org_id`). Service `equipmentDocuments.service.js`, hook `useEquipmentDocuments.js`, UI `EquipmentDocumentsSection` (carte équipement).
 
+### majordhome.equipment_models — référentiel des appareils installés (2026-11-11 → 12)
+Modèles d'appareil : relevés chez le fabricant (470 Invicta), trouvés par la recherche web et validés sur le terrain, ou créés depuis un article (migrations `20261111_1`, `20261112_4/_5`). Aucune écriture `authenticated` : RPC seulement.
+
+| Colonne clé | Type | Notes |
+|-------------|------|-------|
+| `org_id` | uuid → core.organizations | Org CORE |
+| `brand`, `reference`, `model_name`, `name` | text | `brand_key` / `reference_key` / `model_name_key` dérivées par trigger (`equipment_model_key`) |
+| `source_id` | text | Identité : id du site fabricant, `web:<uuid>` ou `catalogue:<id article>` ; unique `(org_id, brand_key, source_id)` |
+| `origin` | text | `releve_fabricant` \| `web` \| `catalogue` |
+| `review_status` | text | `controle` \| `a_controler` (file de contrôle org_admin) |
+| `catalog_item_id` | uuid → catalog_items | Facultatif, même org (trigger) |
+| `equipment_type_id` | uuid → pricing_equipment_types | Facultatif, même org |
+| `specs`, `source_urls` | jsonb | Caractéristiques lues ; pages sources de la recherche web |
+| `created_by`, `reviewed_by`, `reviewed_at` | | Traçabilité création / contrôle |
+| `merged_into` | uuid → equipment_models | Fiche absorbée par une fusion (inactive, hors recherches) |
+
+Vues : `majordhome_equipment_models` (+ `catalog_source_product_id`), `majordhome_equipment_models_a_controler` (+ `nb_equipements`, `clients`, `created_by_name`). Tables liées : `equipment_model_parts` (nomenclature), `equipment_brand_refs` (marques de référence par org, MAJUSCULES), `equipment_enrich_quotas` (recherches web par utilisateur et par jour). `equipments.metadata.saisie_origine` garde la saisie d'avant rattachement.
+
 ### majordhome.interventions
 2411 rows. RLS activé. Historique interventions techniciens + interventions chantier (Sprint 6).
 
