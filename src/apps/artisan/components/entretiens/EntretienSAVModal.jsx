@@ -494,6 +494,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
         attachContext={{
           interventionId: item.id,
           lockedType: isSav ? 'service' : 'maintenance',
+          // La demande décrite sur la fiche reste visible dans la fenêtre RDV
+          demandeSav: isSav ? { description: savDesc, urgence } : null,
           subjectLabel: isSav ? (includesEntretien ? 'SAV + Entretien' : 'SAV') : 'Entretien',
           multi: true,
           mergeOverlapping: isSav,

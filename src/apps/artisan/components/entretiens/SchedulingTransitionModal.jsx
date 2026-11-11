@@ -77,6 +77,9 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, so
         defaultDuration: isSAV && item.estimated_time ? Math.round(Number(item.estimated_time) * 60) : null,
         sideExtra,
         submitSlots: (slots) => onConfirm(slots, includesEntretien, { timeFlexMinutes }),
+        // La souplesse est choisie dans sideExtra : la fenêtre n'en affiche pas une seconde
+        souplesseGeree: true,
+        demandeSav: isSAV ? { description: item.sav_description, urgence: item.sav_urgency } : null,
       }}
       onClose={onCancel}
     />

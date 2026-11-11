@@ -35,7 +35,6 @@ export function useEventSaveActions({
   const [duplicatePrompt, setDuplicatePrompt] = useState(null);
   // RDV SAV sans demande en cours : la demande se décrit d'abord (description, urgence) dans la
   // fenêtre SAV, puis le RDV s'y rattache (Eric 2026-11-11 : « pour renseigner correctement »).
-  const [savPrompt, setSavPrompt] = useState(false);
 
   const resolveActivation = useCallback(({ rdvDate, dupDecision, interventionId = null } = {}) => resolveEventActivation({
     orgId, userId, formData, selectedClient, selectedLead,
@@ -175,16 +174,50 @@ export function useEventSaveActions({
       toast.error(EMAIL_INVALIDE_MESSAGE);
       return;
     }
-    // RDV SAV : une demande ouverte du client reçoit le RDV ; sinon on la fait décrire d'abord.
-    const savInterventionId = maybeDecision?.savInterventionId || null;
-    if (formData.appointment_type === 'service' && !attachContext?.interventionId && !savInterventionId && selectedClient?.id) {
+    // RDV SAV : la demande (problème, urgence) se saisit dans la fenêtre même. Une demande
+    // ouverte du client reçoit le RDV (urgence mise à jour, description complétée) ;
+    // sinon elle est créée avec ce qui a été saisi, puis le RDV s'y rattache.
+    let savInterventionId = maybeDecision?.savInterventionId || null;
+    const demandeSav = formData.appointment_type === 'service' && !attachContext?.interventionId && !savInterventionId;
+    const descriptionSav = (formData.sav_description || '').trim();
+    if (demandeSav && selectedClient?.id) {
       const { data: openSavId, error: openErr } = await savService.getOpenSavCardId(selectedClient.id);
       if (openErr) {
         logger.error('[EventModal] getOpenSavCardId error:', openErr);
         toast.error('Impossible de vérifier les demandes SAV du client');
         return;
       }
-      if (!openSavId) { setSavPrompt(true); return; }
+      if (!openSavId && !descriptionSav) {
+        setErrors((prev) => ({ ...prev, sav_description: 'Décrivez le problème' }));
+        toast.error('Décrivez le problème pour ouvrir la demande SAV');
+        return;
+      }
+      if (openSavId) {
+        savInterventionId = openSavId;
+        const maj = {};
+        if (formData.sav_urgency) maj.sav_urgency = formData.sav_urgency;
+        if (descriptionSav) {
+          const { data: carte } = await savService.getCardById(openSavId);
+          const actuelle = (carte?.sav_description || '').trim();
+          maj.sav_description = actuelle && !actuelle.includes(descriptionSav) ? `${actuelle}
+${descriptionSav}` : descriptionSav;
+        }
+        if (Object.keys(maj).length) {
+          const { error: majErr } = await savService.updateFields(openSavId, maj);
+          if (majErr) logger.error('[EventModal] mise à jour de la demande SAV', majErr);
+        }
+      } else {
+        const { data: demande, error: savErr } = await savService.ouvrirDemandePourClient({
+          orgId, clientId: selectedClient.id, savDescription: descriptionSav,
+          savUrgency: formData.sav_urgency || null, createdBy: userId,
+        });
+        if (savErr || !demande?.id) {
+          logger.error('[EventModal] ouverture de la demande SAV', savErr);
+          toast.error('Impossible d’ouvrir la demande SAV : fiche client incomplète ?');
+          return;
+        }
+        savInterventionId = demande.id;
+      }
     }
     setBatchSaving(true);
     let defaireDecalages = null;
@@ -301,13 +334,7 @@ export function useEventSaveActions({
       toast.error('Une erreur est survenue');
       setBatchSaving(false);
     }
-  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, isCommercialType, isFreeType, isLeave, allTeamMembers, orgId, formData, selectedClient, queryClient, onClose, onCreated, setErrors, attachContext, decalages]);
-
-  // Demande SAV créée depuis la fenêtre SAV : on reprend la création du RDV, rattaché à elle.
-  const resumeAfterSav = useCallback((created) => {
-    setSavPrompt(false);
-    if (created?.id) handleCreateFromAssistant({ savInterventionId: created.id });
-  }, [handleCreateFromAssistant]);
+  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, isCommercialType, isFreeType, isLeave, allTeamMembers, orgId, formData, selectedClient, queryClient, onClose, onCreated, setErrors, attachContext, decalages, userId]);
 
   // --------------------------------------------------------------------------
   // Re-planifier (édition) : 1 créneau choisi dans l'assistant → update du RDV
@@ -463,7 +490,6 @@ export function useEventSaveActions({
 
   return {
     batchSaving, setBatchSaving, duplicatePrompt, setDuplicatePrompt, resumeDuplicate,
-    savPrompt, setSavPrompt, resumeAfterSav,
     handleSave, handleCreateFromAssistant, handleRescheduleSave, handleContinuationSave,
   };
 }

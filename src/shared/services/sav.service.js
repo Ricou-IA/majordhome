@@ -653,6 +653,37 @@ export const savService = {
     }
   },
 
+  /**
+   * Ouvre une demande SAV pour un client depuis la fenêtre « Nouveau RDV » (type SAV) :
+   * relit le projet et le contrat actif du client, puis `createSAV`. Même donnée que
+   * la fenêtre « Nouvelle demande SAV ».
+   * @returns {Promise<{ data: object|null, error: object|null }>}
+   */
+  async ouvrirDemandePourClient({ orgId, clientId, savDescription, savUrgency = null, createdBy = null }) {
+    const { data: client, error: lectureErr } = await supabase
+      .from('majordhome_clients_all')
+      .select('project_id, has_active_contract')
+      .eq('id', clientId)
+      .maybeSingle();
+    if (lectureErr || !client?.project_id) {
+      return { data: null, error: lectureErr || { message: 'client_sans_projet' } };
+    }
+    let contractId = null;
+    if (client.has_active_contract) {
+      const { data: contrat } = await supabase
+        .from('majordhome_contracts')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('status', 'active')
+        .maybeSingle();
+      contractId = contrat?.id || null;
+    }
+    return this.createSAV({
+      orgId, clientId, contractId, projectId: client.project_id,
+      savDescription, savOrigin: 'appel_client', savUrgency, createdBy,
+    });
+  },
+
   // ==========================================================================
   // MUTATIONS
   // ==========================================================================

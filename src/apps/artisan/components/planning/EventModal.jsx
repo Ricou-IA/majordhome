@@ -50,7 +50,7 @@ import {
 } from '@/lib/eventForm';
 import { useEventClientLinking } from './useEventClientLinking';
 import { useEventSaveActions } from './useEventSaveActions';
-import { CreateSAVModal } from '../entretiens/CreateSAVModal';
+import { DemandeSavSection } from './DemandeSavSection';
 import { PlannedOrderFields } from './scheduling/PlannedOrderFields';
 import { ParcoursJournee } from './ParcoursJournee';
 import { useCoordonneesRdv } from '@hooks/useCoordonneesRdv';
@@ -292,7 +292,6 @@ export function EventModal({
 
   const {
     batchSaving, setBatchSaving, duplicatePrompt, setDuplicatePrompt, resumeDuplicate,
-    savPrompt, setSavPrompt, resumeAfterSav,
     handleSave, handleCreateFromAssistant, handleRescheduleSave, handleContinuationSave,
   } = useEventSaveActions({
     orgId, userId, isEdit, appointment, attachContext, formData, setErrors, validate,
@@ -669,7 +668,21 @@ export function EventModal({
                       {sectionType}
                       {/* Souplesse à la prise de RDV (Entretien / SAV) : jusqu'où ce RDV pourra glisser
                           ensuite. L'écran d'origine qui porte déjà le sien (sideExtra) le garde. */}
-                      {!isEdit && !attachContext?.sideExtra && estTypeAdaptable(formData.appointment_type) && (
+                      {/* Demande SAV : saisie (RDV SAV libre) ou rappel de celle de la carte d'origine */}
+                      {!isEdit && formData.appointment_type === 'service' && (attachContext?.demandeSav ? (
+                        <DemandeSavSection mode="lecture" description={attachContext.demandeSav.description} urgence={attachContext.demandeSav.urgence} />
+                      ) : !attachContext?.interventionId && (
+                        <DemandeSavSection
+                          mode="saisie"
+                          description={formData.sav_description || ''}
+                          urgence={formData.sav_urgency || null}
+                          onDescription={(v) => updateField('sav_description', v)}
+                          onUrgence={(v) => updateField('sav_urgency', v)}
+                          error={errors.sav_description || null}
+                          sansFiche={!selectedClient}
+                        />
+                      ))}
+                      {!isEdit && !attachContext?.souplesseGeree && estTypeAdaptable(formData.appointment_type) && (
                         <SectionSouplesse
                           formData={formData}
                           updateField={updateField}
@@ -784,15 +797,6 @@ export function EventModal({
         onPrimaryAction={(c) => resumeDuplicate({ action: 'link', leadId: c.id })}
         onCreateAnyway={() => resumeDuplicate({ action: 'create' })}
         onCancel={() => setDuplicatePrompt(null)}
-      />
-
-      {/* RDV SAV sans demande en cours : décrire la demande (problème, urgence), puis le RDV s'y rattache */}
-      <CreateSAVModal
-        isOpen={savPrompt}
-        onClose={() => setSavPrompt(false)}
-        onCreated={resumeAfterSav}
-        allowSchedule={false}
-        prefillClient={selectedClient}
       />
     </>
   );

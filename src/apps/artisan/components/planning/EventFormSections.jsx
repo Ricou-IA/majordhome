@@ -677,15 +677,6 @@ export const SectionSouplesse = ({ formData, updateField, isCancelled, souplesse
       disabled={isCancelled}
       compact
     />
-    <p className="text-xs text-gray-500 mt-2">
-      {(formData.time_flex_minutes ?? souplesseDefaut) === 0
-        ? (formData.hour_confirmed_at
-          ? 'Heure communiquée au client : le moteur de tournées ne la déplacera pas.'
-          : 'Figé à l’enregistrement : l’heure devient ferme, le moteur ne la déplacera plus.')
-        : (formData.hour_confirmed_at
-          ? 'Redevient adaptable à l’enregistrement : le moteur pourra le glisser dans cette tolérance.'
-          : 'Adaptable : le moteur peut le glisser dans cette tolérance pour faire rentrer un autre entretien.')}
-    </p>
   </div>
 );
 
