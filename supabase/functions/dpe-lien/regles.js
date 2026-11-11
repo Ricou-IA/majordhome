@@ -6,6 +6,9 @@ export const CODES = Object.freeze([
   'module_ferme', 'droit_requis', 'action_inconnue', 'client_introuvable', 'adresse_incomplete',
   'client_sans_numero', 'numero_mal_forme', 'numero_absent', 'sans_rapport_complet', 'corpus_indisponible',
   'partenaire_indisponible', 'enregistrement_impossible',
+  // refonte 2026-11-12
+  'numero_protege', 'numero_ecarte', 'module_communication_inactif', 'no_from_email', 'client_sans_email',
+  'template_missing', 'pdf_indisponible', 'resend_failed',
 ]);
 
 const FORME_NUMERO = /^[0-9A-Za-z]{13}$/;
@@ -98,4 +101,43 @@ const CHAMPS_CANDIDAT = ['identifiant_dpe', 'date_etablissement_dpe', 'etiquette
 export function projeterCandidat(ligne) {
   if (!ligne || typeof ligne !== 'object') return null;
   return Object.fromEntries(CHAMPS_CANDIDAT.filter((c) => c in ligne).map((c) => [c, ligne[c]]));
+}
+
+// ============================================================================
+// Rattachement automatique (refonte 2026-11-12, spec 2026-11-12-logement-monsieurdpe-fiche-client-design.md §5).
+// Seuils PROVISOIRES : à remplacer par la mesure de scripts/dpe/mesure-rattachement-auto.mjs (plan, tâche 1).
+// ============================================================================
+
+/** Score minimal du géocodage IGN de l'adresse du client (0 à 1). */
+export const SCORE_GEOCODAGE_MIN = 0.8;
+/** Types de résultat IGN acceptés : le numéro de la rue, jamais une rue ou une commune entière. */
+export const TYPES_GEOCODAGE_ACCEPTES = Object.freeze(['housenumber']);
+/** Fiabilité du rattachement BDNB d'un DPE à son bâtiment (`fiabilite_geocodage`). */
+export const FIABILITES_BDNB_ACCEPTEES = Object.freeze(['très fiable', 'fiable']);
+
+/**
+ * Décide du rattachement à partir du géocodage de l'adresse du client, des DPE du bâtiment et, quand il n'y en a
+ * qu'un, de son dossier. La machine ne choisit JAMAIS entre plusieurs candidats.
+ * @param {{ geocodage: { score?: number, type?: string } | null, candidats: unknown[],
+ *   dossierUnique: { dossier?: Record<string, unknown> | null } | null, ecartes: string[] }} p
+ * @returns {{ etat: 'rattache' | 'candidats' | 'aucun_dpe' | 'adresse_non_trouvee', numero?: string,
+ *   candidats: Record<string, unknown>[] }}
+ */
+export function decisionRattachement({ geocodage, candidats, dossierUnique, ecartes }) {
+  if (!geocodage) return { etat: 'adresse_non_trouvee', candidats: [] };
+  const exclus = new Set(ecartes || []);
+  const liste = (Array.isArray(candidats) ? candidats : [])
+    .map(projeterCandidat)
+    .filter((c) => c && numeroValide(c.identifiant_dpe) && !exclus.has(c.identifiant_dpe));
+  if (liste.length === 0) return { etat: 'aucun_dpe', candidats: [] };
+  if (liste.length > 1) return { etat: 'candidats', candidats: liste };
+
+  const [seul] = liste;
+  const methode = String(dossierUnique?.dossier?.methode_application_dpe || '').toLowerCase();
+  const sur = typeof geocodage.score === 'number' && geocodage.score >= SCORE_GEOCODAGE_MIN
+    && TYPES_GEOCODAGE_ACCEPTES.includes(geocodage.type)
+    && FIABILITES_BDNB_ACCEPTEES.includes(seul.fiabilite_geocodage)
+    && Boolean(dossierUnique?.dossier)
+    && !methode.startsWith('dpe appartement généré');
+  return sur ? { etat: 'rattache', numero: seul.identifiant_dpe, candidats: liste } : { etat: 'candidats', candidats: liste };
 }

@@ -13,6 +13,7 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useAuth } from '@contexts/AuthContext';
 import { moduleActif } from '@/lib/modules';
 import { DEFAULT_INVOICE_EMAIL } from '@/lib/invoiceEmailTemplate';
+import { DEFAULT_DPE_RAPPORT_EMAIL } from '@/lib/dpeRapportEmailTemplate';
 import ResendDomainSection from './ResendDomainSection';
 import EmailAutoLigne from './EmailAutoLigne';
 import AccueilLeadMetaSection from './AccueilLeadMetaSection';
@@ -129,6 +130,13 @@ export default function EmailsTab() {
               titre="Confirmer le rendez-vous choisi en ligne"
               description="Envoyé quand le client a choisi sa demi-journée."
             />
+            {moduleActif(settings, 'dpe') && (
+              <EmailAutoLigne
+                orgId={orgId} gabarit={DEFAULT_DPE_RAPPORT_EMAIL}
+                titre="Envoyer l’analyse MonsieurDPE du logement au client"
+                description="Utilisé par « Envoyer le rapport au client » de la fiche client : le PDF de l’analyse complète part en pièce jointe."
+              />
+            )}
             <AccueilLeadMetaSection orgId={orgId} />
           </section>
         )}

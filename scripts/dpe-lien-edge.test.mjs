@@ -69,3 +69,49 @@ test("projeterCandidat : ne laisse passer que les champs lus par l'écran", () =
   );
   assert.deepEqual(projeterCandidat('pas un objet'), null);
 });
+
+// --- Refonte 2026-11-12 : décision de rattachement automatique ------------------------------------------------
+import { decisionRattachement, SCORE_GEOCODAGE_MIN, TYPES_GEOCODAGE_ACCEPTES, FIABILITES_BDNB_ACCEPTEES } from '../supabase/functions/dpe-lien/regles.js';
+
+const GEO = { score: Math.max(SCORE_GEOCODAGE_MIN, 0.95), type: TYPES_GEOCODAGE_ACCEPTES[0], cle_ban: '31570_0080_00423' };
+const CAND = (o = {}) => ({ identifiant_dpe: '2631E0482288Y', date_etablissement_dpe: '2026-02-18', etiquette_dpe: 'A',
+  surface_habitable_logement: 114, type_batiment: 'dpe maison individuelle', fiabilite_geocodage: FIABILITES_BDNB_ACCEPTEES[0], ...o });
+const MAISON = { dossier: { methode_application_dpe: 'dpe maison individuelle' }, composants: [{}] };
+const decide = (o) => decisionRattachement({ geocodage: GEO, candidats: [CAND()], dossierUnique: MAISON, ecartes: [], ...o });
+
+test('decisionRattachement : un seul DPE, tout est sûr ⇒ rattaché automatiquement', () => {
+  assert.deepEqual(decide({}), { etat: 'rattache', numero: '2631E0482288Y', candidats: [projeterCandidat(CAND())] });
+});
+
+test('decisionRattachement : adresse non géocodée ⇒ adresse_non_trouvee ; aucun DPE ⇒ aucun_dpe', () => {
+  assert.equal(decide({ geocodage: null }).etat, 'adresse_non_trouvee');
+  assert.equal(decide({ candidats: [] }).etat, 'aucun_dpe');
+});
+
+test('decisionRattachement : plusieurs DPE ⇒ candidats, jamais de choix machine', () => {
+  const d = decide({ candidats: [CAND(), CAND({ identifiant_dpe: '2481E2082752C' })] });
+  assert.equal(d.etat, 'candidats');
+  assert.equal(d.numero, undefined);
+  assert.equal(d.candidats.length, 2);
+});
+
+test('decisionRattachement : chaque critère douteux suffit à refuser l\'automatique', () => {
+  assert.equal(decide({ geocodage: { ...GEO, score: SCORE_GEOCODAGE_MIN - 0.01 } }).etat, 'candidats');
+  assert.equal(decide({ geocodage: { ...GEO, type: 'street' } }).etat, 'candidats');
+  assert.equal(decide({ candidats: [CAND({ fiabilite_geocodage: 'peu fiable' })] }).etat, 'candidats');
+  assert.equal(decide({ candidats: [CAND({ fiabilite_geocodage: null })] }).etat, 'candidats');
+  assert.equal(decide({ dossierUnique: null }).etat, 'candidats');
+  assert.equal(decide({ dossierUnique: { dossier: { methode_application_dpe: 'dpe appartement généré à partir des données DPE immeuble' } } }).etat, 'candidats');
+});
+
+test('decisionRattachement : un numéro écarté (« Ce n\'est pas le bon ») n\'est plus proposé', () => {
+  assert.equal(decide({ ecartes: ['2631E0482288Y'] }).etat, 'aucun_dpe');
+  const d = decide({ candidats: [CAND(), CAND({ identifiant_dpe: '2481E2082752C' })], ecartes: ['2631E0482288Y'] });
+  assert.equal(d.etat, 'rattache');
+  assert.equal(d.numero, '2481E2082752C');
+});
+
+test('decisionRattachement : les candidats ne portent que les champs lus par l\'écran', () => {
+  const d = decide({ candidats: [CAND({ batiment_groupe_id: 'x' }), CAND({ identifiant_dpe: '2481E2082752C', batiment_groupe_id: 'y' })] });
+  for (const c of d.candidats) assert.equal('batiment_groupe_id' in c, false);
+});

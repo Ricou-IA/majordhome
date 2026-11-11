@@ -1,24 +1,41 @@
-// dpe-lien — le lien entre la fiche client et MonsieurDPE (corpus des DPE + rapport complet).
-// Spec : docs/superpowers/specs/2026-11-11-lien-monsieurdpe-fiche-client-design.md
+// dpe-lien — le Logement MonsieurDPE de la fiche client (corpus des DPE, carte du logement, rapport complet).
+// Specs : docs/superpowers/specs/2026-11-11-lien-monsieurdpe-fiche-client-design.md (infrastructure)
+//         docs/superpowers/specs/2026-11-12-logement-monsieurdpe-fiche-client-design.md (refonte)
 //
-// verify_jwt:true + requireOrgMembership + module `dpe` actif + user_can(clients, edit). Trois actions FERMÉES,
-// aucun relais générique : la route SQL libre du corpus (POST /requete) n'est jamais appelée, et aucune URL
-// sortante n'est composée depuis le corps de la requête (l'adresse et le numéro sont relus en base).
+// verify_jwt:true + requireOrgMembership + module `dpe` actif + user_can(clients, edit). Actions FERMÉES, aucun
+// relais générique : la route SQL libre du corpus (POST /requete) n'est jamais appelée ; l'adresse, le numéro et
+// l'e-mail du client sont relus EN BASE, jamais pris du corps de la requête.
 //
-//   - chercher : { org_id, client_id } → les DPE rattachés au bâtiment de l'adresse du client (GET /dossier-batiment).
-//                Rien n'est enregistré : un humain confirme le DPE, jamais la machine.
-//   - verifier : { org_id, numero }    → ce numéro est-il dans le corpus ? (GET /dossier/{numero})
-//   - ouvrir   : { org_id, client_id, forcer? } → le lien du rapport complet MonsieurDPE pour le dpe_number du client.
-//                Émis une fois par (org, numéro) par la porte partenaire du site, puis relu en base.
+//   - rattacher  { client_id }                     géocode l'adresse (IGN), DPE du bâtiment, règle automatique
+//                                                  (regles.js::decisionRattachement), enregistre la tentative.
+//   - choisir    { client_id, numero, voisinage? } un humain choisit un DPE (candidat ou voisinage).
+//   - detacher   { client_id }                     « Ce n'est pas le bon » : numéro écarté, fiche vidée.
+//   - actualiser { client_id }                     relit la carte du numéro de la fiche (saisi si le numéro a changé).
+//   - verifier   { numero }                        ce numéro est-il dans le corpus ? (sans écriture)
+//   - ouvrir     { client_id, forcer? }            lien du rapport complet (émis une fois par org × numéro).
+//   - envoyer    { client_id }                     e-mail au client, PDF du rapport complet en pièce jointe.
+//
+// Toutes les écritures passent par la RPC client_dpe_record (service_role), qui tient clients.dpe_number cohérent
+// et refuse qu'un rattachement automatique remplace un numéro posé par un humain.
 //
 // Réponses : HTTP 200 { data, error } où `error` est un CODE (regles.js::CODES), traduit côté écran. Les refus
 // d'authentification gardent leurs 401/403.
 //
-// Secrets : MDH_DPE_CORPUS_URL, MDH_DPE_CORPUS_SECRET, MDH_DPE_SITE_URL, MDH_DPE_PARTENAIRE_SECRET.
+// Secrets : MDH_DPE_CORPUS_URL, MDH_DPE_CORPUS_SECRET, MDH_DPE_SITE_URL, MDH_DPE_PARTENAIRE_SECRET, RESEND_API_KEY.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOrgMembership, jsonResponse, buildCorsHeaders, sanitizeError } from "../_shared/auth.ts";
-import { numeroValide, adresseDeRecherche, codeDepuisCorpus, resumeDossier, rapportCompletPossible, projeterCandidat } from "./regles.js";
+import {
+  orgBranding, brandingReplacements, wrapWithSkeleton, applyPlaceholders, escapeHtml,
+  sendResendEmail, insertMailingLog, arrayBufferToBase64,
+} from "../_shared/mail.ts";
+import { mapCorpusDossier, colonnesFiltrables, VERSION_CARTE } from "../_shared/dpeCorpus.js";
+import { adresseNormalisee } from "../_shared/dpeLien.js";
+import { DPE_RAPPORT_EMAIL_TEMPLATE_KEY } from "../_shared/dpeRapportEmailTemplate.js";
+import {
+  numeroValide, adresseDeRecherche, codeDepuisCorpus, resumeDossier, rapportCompletPossible, projeterCandidat,
+  decisionRattachement,
+} from "./regles.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -26,11 +43,21 @@ const CORPUS_URL = (Deno.env.get("MDH_DPE_CORPUS_URL") || "").replace(/\/+$/, ""
 const CORPUS_SECRET = Deno.env.get("MDH_DPE_CORPUS_SECRET") || "";
 const SITE_URL = (Deno.env.get("MDH_DPE_SITE_URL") || "").replace(/\/+$/, "");
 const PARTENAIRE_SECRET = Deno.env.get("MDH_DPE_PARTENAIRE_SECRET") || "";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 
+const GEOCODAGE_URL = "https://data.geopf.fr/geocodage/search";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DELAI_MS = 10_000;
+/** Le PDF du rapport complet se fabrique à la demande chez MonsieurDPE (maxDuration 60 s côté site). */
+const DELAI_PDF_MS = 90_000;
+/** Plafond de la pièce jointe (Resend : 40 Mo APRÈS base64, soit ~30 Mo bruts). */
+const PDF_MAX_OCTETS = 25 * 1024 * 1024;
 
 type Corps = { data: unknown; error: string | null };
+type Client = {
+  id: string; address: string | null; postal_code: string | null; city: string | null;
+  dpe_number: string | null; email: string | null; display_name: string | null;
+};
 
 /** GET sur le corpus. Ne lève jamais : une panne se lit `corpus_indisponible`. */
 async function corpus(chemin: string): Promise<{ code: string | null; data: Record<string, unknown> | null }> {
@@ -56,6 +83,30 @@ async function corpus(chemin: string): Promise<{ code: string | null; data: Reco
   }
 }
 
+/** Géocodage IGN de l'adresse du client. `undefined` = panne ; `null` = adresse non trouvée. */
+async function geocoder(adresse: string): Promise<{ score: number; type: string; cle_ban: string } | null | undefined> {
+  try {
+    const r = await fetch(`${GEOCODAGE_URL}?q=${encodeURIComponent(adresse)}&limit=1`, { signal: AbortSignal.timeout(DELAI_MS) });
+    if (!r.ok) {
+      console.error(`[dpe-lien] géocodage HTTP ${r.status}`);
+      return undefined;
+    }
+    const p = (await r.json())?.features?.[0]?.properties;
+    if (!p || typeof p.id !== "string") return null;
+    return { score: Number(p.score), type: String(p.type || ""), cle_ban: p.id };
+  } catch (e) {
+    console.error(`[dpe-lien] géocodage injoignable : ${sanitizeError(e, "erreur réseau")}`);
+    return undefined;
+  }
+}
+
+/** Le patch de carte pour client_dpe_record, depuis la réponse de GET /dossier/{numero}. */
+function patchCarte(data: Record<string, unknown> | null): Record<string, unknown> {
+  const record = mapCorpusDossier(data);
+  if (!record) return {};
+  return { ...colonnesFiltrables(record), carte: record, version_carte: VERSION_CARTE };
+}
+
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -78,7 +129,8 @@ Deno.serve(async (req) => {
     const { data: org, error: errOrg } = await auth.supabase.schema("core").from("organizations")
       .select("name, settings").eq("id", orgId).maybeSingle();
     if (errOrg) return jsonResponse({ error: sanitizeError(errOrg, "lecture de l'organisation impossible") }, 500, req);
-    const modules = ((org?.settings as Record<string, unknown> | null)?.modules ?? {}) as Record<string, unknown>;
+    const settings = ((org?.settings as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+    const modules = (settings.modules ?? {}) as Record<string, unknown>;
     if (modules.dpe !== true) return refus("module_ferme");
 
     // Client au jeton de l'utilisateur : la RLS protège toutes les lectures de la fiche.
@@ -90,31 +142,155 @@ Deno.serve(async (req) => {
     if (errDroit || autorise !== true) return refus("droit_requis");
 
     /** Le client, relu en base et dans l'organisation de l'appelant (clients.org_id = org CORE). */
-    const lireClient = async () => {
+    const lireClient = async (): Promise<Client | null> => {
       const clientId = typeof body.client_id === "string" ? body.client_id : "";
       if (!UUID.test(clientId)) return null;
       const { data, error } = await user.from("majordhome_clients")
-        .select("id, address, postal_code, city, dpe_number")
+        .select("id, address, postal_code, city, dpe_number, email, display_name")
         .eq("id", clientId).eq("org_id", orgId).maybeSingle();
       if (error) throw error;
-      return data as { id: string; address: string | null; postal_code: string | null; city: string | null; dpe_number: string | null } | null;
+      return data as Client | null;
+    };
+    const lireLigne = async (clientId: string) => {
+      const { data, error } = await auth.supabase.from("majordhome_client_dpe")
+        .select("dpe_number, origine, ecartes, rapport_complet, etiquette_dpe")
+        .eq("client_id", clientId).eq("org_id", orgId).maybeSingle();
+      if (error) throw error;
+      return data as { dpe_number: string | null; origine: string | null; ecartes: string[] | null; rapport_complet: boolean | null; etiquette_dpe: string | null } | null;
+    };
+    /** Écriture unique : la RPC tient clients.dpe_number cohérent. Rend la ligne, ou un code d'erreur. */
+    const enregistrer = async (clientId: string, act: string, patch: Record<string, unknown>) => {
+      const { data, error } = await auth.supabase.rpc("client_dpe_record", {
+        p_org_id: orgId, p_client_id: clientId, p_action: act, p_patch: patch, p_user: auth.userId,
+      });
+      if (error) {
+        const m = String(error.message || "");
+        if (m.includes("client_dpe_saisi_protege")) return { code: "numero_protege" as const, ligne: null };
+        if (m.includes("client_dpe_numero_ecarte")) return { code: "numero_ecarte" as const, ligne: null };
+        console.error(`[dpe-lien] client_dpe_record (${act}) refusée : ${sanitizeError(error, "erreur base")}`);
+        return { code: "enregistrement_impossible" as const, ligne: null };
+      }
+      return { code: null, ligne: data };
+    };
+    const reponseEcriture = (r: { code: string | null; ligne: unknown }) => (r.code ? refus(r.code) : ok(r.ligne));
+
+    /** Émet (ou relit) le lien du rapport complet pour ce numéro. */
+    const lienRapport = async (client: Client, numero: string, forcer: boolean) => {
+      if (!forcer) {
+        const { data: existant, error: errLecture } = await auth.supabase.from("majordhome_dpe_report_accesses")
+          .select("report_url, token").eq("org_id", orgId).eq("dpe_number", numero).maybeSingle();
+        if (errLecture) return { code: "enregistrement_impossible", url: null, jeton: null, dejaEmis: false };
+        if (existant?.report_url) return { code: null, url: existant.report_url as string, jeton: existant.token as string, dejaEmis: true };
+      }
+      if (!SITE_URL || !PARTENAIRE_SECRET) {
+        console.error("[dpe-lien] MDH_DPE_SITE_URL ou MDH_DPE_PARTENAIRE_SECRET absent");
+        return { code: "partenaire_indisponible", url: null, jeton: null, dejaEmis: false };
+      }
+      let emis: { jeton?: string; url?: string } | null = null;
+      try {
+        const r = await fetch(`${SITE_URL}/api/partenaire/acces`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-dpe-partenaire-secret": PARTENAIRE_SECRET },
+          body: JSON.stringify({ numero, org_id: orgId, org_libelle: (org?.name as string | undefined) || "Organisation Majord'home" }),
+          signal: AbortSignal.timeout(DELAI_MS),
+        });
+        const corps = (await r.json().catch(() => null)) as { data: { jeton?: string; url?: string } | null; error: string | null } | null;
+        if (corps?.error === "numero_absent" || corps?.error === "numero_mal_forme" || corps?.error === "sans_rapport_complet") {
+          return { code: corps.error, url: null, jeton: null, dejaEmis: false };
+        }
+        if (!r.ok || !corps?.data) {
+          console.error(`[dpe-lien] porte partenaire HTTP ${r.status} (${corps?.error ?? "sans code"})`);
+          return { code: "partenaire_indisponible", url: null, jeton: null, dejaEmis: false };
+        }
+        emis = corps.data;
+      } catch (e) {
+        console.error(`[dpe-lien] porte partenaire injoignable : ${sanitizeError(e, "erreur réseau")}`);
+        return { code: "partenaire_indisponible", url: null, jeton: null, dejaEmis: false };
+      }
+      if (!emis?.jeton || !emis?.url) return { code: "partenaire_indisponible", url: null, jeton: null, dejaEmis: false };
+      const { error: errEcriture } = await auth.supabase.rpc("dpe_report_access_record", {
+        p_org_id: orgId, p_client_id: client.id, p_dpe_number: numero,
+        p_token: emis.jeton, p_report_url: emis.url, p_issued_by: auth.userId,
+      });
+      if (errEcriture) {
+        console.error(`[dpe-lien] dpe_report_access_record refusée : ${sanitizeError(errEcriture, "erreur base")}`);
+        return { code: "enregistrement_impossible", url: null, jeton: null, dejaEmis: false };
+      }
+      return { code: null, url: emis.url, jeton: emis.jeton, dejaEmis: false };
     };
 
-    if (action === "chercher") {
+    // ------------------------------------------------------------------ rattacher
+    if (action === "rattacher") {
       const client = await lireClient();
       if (!client) return refus("client_introuvable");
       const adresse = adresseDeRecherche(client);
-      if (!adresse) return refus("adresse_incomplete");
-      const r = await corpus(`/dossier-batiment?adresse=${encodeURIComponent(adresse)}`);
-      if (r.code) return refus(r.code);
-      const d = r.data || {};
-      return ok({
-        adresse: d.adresse ?? null,
-        batiment_trouve: d.batiment != null,
-        candidats: Array.isArray(d.dpe) ? d.dpe.map(projeterCandidat).filter(Boolean) : [],
-      });
+      const adresseTentee = adresseNormalisee(client);
+      if (!adresse || !adresseTentee) return refus("adresse_incomplete");
+      const ligne = await lireLigne(client.id);
+      const ecartes = ligne?.ecartes || [];
+
+      const geocodage = await geocoder(adresse);
+      if (geocodage === undefined) {
+        return reponseEcriture(await enregistrer(client.id, "tentative", { etat: "erreur", adresse_tentee: adresseTentee }));
+      }
+      let candidats: unknown[] = [];
+      let dossierUnique: Record<string, unknown> | null = null;
+      if (geocodage) {
+        const b = await corpus(`/dossier-batiment?cle_ban=${encodeURIComponent(geocodage.cle_ban)}`);
+        if (b.code) {
+          return reponseEcriture(await enregistrer(client.id, "tentative", { etat: "erreur", adresse_tentee: adresseTentee }));
+        }
+        candidats = Array.isArray(b.data?.dpe) ? (b.data?.dpe as unknown[]) : [];
+        const restants = candidats.map(projeterCandidat).filter((c) => c && numeroValide(c.identifiant_dpe) && !ecartes.includes(c.identifiant_dpe as string));
+        if (restants.length === 1) {
+          const d = await corpus(`/dossier/${encodeURIComponent(restants[0]!.identifiant_dpe as string)}`);
+          dossierUnique = d.code ? null : d.data;
+        }
+      }
+      const decision = decisionRattachement({ geocodage, candidats, dossierUnique, ecartes });
+      const patch: Record<string, unknown> = { etat: decision.etat, adresse_tentee: adresseTentee, candidats: decision.candidats };
+      if (decision.etat === "rattache") Object.assign(patch, { dpe_number: decision.numero }, patchCarte(dossierUnique));
+      return reponseEcriture(await enregistrer(client.id, "tentative", patch));
     }
 
+    // ------------------------------------------------------------------ choisir
+    if (action === "choisir") {
+      const client = await lireClient();
+      if (!client) return refus("client_introuvable");
+      const numero = typeof body.numero === "string" ? body.numero.trim().toUpperCase() : "";
+      if (!numeroValide(numero)) return refus("numero_mal_forme");
+      const d = await corpus(`/dossier/${encodeURIComponent(numero)}`);
+      if (d.code) return refus(d.code);
+      return reponseEcriture(await enregistrer(client.id, "choisir", {
+        dpe_number: numero, voisinage: body.voisinage === true, adresse_tentee: adresseNormalisee(client), ...patchCarte(d.data),
+      }));
+    }
+
+    // ------------------------------------------------------------------ detacher
+    if (action === "detacher") {
+      const client = await lireClient();
+      if (!client) return refus("client_introuvable");
+      return reponseEcriture(await enregistrer(client.id, "detacher", {}));
+    }
+
+    // ------------------------------------------------------------------ actualiser
+    if (action === "actualiser") {
+      const client = await lireClient();
+      if (!client) return refus("client_introuvable");
+      const ligne = await lireLigne(client.id);
+      const numero = (client.dpe_number || "").trim().toUpperCase();
+      // Un numéro qui n'est pas celui de la ligne a été tapé dans la fiche : c'est une saisie humaine.
+      const origine = numero && numero === (ligne?.dpe_number || "") ? (ligne?.origine || "saisi") : "saisi";
+      if (!numero) return reponseEcriture(await enregistrer(client.id, "actualiser", { origine, adresse_tentee: adresseNormalisee(client) }));
+      if (!numeroValide(numero)) return refus("numero_mal_forme");
+      const d = await corpus(`/dossier/${encodeURIComponent(numero)}`);
+      if (d.code) return refus(d.code);
+      return reponseEcriture(await enregistrer(client.id, "actualiser", {
+        dpe_number: numero, origine, adresse_tentee: adresseNormalisee(client), ...patchCarte(d.data),
+      }));
+    }
+
+    // ------------------------------------------------------------------ verifier (sans écriture)
     if (action === "verifier") {
       const numero = typeof body.numero === "string" ? body.numero.trim() : "";
       if (!numeroValide(numero)) return refus("numero_mal_forme");
@@ -128,63 +304,95 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ------------------------------------------------------------------ ouvrir
     if (action === "ouvrir") {
       const client = await lireClient();
       if (!client) return refus("client_introuvable");
       const numero = (client.dpe_number || "").trim();
       if (!numero) return refus("client_sans_numero");
       if (!numeroValide(numero)) return refus("numero_mal_forme");
+      const lien = await lienRapport(client, numero, body.forcer === true);
+      if (lien.code) return refus(lien.code);
+      return ok({ url: lien.url, numero, deja_emis: lien.dejaEmis });
+    }
 
-      // Déjà émis pour cette organisation : on relit, MonsieurDPE n'est pas rappelé — sauf `forcer`, qui
-      // redemande le lien (accès révoqué côté MonsieurDPE, adresse du site changée). La porte rend alors le
-      // jeton en vigueur, ou un jeton neuf si l'ancien était révoqué, et la RPC remplace la ligne.
-      if (body.forcer !== true) {
-        const { data: existant, error: errLecture } = await auth.supabase.from("majordhome_dpe_report_accesses")
-          .select("report_url").eq("org_id", orgId).eq("dpe_number", numero).maybeSingle();
-        if (errLecture) return refus("enregistrement_impossible");
-        if (existant?.report_url) return ok({ url: existant.report_url, numero, deja_emis: true });
+    // ------------------------------------------------------------------ envoyer
+    if (action === "envoyer") {
+      if (modules.communication !== true) return refus("module_communication_inactif");
+      if (!RESEND_API_KEY) {
+        console.error("[dpe-lien] RESEND_API_KEY absent");
+        return refus("resend_failed");
       }
+      const branding = orgBranding(settings);
+      if (!branding.fromEmail) return refus("no_from_email");
+      const client = await lireClient();
+      if (!client) return refus("client_introuvable");
+      const to = (client.email || "").trim();
+      if (!to) return refus("client_sans_email");
+      const numero = (client.dpe_number || "").trim();
+      if (!numero) return refus("client_sans_numero");
+      const ligne = await lireLigne(client.id);
+      if (ligne?.rapport_complet === false) return refus("sans_rapport_complet");
 
-      if (!SITE_URL || !PARTENAIRE_SECRET) {
-        console.error("[dpe-lien] MDH_DPE_SITE_URL ou MDH_DPE_PARTENAIRE_SECRET absent");
-        return refus("partenaire_indisponible");
-      }
-      let emis: { jeton?: string; url?: string } | null = null;
+      const { data: gabarit, error: errGabarit } = await auth.supabase.from("majordhome_mail_campaigns")
+        .select("subject, html_body").eq("org_id", orgId).eq("key", DPE_RAPPORT_EMAIL_TEMPLATE_KEY).eq("is_archived", false)
+        .maybeSingle();
+      if (errGabarit) return jsonResponse({ error: sanitizeError(errGabarit, "lecture du gabarit") }, 500, req);
+      if (!gabarit) return refus("template_missing");
+
+      const lien = await lienRapport(client, numero, false);
+      if (lien.code || !lien.url || !lien.jeton) return refus(lien.code || "partenaire_indisponible");
+
+      // Le PDF du rapport complet, fabriqué par MonsieurDPE pour ce jeton (sans entreprises RGE : accès partenaire).
+      let pdf: ArrayBuffer;
       try {
-        const r = await fetch(`${SITE_URL}/api/partenaire/acces`, {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-dpe-partenaire-secret": PARTENAIRE_SECRET },
-          body: JSON.stringify({ numero, org_id: orgId, org_libelle: (org?.name as string | undefined) || "Organisation Majord'home" }),
-          signal: AbortSignal.timeout(DELAI_MS),
-        });
-        const corps = (await r.json().catch(() => null)) as { data: { jeton?: string; url?: string } | null; error: string | null } | null;
-        if (corps?.error === "numero_absent") return refus("numero_absent");
-        if (corps?.error === "numero_mal_forme") return refus("numero_mal_forme");
-        if (corps?.error === "sans_rapport_complet") return refus("sans_rapport_complet");
-        if (!r.ok || !corps?.data) {
-          console.error(`[dpe-lien] porte partenaire HTTP ${r.status} (${corps?.error ?? "sans code"})`);
-          return refus("partenaire_indisponible");
+        const r = await fetch(
+          `${SITE_URL}/api/pdf/rapport-complet?numero=${encodeURIComponent(numero)}&acces=${encodeURIComponent(lien.jeton)}`,
+          { signal: AbortSignal.timeout(DELAI_PDF_MS) },
+        );
+        if (!r.ok) {
+          console.error(`[dpe-lien] PDF du rapport HTTP ${r.status}`);
+          return refus("pdf_indisponible");
         }
-        emis = corps.data;
+        pdf = await r.arrayBuffer();
       } catch (e) {
-        console.error(`[dpe-lien] porte partenaire injoignable : ${sanitizeError(e, "erreur réseau")}`);
-        return refus("partenaire_indisponible");
+        console.error(`[dpe-lien] PDF du rapport injoignable : ${sanitizeError(e, "erreur réseau")}`);
+        return refus("pdf_indisponible");
       }
-      if (!emis?.jeton || !emis?.url) return refus("partenaire_indisponible");
+      const entete = new TextDecoder().decode(new Uint8Array(pdf.slice(0, 5)));
+      if (entete !== "%PDF-" || pdf.byteLength > PDF_MAX_OCTETS) {
+        console.error(`[dpe-lien] PDF du rapport invalide (${entete}, ${pdf.byteLength} octets)`);
+        return refus("pdf_indisponible");
+      }
 
-      const { error: errEcriture } = await auth.supabase.rpc("dpe_report_access_record", {
-        p_org_id: orgId,
-        p_client_id: client.id,
-        p_dpe_number: numero,
-        p_token: emis.jeton,
-        p_report_url: emis.url,
-        p_issued_by: auth.userId,
-      });
-      if (errEcriture) {
-        console.error(`[dpe-lien] enregistrement refusé : ${sanitizeError(errEcriture, "erreur base")}`);
-        return refus("enregistrement_impossible");
+      const remplacements: Record<string, string> = {
+        ...brandingReplacements(branding),
+        "{{CLIENT_NAME}}": client.display_name || "",
+        "{{LIEN_RAPPORT}}": lien.url,
+        "{{NUMERO_DPE}}": numero,
+        "{{ETIQUETTE_DPE}}": ligne?.etiquette_dpe || "",
+      };
+      const html: Record<string, string> = { ...remplacements };
+      for (const cle of ["{{CLIENT_NAME}}", "{{BRAND_NAME}}", "{{ORG_EMAIL}}", "{{ORG_PHONE}}", "{{ORG_ADDRESS}}", "{{ORG_POSTAL_CODE}}", "{{ORG_CITY}}"]) {
+        if (cle in html) html[cle] = escapeHtml(html[cle]);
       }
-      return ok({ url: emis.url, numero, deja_emis: false });
+      const subject = applyPlaceholders(gabarit.subject || "", remplacements);
+      const corpsHtml = applyPlaceholders(wrapWithSkeleton(branding, gabarit.html_body || ""), html);
+      const from = branding.fromName ? `${branding.fromName} <${branding.fromEmail}>` : branding.fromEmail;
+      const resultat = await sendResendEmail(RESEND_API_KEY, {
+        from, to: [to], replyTo: branding.replyTo, subject, html: corpsHtml,
+        attachments: [{ filename: `Analyse-logement-MonsieurDPE-${numero}.pdf`, content: arrayBufferToBase64(pdf) }],
+      });
+      const avertissement = await insertMailingLog(auth.supabase, {
+        client_id: client.id, org_id: orgId, campaign_name: DPE_RAPPORT_EMAIL_TEMPLATE_KEY, subject, email_to: to,
+        status: resultat.ok ? "sent" : "failed", provider_id: resultat.id, error_message: resultat.message,
+      });
+      if (avertissement) console.error(`[dpe-lien] mailing_logs : ${avertissement}`);
+      if (!resultat.ok) {
+        console.error(`[dpe-lien] Resend a refusé l'envoi : ${resultat.status} ${resultat.message}`);
+        return refus("resend_failed");
+      }
+      return ok({ to, numero, provider_id: resultat.id });
     }
 
     return refus("action_inconnue");

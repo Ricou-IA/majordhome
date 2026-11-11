@@ -70,6 +70,14 @@ const MESSAGES = {
   corpus_indisponible: 'Le corpus MonsieurDPE ne répond pas pour le moment. Réessayez dans quelques minutes.',
   partenaire_indisponible: "MonsieurDPE n'a pas pu ouvrir l'analyse pour le moment. Réessayez dans quelques minutes.",
   enregistrement_impossible: "L'accès n'a pas pu être enregistré. Réessayez, et prévenez-nous si cela se reproduit.",
+  numero_protege: "Un numéro de DPE a été posé à la main sur cette fiche : la recherche automatique ne le remplace pas.",
+  numero_ecarte: "Ce DPE a été écarté pour ce client (« Ce n'est pas le bon »).",
+  module_communication_inactif: "L'envoi d'e-mails (module Communication) n'est pas ouvert pour votre organisation.",
+  no_from_email: "L'adresse d'expédition des e-mails n'est pas configurée : Paramètres → Emails.",
+  client_sans_email: "Aucune adresse e-mail sur la fiche du client.",
+  template_missing: "Le modèle d'e-mail « Rapport MonsieurDPE » n'existe pas encore : créez-le dans Paramètres → Emails.",
+  pdf_indisponible: "MonsieurDPE n'a pas pu fournir le PDF du rapport. Réessayez dans quelques minutes.",
+  resend_failed: "L'e-mail n'a pas pu partir. Réessayez, et prévenez-nous si cela se reproduit.",
 };
 const MESSAGE_GENERIQUE = 'Le service MonsieurDPE a rencontré une erreur. Réessayez dans quelques minutes.';
 
