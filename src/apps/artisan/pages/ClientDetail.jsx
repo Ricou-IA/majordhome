@@ -14,8 +14,9 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, User, FileText, Wrench, History, Mail, MessageSquare,
   Save, Loader2, AlertCircle, Lock, Unlock, Clock,
-  Archive, ArchiveRestore, Receipt, CalendarPlus, Trash2,
+  Archive, ArchiveRestore, Receipt, CalendarPlus, Trash2, LifeBuoy,
 } from 'lucide-react';
+import { CreateSAVModal } from '../components/entretiens/CreateSAVModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClient, useLinkedClients } from '@hooks/useClients';
@@ -77,6 +78,9 @@ export default function ClientDetail() {
 
   const { can } = useCanAccess();
   const canCreateAppointment = can('planning', 'create');
+  // Ouvrir une demande SAV sans repasser par le kanban (Eric 2026-11-11)
+  const canCreateSAV = can('sav', 'create');
+  const [savOpen, setSavOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const {
@@ -393,6 +397,18 @@ export default function ClientDetail() {
             </button>
           )}
 
+          {/* Nouvelle demande SAV pour ce client (la carte arrive dans le kanban Entretiens & SAV) */}
+          {canCreateSAV && !isArchived && (
+            <button
+              onClick={() => setSavOpen(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
+              title="Ouvrir une demande SAV pour ce client"
+            >
+              <LifeBuoy className="w-4 h-4" />
+              Nouveau SAV
+            </button>
+          )}
+
           {/* Portail client */}
           <InviteClientButton client={client} />
 
@@ -533,6 +549,15 @@ export default function ClientDetail() {
         onCancel={() => {}}
         isSaving={isCreatingAppointment}
       />
+
+      {/* Modale création SAV (client pré-rempli ; contrat actif repris par la modale) */}
+      {canCreateSAV && (
+        <CreateSAVModal
+          isOpen={savOpen}
+          onClose={() => setSavOpen(false)}
+          prefillClient={client}
+        />
+      )}
 
       {/* Modale confirmation archivage */}
       {showArchiveConfirm && (
