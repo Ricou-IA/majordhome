@@ -75,13 +75,17 @@ export function appointmentToForm(a) {
   };
 }
 
-/** Formulaire de création : type figé par le kanban sinon « Autre », 1 h à partir de l'heure cliquée. */
+/**
+ * Formulaire de création : type figé par le kanban, sinon VIDE — à choisir, l'enregistrement est
+ * refusé tant qu'il ne l'est pas (Eric 2026-11-11 : « Autre » par défaut finissait enregistré par oubli).
+ * 1 h à partir de l'heure cliquée.
+ */
 export function newEventForm({ defaultDate = null, defaultTime = null, lockedType = null, prefillClient = null } = {}) {
   const startTime = defaultTime || '09:00';
   const duration = 60;
   return {
     subject: '',
-    appointment_type: lockedType || 'other',
+    appointment_type: lockedType || '',
     priority: 'normal',
     status: 'scheduled',
     client_name: prefillClient?.last_name || '',

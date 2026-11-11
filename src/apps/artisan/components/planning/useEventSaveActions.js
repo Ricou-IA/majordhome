@@ -141,6 +141,11 @@ export function useEventSaveActions({
   // --------------------------------------------------------------------------
   const handleCreateFromAssistant = useCallback(async (maybeDecision) => {
     const dupDecision = dupDecisionOf(maybeDecision);
+    if (!formData.appointment_type) {
+      setErrors((prev) => ({ ...prev, appointment_type: 'Type requis' }));
+      toast.error('Choisissez le type de RDV');
+      return;
+    }
     if (assistantSlots.length === 0) {
       toast.error('Choisissez au moins un créneau');
       return;

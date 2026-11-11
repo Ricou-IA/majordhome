@@ -122,9 +122,10 @@ test('appointmentToForm : adresse → client_*, heures tronquées à HH:MM, déf
   assert.deepEqual(vide.technicianIds, []);
 });
 
-test('newEventForm : « Autre » par défaut, type figé du kanban, 1 h depuis l\'heure cliquée, client pré-lié', () => {
+test('newEventForm : type vide par défaut (à choisir), type figé du kanban, 1 h depuis l\'heure cliquée, client pré-lié', () => {
   const f = newEventForm({ defaultDate: '2026-11-06', defaultTime: '14:30', prefillClient: { last_name: 'Martin', first_name: 'Léa', city: 'Albi' } });
-  assert.equal(f.appointment_type, 'other');
+  assert.equal(f.appointment_type, '');
+  assert.equal(validateEventForm(f, { isFreeType: false }).errors.appointment_type, 'Type requis');
   assert.equal(f.scheduled_date, '2026-11-06');
   assert.equal(f.scheduled_start, '14:30');
   assert.equal(f.scheduled_end, '15:30');

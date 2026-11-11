@@ -66,6 +66,7 @@ export const SectionType = ({
         value={formData.appointment_type}
         onChange={(v) => updateField('appointment_type', v)}
         options={availableTypes}
+        placeholder={formData.appointment_type ? undefined : 'Choisir le type…'}
         disabled={(isEdit && !allowTypeChange) || isCancelled || typeLocked}
       />
     </FormField>
