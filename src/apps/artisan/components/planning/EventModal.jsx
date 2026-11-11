@@ -122,6 +122,31 @@ export function EventModal({
   const [apercu, setApercu] = useState(null);
   // Gestes « Choisir / Ajouter / Retirer » sous les parcours, branchés par l'assistant
   const slotActionsRef = useRef(null);
+  // Décalages qu'impliquerait la pose, par personne retenue (remontés par son parcours) :
+  // écrits à la création seulement si TOUT tient dans la souplesse des RDV concernés.
+  const [decalagesParPersonne, setDecalagesParPersonne] = useState({});
+  const rappelsDecalage = useRef(new Map());
+  const onDecalagePour = (cle) => {
+    if (!rappelsDecalage.current.has(cle)) {
+      rappelsDecalage.current.set(cle, (d) => setDecalagesParPersonne((prev) => {
+        if ((prev[cle] ?? null) === d) return prev;
+        const next = { ...prev };
+        if (d) next[cle] = d; else delete next[cle];
+        return next;
+      }));
+    }
+    return rappelsDecalage.current.get(cle);
+  };
+  const decalagesAPoser = useMemo(() => {
+    const entrees = Object.values(decalagesParPersonne);
+    if (entrees.some((d) => d.liste.length > 0 && !d.applicable)) return [];
+    const parId = new Map();
+    entrees.forEach((d) => d.liste.forEach((x) => {
+      const deja = parId.get(x.id);
+      if (!deja || x.debutMinutesApres > deja.debutMinutesApres) parId.set(x.id, x);
+    }));
+    return [...parId.values()];
+  }, [decalagesParPersonne]);
   const navigate = useNavigate();
 
   const { isOrgAdmin } = useAuth();
@@ -273,6 +298,7 @@ export function EventModal({
     orgId, userId, isEdit, appointment, attachContext, formData, setErrors, validate,
     selectedClient, selectedLead, isCommercialType, isFreeType, isLeave, isClosing, fromFiche,
     commercialMemberId, allTeamMembers, assistantSlots, onSave, onClose, onCreated,
+    decalages: decalagesAPoser,
   });
 
   // --------------------------------------------------------------------------
@@ -442,6 +468,7 @@ export function EventModal({
           coords={coordsRdv}
           rdv={rdvParcours}
           partie={partie}
+          onDecalage={partie === 'liste' ? onDecalagePour(`${slot.date}-${slot.startTime}-${pers.key}`) : undefined}
         >
           <div className="flex items-center justify-between gap-2 border-t border-secondary-100 pt-2">
             <span className="text-xs font-medium text-emerald-700">Retenu{retenus.length > 1 ? ' · à plusieurs' : ''}</span>
@@ -640,6 +667,16 @@ export function EventModal({
                   sidePanel={(
                     <div className="space-y-4">
                       {sectionType}
+                      {/* Souplesse à la prise de RDV (Entretien / SAV) : jusqu'où ce RDV pourra glisser
+                          ensuite. L'écran d'origine qui porte déjà le sien (sideExtra) le garde. */}
+                      {!isEdit && !attachContext?.sideExtra && estTypeAdaptable(formData.appointment_type) && (
+                        <SectionSouplesse
+                          formData={formData}
+                          updateField={updateField}
+                          isCancelled={false}
+                          souplesseDefaut={souplesseDefaut}
+                        />
+                      )}
                       {attachContext?.sideExtra}
                       {plannedOrder && (
                         <PlannedOrderFields

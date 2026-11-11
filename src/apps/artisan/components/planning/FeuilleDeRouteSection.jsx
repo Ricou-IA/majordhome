@@ -16,9 +16,9 @@
  * ============================================================================
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, Car, Crosshair, Loader2, MapPin, Navigation, Printer, Home, X } from 'lucide-react';
+import { AlertTriangle, Car, Crosshair, Loader2, Lock, MapPin, MoveHorizontal, Navigation, Printer, Home, X } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useFeuilleDeRoute } from '@hooks/useFeuilleDeRoute';
@@ -146,6 +146,9 @@ function Troncon({ troncon, label, estime, compact = false }) {
   );
 }
 
+/** minutes depuis minuit → 'HH:MM' */
+const hhmmDe = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
 /**
  * @param {object} props
  * @param {string} props.date
@@ -153,11 +156,12 @@ function Troncon({ troncon, label, estime, compact = false }) {
  * @param {{ displayName: string, color?: string }} props.person
  * @param {object|null} [props.ajout]  RDV en cours de pose, inséré à son heure (fenêtre « Nouveau RDV »)
  * @param {'tout'|'liste'|'carte'} [props.partie]  n'afficher que la carte, ou tout sauf la carte
+ * @param {Function} [props.onDecalage]  (decalage|null) => void : ce que la pose de `ajout` implique pour les RDV suivants
  * @param {boolean} [props.carteACote]  itinéraire à gauche, carte à droite (fenêtre « Nouveau RDV », sous la grille)
  * @param {boolean} [props.compact]    variante étroite : sans impression, sans choix ni simulation du
  *   départ, arrêts sur une ligne (la fenêtre RDV) ; impossibilités dues à `ajout` en tête
  */
-export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, compact = false, carteACote = false, partie = 'tout' }) {
+export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, compact = false, carteACote = false, partie = 'tout', onDecalage = null }) {
   const { organization } = useAuth();
   const { settings } = useOrgSettings();
   // Simulation propre à CETTE journée de CETTE personne : changer de jour l'efface.
@@ -191,25 +195,30 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
     membre, exception, peutChoisir, onChange: changerExtremites, disabled: isSavingException, onSimuler: simuler,
     sansReglage: compact,
   };
-  // Impossibilités dues au RDV en cours de pose : on n'y arrive pas à l'heure, ou le suivant ne tient plus
+  // Ce que la pose du RDV implique (Eric 2026-11-11 : tenir compte de la souplesse) :
+  // bloquants (le RDV posé en retard, un suivant figé ou hors souplesse) et décalages qui
+  // tiennent dans la souplesse — ceux-là seront écrits à la création.
+  const decalage = ajout ? feuille?.decalage || null : null;
+  useEffect(() => { onDecalage?.(decalage); }, [decalage, onDecalage]);
+  useEffect(() => () => onDecalage?.(null), [onDecalage]);
   const impossibles = useMemo(() => {
     if (!feuille || !ajout) return [];
-    const i = feuille.items.findIndex((it) => it.nouveau);
-    if (i < 0) return [];
-    const nouveau = feuille.items[i];
-    const apres = feuille.items.slice(i + 1).find((it) => it.localise) || null;
+    const nouveau = feuille.items.find((it) => it.nouveau);
+    if (!nouveau) return [];
     const debut = (it) => it.time.split(' – ')[0];
+    const parId = new Map(feuille.items.map((it) => [it.id, it]));
     return [
       nouveau.retard && `Arrivée au plus tôt à ${nouveau.retard.arriveeAuPlusTot} pour un début à ${debut(nouveau)} (${formatDureeRoute(nouveau.retard.retardMinutes)} de retard).`,
-      apres?.retard && `Le RDV suivant (${apres.clientName || apres.typeLabel}, ${debut(apres)}) ne tient plus : arrivée au plus tôt à ${apres.retard.arriveeAuPlusTot}.`,
-      (() => {
-        const decales = feuille.items.slice(i + 1).filter((it) => it.retard).length;
-        return decales > 1 ? `${decales} RDV décalés derrière celui-ci.` : null;
-      })(),
-      feuille.retourRetardMinutes > 0 && feuille.heureRetour
-        && `Retour à ${feuille.retourLabel} à ${feuille.heureRetour} au lieu de ${feuille.heureRetourPrevue} (+${formatDureeRoute(feuille.retourRetardMinutes)}).`,
+      ...(feuille.decalage?.bloquants || []).map((b) => {
+        const it = parId.get(b.id);
+        const quand = it ? `${debut(it)}, arrivée au plus tôt ${it.retard?.arriveeAuPlusTot}` : '';
+        return b.statut === 'fige'
+          ? `${b.label} (${quand}) : heure figée, il ne peut pas être décalé.`
+          : `${b.label} (${quand}) : au-delà de sa souplesse.`;
+      }),
     ].filter(Boolean);
   }, [feuille, ajout]);
+  const aDecaler = decalage?.liste || [];
   const [isPrinting, setIsPrinting] = useState(false);
   // Carte : avec tracé, puis sans tracé si l'image échoue ; un nouvel itinéraire repart du début
   // (avant : un seul échec masquait la carte pour toute la vie du composant).
@@ -300,7 +309,24 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
         <div className="rounded-lg bg-red-50 border border-red-300 px-2 py-1.5 text-xs text-red-800 space-y-0.5">
           <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />Impossible à cette heure</p>
           {impossibles.map((m) => <p key={m}>{m}</p>)}
+          {aDecaler.length > 0 && <p className="text-red-700/80">Aucun RDV ne sera décalé tant que ce n&apos;est pas réglé.</p>}
         </div>
+      )}
+      {decalage?.applicable && (
+        <div className="rounded-lg bg-amber-50 border border-amber-300 px-2 py-1.5 text-xs text-amber-900 space-y-0.5">
+          <p className="flex items-center gap-1.5 font-semibold">
+            <MoveHorizontal className="h-3.5 w-3.5 shrink-0" />
+            {aDecaler.length === 1 ? '1 RDV sera décalé' : `${aDecaler.length} RDV seront décalés`} à la création, dans leur souplesse
+          </p>
+          {aDecaler.map((d) => (
+            <p key={d.id}>{d.label} : {hhmmDe(d.debutMinutesAvant)} → {hhmmDe(d.debutMinutesApres)}</p>
+          ))}
+        </div>
+      )}
+      {ajout && feuille.retourRetardMinutes > 0 && feuille.heureRetour && (
+        <p className="text-xs text-secondary-600">
+          Retour à {feuille.retourLabel} à {feuille.heureRetour} au lieu de {feuille.heureRetourPrevue} (+{formatDureeRoute(feuille.retourRetardMinutes)}).
+        </p>
       )}
       {sansDepot && n > 0 && (
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
@@ -374,9 +400,15 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
                     <p className="text-xs text-gray-500">Équipements : {it.equipments.join(' · ')}</p>
                   )}
                   {it.retard && (
-                    <p className={`flex items-center gap-1 text-red-700 ${compact ? 'text-[11px] leading-tight' : 'text-xs'}`}>
-                      <AlertTriangle className="h-3 w-3 shrink-0" />
-                      Arrivée au plus tôt {it.retard.arriveeAuPlusTot} (+{formatDureeRoute(it.retard.retardMinutes)})
+                    <p className={`flex items-center gap-1 ${it.retard.statut === 'souple' ? 'text-amber-700' : 'text-red-700'} ${compact ? 'text-[11px] leading-tight' : 'text-xs'}`}>
+                      {it.retard.statut === 'fige' ? <Lock className="h-3 w-3 shrink-0" />
+                        : it.retard.statut === 'souple' ? <MoveHorizontal className="h-3 w-3 shrink-0" />
+                          : <AlertTriangle className="h-3 w-3 shrink-0" />}
+                      {it.retard.statut === 'souple' && decalage?.applicable ? `Décalé à ${it.retard.arriveeAuPlusTot}` : `Arrivée au plus tôt ${it.retard.arriveeAuPlusTot}`}
+                      {' '}(+{formatDureeRoute(it.retard.retardMinutes)})
+                      {it.retard.statut === 'souple' && ' · dans sa souplesse'}
+                      {it.retard.statut === 'hors' && ' · hors souplesse'}
+                      {it.retard.statut === 'fige' && ' · heure figée'}
                     </p>
                   )}
                 </div>

@@ -17,11 +17,12 @@ import { FeuilleDeRouteSection } from './FeuilleDeRouteSection';
  * @param {{ lat: number, lng: number }|null} p.coords  lieu du RDV
  * @param {object} p.rdv  { appointment_type, client_name, client_first_name, address, postal_code, city }
  * @param {boolean} [p.apercu]  tournée telle qu'elle est, sans ce RDV
+ * @param {Function} [p.onDecalage]  remonte les décalages qu'impliquerait la pose (cf. FeuilleDeRouteSection)
  * @param {string} [p.titre]  titre imposé (option de comparaison)
  * @param {import('react').ReactNode} [p.children]  pied du bloc liste (boutons Choisir / Ajouter)
  * @param {'tout'|'liste'|'carte'} [p.partie]  bloc affiché (la fenêtre « Nouveau RDV » sépare carte et liste)
  */
-export function ParcoursJournee({ slot, personne, coords, rdv, apercu = false, partie = 'tout', titre = null, children = null }) {
+export function ParcoursJournee({ slot, personne, coords, rdv, apercu = false, partie = 'tout', titre = null, children = null, onDecalage = null }) {
   const ajout = useMemo(() => (coords && !apercu ? {
     ...rdv,
     scheduled_date: slot.date,
@@ -46,7 +47,7 @@ export function ParcoursJournee({ slot, personne, coords, rdv, apercu = false, p
       {partie !== 'carte' && !coords && !apercu && (
         <p className="text-xs text-amber-700">Adresse du client non localisée : ce RDV est hors itinéraire.</p>
       )}
-      <FeuilleDeRouteSection date={slot.date} memberIds={memberIds} person={person} ajout={ajout} compact partie={partie} />
+      <FeuilleDeRouteSection date={slot.date} memberIds={memberIds} person={person} ajout={ajout} compact partie={partie} onDecalage={onDecalage} />
       {partie !== 'carte' && children}
     </div>
   );

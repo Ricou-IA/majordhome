@@ -21,6 +21,7 @@ import { useTeamMembers } from '@hooks/useAppointments';
 import { useDayEndpoint } from '@hooks/useDayEndpoint';
 import { useAuth } from '@contexts/AuthContext';
 import { resoudreExtremites } from '@/lib/tournee/extremites.js';
+import { construireReglages } from '@/lib/tournee/reglages.js';
 import { feuilleDeRouteService } from '@services/feuilleDeRoute.service';
 import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { getOrgHeadquarters } from '@lib/territoire-config';
@@ -51,6 +52,11 @@ export function useFeuilleDeRoute({ orgId, date, memberIds = [], person, simulat
   const { isTeamLeaderOrAbove } = useAuth();
   const { members } = useTeamMembers(orgId);
   const siege = useMemo(() => getOrgHeadquarters(settings), [settings]);
+  // Souplesse des RDV : classe chaque retard (dans sa tolérance / hors / figé), mêmes réglages que le moteur
+  const souplesse = useMemo(() => {
+    const r = construireReglages(settings);
+    return { flexDefaut: r.souplesse_defaut_minutes, demiJournee: r.demi_journee };
+  }, [settings]);
   const enabled = !!orgId && !!date && memberIds.length > 0;
 
   // La ressource planning de la personne (un commercial sans ressource reste à l'agence).
@@ -107,8 +113,9 @@ export function useFeuilleDeRoute({ orgId, date, memberIds = [], person, simulat
       estime: legsQuery.data?.estime,
       typeLabels: TYPE_LABELS,
       equipmentLabelsByClient: labelsByClientId,
+      souplesse,
     });
-  }, [enabled, rdvsQuery.data, date, person, depart, retour, arrets, legsQuery.data, labelsByClientId]);
+  }, [enabled, rdvsQuery.data, date, person, depart, retour, arrets, legsQuery.data, labelsByClientId, souplesse]);
 
   return {
     feuille,

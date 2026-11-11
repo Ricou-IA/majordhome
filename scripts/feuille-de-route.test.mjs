@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   arretsDeLaJournee, pointsItineraire, urlDirections, lireDirections, estimerTroncons,
   lienGoogleMapsTournee, urlCarteStatique, buildFeuilleDeRoute, formatDureeRoute, formatKm,
-  decoderPolyline, insererArret, retardsDeLaJournee, heuresDeTournee,
+  decoderPolyline, insererArret, retardsDeLaJournee, heuresDeTournee, decalagesDeLaPose,
 } from '../src/lib/feuilleDeRoute.js';
 
 const MOH = 'tm-moh';
@@ -169,6 +169,9 @@ test('insererArret : le RDV en cours de pose prend sa place horaire, marqué nou
   assert.deepEqual(feuille.items.map((i) => i.nouveau), [false, true, false]);
 });
 
+/** Retard réduit à l'heure et à la durée (les autres champs sont testés à part). */
+const court = (x) => x && { retardMinutes: x.retardMinutes, arriveeAuPlusTot: x.arriveeAuPlusTot };
+
 test('retardsDeLaJournee : fin prévue + trajet au-delà du début = retard ; le premier arrêt n\'est pas jugé', () => {
   const arrets = [
     { id: 'a', scheduled_start: '08:30', scheduled_end: '10:00', lat: 43.9, lng: 1.9 },
@@ -180,11 +183,11 @@ test('retardsDeLaJournee : fin prévue + trajet au-delà du début = retard ; le
   const troncons = [{ minutes: 20 }, { minutes: 19 }, { minutes: 153 }, { minutes: 117 }, { minutes: 30 }];
   const r = retardsDeLaJournee(arrets, troncons);
   assert.equal(r.has('a'), false);
-  assert.deepEqual(r.get('b'), { retardMinutes: 19, arriveeAuPlusTot: '10:19' });
+  assert.deepEqual(court(r.get('b')), { retardMinutes: 19, arriveeAuPlusTot: '10:19' });
   // Retard propagé : b décalé à 10:19, fini 11:19 ; n arrive 11:19 + 153 = 13:52, fini 14:22 ;
   // c arrive 14:22 + 117 = 16:19
-  assert.deepEqual(r.get('n'), { retardMinutes: 142, arriveeAuPlusTot: '13:52' });
-  assert.deepEqual(r.get('c'), { retardMinutes: 229, arriveeAuPlusTot: '16:19' });
+  assert.deepEqual(court(r.get('n')), { retardMinutes: 142, arriveeAuPlusTot: '13:52' });
+  assert.deepEqual(court(r.get('c')), { retardMinutes: 229, arriveeAuPlusTot: '16:19' });
   assert.equal(retardsDeLaJournee(arrets, null).size, 0);
   const feuille = buildFeuilleDeRoute({ date: '2026-11-12', person: { displayName: 'Ludovic' }, depart: depot, arrets, troncons });
   assert.equal(feuille.items.find((i) => i.id === 'n').retard.arriveeAuPlusTot, '13:52');
@@ -201,7 +204,7 @@ test('retardsDeLaJournee : un arrêt non localisé est sauté sans décaler les 
     { id: 'b', scheduled_start: '09:15', scheduled_end: '10:00', lat: 43.8, lng: 1.8 },
   ];
   const r = retardsDeLaJournee(arrets, [{ minutes: 10 }, { minutes: 30 }, { minutes: 10 }]);
-  assert.deepEqual(r.get('b'), { retardMinutes: 15, arriveeAuPlusTot: '09:30' });
+  assert.deepEqual(court(r.get('b')), { retardMinutes: 15, arriveeAuPlusTot: '09:30' });
 });
 
 test('heuresDeTournee : départ = 1er RDV − trajet aller, retour = fin du dernier + trajet retour', () => {
@@ -225,4 +228,43 @@ test('urlCarteStatique : un tracé trop long pour l\'URL Mapbox est abandonné, 
   assert.ok(long.length < 8000);
   assert.ok(!long.includes('path-4'));
   assert.ok(long.includes('pin-s-1'));
+});
+
+test('souplesse : un retard dans la tolérance se décale, un figé ou hors tolérance bloque', () => {
+  const souplesse = { flexDefaut: 30, demiJournee: { matin: [8, 12], apres_midi: [13, 18] } };
+  const base = { lat: 43.9, lng: 1.9, appointment_type: 'maintenance', duration_minutes: 60 };
+  const arrets = [
+    { ...base, id: 'a', scheduled_start: '08:00', scheduled_end: '09:00' },
+    { ...base, id: 'n', scheduled_start: '09:00', scheduled_end: '10:00', nouveau: true },
+    // demi-journée : 10:00 peut glisser jusqu'à 11:30 (moitié des 60 min avant midi)
+    { ...base, id: 'b', scheduled_start: '10:00', scheduled_end: '11:00', time_flex_minutes: 240, client_name: 'PUECH' },
+    { ...base, id: 'c', scheduled_start: '11:30', scheduled_end: '12:00', hour_confirmed_at: '2026-11-01T00:00:00Z', client_name: 'FIGÉ' },
+  ];
+  // départ→a, a→n (20 → n en retard de 20), n→b (10), b→c (5), retour
+  const troncons = [{ minutes: 10 }, { minutes: 20 }, { minutes: 10 }, { minutes: 5 }, { minutes: 10 }];
+  const r = retardsDeLaJournee(arrets, troncons, souplesse);
+  assert.equal(r.get('n').statut, 'nouveau');
+  assert.equal(r.get('b').statut, 'souple');
+  assert.equal(r.get('b').debutMinutesApres, 10 * 60 + 30);
+  assert.equal(r.get('c').statut, 'fige');
+  const d = decalagesDeLaPose(arrets, r);
+  assert.equal(d.applicable, false);
+  assert.deepEqual(d.liste.map((x) => x.id), ['b']);
+  assert.deepEqual(d.bloquants.map((x) => x.statut), ['fige']);
+  assert.equal(d.nouveauEnRetard, true);
+
+  // Sans le figé et sans retard du RDV posé : tout tient, applicable
+  const ok = [arrets[0], { ...arrets[1], scheduled_start: '09:20', scheduled_end: '10:20' }, arrets[2]];
+  const d2 = decalagesDeLaPose(ok, retardsDeLaJournee(ok, [{ minutes: 10 }, { minutes: 20 }, { minutes: 10 }, { minutes: 10 }], souplesse));
+  assert.equal(d2.applicable, true);
+  assert.equal(d2.liste[0].debutMinutesApres, 10 * 60 + 30);
+  assert.equal(d2.liste[0].debutMinutesAvant, 10 * 60);
+
+  // Hors tolérance : ±30 min ne couvre pas 45 min de retard
+  const hors = [arrets[0], { ...arrets[1], scheduled_start: '09:20', scheduled_end: '10:20' },
+    { ...base, id: 'h', scheduled_start: '10:00', scheduled_end: '11:00' }];
+  const r3 = retardsDeLaJournee(hors, [{ minutes: 10 }, { minutes: 20 }, { minutes: 25 }, { minutes: 10 }], souplesse);
+  assert.equal(r3.get('h').statut, 'hors');
+  // Sans réglages : pas de statut (feuille de route classique)
+  assert.equal(retardsDeLaJournee(hors, [{ minutes: 10 }, { minutes: 20 }, { minutes: 25 }, { minutes: 10 }]).get('h').statut, null);
 });

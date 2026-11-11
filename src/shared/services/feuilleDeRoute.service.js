@@ -26,7 +26,7 @@ export const feuilleDeRouteService = {
       const orgId = await getMajordhomeOrgId(coreOrgId);
       const { data: rows, error } = await supabase
         .from('majordhome_appointments')
-        .select('id, appointment_type, status, scheduled_date, scheduled_start, scheduled_end, subject, description, client_id, lead_id, client_name, client_first_name, client_phone, address, postal_code, city, grand_secteur, target_invoiced, assigned_commercial_id')
+        .select('id, appointment_type, status, scheduled_date, scheduled_start, scheduled_end, subject, description, client_id, lead_id, client_name, client_first_name, client_phone, address, postal_code, city, grand_secteur, target_invoiced, assigned_commercial_id, duration_minutes, time_flex_minutes, hour_confirmed_at, announced_start')
         .eq('org_id', orgId)
         .eq('scheduled_date', date)
         .not('status', 'in', '(cancelled,no_show)')

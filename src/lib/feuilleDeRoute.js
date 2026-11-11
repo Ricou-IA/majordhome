@@ -20,6 +20,7 @@
  * ============================================================================
  */
 
+import { toleranceDe } from './tournee/arrets.js';
 import { haversineKm } from './sectorClustering.js';
 import { estimerParVolDOiseau } from './tournee/matrice.js';
 import { formatItem } from './planningPrintModel.js';
@@ -87,16 +88,37 @@ function dureeArret(a) {
 }
 
 /**
+ * Classe un retard selon la SOUPLESSE du RDV (Eric 2026-11-11 : « tenir compte de la souplesse
+ * et donc modifier le RDV ») : `souple` = la nouvelle heure tient dans sa tolérance (il sera
+ * décalé), `hors` = au-delà, `fige` = heure communiquée au client / souplesse 0 / type non
+ * adaptable, `nouveau` = le RDV en cours de pose lui-même. Tolérance = `toleranceDe` du moteur
+ * de tournées (même règle que les décalages des tournées). Sans `souplesse`, pas de statut.
+ * @param {object} a  arrêt
+ * @param {number} arrivee  minutes
+ * @param {{ flexDefaut?: number, demiJournee?: object }|null} souplesse
+ * @returns {{ statut: string|null, tolerance: object|null }}
+ */
+function statutRetard(a, arrivee, souplesse) {
+  if (a.nouveau) return { statut: 'nouveau', tolerance: null };
+  if (!souplesse) return { statut: null, tolerance: null };
+  const tolerance = toleranceDe(a, { souplesse: true, flexDefaut: souplesse.flexDefaut ?? 0, demiJournee: souplesse.demiJournee });
+  if (!tolerance || tolerance.flex === 0) return { statut: 'fige', tolerance };
+  return { statut: arrivee <= tolerance.max ? 'souple' : 'hors', tolerance };
+}
+
+/**
  * Déroulé simulé de la journée, retards PROPAGÉS (Eric 2026-11-11 : « ça doit montrer tout le
  * décalage, y compris celui du retour ») : un arrêt commence à son heure prévue ou à l'arrivée
  * au plus tôt si elle est plus tardive, et dure sa durée prévue ; le suivant part de là. Le
  * premier arrêt n'est pas jugé (pas d'heure de départ imposée). Arrêts non localisés sautés.
  * @param {Array} arrets
  * @param {Array|null} troncons  un par paire de `pointsItineraire` (le dernier = retour)
- * @returns {{ retards: Map<string, { retardMinutes: number, arriveeAuPlusTot: string }>,
- *   finPrevue: number|null, finSimulee: number|null }}  fins du dernier arrêt localisé (minutes)
+ * @param {{ flexDefaut?: number, demiJournee?: object }|null} [souplesse]  réglages pour classer les retards
+ * @returns {{ retards: Map<string, object>, finPrevue: number|null, finSimulee: number|null }}
+ *   retard = { retardMinutes, arriveeAuPlusTot, statut, debutMinutesAvant, debutMinutesApres,
+ *   dureeMinutes, tolerance } ; fins du dernier arrêt localisé (minutes)
  */
-function simulerJournee(arrets, troncons) {
+function simulerJournee(arrets, troncons, souplesse = null) {
   const retards = new Map();
   let finPrevue = null;
   let finSimulee = null;
@@ -112,7 +134,14 @@ function simulerJournee(arrets, troncons) {
     if (finSimulee != null && debut != null && trajet && Number.isFinite(trajet.minutes)) {
       const arrivee = finSimulee + trajet.minutes;
       if (arrivee > debut) {
-        retards.set(a.id, { retardMinutes: arrivee - debut, arriveeAuPlusTot: hhmm(arrivee) });
+        retards.set(a.id, {
+          retardMinutes: arrivee - debut,
+          arriveeAuPlusTot: hhmm(arrivee),
+          ...statutRetard(a, arrivee, souplesse),
+          debutMinutesAvant: debut,
+          debutMinutesApres: arrivee,
+          dureeMinutes: duree,
+        });
         debutSimule = arrivee;
       }
     }
@@ -128,10 +157,11 @@ function simulerJournee(arrets, troncons) {
  * (cf. simulerJournee).
  * @param {Array} arrets   arrêts dans l'ordre (scheduled_start / scheduled_end, lat / lng)
  * @param {Array|null} troncons  un par paire de `pointsItineraire`
- * @returns {Map<string, { retardMinutes: number, arriveeAuPlusTot: string }>} par id d'arrêt
+ * @param {{ flexDefaut?: number, demiJournee?: object }|null} [souplesse]
+ * @returns {Map<string, object>} par id d'arrêt (cf. simulerJournee)
  */
-export function retardsDeLaJournee(arrets = [], troncons = null) {
-  return simulerJournee(arrets, troncons).retards;
+export function retardsDeLaJournee(arrets = [], troncons = null, souplesse = null) {
+  return simulerJournee(arrets, troncons, souplesse).retards;
 }
 
 /**
@@ -159,6 +189,36 @@ export function heuresDeTournee(arrets = [], troncons = null) {
     retourPrevu: finPrevue != null && okRetour ? hhmm(finPrevue + retour) : null,
     retourRetardMinutes: finSimulee != null && finPrevue != null ? Math.max(0, finSimulee - finPrevue) : 0,
   };
+}
+
+/**
+ * Ce que la pose d'un RDV implique pour les RDV suivants : les décalages à ÉCRIRE (RDV
+ * adaptables qui tiennent dans leur souplesse), au format de `decalerVoisins` (sav.service),
+ * et ce qui bloque (figé, hors souplesse, RDV posé lui-même en retard). `applicable` = tout
+ * tient : la création glissera ces RDV, tout ou rien.
+ * @param {Array} arrets
+ * @param {Map<string, object>} retards  sortie de `retardsDeLaJournee(…, souplesse)`
+ * @returns {{ liste: Array, bloquants: Array<{ id, label, statut }>, nouveauEnRetard: boolean, applicable: boolean }}
+ */
+export function decalagesDeLaPose(arrets = [], retards = new Map()) {
+  const liste = [];
+  const bloquants = [];
+  let nouveauEnRetard = false;
+  for (const a of arrets) {
+    const r = retards.get(a.id);
+    if (!r) continue;
+    if (a.nouveau) { nouveauEnRetard = true; continue; }
+    const label = [a.client_name, a.client_first_name].filter(Boolean).join(' ') || a.subject || 'RDV';
+    if (r.statut === 'souple') {
+      liste.push({
+        id: a.id, label, debutMinutesAvant: r.debutMinutesAvant, debutMinutesApres: r.debutMinutesApres,
+        dureeMinutes: r.dureeMinutes, tolerance: r.tolerance,
+      });
+    } else {
+      bloquants.push({ id: a.id, label, statut: r.statut });
+    }
+  }
+  return { liste, bloquants, nouveauEnRetard, applicable: liste.length > 0 && bloquants.length === 0 && !nouveauEnRetard };
 }
 
 /**
@@ -358,16 +418,17 @@ function slug(s) {
  * @param {object} [p.typeLabels]
  * @param {Map}    [p.equipmentLabelsByClient]
  * @param {Date}   [p.now]
+ * @param {{ flexDefaut?: number, demiJournee?: object }|null} [p.souplesse]  classe les retards (figé / dans la souplesse / hors)
  */
 export function buildFeuilleDeRoute({
   date, person, depot = null, depart = depot, retour: pointRetour = depart, arrets = [], troncons = null, estime = false,
-  typeLabels = {}, equipmentLabelsByClient = new Map(), now = new Date(),
+  typeLabels = {}, equipmentLabelsByClient = new Map(), now = new Date(), souplesse = null,
 } = {}) {
   const ctx = { typeLabels, equipmentLabelsByClient, personColor: person?.color };
   const aTroncons = Array.isArray(troncons) && troncons.length > 0;
   let leg = 0;
   let rang = 0;
-  const retards = retardsDeLaJournee(arrets, troncons);
+  const retards = retardsDeLaJournee(arrets, troncons, souplesse);
   const heures = heuresDeTournee(arrets, troncons);
   const items = arrets.map((a) => {
     const localise = coordValide(a.lat, a.lng);
@@ -394,6 +455,7 @@ export function buildFeuilleDeRoute({
     heureRetour: heures.retour,
     heureRetourPrevue: heures.retourPrevu,
     retourRetardMinutes: heures.retourRetardMinutes,
+    decalage: decalagesDeLaPose(arrets, retards),
     retourLabel: (pointRetour || depart)?.label || 'Agence',
     depotLabel: depart?.label || 'Agence',
     items,

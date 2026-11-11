@@ -32,7 +32,7 @@ const STATUTS_CLOS = ['cancelled', 'completed', 'no_show'];
  * @returns {Promise<{ faits: Array<{id, scheduled_start, scheduled_end}>, error: object|null }>}
  *   `faits` = décalages déjà écrits (pour les annuler si la suite échoue)
  */
-async function decalerVoisins(appointmentsService, decalages) {
+export async function decalerVoisins(appointmentsService, decalages) {
   const faits = [];
   for (const d of decalages || []) {
     if (!d?.id || d.debutMinutesApres == null) continue;
@@ -64,7 +64,7 @@ async function decalerVoisins(appointmentsService, decalages) {
 }
 
 /** Remet les voisins glissés à leur heure d'origine (au mieux : une erreur ici se logue, elle ne masque pas la cause). */
-async function annulerDecalages(appointmentsService, faits) {
+export async function annulerDecalages(appointmentsService, faits) {
   for (const f of faits || []) {
     const { error } = await appointmentsService.updateAppointment(f.id, { scheduled_start: f.scheduled_start, scheduled_end: f.scheduled_end });
     if (error) logger.error('[sav] scheduleEntretien : retour du voisin impossible', { id: f.id, error });

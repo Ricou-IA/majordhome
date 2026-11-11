@@ -10,7 +10,8 @@ import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getAppointmentTypeConfig, appointmentsService } from '@services/appointments.service';
-import { savService } from '@services/sav.service';
+import { savService, decalerVoisins, annulerDecalages } from '@services/sav.service';
+import { estTypeAdaptable } from '@/lib/souplesse';
 import { leadKeys } from '@hooks/useLeads';
 import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, chantierKeys } from '@hooks/cacheKeys';
 import { PHONE_REQUIRED_TYPES } from '@/lib/planningEvents';
@@ -24,6 +25,8 @@ export function useEventSaveActions({
   orgId, userId, isEdit, appointment, attachContext, formData, setErrors, validate,
   selectedClient, selectedLead, isCommercialType, isFreeType, isLeave, isClosing, fromFiche,
   commercialMemberId, allTeamMembers, assistantSlots, onSave, onClose, onCreated,
+  // RDV suivants à glisser dans leur souplesse avant la pose (parcours de la fenêtre), tout ou rien
+  decalages = [],
 }) {
   const queryClient = useQueryClient();
   const [batchSaving, setBatchSaving] = useState(false);
@@ -184,6 +187,7 @@ export function useEventSaveActions({
       if (!openSavId) { setSavPrompt(true); return; }
     }
     setBatchSaving(true);
+    let defaireDecalages = null;
     try {
       const act = await resolveActivation({ rdvDate: assistantSlots[0]?.date, dupDecision, interventionId: savInterventionId });
       if (act.error === 'duplicate') {
@@ -210,13 +214,34 @@ export function useEventSaveActions({
         .map((id) => (allTeamMembers || []).find((m) => m.id === id)?.display_name?.trim().split(' ')[0])
         .filter(Boolean).join(', ');
       const subjectFor = (s) => (isLeave && prenomsDe(s.technicianIds) ? `${typeLabel} — ${prenomsDe(s.technicianIds)}` : autoSubject);
-      const slots = assistantSlots.map((s) => ({ ...s, subject: subjectFor(s), notes: null }));
+      // Souplesse choisie à la pose (Entretien / SAV) : null = défaut d'org, 0 = figé
+      const flex = estTypeAdaptable(formData.appointment_type) ? (formData.time_flex_minutes ?? null) : null;
+      const slots = assistantSlots.map((s) => ({ ...s, subject: subjectFor(s), notes: null, timeFlexMinutes: s.timeFlexMinutes ?? flex }));
+
+      // RDV suivants glissés dans leur souplesse AVANT la pose, chacun relu en base (refusé
+      // s'il a changé depuis l'affichage) ; remis en place si la pose échoue.
+      if (decalages.length > 0) {
+        const { faits, error: decErr } = await decalerVoisins(appointmentsService, decalages);
+        if (decErr) {
+          await annulerDecalages(appointmentsService, faits);
+          toast.error(`Décalage refusé : ${decErr.detail || 'un RDV'} a changé depuis l'affichage. Rien n'a été créé.`);
+          queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+          setBatchSaving(false);
+          return;
+        }
+        defaireDecalages = () => annulerDecalages(appointmentsService, faits);
+      }
 
       // Création confiée à l'écran d'origine (glisser-déposer kanban, fiche contrat) :
       // savService.scheduleEntretien reste la voie unique de planification entretien / SAV
       // (souplesse, voisins). Il ferme la fenêtre lui-même en cas de succès.
       if (attachContext?.submitSlots) {
-        try { await attachContext.submitSlots(slots); } finally { setBatchSaving(false); }
+        try {
+          await attachContext.submitSlots(slots);
+        } catch (err) {
+          if (defaireDecalages) await defaireDecalages();
+          throw err;
+        } finally { setBatchSaving(false); }
         return;
       }
 
@@ -241,12 +266,14 @@ export function useEventSaveActions({
       });
       if (batchErr) {
         logger.error('[EventModal] batch create error:', batchErr);
+        if (defaireDecalages) await defaireDecalages();
         toast.error('Erreur lors de la création du RDV');
         setBatchSaving(false);
         return;
       }
 
       // Invalidations ciblées selon la destination de la carte.
+      if (decalages.length > 0) queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
       if (act.leadId) {
         queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
@@ -260,7 +287,8 @@ export function useEventSaveActions({
         queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
       }
 
-      toast.success(slots.length > 1 ? `${slots.length} RDV créés` : 'RDV créé avec succès');
+      toast.success((slots.length > 1 ? `${slots.length} RDV créés` : 'RDV créé avec succès')
+        + (decalages.length > 0 ? ` · ${decalages.length} RDV décalé${decalages.length > 1 ? 's' : ''} dans sa souplesse` : ''));
       // Suites propres à l'écran d'origine (fiche SAV : date de la carte, fiche web confirmée).
       // Le RDV existe : un échec ici se dit sans le défaire.
       if (onCreated) {
@@ -269,10 +297,11 @@ export function useEventSaveActions({
       onClose();
     } catch (err) {
       logger.error('[EventModal] handleCreateFromAssistant error:', err);
+      if (defaireDecalages) await defaireDecalages();
       toast.error('Une erreur est survenue');
       setBatchSaving(false);
     }
-  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, isCommercialType, isFreeType, isLeave, allTeamMembers, orgId, formData, selectedClient, queryClient, onClose, onCreated, setErrors, attachContext]);
+  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, isCommercialType, isFreeType, isLeave, allTeamMembers, orgId, formData, selectedClient, queryClient, onClose, onCreated, setErrors, attachContext, decalages]);
 
   // Demande SAV créée depuis la fenêtre SAV : on reprend la création du RDV, rattaché à elle.
   const resumeAfterSav = useCallback((created) => {
