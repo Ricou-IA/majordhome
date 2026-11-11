@@ -222,3 +222,7 @@ verify_jwt = true
 # core.organization_members ; auth.admin.updateUserById. Jamais stocké ni journalisé. 2026-10-27.
 [functions.member-reset-password]
 verify_jwt = true
+
+# dpe-lien : lien fiche client <-> MonsieurDPE (corpus des DPE, rapport complet). JWT user + module dpe + clients.edit. 2026-11-11.
+[functions.dpe-lien]
+verify_jwt = true
