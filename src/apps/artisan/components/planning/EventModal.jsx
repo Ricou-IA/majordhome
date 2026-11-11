@@ -424,8 +424,9 @@ export function EventModal({
   // Rendu en deux blocs (Eric 2026-11-11) : la carte sous le type, la liste en colonne de droite.
   // Même hook, même cache : les deux blocs lisent la même journée.
   const avecParcours = !isFreeType && (assistantSlots.length > 0 || apercu);
+  // Les itinéraires se lisent côte à côte (comparer deux personnes) ; les cartes s'empilent.
   const rendreParcours = (partie) => (
-    <div className="space-y-3">
+    <div className={partie === 'liste' ? 'flex flex-wrap items-start gap-3 [&>*]:w-[19rem] [&>*]:shrink-0' : 'space-y-3'}>
       {apercu && !apercuDejaPose && (
         <ParcoursJournee
           key={`apercu-${apercu.memberId}-${apercu.date}`}
@@ -466,7 +467,7 @@ export function EventModal({
 
       {/* Panel modale — taille uniforme pour tous les types de RDV (largeur de la grille assistant).
           Sous `sm` (téléphone) le gabarit partagé MODAL_PANEL_PHONE le passe en plein écran. */}
-      <div className={`fixed sm:inset-4 sm:m-auto sm:h-fit sm:max-h-[calc(100vh-2rem)] sm:w-full ${usesAssistant ? (parcours ? (sectionClient ? 'max-w-[124rem]' : 'max-w-[110rem]') : (sectionClient ? 'max-w-7xl' : 'max-w-6xl')) : 'max-w-2xl'} bg-white rounded-xl shadow-2xl ${attachContext ? 'z-[61]' : 'z-50'} flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
+      <div className={`fixed sm:inset-4 sm:m-auto sm:h-fit sm:max-h-[calc(100vh-2rem)] sm:w-full ${usesAssistant ? (parcours ? 'max-w-none' : (sectionClient ? 'max-w-7xl' : 'max-w-6xl')) : 'max-w-2xl'} bg-white rounded-xl shadow-2xl ${attachContext ? 'z-[61]' : 'z-50'} flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
         <EventModalHeader
           typeConfig={typeConfig}
           title={continuationMode ? 'Programmer une suite' : (isEdit ? 'Modifier le RDV' : 'Nouveau RDV')}
@@ -475,7 +476,7 @@ export function EventModal({
         />
 
         {/* ---- Contenu scrollable ---- */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
+        <div className="flex-1 min-h-0 overflow-auto p-4 sm:p-6">
           {/* Confirmation annulation */}
           {confirmAction === 'cancel' && (
             <CancelConfirmation

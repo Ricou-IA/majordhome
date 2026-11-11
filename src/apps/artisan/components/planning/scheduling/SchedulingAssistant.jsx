@@ -228,10 +228,10 @@ export function SchedulingAssistant({
   // elle reste sous les créneaux. Classes écrites en entier : Tailwind ne lit pas les noms composés.
   const grilleColonnes = sidePanelClient
     ? (sidePanelBas
-      ? 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem] 2xl:grid-cols-[minmax(0,1fr)_17rem_17rem_19rem] min-[1800px]:grid-cols-[minmax(0,1fr)_17rem_17rem_19rem_24rem]'
+      ? 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem] 2xl:grid-cols-[minmax(28rem,1fr)_17rem_17rem_fit-content(39rem)] min-[1800px]:grid-cols-[minmax(28rem,1fr)_17rem_17rem_fit-content(39rem)_24rem]'
       : 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem]')
     : (sidePanelBas
-      ? 'lg:grid-cols-[minmax(0,1fr)_17rem] xl:grid-cols-[minmax(0,1fr)_17rem_19rem] 2xl:grid-cols-[minmax(0,1fr)_17rem_19rem_24rem]'
+      ? 'lg:grid-cols-[minmax(0,1fr)_17rem] xl:grid-cols-[minmax(28rem,1fr)_17rem_fit-content(39rem)] 2xl:grid-cols-[minmax(28rem,1fr)_17rem_fit-content(39rem)_24rem]'
       : 'lg:grid-cols-[minmax(0,1fr)_17rem]');
 
   // Déplacer un RDV existant : enregistré tout de suite (comme le glisser du planning), avec
