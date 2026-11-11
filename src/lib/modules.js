@@ -108,6 +108,8 @@ export const CATALOGUE = [
   { key: 'maintenance', label: 'Tâches récurrentes', description: "Tâches récurrentes par unité, borne d'atelier, traçabilité, e-mail du soir.", parDefaut: false, accueil: '/maintenance' },
   // Lien MonsieurDPE (fiche client) : rien à régler, donc pas de groupe de Paramètres (`sansReglage`).
   { key: 'dpe', label: 'MonsieurDPE', description: 'DPE du client retrouvé depuis sa fiche et analyse complète du logement.', parDefaut: false, accueil: null, sansReglage: true },
+  // Assistant pièces (fiche appareil) : rien à régler côté Paramètres, donc pas de groupe (`sansReglage`).
+  { key: 'assistant', label: 'Assistant pièces', description: "Recherche d'une pièce détachée sur le web depuis la fiche d'un appareil.", parDefaut: false, accueil: null, sansReglage: true },
 ];
 
 const PAR_CLE = new Map(CATALOGUE.map((m) => [m.key, m]));
