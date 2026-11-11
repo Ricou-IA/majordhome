@@ -56,7 +56,7 @@ export default function VerifierAppareil({ brand, model, equipmentTypeId = null,
     try {
       const r = await createFromWeb({ appareil, equipmentTypeId, champs });
       if (r.existante) toast.info('Cet appareil existait déjà dans la base : il y est rattaché.');
-      else toast.success('Appareil ajouté à la base, en attente de contrôle par l\'administrateur.');
+      else toast.success('Appareil trouvé : indexation à venir dans la base.');
       (r.avertissements || []).forEach((a) => toast.warning(a));
       onChoisir(r.model_id);
       fermer();

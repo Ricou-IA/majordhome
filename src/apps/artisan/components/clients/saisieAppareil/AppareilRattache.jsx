@@ -29,7 +29,7 @@ export default function AppareilRattache({ fiche, isLoading = false, onChanger, 
         </p>
         {fiche.review_status === 'a_controler' && (
           <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-amber-800">
-            <AlertTriangle className="w-3 h-3" />Fiche trouvée sur le web, en attente de contrôle
+            <AlertTriangle className="w-3 h-3" />Indexation à venir dans la base
           </p>
         )}
       </div>
