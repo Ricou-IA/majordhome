@@ -67,6 +67,10 @@ export const DEFAULT_FAMILLES = Object.freeze([
   familleDefaut('borne_recharge', 'Borne de recharge', ['borne_recharge'], CHAPITRES_EQUIPEMENT),
   familleDefaut('electricite', 'Electricité', [], [['MATÉRIEL', 'stock'], ['POSE ET MISE EN SERVICE', 'main_oeuvre']]),
   familleDefaut('vmc', 'VMC', [], CHAPITRES_EQUIPEMENT),
+  // Devis hors pose (Eric 2026-11-11 : le devis est transversal) — pièces en saisie libre + tout le catalogue
+  familleDefaut('sav', 'Dépannage / SAV', [], [['PIÈCES', 'libre'], ['MAIN D\'ŒUVRE', 'main_oeuvre'], ['DÉPLACEMENT', 'main_oeuvre']]),
+  familleDefaut('entretien', 'Entretien / ramonage', [], [['PRESTATIONS', 'libre'], ['PIÈCES', 'libre']]),
+  familleDefaut('pieces', 'Pièces détachées', [], [['PIÈCES', 'libre']]),
   familleDefaut('autre', 'Autre', [], [['PRESTATIONS', 'libre'], ['MAIN D\'ŒUVRE', 'main_oeuvre']]),
 ]);
 

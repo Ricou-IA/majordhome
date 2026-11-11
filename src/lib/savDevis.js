@@ -69,5 +69,6 @@ export function leadDepuisCarteSav(item) {
     city: item?.client_city || '',
     phone: item?.client_phone || '',
     email: item?.client_email || '',
+    project_family_key: 'sav', // famille « Dépannage / SAV » présélectionnée (familleDuLead), ignorée si désactivée
   };
 }

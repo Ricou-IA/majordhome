@@ -163,6 +163,18 @@ test('défauts : chaque famille a des chapitres typés alignés sur ses titres e
   assert.deepEqual(pv.chapitres.map((c) => c.type), ['equipement', 'equipement', 'equipement', 'stock', 'main_oeuvre']);
 });
 
+test('défauts : familles hors pose (SAV, entretien, pièces), tout le catalogue, sans chapitre de pose', async () => {
+  const { familleDuLead } = await import('../src/lib/devisConfig.js');
+  for (const key of ['sav', 'entretien', 'pieces']) {
+    const f = DEFAULT_FAMILLES.find((x) => x.key === key);
+    assert.ok(f, key);
+    assert.deepEqual([...f.categories], [], key);
+    assert.ok(!f.sections.some((s) => /POSE/.test(s)), key);
+  }
+  assert.equal(DEFAULT_FAMILLES.at(-1).key, 'autre', '« Autre » reste en dernier');
+  assert.equal(familleDuLead(buildDevisConfig({}), { project_family_key: 'sav' }), 'Dépannage / SAV');
+});
+
 test("tauxTvaLigne : 0 % reste 0 % (autoliquidation), illisible ⇒ 20 %", () => {
   assert.equal(tauxTvaLigne(0), 0);
   assert.equal(tauxTvaLigne("0"), 0);
