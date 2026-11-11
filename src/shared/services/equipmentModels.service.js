@@ -74,7 +74,11 @@ export const equipmentModelsService = {
         model?.photo_path ? storageService.getSignedUrl(BUCKET, model.photo_path, 3600) : Promise.resolve({ url: null, error: null }),
         ...vuesSource.map((v) => storageService.getSignedUrl(BUCKET, v.path, 3600)),
       ]);
-      const ok = vues.map((r, i) => (r.url ? { url: r.url, width: vuesSource[i].width ?? null, height: vuesSource[i].height ?? null } : null)).filter(Boolean);
+      const ok = vues.map((r, i) => (r.url ? {
+        url: r.url, width: vuesSource[i].width ?? null, height: vuesSource[i].height ?? null,
+        // vue tirée de la notice (et non du site) : ses repères sont ceux de la notice — l'écran doit le dire
+        origine: vuesSource[i].origine || 'site', role: vuesSource[i].role || 'vue', page: vuesSource[i].page ?? null,
+      } : null)).filter(Boolean);
       return { photo: photo.url || null, vues: ok, manquantes: (vuesSource.length - ok.length) + (model?.photo_path && !photo.url ? 1 : 0) };
     }, 'equipmentModels.getImages');
   },

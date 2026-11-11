@@ -2,7 +2,7 @@
  * EquipmentPartsSection.jsx — Bloc « Pièces détachées » d'un équipement client
  * ============================================================================
  * Fiche client (carte équipement) et fiche SAV. Si l'équipement est rattaché à un modèle fabricant : la vue éclatée
- * (agrandissable), un champ « Numéro de repère » et le tableau repère · référence · désignation · quantité · prix
+ * (agrandissable), un champ de recherche (repère, référence ou mot) et le tableau repère · référence · désignation · quantité · prix
  * public HT. Sinon : « Choisir le modèle fabricant ». Avec `onAddToQuote` (fiche SAV), les pièces se cochent et
  * partent dans un devis.
  * Le prix affiché est le PRIX PUBLIC HT du fabricant au dernier relevé, libellé comme tel.
@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Wrench, Loader2, Search, Maximize2, ShoppingCart, AlertTriangle, Minus, Plus } from 'lucide-react';
 import { useEquipmentModel, useEquipmentModelParts, useEquipmentModelImages, useSetEquipmentModel } from '@hooks/useEquipmentModels';
-import { filtrerParReperes, trierParRepere, mentionsPiece, prixPublicPiece } from '@/lib/catalogue/nomenclature';
+import { chercherDansNomenclature, trierParRepere, mentionsPiece, prixPublicPiece } from '@/lib/catalogue/nomenclature';
 import { formatEuro } from '@/lib/utils';
 import EquipmentModelPicker from './EquipmentModelPicker';
 import ExplodedViewViewer from './ExplodedViewViewer';
@@ -58,7 +58,8 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
   const { vues, manquantes, isLoading: chargementImages } = useEquipmentModelImages(model, ouvert);
   const { setModel, isSaving } = useSetEquipmentModel();
 
-  const lignes = useMemo(() => filtrerParReperes(trierParRepere(parts), reperes), [parts, reperes]);
+  const lignes = useMemo(() => chercherDansNomenclature(trierParRepere(parts), reperes), [parts, reperes]);
+  const vuesDeNotice = vues.some((v) => v.origine === 'notice');
   const choisies = useMemo(() => parts.filter((l) => quantites[l.id] > 0), [parts, quantites]);
 
   const choisirModele = async (id) => {
@@ -141,13 +142,24 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
                   className="relative group border border-secondary-200 rounded-lg overflow-hidden bg-white"
                   title="Agrandir la vue éclatée"
                 >
-                  <img src={v.url} alt={`Vue éclatée ${model?.model_name || ''}${vues.length > 1 ? ` (${i + 1}/${vues.length})` : ''}`} className="h-48 w-auto max-w-full object-contain" loading="lazy" />
+                  <img src={v.url} alt={`${v.role === 'nomenclature' ? 'Nomenclature de la notice' : 'Vue éclatée'} ${model?.model_name || ''}${vues.length > 1 ? ` (${i + 1}/${vues.length})` : ''}`} className="h-48 w-auto max-w-full object-contain" loading="lazy" />
                   <span className="absolute bottom-1 right-1 inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-white/90 text-secondary-700 border border-secondary-200">
                     <Maximize2 className="w-3 h-3" />Agrandir
                   </span>
+                  {v.origine === 'notice' && (
+                    <span className="absolute top-1 left-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
+                      {v.role === 'nomenclature' ? 'Nomenclature de la notice' : 'Vue de la notice'}{v.page ? `, p. ${v.page}` : ''}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
+          )}
+          {vuesDeNotice && (
+            <p className="flex items-start gap-1.5 text-xs text-amber-900 bg-amber-50 rounded px-2 py-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>Le fabricant ne publie pas de vue éclatée pour ce modèle : celle-ci vient de la notice. <strong>Ses repères sont ceux de la notice, pas ceux de la liste ci-dessous.</strong> Lisez la référence dans la nomenclature de la notice, puis cherchez-la dans la liste.</span>
+            </p>
           )}
           {!chargementImages && model && vues.length === 0 && (
             <p className="text-xs text-secondary-500">Pas de vue éclatée pour ce modèle sur le site du fabricant.</p>
@@ -160,9 +172,9 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-secondary-400" />
               <input
                 type="text" value={reperes} onChange={(e) => setReperes(e.target.value)}
-                placeholder="Repère (ex. 12, 30)"
-                aria-label="Numéro de repère"
-                className="pl-8 pr-3 py-1.5 w-56 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Repère, référence ou mot"
+                aria-label="Repère, référence ou mot de la désignation"
+                className="pl-8 pr-3 py-1.5 w-64 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
             <span className="text-xs text-secondary-500">
@@ -213,7 +225,7 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
                   })}
                 </tbody>
               </table>
-              {lignes.length === 0 && <p className="px-1 py-3 text-sm text-secondary-500">Aucune pièce au repère « {reperes} » sur ce modèle.</p>}
+              {lignes.length === 0 && <p className="px-1 py-3 text-sm text-secondary-500">Aucune pièce ne correspond à « {reperes} » sur ce modèle.</p>}
             </div>
           )}
           {!chargementPieces && !erreurPieces && model && parts.length === 0 && (

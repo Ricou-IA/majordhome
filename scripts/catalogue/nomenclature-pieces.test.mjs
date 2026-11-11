@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cle, reperesSaisis, filtrerParReperes, trierParRepere, mentionsPiece, prixPublicPiece, prixVentePiece, prixAchatPiece, ligneDevisDepuisPiece,
+  cle, reperesSaisis, filtrerParReperes, chercherDansNomenclature, trierParRepere, mentionsPiece, prixPublicPiece, prixVentePiece, prixAchatPiece, ligneDevisDepuisPiece,
   lignesDevisAvecPieces, classerModeles, filtrerModeles, rangerDocumentsModele, titreDocumentModele,
 } from '../../src/lib/catalogue/nomenclature.js';
 
@@ -143,4 +143,25 @@ test('trierParRepere : ordre numérique, plages, non numériques puis sans repè
   const tri = trierParRepere([l('35', 1), l('21', 2), l('10', 3), l('7-14', 4), l('2', 5), l('A2', 6), l('', 7), l('10', 8), l('100', 9), l(null, 10)]);
   assert.deepEqual(tri.map((x) => x.id), [5, 4, 3, 8, 2, 1, 9, 6, 7, 10]);
   assert.deepEqual(trierParRepere(null), []);
+});
+
+test('chercherDansNomenclature : repères ou référence / mot de la désignation', () => {
+  const lignes = [
+    L({ repere: '17', piece_reference: 'F610592B AM', piece_name: 'KIT "TAQUE ANCIEN MODELE"' }),
+    L({ repere: '35', piece_reference: 'AT610109A', piece_name: 'REGISTRE AIR SECONDAIRE' }),
+    L({ repere: '7-14', piece_reference: 'G300306J', piece_name: 'KIT ENS.FAC/POR. OXANA' }),
+    L({ repere: 'A2', piece_reference: 'AI303008', piece_name: 'JOINT THERMOCORDE D8' }),
+  ];
+  const refs = (saisie) => chercherDansNomenclature(lignes, saisie).map((l) => l.piece_reference);
+  assert.equal(refs('').length, 4);
+  assert.deepEqual(refs('17'), ['F610592B AM']);
+  assert.deepEqual(refs('17 35'), ['F610592B AM', 'AT610109A']);
+  assert.deepEqual(refs('9'), ['G300306J']);                       // repère dans une plage
+  assert.deepEqual(refs('a2'), ['AI303008']);                      // repère non numérique
+  assert.deepEqual(refs('F610592B'), ['F610592B AM']);             // référence de la notice → ligne du site
+  assert.deepEqual(refs('at610109a'), ['AT610109A']);
+  assert.deepEqual(refs('taque'), ['F610592B AM']);
+  assert.deepEqual(refs('thermocorde, 35'), ['AT610109A', 'AI303008']);
+  assert.deepEqual(refs('zz'), []);                                // trop court pour un texte, pas un repère connu
+  assert.deepEqual(chercherDansNomenclature(null, 'x'), []);
 });

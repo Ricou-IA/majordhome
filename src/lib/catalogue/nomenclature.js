@@ -55,6 +55,29 @@ export function trierParRepere(lignes) {
 }
 
 /**
+ * Recherche dans une nomenclature : repères (« 12, 30 », « 12 30 ») OU texte (référence, mot de la désignation —
+ * au moins 3 caractères, sans accents ni ponctuation). Les termes se séparent par une virgule ; un terme fait de
+ * nombres seulement est une liste de repères. Saisie vide = toutes les lignes.
+ * @param {object[]} lignes
+ * @param {string} saisie
+ * @returns {object[]}
+ */
+export function chercherDansNomenclature(lignes, saisie) {
+  const termes = String(saisie || '').split(/[,;]+/).map((t) => t.trim()).filter(Boolean);
+  if (!termes.length) return lignes || [];
+  const reperes = [];
+  const textes = [];
+  for (const t of termes) {
+    if (/^[\d\s-]+$/.test(t)) reperes.push(...reperesSaisis(t));
+    else if (/^[a-z]?\d{1,3}[a-z]?$/i.test(t)) reperes.push(t.toLowerCase());
+    else if (cle(t).length >= 3) textes.push(cle(t));
+    else reperes.push(t.toLowerCase());
+  }
+  return (lignes || []).filter((l) => reperes.some((c) => repereCorrespond(l.repere, c))
+    || (textes.length > 0 && textes.some((t) => cle(`${l.piece_reference} ${l.piece_name}`).includes(t))));
+}
+
+/**
  * Lignes de nomenclature dont le repère est l'un des repères saisis ; saisie vide = toutes.
  * @param {object[]} lignes
  * @param {string} saisie
