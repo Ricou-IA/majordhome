@@ -24,8 +24,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   X, Loader2, ArrowLeft, ArrowRight, Save,
   User, Phone, ClipboardCheck, Wrench, Mail, FileText,
-  ExternalLink, Calendar, Check, UserPlus, Archive, Link2, AlertTriangle, Zap, CheckCircle2,
+  ExternalLink, Calendar, Check, UserPlus, Archive, Link2, AlertTriangle, Zap, CheckCircle2, Trash2,
 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { anomaliesDeCarte } from '@/lib/certificatAnomalies';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -117,6 +118,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
   const [showScheduling, setShowScheduling] = useState(initialScheduling); // ouverte sur l'assistant après « Créer et planifier »
   const [schedulingLoading, setSchedulingLoading] = useState(false);
   const [showCloture, setShowCloture] = useState(false); // fenêtre « Intervention faite » (SAV sans planification)
+  const [confirmAnnuler, setConfirmAnnuler] = useState(false); // « Annuler la demande » (SAV, org_admin)
+  const [annulation, setAnnulation] = useState(false);
 
   // --- Certificats multi-équipements ---
   const isEntretien = item?.intervention_type === 'entretien';
@@ -479,6 +482,29 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
         },
       },
     });
+  };
+
+  // « Annuler la demande » : suppression de la carte SAV (org_admin seul, comme toute suppression)
+  const peutAnnulerDemande = type === 'sav' && effectiveRole === 'org_admin'
+    && !['realise', 'facture'].includes(item.workflow_status);
+  const handleAnnulerDemande = async () => {
+    setAnnulation(true);
+    const { error } = await savService.annulerDemandeSav(item.id);
+    setAnnulation(false);
+    if (error) {
+      const messages = {
+        rdv_actif: 'Un RDV est posé pour cette demande : supprimez-le du planning (ou remettez la carte « À planifier ») avant d’annuler.',
+        lie: 'Cette demande est liée à un SMS ou une demande client : elle ne peut pas être supprimée.',
+        non_autorise: 'Suppression refusée : réservée à l’administrateur.',
+      };
+      toast.error(messages[error.code] || 'Impossible d’annuler la demande');
+      return;
+    }
+    setConfirmAnnuler(false);
+    queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+    toast.success('Demande SAV annulée');
+    onUpdated?.();
+    onClose?.();
   };
 
   // --- Transitions ---
@@ -890,6 +916,19 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                   </button>
                 )}
 
+                {peutAnnulerDemande && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAnnuler(true)}
+                    disabled={isUpdatingStatus || annulation}
+                    title="Supprimer cette demande SAV"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Annuler la demande
+                  </button>
+                )}
+
                 <div className="flex-1" />
 
                 <button
@@ -948,6 +987,18 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmAnnuler}
+        onOpenChange={(o) => { if (!o) setConfirmAnnuler(false); }}
+        title="Annuler la demande SAV"
+        description={`La carte SAV de ${name} sera définitivement supprimée.${(item.sav_quotes?.length || 0) > 0 ? ' Ses devis restent sur la fiche client, détachés de la carte.' : ''}`}
+        confirmLabel="Annuler la demande"
+        cancelLabel="Garder la demande"
+        variant="destructive"
+        onConfirm={handleAnnulerDemande}
+        loading={annulation}
+      />
 
       {showCloture && (
         <SAVInterventionFaiteModal

@@ -547,6 +547,37 @@ export const savService = {
    * projectId est obligatoire (NOT NULL + RLS via projects.org_id)
    */
   /**
+   * « Annuler la demande » SAV (org_admin : la policy DELETE d'`interventions` lui est réservée).
+   * Refusée tant qu'un RDV actif y est rattaché (déplanifier d'abord : le RDV disparaîtrait sans
+   * carte) ; un devis fléché reste chez le client, détaché de la carte (FK SET NULL).
+   * Le nombre de lignes supprimées est vérifié : un refus RLS n'est pas une erreur PostgREST.
+   * @param {string} interventionId
+   * @returns {Promise<{ data: { deleted: true } | null, error: { code: 'rdv_actif'|'lie'|'non_autorise'|'erreur', cause?: unknown } | null }>}
+   */
+  async annulerDemandeSav(interventionId) {
+    const { count, error: rdvErr } = await supabase
+      .from('majordhome_appointments')
+      .select('id', { count: 'exact', head: true })
+      .eq('intervention_id', interventionId)
+      .not('status', 'in', '(cancelled,no_show)');
+    if (rdvErr) return { data: null, error: { code: 'erreur', cause: rdvErr } };
+    if (count > 0) return { data: null, error: { code: 'rdv_actif' } };
+
+    const { data, error } = await supabase
+      .from('majordhome_interventions')
+      .delete()
+      .eq('id', interventionId)
+      .eq('intervention_type', 'sav')
+      .select('id');
+    if (error) {
+      logger.error('[sav] annulerDemandeSav error:', error);
+      return { data: null, error: { code: error.code === '23503' ? 'lie' : 'erreur', cause: error } };
+    }
+    if (!data?.length) return { data: null, error: { code: 'non_autorise' } };
+    return { data: { deleted: true }, error: null };
+  },
+
+  /**
    * Une carte du kanban Entretiens & SAV (ligne de la vue), pour l'ouvrir juste après sa création.
    * @param {string} interventionId
    * @returns {Promise<{ data: object|null, error: unknown }>}
