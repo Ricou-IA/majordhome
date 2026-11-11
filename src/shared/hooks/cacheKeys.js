@@ -200,6 +200,13 @@ export const smsKeys = {
   remindedClients: (orgId, year) => [...smsKeys.all(orgId), 'reminded-clients', year],
 };
 
+// --- Lien MonsieurDPE (fiche client) ---
+export const dpeLienKeys = {
+  all: (orgId) => ['dpe-lien', orgId],
+  acces: (orgId, dpeNumber) => [...dpeLienKeys.all(orgId), 'acces', dpeNumber],
+  verification: (orgId, dpeNumber) => [...dpeLienKeys.all(orgId), 'verification', dpeNumber],
+};
+
 // --- Pricing per-org (P0.0.6 — pattern de référence pour P0.11) ---
 export const pricingKeys = {
   all: (orgId) => ['pricing', orgId],

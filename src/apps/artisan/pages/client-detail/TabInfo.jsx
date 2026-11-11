@@ -8,6 +8,7 @@ import { CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@services/client
 import { useLinkedClients, useClientSearch } from '@hooks/useClients';
 import { ClientModal } from '@/apps/artisan/components/clients/ClientModal';
 import { ClientLocationMap } from '@/apps/artisan/components/clients/ClientLocationMap';
+import { ClientDpeLinkPanel } from '@/apps/artisan/components/clients/ClientDpeLinkPanel';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { getOrgHeadquarters } from '@lib/territoire-config';
 
@@ -295,7 +296,7 @@ function LinkedClientsSection({ clientId, orgId, isLocked }) {
 // COMPOSANT PRINCIPAL — TabInfo
 // ============================================================================
 
-export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onInvestigate, savedLocation, savedAddress }) => {
+export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onInvestigate, savedLocation, savedAddress, savedDpeNumber }) => {
   const u = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }));
   const { settings } = useOrgSettings();
   const siege = getOrgHeadquarters(settings);
@@ -451,6 +452,14 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onIn
             </div>
           </FormField>
         </div>
+        {/* Lien MonsieurDPE : ne rend rien si le module n'est pas ouvert pour l'organisation. */}
+        <ClientDpeLinkPanel
+          clientId={clientId}
+          savedDpeNumber={savedDpeNumber || ''}
+          formDpeNumber={formData.dpeNumber || ''}
+          adresseComplete={!!(savedAddress?.address?.trim() && (savedAddress?.postalCode?.trim() || savedAddress?.city?.trim()))}
+          onDpeNumberSaved={(numero) => u('dpeNumber', numero)}
+        />
       </section>
 
       {/* Clients liés (Propriétaire / Locataire) */}

@@ -472,3 +472,26 @@ Compétences cochées comme des droits : 1 ligne = ce membre couvre ce type pour
 | `role` | text | CHECK ∈ {entretien, pose} (`SKILL_ROLES`, `src/lib/tournee/competences.js`) |
 
 PK (team_member_id, equipment_type_id, role). RLS SELECT membre de l'org ; **aucune policy d'écriture** : RPC `public.team_member_set_skills(p_team_member_id, p_role, p_equipment_type_ids uuid[])` (SECURITY DEFINER, org_admin, remplacement atomique, type hors org → 23514). Vue `majordhome_team_member_skills`. Semis M1 : techniciens actifs × types actifs × 2 rôles (Mayer 84).
+
+## Lien MonsieurDPE (2026-11-11)
+
+Migration `20261112_1_dpe_report_accesses.sql`, assertions `scripts/migration-rehearsal/assert-dpe-report-accesses.sql`.
+
+### majordhome.dpe_report_accesses
+Accès au rapport complet MonsieurDPE émis depuis la fiche client. Une ligne par `(org_id, dpe_number)` ; `org_id` = organisation **CORE** (comme `clients.org_id`).
+
+| Colonne | Type | Note |
+|---|---|---|
+| id | uuid PK | |
+| org_id | uuid NOT NULL | FK `core.organizations` |
+| client_id | uuid | FK `majordhome.clients` ON DELETE SET NULL |
+| dpe_number | text NOT NULL | 13 caractères alphanumériques (CHECK) |
+| token | text NOT NULL | jeton rendu par la porte partenaire MonsieurDPE |
+| report_url | text NOT NULL | lien du rapport complet, transmissible au client |
+| issued_by | uuid | utilisateur qui a déclenché l'émission |
+| issued_at | timestamptz | |
+
+- RLS : SELECT = membre de l'organisation. **Aucune policy d'écriture** ; `authenticated` n'a que SELECT.
+- Vue `public.majordhome_dpe_report_accesses` (`security_invoker=true`, lecture seule).
+- Écriture : `public.dpe_report_access_record(p_org_id, p_client_id, p_dpe_number, p_token, p_report_url, p_issued_by)` — SECURITY DEFINER, **service_role seul** (elle prend `org_id` en paramètre), appelée par l'edge function `dpe-lien`. Refuse un client d'une autre organisation.
+- Côté MonsieurDPE (projet `odspcxgafcqxjzrarsqf`, dépôt `C:\Dev\DPE`) : la trace jumelle est `dpe.acces_partenaire`.

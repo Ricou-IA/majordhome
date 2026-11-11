@@ -55,7 +55,7 @@ test('catalogue : clés uniques, CRM en tête, chaque module activable a un grou
   for (const m of CATALOGUE) {
     assert.equal(typeof m.parDefaut, 'boolean', `${m.key} sans parDefaut`);
     assert.ok(m.label && m.description, `${m.key} incomplet`);
-    if (m.key !== 'crm') assert.ok(MODULES.some((g) => g.key === m.key), `${m.key} sans groupe de Paramètres`);
+    if (m.key !== 'crm' && !m.sansReglage) assert.ok(MODULES.some((g) => g.key === m.key), `${m.key} sans groupe de Paramètres`);
   }
   assert.ok(!cles.includes('socle'), 'le socle n’est pas activable');
 });
@@ -98,7 +98,7 @@ test('modulesVisibles : la tuile Fournisseurs & catalogue suit le droit articles
 
 test('modulesEffectifs : état de chaque module du catalogue, défauts appliqués', () => {
   assert.deepEqual(modulesEffectifs({ modules: { maintenance: true, crm: false } }), {
-    crm: false, entretiens: true, communication: false, solaire: true, thermique: true, maintenance: true,
+    crm: false, entretiens: true, communication: false, solaire: true, thermique: true, maintenance: true, dpe: false,
   });
 });
 

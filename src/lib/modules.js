@@ -106,6 +106,8 @@ export const CATALOGUE = [
   { key: 'solaire', label: 'Solaire', description: 'Simulateur photovoltaïque et dossiers PV.', parDefaut: true, accueil: '/solaire' },
   { key: 'thermique', label: 'Thermique', description: 'Études de déperditions et dimensionnement PAC.', parDefaut: true, accueil: '/thermique' },
   { key: 'maintenance', label: 'Tâches récurrentes', description: "Tâches récurrentes par unité, borne d'atelier, traçabilité, e-mail du soir.", parDefaut: false, accueil: '/maintenance' },
+  // Lien MonsieurDPE (fiche client) : rien à régler, donc pas de groupe de Paramètres (`sansReglage`).
+  { key: 'dpe', label: 'MonsieurDPE', description: 'DPE du client retrouvé depuis sa fiche et analyse complète du logement.', parDefaut: false, accueil: null, sansReglage: true },
 ];
 
 const PAR_CLE = new Map(CATALOGUE.map((m) => [m.key, m]));
