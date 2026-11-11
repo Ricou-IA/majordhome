@@ -40,7 +40,7 @@ export function ParcoursJournee({ slot, personne, coords, rdv, apercu = false })
       {!coords && !apercu && (
         <p className="text-xs text-amber-700">Adresse du client non localisée : ce RDV est hors itinéraire.</p>
       )}
-      <FeuilleDeRouteSection date={slot.date} memberIds={memberIds} person={person} ajout={ajout} compact />
+      <FeuilleDeRouteSection date={slot.date} memberIds={memberIds} person={person} ajout={ajout} compact carteACote />
     </div>
   );
 }

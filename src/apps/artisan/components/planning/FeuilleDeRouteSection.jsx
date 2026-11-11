@@ -152,10 +152,11 @@ function Troncon({ troncon, label, estime }) {
  * @param {string[]} props.memberIds
  * @param {{ displayName: string, color?: string }} props.person
  * @param {object|null} [props.ajout]  RDV en cours de pose, inséré à son heure (fenêtre « Nouveau RDV »)
+ * @param {boolean} [props.carteACote]  itinéraire à gauche, carte à droite (fenêtre « Nouveau RDV », sous la grille)
  * @param {boolean} [props.compact]    variante étroite : sans impression, sans choix ni simulation du
  *   départ, arrêts sur une ligne (la fenêtre RDV) ; impossibilités dues à `ajout` en tête
  */
-export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, compact = false }) {
+export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, compact = false, carteACote = false }) {
   const { organization } = useAuth();
   const { settings } = useOrgSettings();
   // Simulation propre à CETTE journée de CETTE personne : changer de jour l'efface.
@@ -316,12 +317,13 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
         </p>
       )}
 
+      <div className={carteACote ? 'grid gap-3 md:grid-cols-2 md:items-start' : 'space-y-2'}>
       {carteSrc && !carteActuelle.ko && (
         <img
           src={carteSrc}
           alt={`Itinéraire de ${feuille.personName}`}
           onError={carteEnErreur}
-          className="w-full rounded-lg border border-gray-200"
+          className={`w-full rounded-lg border border-gray-200 ${carteACote ? 'md:order-2 md:sticky md:top-0' : ''}`}
         />
       )}
 
@@ -374,6 +376,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
           <ExtremiteChoix cote="retour" point={retour} simule={simulation?.retour} heure={feuille.heureRetour} {...choixProps} />
         </ol>
       )}
+      </div>
     </div>
   );
 }

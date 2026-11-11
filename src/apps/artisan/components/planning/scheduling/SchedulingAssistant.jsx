@@ -122,7 +122,7 @@ export function SchedulingAssistant({
   // Contenu placé en tête de la colonne de droite (sideBySide) : type, client, pers. × jours
   // de la fenêtre « Nouveau RDV », fenêtre unique de pose d'un RDV.
   sidePanel = null,
-  // Contenu placé en bas de la colonne de droite (sideBySide) : parcours de la journée.
+  // Contenu placé sous la grille (sideBySide) : parcours de la journée (itinéraire + carte).
   sidePanelBas = null,
   // Colonne client, entre la grille et la colonne type (sideBySide) : saisie du client quand il
   // n'est pas connu (« Nouveau RDV » du planning) — la colonne de droite garde type, créneaux et déroulé.
@@ -508,9 +508,11 @@ export function SchedulingAssistant({
             : `Bloc contrat : ${formatDureeHeures(fixedDuration)} au barème — un clic pose le rendez-vous entier.`}
         </p>
       ) : null}
+      {/* Itinéraire et carte sous la grille : la place libre de la colonne large */}
+      {sideBySide && sidePanelBas && <div className="pt-3">{sidePanelBas}</div>}
       </div>
 
-      {/* Client d'abord (à côté de la grille), puis type, créneaux et parcours */}
+      {/* Client d'abord (à côté de la grille), puis type et créneaux */}
       {sideBySide && sidePanelClient && <div className="space-y-4">{sidePanelClient}</div>}
 
       <div className="space-y-4">
@@ -574,7 +576,6 @@ export function SchedulingAssistant({
           {totalConflicts} conflit(s) de disponibilité détecté(s) — la planification reste possible.
         </p>
       )}
-      {sideBySide && sidePanelBas}
       </div>
       </div>
 
