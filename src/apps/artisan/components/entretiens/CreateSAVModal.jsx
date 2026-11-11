@@ -83,6 +83,11 @@ export function CreateSAVModal({
   // « Créer et planifier » : la demande s'ouvre aussitôt sur l'assistant de planification.
   // Faux quand l'appelant pose déjà le RDV (Nouveau RDV du planning).
   allowSchedule = true,
+  // Demande ouverte depuis des pièces choisies (fiche client) : appareil concerné, description de départ et
+  // phrase qui annonce la suite (la fenêtre de devis).
+  prefillEquipmentId = null,
+  prefillDescription = '',
+  suite = '',
 }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
@@ -90,7 +95,7 @@ export function CreateSAVModal({
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState(prefillClient);
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(prefillDescription);
   const [urgence, setUrgence] = useState(SAV_URGENCE_DEFAUT);
   const [planCard, setPlanCard] = useState(null); // carte créée, ouverte sur la planification
   const searchRef = useRef(null);
@@ -109,11 +114,11 @@ export function CreateSAVModal({
     if (!isOpen) {
       setSearchTerm('');
       setSelectedClient(prefillClient);
-      setDescription('');
+      setDescription(prefillDescription);
       setUrgence(SAV_URGENCE_DEFAUT);
       setPlanCard(null);
     }
-  }, [isOpen, prefillClient]);
+  }, [isOpen, prefillClient, prefillDescription]);
 
   const handleSubmit = async (planifier = false) => {
     if (!selectedClient || !description.trim()) return;
@@ -153,6 +158,7 @@ export function CreateSAVModal({
         clientId: client.id,
         contractId,
         projectId: client.project_id,
+        equipmentId: prefillEquipmentId,
         savDescription: description.trim(),
         savOrigin,
         savUrgency: urgence,
@@ -303,6 +309,8 @@ export function CreateSAVModal({
             <span className="block text-sm font-medium text-gray-700">Degré d&apos;urgence</span>
             <SAVUrgencySelect value={urgence} onChange={setUrgence} />
           </div>
+
+          {suite && <p className="text-xs text-gray-500">{suite}</p>}
         </div>
 
         {/* Footer */}

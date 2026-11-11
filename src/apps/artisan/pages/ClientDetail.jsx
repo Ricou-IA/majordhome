@@ -511,6 +511,7 @@ export default function ClientDetail() {
         {activeTab === 'equipments' && (
           <TabEquipments
             clientId={id}
+            client={isArchived ? null : client}
             prefillDraft={equipmentDraft}
             onPrefillConsumed={() => setEquipmentDraft(null)}
           />

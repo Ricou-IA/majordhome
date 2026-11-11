@@ -42,9 +42,10 @@ function Mentions({ ligne }) {
  * @param {(modelId: string|null) => void} [p.onModelChanged] après un rattachement réussi (appelant sans cache)
  * @param {number} [p.selectionVersion] change quand la sélection doit être vidée (devis créé) — la sélection est
  *   gardée tant que le devis n'existe pas (fermer la fenêtre de devis ne perd pas les pièces cochées)
+ * @param {string} [p.quoteLabel] libellé du bouton de devis (fiche client : « Créer un devis SAV »)
  * @param {string} [p.className]
  */
-export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen = false, onAddToQuote = null, onModelChanged = null, selectionVersion = 0, className = '' }) {
+export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen = false, onAddToQuote = null, onModelChanged = null, selectionVersion = 0, quoteLabel = 'Créer un devis avec ces pièces', className = '' }) {
   const modelId = equipment?.equipment_model_id || null;
   const [ouvert, setOuvert] = useState(defaultOpen);
   const [choixModele, setChoixModele] = useState(false);
@@ -240,7 +241,7 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
             <div className="flex items-center justify-end gap-3 pt-1">
               <span className="text-xs text-secondary-500">{choisies.length > 0 ? `${choisies.length} pièce${choisies.length > 1 ? 's' : ''} choisie${choisies.length > 1 ? 's' : ''}` : 'Choisissez les pièces avec + pour créer un devis'}</span>
               <button type="button" onClick={ajouterAuDevis} disabled={choisies.length === 0} className="btn-primary btn-sm inline-flex items-center gap-1.5 disabled:opacity-50">
-                <ShoppingCart className="w-4 h-4" />Créer un devis avec ces pièces
+                <ShoppingCart className="w-4 h-4" />{quoteLabel}
               </button>
             </div>
           )}

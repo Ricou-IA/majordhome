@@ -14,26 +14,27 @@
  */
 
 import { useState } from 'react';
-import { BookOpen, Layers, FileText, ExternalLink, ChevronDown, ChevronUp, ListChecks } from 'lucide-react';
-import { useEquipmentModelDocuments, openEquipmentDocument } from '@hooks/useEquipmentDocuments';
+import { BookOpen, Layers, FileText, Eye, ChevronDown, ChevronUp, ListChecks } from 'lucide-react';
+import { useEquipmentModelDocuments } from '@hooks/useEquipmentDocuments';
 import { equipmentDocumentTypeLabel } from '@services/equipmentDocuments.service';
 import { rangerDocumentsModele, titreDocumentModele } from '@/lib/catalogue/nomenclature';
+import EquipmentDocumentViewer from '../equipements/EquipmentDocumentViewer';
 
 const TYPE_ICON = { notice: BookOpen, vue_eclatee: Layers, fiche_technique: FileText, procedure: ListChecks, autre: FileText };
 const PUCE = 'inline-flex items-center gap-2 min-h-[44px] px-3 py-2 rounded-lg border text-sm';
 
-function Puce({ doc }) {
+function Puce({ doc, onOpen }) {
   const Icon = TYPE_ICON[doc.document_type] || FileText;
   return (
     <button
       type="button"
-      onClick={() => openEquipmentDocument(doc)}
+      onClick={() => onOpen(doc)}
       title={doc.file_name}
       className={`${PUCE} border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100`}
     >
       <Icon className="h-4 w-4" />
       <span className="truncate max-w-[14rem]">{titreDocumentModele(doc, equipmentDocumentTypeLabel)}</span>
-      <ExternalLink className="h-3.5 w-3.5 text-indigo-400" />
+      <Eye className="h-3.5 w-3.5 text-indigo-400" />
     </button>
   );
 }
@@ -46,13 +47,14 @@ function Puce({ doc }) {
 export function EquipmentModelDocuments({ equipment, className = '' }) {
   const { documentsByEquipmentId } = useEquipmentModelDocuments(equipment?.id ? [equipment.id] : []);
   const [proceduresOuvertes, setProceduresOuvertes] = useState(false);
+  const [consulte, setConsulte] = useState(null); // document ouvert dans la visionneuse
   const docs = equipment?.id ? documentsByEquipmentId[equipment.id] || [] : [];
   if (docs.length === 0) return null;
   const { principaux, procedures } = rangerDocumentsModele(docs);
 
   return (
     <div className={`flex flex-wrap gap-2 ${className}`}>
-      {principaux.map((doc) => <Puce key={doc.id} doc={doc} />)}
+      {principaux.map((doc) => <Puce key={doc.id} doc={doc} onOpen={setConsulte} />)}
       {procedures.length > 0 && (
         <button
           type="button"
@@ -65,7 +67,8 @@ export function EquipmentModelDocuments({ equipment, className = '' }) {
           {proceduresOuvertes ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
       )}
-      {proceduresOuvertes && procedures.map((doc) => <Puce key={doc.id} doc={doc} />)}
+      {proceduresOuvertes && procedures.map((doc) => <Puce key={doc.id} doc={doc} onOpen={setConsulte} />)}
+      {consulte && <EquipmentDocumentViewer doc={consulte} onClose={() => setConsulte(null)} />}
     </div>
   );
 }

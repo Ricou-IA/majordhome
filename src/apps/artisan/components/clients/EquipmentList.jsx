@@ -200,6 +200,8 @@ const EquipmentCard = ({
   canDeleteDocument = false,
   onUploadDocument,
   onDeleteDocument,
+  onPartsToQuote,
+  partsSelectionVersion = 0,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -371,7 +373,15 @@ const EquipmentCard = ({
         />
 
         {/* Pièces détachées du modèle fabricant (vue éclatée + nomenclature), ou choix du modèle */}
-        <EquipmentPartsSection equipment={equipment} canEdit={canUploadDocument} className="mt-3" />
+        {/* Avec `onPartsToQuote` (fiche client) : les pièces se choisissent et partent dans un devis SAV */}
+        <EquipmentPartsSection
+          equipment={equipment}
+          canEdit={canUploadDocument}
+          onAddToQuote={onPartsToQuote ? (choix) => onPartsToQuote(equipment, choix) : null}
+          selectionVersion={partsSelectionVersion}
+          quoteLabel="Créer un devis SAV"
+          className="mt-3"
+        />
 
         {/* Bouton détails */}
         <button
@@ -460,6 +470,8 @@ const EquipmentCard = ({
  * @param {Function} [props.onAdd] - Callback ajout
  * @param {Function} [props.onEdit] - Callback édition
  * @param {Function} [props.onDelete] - Callback suppression
+ * @param {Function} [props.onPartsToQuote] - (equipment, choix) : pièces détachées choisies → devis SAV (fiche client)
+ * @param {number} [props.partsSelectionVersion] - change quand la sélection de pièces doit être vidée (devis créé)
  * @param {boolean} [props.readOnly] - Mode lecture seule
  */
 export function EquipmentList({
@@ -478,6 +490,8 @@ export function EquipmentList({
   canDeleteDocument = false,
   onUploadDocument,
   onDeleteDocument,
+  onPartsToQuote,
+  partsSelectionVersion = 0,
   readOnly = false,
 }) {
   const [expandedId, setExpandedId] = useState(null);
@@ -566,6 +580,8 @@ export function EquipmentList({
           canDeleteDocument={!readOnly && canDeleteDocument}
           onUploadDocument={readOnly ? undefined : onUploadDocument}
           onDeleteDocument={readOnly ? undefined : onDeleteDocument}
+          onPartsToQuote={readOnly ? undefined : onPartsToQuote}
+          partsSelectionVersion={partsSelectionVersion}
         />
       ))}
     </div>

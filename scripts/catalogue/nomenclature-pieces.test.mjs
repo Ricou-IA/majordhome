@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   cle, reperesSaisis, filtrerParReperes, chercherDansNomenclature, trierParRepere, mentionsPiece, prixPublicPiece, prixVentePiece, prixAchatPiece, ligneDevisDepuisPiece,
-  lignesDevisAvecPieces, classerModeles, filtrerModeles, rangerDocumentsModele, titreDocumentModele,
+  lignesDevisAvecPieces, descriptionSavDepuisPieces, classerModeles, filtrerModeles, rangerDocumentsModele, titreDocumentModele,
 } from '../../src/lib/catalogue/nomenclature.js';
 
 const L = (extra = {}) => ({
@@ -87,6 +87,14 @@ test('lignesDevisAvecPieces : pièces rangées sous le chapitre PIÈCES', () => 
   assert.equal(sansPieces[1].reference, 'F670108B'); // pas de chapitre « pièces » : sous le premier
   assert.equal(lignesDevisAvecPieces([], choix, 10).length, 2);
   assert.equal(lignesDevisAvecPieces(null, [], 10).length, 0);
+});
+
+test('descriptionSavDepuisPieces : appareil puis quantité × désignation (référence)', () => {
+  const choix = [{ ligne: L({ piece_name: 'VITRE POELE ARATOS', piece_reference: 'AX605344B' }), quantite: 1 }, { ligne: L({ piece_name: '', piece_reference: 'AV6306250' }), quantite: 2 }];
+  assert.equal(descriptionSavDepuisPieces({ brand: 'INVICTA', model: 'ARATOS' }, choix),
+    'Remplacement de pièces — INVICTA ARATOS : 1 × VITRE POELE ARATOS (AX605344B), 2 × AV6306250');
+  assert.equal(descriptionSavDepuisPieces({ brand: null, model: ' ' }, [choix[0]]), 'Remplacement de pièces : 1 × VITRE POELE ARATOS (AX605344B)');
+  assert.equal(descriptionSavDepuisPieces(null, []), 'Remplacement de pièces');
 });
 
 const M = (reference, model_name, extra = {}) => ({ id: reference + model_name, reference, model_name, name: `POELE ${model_name} - ${reference}`, is_active: true, ...extra });

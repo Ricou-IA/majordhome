@@ -9,16 +9,21 @@ import { useEquipmentModelDocuments, useEquipmentDocumentMutations } from '@hook
 import { useCanAccess } from '@hooks/usePermissions';
 import { contractsService } from '@services/contracts.service';
 import { equipmentsService } from '@services/equipments.service';
+import { savService } from '@services/sav.service';
 import { reduireImage } from '@/lib/imageResize';
 import { EquipmentList } from '@/apps/artisan/components/clients/EquipmentList';
 import { EquipmentFormModal } from '@/apps/artisan/components/clients/EquipmentFormModal';
+import { PartsToSavQuote } from '@/apps/artisan/components/equipements/PartsToSavQuote';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { logger } from '@lib/logger';
 
-export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed }) => {
+export const TabEquipments = ({ clientId, client = null, prefillDraft = null, onPrefillConsumed }) => {
   const { organization, effectiveRole } = useAuth();
   const orgId = organization?.id;
   const { can } = useCanAccess();
+  // Pièces détachées choisies sur une carte équipement → demande SAV → devis (PartsToSavQuote)
+  const [partsFlow, setPartsFlow] = useState(null); // { equipment, choix, carte }
+  const [partsSelectionVersion, setPartsSelectionVersion] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState(null);
   const [isUploadingNameplate, setIsUploadingNameplate] = useState(false);
@@ -85,6 +90,30 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
     if (contract?.id) {
       queryClient.invalidateQueries({ queryKey: contractKeys.equipments(orgId, contract.id) });
     }
+  };
+
+  // Une demande SAV déjà ouverte pour le client reçoit le devis (même anti-doublon que le RDV SAV du planning) ;
+  // sinon la demande est d'abord créée. Les services renvoient { error } sans throw : on le lit.
+  const peutDevisSav = !!client?.id && can('devis', 'create') && can('sav', 'create');
+  const handlePartsToQuote = async (equipment, choix) => {
+    const { data: openId, error } = await savService.getOpenSavCardId(clientId);
+    if (error) {
+      logger.error('[TabEquipments] demande SAV ouverte illisible:', error);
+      toast.error('Les demandes SAV du client n\'ont pas pu être lues. Réessayez.');
+      return;
+    }
+    let carte = null;
+    if (openId) {
+      const lue = await savService.getCardById(openId);
+      if (lue.error || !lue.data) {
+        logger.error('[TabEquipments] carte SAV illisible:', lue.error);
+        toast.error('La demande SAV ouverte de ce client n\'a pas pu être lue. Réessayez.');
+        return;
+      }
+      carte = lue.data;
+      toast.info('Une demande SAV est déjà ouverte pour ce client : le devis s\'y rattache.');
+    }
+    setPartsFlow({ equipment, choix, carte });
   };
 
   const handleOpenAdd = () => { setEditingEquipment(null); setShowModal(true); };
@@ -308,7 +337,19 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
         canDeleteDocument={effectiveRole === 'org_admin'}
         onUploadDocument={handleUploadDocument}
         onDeleteDocument={removeModelDocument}
+        onPartsToQuote={peutDevisSav ? handlePartsToQuote : undefined}
+        partsSelectionVersion={partsSelectionVersion}
       />
+      {partsFlow && (
+        <PartsToSavQuote
+          client={client}
+          equipment={partsFlow.equipment}
+          choix={partsFlow.choix}
+          carteOuverte={partsFlow.carte}
+          onClose={() => setPartsFlow(null)}
+          onQuoteCreated={() => setPartsSelectionVersion((v) => v + 1)}
+        />
+      )}
       <EquipmentFormModal
         isOpen={showModal}
         onClose={handleCloseModal}

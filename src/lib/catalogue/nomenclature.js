@@ -205,6 +205,24 @@ export function lignesDevisAvecPieces(sections, choix, tva) {
 }
 
 /**
+ * Description pré-remplie d'une demande SAV ouverte depuis des pièces choisies (fiche client) : l'appareil, puis
+ * « quantité × désignation (référence) ». Texte de départ, que l'utilisateur complète ou remplace.
+ * @param {{ brand?: string|null, model?: string|null }|null} equipement
+ * @param {Array<{ ligne: object, quantite: number }>} choix
+ * @returns {string}
+ */
+export function descriptionSavDepuisPieces(equipement, choix) {
+  const appareil = [equipement?.brand, equipement?.model].map((v) => String(v || '').trim()).filter(Boolean).join(' ');
+  const pieces = (choix || []).map((c) => {
+    const nom = c?.ligne?.piece_name || c?.ligne?.piece_reference || 'pièce';
+    const ref = c?.ligne?.piece_name && c?.ligne?.piece_reference ? ` (${c.ligne.piece_reference})` : '';
+    return `${Number(c?.quantite) > 0 ? Number(c.quantite) : 1} × ${nom}${ref}`;
+  });
+  const tete = `Remplacement de pièces${appareil ? ` — ${appareil}` : ''}`;
+  return pieces.length ? `${tete} : ${pieces.join(', ')}` : tete;
+}
+
+/**
  * Modèles fabricant proposés pour un équipement, du plus probable au moins probable. Jamais un choix d'office :
  * c'est une liste à présenter. Score : référence fabricant saisie telle quelle (100), nom de modèle identique (80),
  * l'un contient l'autre (50), premier mot commun (30) ; à égalité, les modèles en vente d'abord puis l'ordre
