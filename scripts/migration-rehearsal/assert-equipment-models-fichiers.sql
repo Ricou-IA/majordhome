@@ -129,9 +129,14 @@ BEGIN
 
   -- (4 bis) 20261111_5 : la vue de nomenclature expose prix d'achat et remise, en fin de liste, sans élargir ses droits
   SELECT string_agg(column_name, ',' ORDER BY ordinal_position) INTO v_txt FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'majordhome_equipment_model_parts';
-  IF v_txt NOT LIKE '%,prix_selon_appareil,purchase_price_ht,taux_remise' THEN RAISE EXCEPTION '(4 bis) colonnes de la vue de nomenclature : %', v_txt; END IF;
+  IF v_txt NOT LIKE '%,prix_selon_appareil,purchase_price_ht,taux_remise,article_selling_price_ht' THEN RAISE EXCEPTION '(4 bis) colonnes de la vue de nomenclature : %', v_txt; END IF;
   IF NOT (SELECT purchase_price_ht = 7 AND taux_remise = 30 FROM public.majordhome_equipment_model_parts WHERE equipment_model_id = v_m AND piece_reference = 'TFA') THEN
     RAISE EXCEPTION '(4 bis) prix d''achat / remise inattendus : %', (SELECT purchase_price_ht || '/' || taux_remise FROM public.majordhome_equipment_model_parts WHERE equipment_model_id = v_m AND piece_reference = 'TFA');
+  END IF;
+  -- 20261111_6 : prix de vente de l'ARTICLE (distinct de celui de la ligne)
+  UPDATE majordhome.catalog_items ci SET selling_price_ht = 45 FROM majordhome.supplier_products p WHERE p.catalog_item_id = ci.id AND p.supplier_id = v_sup AND p.reference = 'TFA';
+  IF NOT (SELECT article_selling_price_ht = 45 AND selling_price_ht = 10 FROM public.majordhome_equipment_model_parts WHERE equipment_model_id = v_m AND piece_reference = 'TFA') THEN
+    RAISE EXCEPTION '(4 bis) prix de vente de l''article non exposé par la vue';
   END IF;
   IF has_table_privilege('anon', 'public.majordhome_equipment_model_parts', 'SELECT') OR has_table_privilege('authenticated', 'public.majordhome_equipment_model_parts', 'INSERT') THEN
     RAISE EXCEPTION '(4 bis) droits de la vue de nomenclature élargis';

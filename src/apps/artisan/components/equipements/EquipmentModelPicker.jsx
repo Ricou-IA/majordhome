@@ -105,6 +105,9 @@ export default function EquipmentModelPicker({ equipment, currentModelId = null,
               {filtres.length > affiches.length && (
                 <p className="px-2 py-2 text-xs text-secondary-500">{affiches.length} modèles affichés sur {filtres.length} : précisez la recherche pour voir les autres.</p>
               )}
+              {modeles.length >= 1000 && (
+                <p className="px-2 py-2 text-xs text-amber-900">La liste est limitée aux 1 000 premiers modèles : un modèle peut manquer. Prévenez l&apos;administrateur.</p>
+              )}
               {filtres.length === 0 && <p className="px-2 py-6 text-sm text-secondary-500">Aucun modèle ne correspond à « {recherche} ».</p>}
             </>
           )}

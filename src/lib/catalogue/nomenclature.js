@@ -79,20 +79,26 @@ export function prixPublicPiece(ligne) {
 }
 
 /**
- * Prix de vente HT d'une pièce sur cet appareil : le prix de vente du catalogue s'il a été ajusté à la main (et que
- * la pièce a un prix unique), sinon le prix public de la ligne ; `null` = pas de prix connu (à chiffrer).
+ * Prix de vente HT d'une pièce sur cet appareil : pour une pièce à prix unique, le prix de vente de l'ARTICLE, sinon
+ * celui de la ligne fournisseur ; à défaut (ou pièce dont le prix dépend de l'appareil) le prix public de la ligne ;
+ * `null` = pas de prix connu (à chiffrer).
  * @param {object} ligne
  * @returns {number|null}
  */
 export function prixVentePiece(ligne) {
-  const vente = nombre(ligne?.selling_price_ht);
-  if (!ligne?.prix_selon_appareil && vente != null && vente > 0) return vente;
+  if (!ligne?.prix_selon_appareil) {
+    // l'article d'abord (prix ajusté dans la fiche article, celui que pose la recherche d'articles du devis)
+    const article = ligne?.catalog_item_id ? nombre(ligne?.article_selling_price_ht) : null;
+    if (article != null && article > 0) return article;
+    const vente = nombre(ligne?.selling_price_ht);
+    if (vente != null && vente > 0) return vente;
+  }
   return prixPublicPiece(ligne);
 }
 
 /**
  * Prix d'achat HT estimé (marge du devis) : celui du catalogue, sinon le prix public de la ligne moins la remise
- * du fournisseur (pièce dont le prix dépend de l'appareil) ; `null` si rien n'est connu.
+ * du fournisseur (pièce dont le prix dépend de l'appareil) ; `null` si rien n'est connu (prix public ou remise).
  * @param {object} ligne
  * @returns {number|null}
  */
@@ -101,7 +107,8 @@ export function prixAchatPiece(ligne) {
   if (!ligne?.prix_selon_appareil && achat != null && achat > 0) return achat;
   const publicHt = nombre(ligne?.prix_public_ht);
   if (publicHt == null || publicHt <= 0) return null;
-  const remise = nombre(ligne?.taux_remise) ?? 0;
+  const remise = nombre(ligne?.taux_remise);
+  if (remise == null) return null; // remise inconnue : pas de prix d'achat, plutôt qu'une marge de 0 % inventée
   return centime(publicHt * (1 - Math.min(Math.max(remise, 0), 99.99) / 100));
 }
 
@@ -172,7 +179,7 @@ export function classerModeles(modeles, equipement) {
     const nom = cle(modele.model_name || modele.name);
     let score = 0;
     if (saisi) {
-      if (ref && (ref === saisi || ref === `p${saisi}` || (saisi.length >= 5 && saisi.includes(ref)))) score = 100;
+      if (ref && (ref === saisi || ref === `p${saisi}` || (ref.length >= 5 && saisi.includes(ref)))) score = 100;
       else if (nom && nom === saisi) score = 80;
       else if (nom && saisi.length >= 3 && (nom.includes(saisi) || (nom.length >= 3 && saisi.includes(nom)))) score = 50;
       else if (premierMot.length >= 3 && cle(String(modele.model_name || '').trim().split(/\s+/)[0]) === premierMot) score = 30;

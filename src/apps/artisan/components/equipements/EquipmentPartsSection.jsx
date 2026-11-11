@@ -10,7 +10,7 @@
  * ============================================================================
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Wrench, Loader2, Search, Maximize2, ShoppingCart, AlertTriangle, Minus, Plus } from 'lucide-react';
 import { useEquipmentModel, useEquipmentModelParts, useEquipmentModelImages, useSetEquipmentModel } from '@hooks/useEquipmentModels';
@@ -40,15 +40,18 @@ function Mentions({ ligne }) {
  * @param {boolean} [p.defaultOpen] bloc ouvert au montage (fiche SAV)
  * @param {(choix: Array<{ ligne: object, quantite: number }>) => void} [p.onAddToQuote] active la sélection de pièces
  * @param {(modelId: string|null) => void} [p.onModelChanged] après un rattachement réussi (appelant sans cache)
+ * @param {number} [p.selectionVersion] change quand la sélection doit être vidée (devis créé) — la sélection est
+ *   gardée tant que le devis n'existe pas (fermer la fenêtre de devis ne perd pas les pièces cochées)
  * @param {string} [p.className]
  */
-export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen = false, onAddToQuote = null, onModelChanged = null, className = '' }) {
+export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen = false, onAddToQuote = null, onModelChanged = null, selectionVersion = 0, className = '' }) {
   const modelId = equipment?.equipment_model_id || null;
   const [ouvert, setOuvert] = useState(defaultOpen);
   const [choixModele, setChoixModele] = useState(false);
   const [reperes, setReperes] = useState('');
   const [agrandie, setAgrandie] = useState(null);
   const [quantites, setQuantites] = useState({}); // { idLigne: quantité }
+  useEffect(() => { setQuantites({}); }, [selectionVersion]);
 
   const { model, isLoading: chargementModele, error: erreurModele } = useEquipmentModel(modelId);
   const { parts, isLoading: chargementPieces, error: erreurPieces } = useEquipmentModelParts(modelId, ouvert);
@@ -81,7 +84,6 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
   const ajouterAuDevis = () => {
     if (!choisies.length) return;
     onAddToQuote(choisies.map((ligne) => ({ ligne, quantite: quantites[ligne.id] })));
-    setQuantites({});
   };
 
   // Équipement sans modèle fabricant : une ligne discrète, un seul geste.
@@ -120,7 +122,10 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
       {ouvert && (
         <div className="border-t border-secondary-200 p-3 space-y-3">
           {(erreurModele || erreurPieces) && (
-            <p className="text-sm text-red-700">Les pièces de ce modèle n&apos;ont pas pu être chargées. Fermez puis rouvrez le bloc.</p>
+            <p className="text-sm text-red-700">Les pièces de ce modèle n&apos;ont pas pu être chargées. Rechargez la page ; si cela persiste, prévenez l&apos;administrateur.</p>
+          )}
+          {!chargementModele && !erreurModele && !model && (
+            <p className="text-sm text-secondary-600">Ce modèle fabricant n&apos;existe plus dans le référentiel.{canEdit ? ' Choisissez-en un autre avec « Changer ».' : ''}</p>
           )}
           {model && model.is_active === false && (
             <p className="text-xs text-amber-900 bg-amber-50 rounded px-2 py-1.5">Ce modèle n&apos;est plus au catalogue du fabricant : la liste est celle du dernier relevé où il figurait.</p>
@@ -154,7 +159,7 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-secondary-400" />
               <input
-                type="text" inputMode="numeric" value={reperes} onChange={(e) => setReperes(e.target.value)}
+                type="text" value={reperes} onChange={(e) => setReperes(e.target.value)}
                 placeholder="Numéro de repère (ex. 12, 30)"
                 aria-label="Numéro de repère"
                 className="pl-8 pr-3 py-1.5 w-56 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
@@ -176,7 +181,7 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
                     <th className="px-1 py-1.5 font-medium">Désignation</th>
                     <th className="px-1 py-1.5 font-medium text-right w-12">Qté</th>
                     <th className="px-1 py-1.5 font-medium text-right w-28">Prix public HT</th>
-                    {onAddToQuote && <th className="px-1 py-1.5 font-medium text-right w-28">Au devis</th>}
+                    {onAddToQuote && <th className="px-1 py-1.5 font-medium text-right w-28">Pour le devis</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -221,9 +226,9 @@ export function EquipmentPartsSection({ equipment, canEdit = false, defaultOpen 
 
           {onAddToQuote && (
             <div className="flex items-center justify-end gap-3 pt-1">
-              <span className="text-xs text-secondary-500">{choisies.length > 0 ? `${choisies.length} pièce${choisies.length > 1 ? 's' : ''} choisie${choisies.length > 1 ? 's' : ''}` : 'Choisissez les pièces avec + pour les ajouter à un devis'}</span>
+              <span className="text-xs text-secondary-500">{choisies.length > 0 ? `${choisies.length} pièce${choisies.length > 1 ? 's' : ''} choisie${choisies.length > 1 ? 's' : ''}` : 'Choisissez les pièces avec + pour créer un devis'}</span>
               <button type="button" onClick={ajouterAuDevis} disabled={choisies.length === 0} className="btn-primary btn-sm inline-flex items-center gap-1.5 disabled:opacity-50">
-                <ShoppingCart className="w-4 h-4" />Ajouter au devis
+                <ShoppingCart className="w-4 h-4" />Créer un devis avec ces pièces
               </button>
             </div>
           )}

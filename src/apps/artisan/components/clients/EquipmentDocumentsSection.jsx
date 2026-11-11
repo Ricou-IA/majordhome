@@ -255,7 +255,7 @@ export function EquipmentDocumentsSection({
               className="w-full flex items-center gap-2.5 p-2 text-left text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
             >
               <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              Procédures du fabricant ({ranges.procedures.length})
+              Procédures ({ranges.procedures.length})
               <span className="ml-auto text-xs text-indigo-600">{proceduresOuvertes ? 'Masquer' : 'Afficher'}</span>
             </button>
           )}

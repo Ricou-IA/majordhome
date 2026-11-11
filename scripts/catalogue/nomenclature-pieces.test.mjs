@@ -41,12 +41,19 @@ test('prix de vente et d’achat', () => {
   assert.equal(prixVentePiece(L()), 79.84);
   assert.equal(prixVentePiece(L({ selling_price_ht: 95 })), 95);                 // ajusté à la main au catalogue
   assert.equal(prixVentePiece(L({ selling_price_ht: 0 })), 79.84);
+  // le prix de l'ARTICLE (ajusté dans la fiche article) prime sur celui de la ligne fournisseur
+  assert.equal(prixVentePiece(L({ article_selling_price_ht: 45 })), 45);
+  assert.equal(prixVentePiece(L({ article_selling_price_ht: 45, selling_price_ht: 95 })), 45);
+  assert.equal(prixVentePiece(L({ article_selling_price_ht: 0, selling_price_ht: 95 })), 95);
+  assert.equal(prixVentePiece(L({ catalog_item_id: null, article_selling_price_ht: 45 })), 79.84);
   // prix selon l'appareil : le prix de la ligne, jamais celui du catalogue (0)
   assert.equal(prixVentePiece(L({ prix_selon_appareil: true, selling_price_ht: 0, prix_public_ht: 13.65 })), 13.65);
   assert.equal(prixVentePiece(L({ prix_public_ht: null, selling_price_ht: 0 })), null);
   assert.equal(prixAchatPiece(L()), 55.89);
   assert.equal(prixAchatPiece(L({ prix_selon_appareil: true, purchase_price_ht: 0, prix_public_ht: 13.65 })), 9.56);
-  assert.equal(prixAchatPiece(L({ purchase_price_ht: 0, taux_remise: null })), 79.84);
+  // prix d'achat inconnu ET remise inconnue : pas de prix d'achat (jamais une marge de 0 % inventée)
+  assert.equal(prixAchatPiece(L({ purchase_price_ht: 0, taux_remise: null })), null);
+  assert.equal(prixAchatPiece(L({ purchase_price_ht: 0, taux_remise: 0 })), 79.84);
   assert.equal(prixAchatPiece(L({ purchase_price_ht: 0, prix_public_ht: null })), null);
 });
 
@@ -97,6 +104,8 @@ test('classerModeles : référence exacte, nom, contenance, premier mot', () => 
   assert.equal(classerModeles(MODELES, { model: '' }).every((c) => c.score === 0), true);
   assert.equal(classerModeles(MODELES, { model: 'a6-a9' }).every((c) => c.score === 0), true);
   assert.equal(classerModeles(null, { model: 'x' }).length, 0);
+  // une référence courte ne « matche » pas un modèle saisi qui la contient par hasard
+  assert.equal(classerModeles([M('10', 'DIX')], { model: 'Serie 100 XL' })[0].score, 0);
   // à score égal : les modèles actifs d'abord
   assert.equal(classerModeles(MODELES, { model: '' }).at(-1).modele.reference, 'P687644');
 });

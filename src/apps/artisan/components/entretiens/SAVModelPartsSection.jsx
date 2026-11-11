@@ -2,7 +2,7 @@
  * SAVModelPartsSection.jsx — Pièces détachées de l'appareil, dans la fiche SAV
  * ============================================================================
  * Le bloc « Pièces détachées » (vue éclatée + nomenclature du modèle fabricant) pour l'équipement du SAV, ou celui
- * que l'on choisit parmi les équipements du client. Les pièces cochées partent dans un devis fléché vers la carte
+ * que l'on choisit parmi les équipements du client. Les pièces cochées partent dans un NOUVEAU devis fléché vers la carte
  * (même fenêtre que « Créer un devis » de la fiche : aucun lead, devis sur le client), rangées sous le chapitre
  * « PIÈCES » de la famille « Dépannage / SAV », au prix public.
  * ============================================================================
@@ -48,6 +48,7 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
   const equipement = liste.find((e) => e.id === choisi) || null;
 
   const [lignesDevis, setLignesDevis] = useState(null);
+  const [versionSelection, setVersionSelection] = useState(0); // incrémentée quand le devis est créé : vide la sélection
   const familleSav = useMemo(() => famillesActives(config).find((f) => f.key === 'sav') || null, [config]);
   const peutCreerDevis = canEdit && can('devis', 'create') && !!item?.client_id;
 
@@ -84,6 +85,7 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
           defaultOpen={!!equipement.equipment_model_id}
           onModelChanged={(modelId) => setModeles((prev) => ({ ...prev, [equipement.id]: modelId }))}
           onAddToQuote={peutCreerDevis ? ajouterAuDevis : null}
+          selectionVersion={versionSelection}
         />
       )}
       {equipement && !equipement.equipment_model_id && !canEdit && (
@@ -97,7 +99,7 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
           initialFamily={lignesDevis.famille}
           initialLines={lignesDevis.lignes}
           onClose={() => setLignesDevis(null)}
-          onCreated={() => onUpdated?.()}
+          onCreated={() => { setVersionSelection((v) => v + 1); onUpdated?.(); }}
         />,
         document.body,
       )}

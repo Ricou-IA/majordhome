@@ -38,7 +38,7 @@ export const equipmentModelsService = {
     return withErrorHandling(async () => {
       if (!orgId) throw new Error('[equipmentModelsService] orgId requis');
       const base = () => supabase.from('majordhome_equipment_models').select(COLONNES_LISTE)
-        .eq('org_id', orgId).eq('is_active', true).order('name').limit(2000);
+        .eq('org_id', orgId).eq('is_active', true).order('name').limit(1000); // plafond PostgREST ; l'écran signale une liste pleine
       const marque = cle(brand);
       if (marque) {
         const { data, error } = await base().eq('brand_key', marque);
