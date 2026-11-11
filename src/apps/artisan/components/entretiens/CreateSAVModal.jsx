@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Search, Loader2, Wrench, User } from 'lucide-react';
+import { X, Search, Loader2, Wrench, User, CalendarPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
@@ -19,6 +19,8 @@ import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { logger } from '@lib/logger';
 import { SAV_URGENCE_DEFAUT } from '@/lib/savUrgency';
 import { SAVUrgencySelect } from './SAVUrgency';
+import { EntretienSAVModal } from './EntretienSAVModal';
+import { savService } from '@services/sav.service';
 
 // ============================================================================
 // HOOK : RECHERCHE CLIENT
@@ -78,6 +80,9 @@ export function CreateSAVModal({
   prefillClient = null,
   prefillContractId = null,
   savOrigin = 'appel_client',
+  // « Créer et planifier » : la demande s'ouvre aussitôt sur l'assistant de planification.
+  // Faux quand l'appelant pose déjà le RDV (Nouveau RDV du planning).
+  allowSchedule = true,
 }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
@@ -87,6 +92,7 @@ export function CreateSAVModal({
   const [selectedClient, setSelectedClient] = useState(prefillClient);
   const [description, setDescription] = useState('');
   const [urgence, setUrgence] = useState(SAV_URGENCE_DEFAUT);
+  const [planCard, setPlanCard] = useState(null); // carte créée, ouverte sur la planification
   const searchRef = useRef(null);
 
   const { results, isSearching } = useClientSearch(orgId, searchTerm);
@@ -105,10 +111,11 @@ export function CreateSAVModal({
       setSelectedClient(prefillClient);
       setDescription('');
       setUrgence(SAV_URGENCE_DEFAUT);
+      setPlanCard(null);
     }
   }, [isOpen, prefillClient]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (planifier = false) => {
     if (!selectedClient || !description.trim()) return;
 
     try {
@@ -154,6 +161,13 @@ export function CreateSAVModal({
 
       // La carte créée remonte à l'appelant (RDV SAV du planning : le RDV s'y rattache)
       onCreated?.(created);
+      if (planifier && created?.id) {
+        // La demande existe quoi qu'il arrive : un échec de lecture se dit, sans la défaire
+        const { data: card, error: cardErr } = await savService.getCardById(created.id);
+        if (!cardErr && card) { setPlanCard(card); return; }
+        logger.error('[CreateSAVModal] lecture carte créée:', cardErr);
+        toast.warning('Demande SAV créée, mais la planification n’a pas pu s’ouvrir : planifiez-la depuis le kanban');
+      }
       onClose();
     } catch (err) {
       logger.error('[CreateSAVModal] submit error:', err);
@@ -162,13 +176,18 @@ export function CreateSAVModal({
 
   if (!isOpen) return null;
 
+  // Planifier tout de suite : la fiche SAV de la carte créée, ouverte sur l'assistant
+  if (planCard) {
+    return <EntretienSAVModal item={planCard} initialScheduling onClose={onClose} />;
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Contenu */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-3">
@@ -295,9 +314,21 @@ export function CreateSAVModal({
           >
             Annuler
           </button>
+          {allowSchedule && (
+            <button
+              type="button"
+              onClick={() => handleSubmit(true)}
+              disabled={!selectedClient || !description.trim() || isCreatingSAV}
+              title="Créer la demande et poser le RDV tout de suite"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange-700 bg-white border border-orange-300 rounded-lg hover:bg-orange-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              Créer et planifier
+            </button>
+          )}
           <button
             type="button"
-            onClick={handleSubmit}
+            onClick={() => handleSubmit(false)}
             disabled={!selectedClient || !description.trim() || isCreatingSAV}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >

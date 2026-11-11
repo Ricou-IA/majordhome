@@ -579,6 +579,7 @@ export function EventModal({
         isOpen={savPrompt}
         onClose={() => setSavPrompt(false)}
         onCreated={resumeAfterSav}
+        allowSchedule={false}
         prefillClient={selectedClient}
       />
     </>

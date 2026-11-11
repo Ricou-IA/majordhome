@@ -547,6 +547,20 @@ export const savService = {
    * projectId est obligatoire (NOT NULL + RLS via projects.org_id)
    */
   /**
+   * Une carte du kanban Entretiens & SAV (ligne de la vue), pour l'ouvrir juste après sa création.
+   * @param {string} interventionId
+   * @returns {Promise<{ data: object|null, error: unknown }>}
+   */
+  async getCardById(interventionId) {
+    const { data, error } = await supabase
+      .from('majordhome_entretien_sav')
+      .select('*')
+      .eq('id', interventionId)
+      .maybeSingle();
+    return { data: data || null, error };
+  },
+
+  /**
    * Demande SAV ouverte du client (carte parent non réalisée ni facturée), la plus récente —
    * même règle anti-doublon que `ensureEntretienCard`. Sert au RDV SAV du planning : une
    * demande en cours reçoit le RDV, sinon on fait d'abord décrire la nouvelle demande.

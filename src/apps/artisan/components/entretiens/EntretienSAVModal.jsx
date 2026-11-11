@@ -81,7 +81,7 @@ const TYPE_LABELS = {
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-export function EntretienSAVModal({ item, onClose, onUpdated }) {
+export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling = false }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useAuth();
@@ -114,7 +114,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
   const [lastEntretienDate, setLastEntretienDate] = useState(null);
 
   // État planification
-  const [showScheduling, setShowScheduling] = useState(false);
+  const [showScheduling, setShowScheduling] = useState(initialScheduling); // ouverte sur l'assistant après « Créer et planifier »
   const [schedulingLoading, setSchedulingLoading] = useState(false);
   const [showCloture, setShowCloture] = useState(false); // fenêtre « Intervention faite » (SAV sans planification)
 
