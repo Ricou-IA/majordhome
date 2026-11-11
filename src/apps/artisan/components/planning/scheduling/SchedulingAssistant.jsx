@@ -119,6 +119,9 @@ export function SchedulingAssistant({
   sidePanel = null,
   // Contenu placé en bas de la colonne de droite (sideBySide) : parcours de la journée.
   sidePanelBas = null,
+  // 3ᵉ colonne à l'extrême droite (sideBySide) : saisie du client quand il n'est pas connu
+  // (« Nouveau RDV » du planning) — la colonne du milieu garde type, créneaux et déroulé.
+  sidePanelClient = null,
   // Aperçu de la tournée d'une personne (clic sur son prénom) : ({ memberId, date } | null) => void
   onApercuChange = null,
   onSlotsChange,
@@ -424,7 +427,10 @@ export function SchedulingAssistant({
         </div>
       )}
 
-      <div className={sideBySide ? 'space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-4 lg:items-start' : 'space-y-4'}>
+      <div className={sideBySide
+        ? `space-y-4 lg:space-y-0 lg:grid ${sidePanelClient ? 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem]' : 'lg:grid-cols-[minmax(0,1fr)_17rem]'} lg:gap-4 lg:items-start`
+        : 'space-y-4'}
+      >
       <div className="space-y-1">
       {/* Grille jour × colonnes par membre */}
       <DayResourceGrid
@@ -523,6 +529,7 @@ export function SchedulingAssistant({
       )}
       {sideBySide && sidePanelBas}
       </div>
+      {sideBySide && sidePanelClient && <div className="space-y-4">{sidePanelClient}</div>}
       </div>
 
       {/* En embedded, le host confirme ; en mode autonome la barre collante du haut porte
