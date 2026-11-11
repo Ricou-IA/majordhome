@@ -108,6 +108,33 @@ export function retardsDeLaJournee(arrets = [], troncons = null) {
 }
 
 /**
+ * Heures de départ et de retour de la tournée : départ = début du premier arrêt localisé
+ * moins son trajet depuis le point de départ ; retour = fin du dernier arrêt localisé plus
+ * le trajet retour. null quand l'heure ou le trajet manque.
+ * @param {Array} arrets
+ * @param {Array|null} troncons  un par paire de `pointsItineraire` (le dernier = retour)
+ * @returns {{ depart: string|null, retour: string|null }}
+ */
+export function heuresDeTournee(arrets = [], troncons = null) {
+  const vide = { depart: null, retour: null };
+  if (!Array.isArray(troncons) || troncons.length === 0) return vide;
+  const localises = arrets.filter((a) => coordValide(a.lat, a.lng));
+  if (localises.length === 0) return vide;
+  const premier = localises[0];
+  const dernier = localises[localises.length - 1];
+  const debut = minutesDe(premier.scheduled_start);
+  const aller = troncons[0]?.minutes;
+  const finDernier = minutesDe(dernier.scheduled_end)
+    ?? (minutesDe(dernier.scheduled_start) != null && Number(dernier.duration_minutes) > 0
+      ? minutesDe(dernier.scheduled_start) + Number(dernier.duration_minutes) : null);
+  const retour = troncons[troncons.length - 1]?.minutes;
+  return {
+    depart: debut != null && Number.isFinite(aller) ? hhmm(debut - aller) : null,
+    retour: finDernier != null && Number.isFinite(retour) ? hhmm(finDernier + retour) : null,
+  };
+}
+
+/**
  * Journée de la personne avec un RDV en cours de pose (fenêtre « Nouveau RDV ») : l'arrêt
  * candidat (`nouveau: true`) est inséré à son heure de début, sans rien retirer.
  * @param {Array} arrets  sortie de `arretsDeLaJournee`
@@ -310,6 +337,7 @@ export function buildFeuilleDeRoute({
   let leg = 0;
   let rang = 0;
   const retards = retardsDeLaJournee(arrets, troncons);
+  const heures = heuresDeTournee(arrets, troncons);
   const items = arrets.map((a) => {
     const localise = coordValide(a.lat, a.lng);
     const trajetAvant = localise && aTroncons ? troncons[leg] || null : null;
@@ -331,6 +359,8 @@ export function buildFeuilleDeRoute({
     date,
     dateLabel: capitalize(LONG_FMT.format(parseISODate(date))),
     departLabel: depart?.label || 'Agence',
+    heureDepart: heures.depart,
+    heureRetour: heures.retour,
     retourLabel: (pointRetour || depart)?.label || 'Agence',
     depotLabel: depart?.label || 'Agence',
     items,

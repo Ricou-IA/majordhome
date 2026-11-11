@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   arretsDeLaJournee, pointsItineraire, urlDirections, lireDirections, estimerTroncons,
   lienGoogleMapsTournee, urlCarteStatique, buildFeuilleDeRoute, formatDureeRoute, formatKm,
-  decoderPolyline, insererArret, retardsDeLaJournee,
+  decoderPolyline, insererArret, retardsDeLaJournee, heuresDeTournee,
 } from '../src/lib/feuilleDeRoute.js';
 
 const MOH = 'tm-moh';
@@ -196,4 +196,17 @@ test('retardsDeLaJournee : un arrêt non localisé est sauté sans décaler les 
   ];
   const r = retardsDeLaJournee(arrets, [{ minutes: 10 }, { minutes: 30 }, { minutes: 10 }]);
   assert.deepEqual(r.get('b'), { retardMinutes: 15, arriveeAuPlusTot: '09:30' });
+});
+
+test('heuresDeTournee : départ = 1er RDV − trajet aller, retour = fin du dernier + trajet retour', () => {
+  const arrets = [
+    { id: 'a', scheduled_start: '08:30', scheduled_end: '10:00', lat: 43.9, lng: 1.9 },
+    { id: 'x', scheduled_start: '11:00', scheduled_end: '11:30', lat: null, lng: null },
+    { id: 'c', scheduled_start: '14:00:00', scheduled_end: '16:15:00', lat: 43.8, lng: 1.8 },
+  ];
+  assert.deepEqual(heuresDeTournee(arrets, [{ minutes: 20 }, { minutes: 30 }, { minutes: 51 }]), { depart: '08:10', retour: '17:06' });
+  assert.deepEqual(heuresDeTournee(arrets, null), { depart: null, retour: null });
+  const feuille = buildFeuilleDeRoute({ date: '2026-11-12', person: { displayName: 'Ludovic' }, depart: depot, arrets, troncons: [{ minutes: 20 }, { minutes: 30 }, { minutes: 51 }] });
+  assert.equal(feuille.heureDepart, '08:10');
+  assert.equal(feuille.heureRetour, '17:06');
 });

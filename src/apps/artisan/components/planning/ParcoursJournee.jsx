@@ -81,7 +81,11 @@ export function ParcoursJournee({ orgId, slot, personne, coords, rdv, apercu = f
             <p className="text-xs text-secondary-500">Aucun RDV ce jour-là.</p>
           )}
           <ol className="space-y-1 text-xs">
-            <li className="flex items-center gap-1.5 text-secondary-500"><MapPin className="w-3 h-3" />{feuille.departLabel}</li>
+            <li className="flex items-center gap-1.5 text-secondary-500">
+              <MapPin className="w-3 h-3" />
+              {feuille.heureDepart && <span className="tabular-nums font-semibold text-secondary-700">{feuille.heureDepart}</span>}
+              Départ · {feuille.departLabel}
+            </li>
             {feuille.items.map((it) => (
               <li key={it.id} className="space-y-0.5">
                 {it.trajetAvant && (
@@ -103,7 +107,11 @@ export function ParcoursJournee({ orgId, slot, personne, coords, rdv, apercu = f
             {feuille.retour && (
               <div className="pl-4 text-secondary-400">↓ {formatDureeRoute(feuille.retour.minutes)} · {formatKm(feuille.retour.km)}</div>
             )}
-            <li className="flex items-center gap-1.5 text-secondary-500"><Flag className="w-3 h-3" />{feuille.retourLabel}</li>
+            <li className="flex items-center gap-1.5 text-secondary-500">
+              <Flag className="w-3 h-3" />
+              {feuille.heureRetour && <span className="tabular-nums font-semibold text-secondary-700">{feuille.heureRetour}</span>}
+              Retour · {feuille.retourLabel}
+            </li>
           </ol>
           {feuille.totaux && (
             <p className="text-xs text-secondary-600 border-t border-secondary-200 pt-1.5">
