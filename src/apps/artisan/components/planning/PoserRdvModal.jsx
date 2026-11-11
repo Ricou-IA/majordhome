@@ -8,6 +8,7 @@
 
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeamMembers } from '@hooks/useAppointments';
 import { EventModal } from './EventModal';
 
 // Chemins d'édition d'EventModal, sans objet en création
@@ -25,12 +26,14 @@ const refus = async () => false;
  */
 export function PoserRdvModal({ client, orgId, members = [], attachContext, onCreated = null, onClose }) {
   const { user } = useAuth();
+  // Équipe : celle de l'écran, sinon chargée ici (parcours de la journée, colonnes)
+  const { members: equipe } = useTeamMembers(orgId);
   return createPortal(
     <EventModal
       isOpen
       mode="create"
       prefillClient={client}
-      members={members || []}
+      members={members?.length ? members : (equipe || [])}
       orgId={orgId}
       userId={user?.id}
       attachContext={attachContext}

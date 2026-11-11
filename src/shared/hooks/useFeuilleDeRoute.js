@@ -26,7 +26,7 @@ import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { getOrgHeadquarters } from '@lib/territoire-config';
 import { MAPBOX_CONFIG } from '@/lib/mapbox';
 import {
-  arretsDeLaJournee, pointsItineraire, cleItineraire, buildFeuilleDeRoute,
+  arretsDeLaJournee, insererArret, pointsItineraire, cleItineraire, buildFeuilleDeRoute,
   lienGoogleMapsTournee, urlCarteStatique,
 } from '@/lib/feuilleDeRoute';
 
@@ -39,12 +39,13 @@ const TYPE_LABELS = Object.fromEntries(APPOINTMENT_TYPES.map((t) => [t.value, t.
  * @param {string[]} p.memberIds  ids de la personne (team_members.id / commercials.id)
  * @param {{ displayName: string, color?: string }} p.person
  * @param {{ depart?: object|null, retour?: object|null }|null} [p.simulation]  points simulés `{ lat, lng, label }`
+ * @param {object|null} [p.ajout]  RDV en cours de pose, inséré à son heure (cf. insererArret) ; doit être mémoïsé
  * @returns {{ feuille: object|null, lienMaps: string|null, carteUrl: string|null, isLoading: boolean, error: Error|null,
  *   depart: object|null, retour: object|null, membre: object|null, exception: object|null,
  *   setException: Function, isSavingException: boolean, peutChoisir: boolean }}
  *   `peutChoisir` : l'utilisateur peut poser l'exception du jour (team_leader+) et la personne a une ressource planning.
  */
-export function useFeuilleDeRoute({ orgId, date, memberIds = [], person, simulation = null }) {
+export function useFeuilleDeRoute({ orgId, date, memberIds = [], person, simulation = null, ajout = null }) {
   const { settings } = useOrgSettings();
   const { labelsByClientId } = useClientEquipmentLabels();
   const { isTeamLeaderOrAbove } = useAuth();
@@ -79,9 +80,10 @@ export function useFeuilleDeRoute({ orgId, date, memberIds = [], person, simulat
   });
 
   const idsKey = memberIds.join(',');
+  // `ajout` : RDV en cours de pose (fenêtre « Nouveau RDV »), inséré à son heure — jamais enregistré
   const arrets = useMemo(
-    () => arretsDeLaJournee(rdvsQuery.data || [], idsKey ? idsKey.split(',') : []),
-    [rdvsQuery.data, idsKey],
+    () => insererArret(arretsDeLaJournee(rdvsQuery.data || [], idsKey ? idsKey.split(',') : []), ajout),
+    [rdvsQuery.data, idsKey, ajout],
   );
   const points = useMemo(() => pointsItineraire(depart, arrets, retour), [depart, arrets, retour]);
   const itineraryKey = cleItineraire(points);

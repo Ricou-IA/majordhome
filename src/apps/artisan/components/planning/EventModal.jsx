@@ -52,6 +52,8 @@ import { useEventClientLinking } from './useEventClientLinking';
 import { useEventSaveActions } from './useEventSaveActions';
 import { CreateSAVModal } from '../entretiens/CreateSAVModal';
 import { PlannedOrderFields } from './scheduling/PlannedOrderFields';
+import { ParcoursJournee } from './ParcoursJournee';
+import { useCoordonneesRdv } from '@hooks/useCoordonneesRdv';
 import { useAppointmentEntretien } from './useAppointmentEntretien';
 import { EventModalHeader, EventModalFooter } from './EventModalFrame';
 
@@ -327,6 +329,15 @@ export function EventModal({
     );
   }, [attachContext, formData.appointment_type]);
 
+  // Lieu du RDV (parcours de la journée) : client géocodé, sinon adresse saisie
+  const { coords: coordsRdv } = useCoordonneesRdv({
+    orgId,
+    clientId: usesAssistant && !isFreeType ? (selectedClient?.id || null) : null,
+    address: usesAssistant && !isFreeType ? formData.client_address : null,
+    postalCode: usesAssistant && !isFreeType ? formData.client_postal_code : null,
+    city: usesAssistant && !isFreeType ? formData.client_city : null,
+  });
+
   // Blocs Type et Client : dans la colonne de droite de l'assistant (création, re-planification,
   // suite), sinon dans le formulaire classique (édition au repos). Une seule définition.
   const sectionType = (
@@ -376,6 +387,47 @@ export function EventModal({
   ) : null;
   // « pers. × jours » d'une carte SAV / chantier (le moteur fusionne les clics d'un même horaire)
   const plannedOrder = attachContext?.plannedOrder || null;
+
+  // Parcours de la journée de chaque personne d'un créneau posé, le RDV inséré à son heure.
+  // Personne = team_members.id (techniciens, commerciaux du planning) ou commercials.id (VT du
+  // pipeline : relié à sa ressource planning par le profil, pour son point de départ).
+  const personnesDuCreneau = (slot) => {
+    const ids = slot.technicianIds?.length ? slot.technicianIds : (slot.assignedCommercialId ? [slot.assignedCommercialId] : []);
+    return ids.map((id) => {
+      const tm = allTeamMembers.find((m) => m.id === id);
+      if (tm) return { key: id, ids: [id], displayName: tm.display_name || 'Technicien', color: tm.calendar_color };
+      const com = (attachContext?.commercials || []).find((x) => x.id === id);
+      const tmCom = com ? allTeamMembers.find((m) => m.user_id && m.user_id === com.profile_id) : null;
+      return {
+        key: id,
+        ids: tmCom ? [id, tmCom.id] : [id],
+        displayName: com?.full_name || com?.name || tmCom?.display_name || 'Commercial',
+        color: tmCom?.calendar_color,
+      };
+    });
+  };
+  const rdvParcours = {
+    appointment_type: formData.appointment_type,
+    client_name: formData.client_name,
+    client_first_name: formData.client_first_name,
+    address: formData.client_address,
+    postal_code: formData.client_postal_code,
+    city: formData.client_city,
+  };
+  const parcours = !isFreeType && assistantSlots.length > 0 ? (
+    <div className="space-y-3">
+      {assistantSlots.flatMap((slot) => personnesDuCreneau(slot).map((pers) => (
+        <ParcoursJournee
+          key={`${slot.date}-${slot.startTime}-${pers.key}`}
+          orgId={orgId}
+          slot={slot}
+          personne={pers}
+          coords={coordsRdv}
+          rdv={rdvParcours}
+        />
+      ))).slice(0, 4)}
+    </div>
+  ) : null;
 
   // Si fermée, on ne rend rien
   if (!isOpen) return null;
@@ -521,6 +573,7 @@ export function EventModal({
                       {sectionClient}
                     </div>
                   )}
+                  sidePanelBas={parcours}
                 />
               )}
 

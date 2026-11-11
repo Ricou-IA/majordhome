@@ -117,6 +117,8 @@ export function SchedulingAssistant({
   // Contenu placé en tête de la colonne de droite (sideBySide) : type, client, pers. × jours
   // de la fenêtre « Nouveau RDV », fenêtre unique de pose d'un RDV.
   sidePanel = null,
+  // Contenu placé en bas de la colonne de droite (sideBySide) : parcours de la journée.
+  sidePanelBas = null,
   onSlotsChange,
   initialDate = null,
   mergeOverlapping = false,
@@ -509,6 +511,7 @@ export function SchedulingAssistant({
           {totalConflicts} conflit(s) de disponibilité détecté(s) — la planification reste possible.
         </p>
       )}
+      {sideBySide && sidePanelBas}
       </div>
       </div>
 

@@ -66,6 +66,20 @@ export function arretsDeLaJournee(rdvs = [], memberIds = []) {
 }
 
 /**
+ * Journée de la personne avec un RDV en cours de pose (fenêtre « Nouveau RDV ») : l'arrêt
+ * candidat (`nouveau: true`) est inséré à son heure de début, sans rien retirer.
+ * @param {Array} arrets  sortie de `arretsDeLaJournee`
+ * @param {object|null} ajout  { scheduled_start, scheduled_end, lat, lng, client_name, … }
+ * @returns {Array}
+ */
+export function insererArret(arrets = [], ajout = null) {
+  if (!ajout) return arrets;
+  const candidat = { id: '__nouveau', status: 'scheduled', ...ajout, nouveau: true };
+  return [...arrets, candidat]
+    .sort((a, b) => String(a.scheduled_start || '').localeCompare(String(b.scheduled_start || '')));
+}
+
+/**
  * Points de l'itinéraire : départ, arrêts localisés, retour.
  * @param {{ lat: number, lng: number }|null} depart
  * @param {Array} arrets  sortie de `arretsDeLaJournee`, avec `lat`/`lng` éventuels
@@ -258,7 +272,7 @@ export function buildFeuilleDeRoute({
     const trajetAvant = localise && aTroncons ? troncons[leg] || null : null;
     if (localise && aTroncons) leg += 1;
     rang += 1;
-    return { ...formatItem(a, ctx), rang, localise, trajetAvant };
+    return { ...formatItem(a, ctx), rang, localise, trajetAvant, nouveau: a.nouveau === true };
   });
   const retour = aTroncons ? troncons[troncons.length - 1] || null : null;
   const totaux = aTroncons

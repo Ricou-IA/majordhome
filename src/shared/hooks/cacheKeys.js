@@ -105,6 +105,8 @@ export const appointmentKeys = {
   // Feuille de route : RDV du jour avec coordonnées, puis trajets d'un itinéraire
   dayRoute: (orgId, date) => [...appointmentKeys.all(orgId), 'day-route', date],
   routeLegs: (orgId, itineraryKey) => [...appointmentKeys.all(orgId), 'route-legs', itineraryKey],
+  // Coordonnées du lieu d'un RDV en cours de pose (client géocodé, sinon adresse saisie)
+  rdvCoords: (orgId, cle) => [...appointmentKeys.all(orgId), 'rdv-coords', cle],
   chantier: (orgId, chantierId) => [...appointmentKeys.all(orgId), 'chantier', chantierId],
   // Appros des chantiers des RDV d'installation affichés (pose provisoire hachurée)
   chantierOrders: (orgId, chantierIds) => [...appointmentKeys.all(orgId), 'chantier-orders', chantierIds],

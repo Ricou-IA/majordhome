@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   arretsDeLaJournee, pointsItineraire, urlDirections, lireDirections, estimerTroncons,
   lienGoogleMapsTournee, urlCarteStatique, buildFeuilleDeRoute, formatDureeRoute, formatKm,
-  decoderPolyline,
+  decoderPolyline, insererArret,
 } from '../src/lib/feuilleDeRoute.js';
 
 const MOH = 'tm-moh';
@@ -154,4 +154,17 @@ test('decoderPolyline : exemple de référence Google, [lng, lat], vide si illis
   assert.deepEqual(decoderPolyline(''), []);
   assert.deepEqual(decoderPolyline(null), []);
   assert.deepEqual(decoderPolyline('_p~iF'), []);
+});
+
+test('insererArret : le RDV en cours de pose prend sa place horaire, marqué nouveau, rien n\'est retiré', () => {
+  const jour = [
+    { id: 'a', scheduled_start: '08:00', lat: 43.9, lng: 1.9 },
+    { id: 'b', scheduled_start: '14:00', lat: 43.8, lng: 1.8 },
+  ];
+  const r = insererArret(jour, { scheduled_start: '10:30', scheduled_end: '11:30', lat: 43.7, lng: 1.7, client_name: 'DUPONT' });
+  assert.deepEqual(r.map((x) => x.id), ['a', '__nouveau', 'b']);
+  assert.equal(r[1].nouveau, true);
+  assert.equal(insererArret(jour, null), jour);
+  const feuille = buildFeuilleDeRoute({ date: '2026-11-11', person: { displayName: 'Lucas' }, depart: depot, arrets: r, troncons: null });
+  assert.deepEqual(feuille.items.map((i) => i.nouveau), [false, true, false]);
 });
