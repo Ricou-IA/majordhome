@@ -495,3 +495,11 @@ Accès au rapport complet MonsieurDPE émis depuis la fiche client. Une ligne pa
 - Vue `public.majordhome_dpe_report_accesses` (`security_invoker=true`, lecture seule).
 - Écriture : `public.dpe_report_access_record(p_org_id, p_client_id, p_dpe_number, p_token, p_report_url, p_issued_by)` — SECURITY DEFINER, **service_role seul** (elle prend `org_id` en paramètre), appelée par l'edge function `dpe-lien`. Refuse un client d'une autre organisation.
 - Côté MonsieurDPE (projet `odspcxgafcqxjzrarsqf`, dépôt `C:\Dev\DPE`) : la trace jumelle est `dpe.acces_partenaire`.
+
+### majordhome.client_dpe (2026-11-12)
+Le DPE rattaché à chaque client (corpus MonsieurDPE) et la carte du logement. Migration `20261112_2_client_dpe.sql`, assertions `assert-client-dpe.sql`. Une ligne par client (`UNIQUE(client_id)`), `org_id` = org CORE.
+
+- `dpe_number`, `origine` (`auto` | `choisi` | `saisi`), `etat` (`rattache` | `candidats` | `aucun_dpe` | `adresse_non_trouvee` | `detache` | `erreur`), `adresse_tentee` (normalisée par `adresseNormalisee`), `tente_le`, `candidats` jsonb, `ecartes` text[] (« Ce n'est pas le bon »), `voisinage`.
+- Colonnes filtrables (prospection) : `etiquette_dpe`, `etiquette_ges`, `energie_chauffage`, `generateur_chauffage`, `surface`, `periode_construction`, `date_dpe`, `rapport_complet` ; carte complète `carte` jsonb (`src/lib/dpeCorpus.js::mapCorpusDossier`) + `version_carte`, `lu_le`.
+- RLS : SELECT membre ; aucune écriture `authenticated`. Vue `public.majordhome_client_dpe` (`security_invoker`, lecture seule).
+- Écriture : `public.client_dpe_record(p_org_id, p_client_id, p_action, p_patch, p_user)` (service_role seul) — actions `tentative` | `choisir` | `actualiser` | `detacher` ; tient `clients.dpe_number` dans la même transaction ; refuse `client_dpe_saisi_protege` (un numéro humain n'est jamais remplacé par l'auto) et `client_dpe_numero_ecarte`.

@@ -45,7 +45,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'team_members', columns: null },
   { schema: 'majordhome', table: 'commercials', columns: null }, // 20261005_1 : commercial_set_for_user (liste « Commercial assigné »)
   // auth_user_id : cité par les policies portail client (client_portal_select_own_*) des tables contracts/equipments/interventions
-  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived', 'address_complement', 'company_name', 'client_category'] }, // client_category : 20261021_1 (find_or_create_client crée la fiche) // address_complement / company_name : 20261011_1 (push identité PL) // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
+  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived', 'address_complement', 'company_name', 'client_category', 'dpe_number'] }, // dpe_number : 20261112_2 (client_dpe_record tient le numéro de la fiche) // client_category : 20261021_1 (find_or_create_client crée la fiche) // address_complement / company_name : 20261011_1 (push identité PL) // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
   { schema: 'majordhome', table: 'equipments', columns: null },
   // contracts / interventions / leads : toutes les colonnes (DDL seul), les vues
   // majordhome_entretien_sav / majordhome_chantiers (20260922_1) en citent des dizaines.
@@ -124,6 +124,7 @@ const FUNCTIONS = [
   'majordhome.handle_updated_at()',
   'majordhome.calculate_next_maintenance()',
   'majordhome.update_client_on_equipment_change()',
+  'majordhome.equipments_check_model_org()', // trigger equipments posé par 20261111_x (pièces détachées), en prod depuis le 2026-11-11
   'majordhome.equipments_sync_category()', // trigger equipments posé par M1 (20260913_1), en prod depuis le 2026-09-12
   'majordhome.equipment_unlinked_purge_children()', // trigger equipments posé par 20260922_2, en prod depuis le 2026-09-22
   'majordhome.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)',
