@@ -459,7 +459,7 @@ export function EventModal({
 
       {/* Panel modale — taille uniforme pour tous les types de RDV (largeur de la grille assistant).
           Sous `sm` (téléphone) le gabarit partagé MODAL_PANEL_PHONE le passe en plein écran. */}
-      <div className={`fixed sm:inset-4 sm:m-auto sm:h-fit sm:max-h-[calc(100vh-2rem)] sm:w-full ${usesAssistant ? (sectionClient ? 'max-w-7xl' : 'max-w-6xl') : 'max-w-2xl'} bg-white rounded-xl shadow-2xl ${attachContext ? 'z-[61]' : 'z-50'} flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
+      <div className={`fixed sm:inset-4 sm:m-auto sm:h-fit sm:max-h-[calc(100vh-2rem)] sm:w-full ${usesAssistant ? (parcours ? (sectionClient ? 'max-w-[96rem]' : 'max-w-[80rem]') : (sectionClient ? 'max-w-7xl' : 'max-w-6xl')) : 'max-w-2xl'} bg-white rounded-xl shadow-2xl ${attachContext ? 'z-[61]' : 'z-50'} flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
         <EventModalHeader
           typeConfig={typeConfig}
           title={continuationMode ? 'Programmer une suite' : (isEdit ? 'Modifier le RDV' : 'Nouveau RDV')}

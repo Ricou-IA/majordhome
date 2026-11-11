@@ -220,6 +220,17 @@ export function SchedulingAssistant({
   // RDV du jour sélectionné (avec technician_ids) pour les colonnes.
   const { dayAppointments } = useTeamDayAvailability(orgId, selectedDate);
 
+  // Colonnes de la fenêtre (sideBySide) : grille · client (si non rattaché) · type · parcours.
+  // Le parcours prend une colonne quand l'écran le permet (xl sans client, 2xl avec), sinon il
+  // passe sous la grille. Classes écrites en entier : Tailwind ne lit pas les noms composés.
+  const grilleColonnes = sidePanelClient
+    ? (sidePanelBas
+      ? 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem] 2xl:grid-cols-[minmax(22rem,1fr)_17rem_17rem_34rem]'
+      : 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem]')
+    : (sidePanelBas
+      ? 'lg:grid-cols-[minmax(0,1fr)_17rem] xl:grid-cols-[minmax(22rem,1fr)_17rem_34rem]'
+      : 'lg:grid-cols-[minmax(0,1fr)_17rem]');
+
   // Déplacer un RDV existant : enregistré tout de suite (comme le glisser du planning), avec
   // « Annuler » dans la notification. Parcours, colonnes et planning se rafraîchissent.
   const queryClient = useQueryClient();
@@ -471,7 +482,7 @@ export function SchedulingAssistant({
       )}
 
       <div className={sideBySide
-        ? `space-y-4 lg:space-y-0 lg:grid ${sidePanelClient ? 'lg:grid-cols-[minmax(0,1fr)_17rem_17rem]' : 'lg:grid-cols-[minmax(0,1fr)_17rem]'} lg:gap-4 lg:items-start`
+        ? `space-y-4 lg:space-y-0 lg:grid ${grilleColonnes} lg:gap-4 lg:items-start`
         : 'space-y-4'}
       >
       <div className="space-y-1">
@@ -508,8 +519,6 @@ export function SchedulingAssistant({
             : `Bloc contrat : ${formatDureeHeures(fixedDuration)} au barème — un clic pose le rendez-vous entier.`}
         </p>
       ) : null}
-      {/* Itinéraire et carte sous la grille : la place libre de la colonne large */}
-      {sideBySide && sidePanelBas && <div className="pt-3">{sidePanelBas}</div>}
       </div>
 
       {/* Client d'abord (à côté de la grille), puis type et créneaux */}
@@ -577,6 +586,16 @@ export function SchedulingAssistant({
         </p>
       )}
       </div>
+      {/* Parcours (itinéraire + carte) : colonne de droite quand l'écran est assez large — la
+          fenêtre s'élargit ; sinon sous la grille. Placement explicite par point de rupture. */}
+      {sideBySide && sidePanelBas && (
+        <div className={sidePanelClient
+          ? 'lg:col-start-1 lg:row-start-2 lg:pt-3 2xl:col-start-auto 2xl:row-start-auto 2xl:pt-0'
+          : 'lg:col-start-1 lg:row-start-2 lg:pt-3 xl:col-start-auto xl:row-start-auto xl:pt-0'}
+        >
+          {sidePanelBas}
+        </div>
+      )}
       </div>
 
       {/* En embedded, le host confirme ; en mode autonome la barre collante du haut porte
