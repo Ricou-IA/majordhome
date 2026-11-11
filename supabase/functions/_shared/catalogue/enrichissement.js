@@ -119,8 +119,12 @@ export function construirePromptEnrichissement(article, champs) {
   ].join('\n');
 }
 
-/** Dernier objet JSON du texte : bloc ```json``` d'abord, sinon de la dernière « { » ouvrante équilibrée. */
-function extraireJson(texte) {
+/**
+ * Dernier objet JSON du texte : bloc ```json``` d'abord, sinon de la dernière « { » ouvrante équilibrée.
+ * @param {string} texte
+ * @returns {Record<string, any> | null}
+ */
+export function extraireJson(texte) {
   const bloc = [...String(texte || '').matchAll(/```(?:json)?\s*([\s\S]*?)```/g)].pop();
   const candidats = [];
   if (bloc) candidats.push(bloc[1]);
@@ -138,7 +142,13 @@ function extraireJson(texte) {
   return null;
 }
 
-function convertir(champ, v) {
+/**
+ * Valeur lue convertie selon le type du champ (nombre « 9,5 kW » → 9.5, booléen « oui », option exacte) ; null sinon.
+ * @param {{ type: string, options?: string[] }} champ
+ * @param {unknown} v
+ * @returns {string | number | boolean | null}
+ */
+export function convertir(champ, v) {
   if (v == null || v === '') return null;
   if (champ.type === 'number') {
     if (typeof v === 'number') return Number.isFinite(v) ? v : null;
