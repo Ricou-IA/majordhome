@@ -20,9 +20,10 @@
 import Anthropic from "npm:@anthropic-ai/sdk@1.3.0";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOrgMembership, jsonResponse, buildCorsHeaders, sanitizeError } from "../_shared/auth.ts";
+import { construirePromptEnrichissement, lireProposition, estPdf, nomDeFichier, fusionnerSpecs } from "../_shared/catalogue/enrichissement.js";
 import {
-  urlPublique, adresseIpPrivee, construirePromptEnrichissement, lireProposition, estPdf, nomDeFichier, fusionnerSpecs,
-} from "../_shared/catalogue/enrichissement.js";
+  PHOTO_MAX, PDF_MAX, TYPES_IMAGE, champsPropres, specsPropres, telecharger, verifierPhoto, verifierFiche,
+} from "../_shared/telechargement.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
 const MODEL = Deno.env.get("ANTHROPIC_ENRICH_MODEL") || "claude-sonnet-5-5";
@@ -32,131 +33,7 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const DUREE_IA_MS = 115_000; // recherche IA ; le reste de l'échéance sert aux vérifications
 const ECHEANCE_MS = 140_000; // échéance GLOBALE d'une requête, sous le plafond d'exécution d'une edge (150 s)
 const REPRISES_MAX = 4; // pause_turn : la recherche serveur rend la main, on relance
-const PHOTO_MAX = 5 * 1024 * 1024; // limite du bucket product-images
-const PDF_MAX = 20 * 1024 * 1024;
-const TYPES_IMAGE: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CLE = /^[a-z0-9_]{1,60}$/;
-const TYPES_CHAMP = new Set(["number", "text", "boolean", "enum"]);
-
-interface Champ { key: string; label: string; unit: string | null; type: string; options?: string[] }
-
-/** Champs envoyés par l'écran, nettoyés (le prompt ne reçoit rien d'autre). */
-function champsPropres(brut: unknown): Champ[] {
-  if (!Array.isArray(brut)) return [];
-  const out: Champ[] = [];
-  for (const c of brut.slice(0, 40)) {
-    if (!c || typeof c !== "object") continue;
-    const o = c as Record<string, unknown>;
-    if (typeof o.key !== "string" || !CLE.test(o.key)) continue;
-    const type = typeof o.type === "string" && TYPES_CHAMP.has(o.type) ? o.type : "text";
-    const champ: Champ = {
-      key: o.key, label: String(o.label || o.key).slice(0, 80), unit: o.unit ? String(o.unit).slice(0, 20) : null, type,
-    };
-    if (Array.isArray(o.options)) champ.options = o.options.slice(0, 30).map((x) => String(x).slice(0, 40));
-    out.push(champ);
-  }
-  return out;
-}
-
-/** Caractéristiques acceptées : clés du format attendu, valeurs scalaires bornées. */
-function specsPropres(brut: unknown): Record<string, string | number | boolean> {
-  const out: Record<string, string | number | boolean> = {};
-  if (!brut || typeof brut !== "object" || Array.isArray(brut)) return out;
-  for (const [k, v] of Object.entries(brut as Record<string, unknown>).slice(0, 60)) {
-    if (!CLE.test(k)) continue;
-    if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
-    else if (typeof v === "boolean") out[k] = v;
-    else if (typeof v === "string" && v.trim()) out[k] = v.trim().slice(0, 200);
-  }
-  return out;
-}
-
-/**
- * Le nom doit résoudre, et UNIQUEMENT vers des adresses publiques (A et AAAA) : un nom quelconque peut pointer vers
- * 127.0.0.1 ou les métadonnées cloud. Refus si la résolution DNS n'est pas disponible (on ne télécharge pas à l'aveugle).
- * Limite assumée : fetch résout à nouveau (rebinding DNS non couvert), réduit par la rareté du cas et le type vérifié.
- */
-async function verifierDns(url: string): Promise<void> {
-  const hote = new URL(url).hostname;
-  // deno-lint-ignore no-explicit-any
-  const resoudre = (Deno as any).resolveDns as ((h: string, t: string) => Promise<string[]>) | undefined;
-  if (typeof resoudre !== "function") throw new Error("vérification DNS indisponible");
-  const adresses: string[] = [];
-  for (const type of ["A", "AAAA"]) {
-    try { adresses.push(...await resoudre(hote, type)); } catch { /* pas d'enregistrement de ce type */ }
-  }
-  if (!adresses.length) throw new Error("nom de domaine introuvable");
-  if (adresses.some((ip) => adresseIpPrivee(ip))) throw new Error("adresse refusée (réseau privé)");
-}
-
-/**
- * GET d'une URL publique : redirections suivies à la main (chaque saut revérifié : forme ET DNS), corps lu jusqu'à
- * `max` octets, jamais au-delà de l'`echeance` globale de la requête. `apercu` : lit le début (signature) puis coupe.
- */
-async function telecharger(url: string, max: number, echeance: number, apercu = false): Promise<{ octets: Uint8Array; type: string; url: string }> {
-  let courante = url;
-  for (let saut = 0; saut < 5; saut++) {
-    if (!urlPublique(courante)) throw new Error("adresse refusée (non publique)");
-    const reste = echeance - Date.now();
-    if (reste < 1_500) throw new Error("temps écoulé, vérification non faite");
-    await verifierDns(courante);
-    const ctrl = new AbortController();
-    const minuterie = setTimeout(() => ctrl.abort(), Math.min(20_000, echeance - Date.now()));
-    try {
-      const rep = await fetch(courante, {
-        redirect: "manual", signal: ctrl.signal,
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; Majordhome/1.0; +https://majordhome.vercel.app)", Accept: "*/*" },
-      });
-      if (rep.status >= 300 && rep.status < 400) {
-        const loc = rep.headers.get("location");
-        await rep.body?.cancel();
-        if (!loc) throw new Error(`redirection ${rep.status} sans destination`);
-        courante = new URL(loc, courante).toString();
-        continue;
-      }
-      if (!rep.ok) { await rep.body?.cancel(); throw new Error(`le site a répondu ${rep.status}`); }
-      const annonce = Number(rep.headers.get("content-length") || 0);
-      if (annonce > max) { await rep.body?.cancel(); throw new Error(`fichier trop lourd (${Math.round(annonce / 1048576)} Mo)`); }
-      const lecteur = rep.body?.getReader();
-      const morceaux: Uint8Array[] = [];
-      let total = 0;
-      if (lecteur) {
-        while (true) {
-          const { done, value } = await lecteur.read();
-          if (done) break;
-          total += value.length;
-          if (total > max) { await lecteur.cancel(); throw new Error(`fichier trop lourd (plus de ${Math.round(max / 1048576)} Mo)`); }
-          morceaux.push(value);
-          if (apercu && total >= 1024) { await lecteur.cancel(); break; }
-        }
-      }
-      const octets = new Uint8Array(total);
-      let pos = 0;
-      for (const m of morceaux) { octets.set(m.subarray(0, Math.min(m.length, total - pos)), pos); pos += m.length; }
-      return { octets, type: (rep.headers.get("content-type") || "").split(";")[0].trim().toLowerCase(), url: courante };
-    } finally {
-      clearTimeout(minuterie);
-    }
-  }
-  throw new Error("trop de redirections");
-}
-
-async function verifierPhoto(url: string | null, echeance: number): Promise<string | null> {
-  if (!url) return "aucune photo trouvée";
-  try {
-    const r = await telecharger(url, PHOTO_MAX, echeance, true);
-    return TYPES_IMAGE[r.type] ? null : `le lien ne renvoie pas une image (${r.type || "type inconnu"})`;
-  } catch (e) { return (e as Error).message; }
-}
-
-async function verifierFiche(url: string | null, echeance: number): Promise<string | null> {
-  if (!url) return "aucune fiche technique trouvée";
-  try {
-    const r = await telecharger(url, PDF_MAX, echeance, true);
-    return estPdf(r.octets) ? null : "le lien ne renvoie pas un PDF";
-  } catch (e) { return (e as Error).message; }
-}
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req);

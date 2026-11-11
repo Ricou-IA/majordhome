@@ -223,6 +223,11 @@ verify_jwt = true
 [functions.member-reset-password]
 verify_jwt = true
 
+# equipment-model-enrich : recherche web d'un appareil installé + fiche validée sur place (référentiel). JWT user +
+# requireOrgMembership + user_can(clients, edit), plafond par utilisateur et par jour. 2026-11-12.
+[functions.equipment-model-enrich]
+verify_jwt = true
+
 # dpe-lien : lien fiche client <-> MonsieurDPE (corpus des DPE, rapport complet). JWT user + module dpe + clients.edit. 2026-11-11.
 [functions.dpe-lien]
 verify_jwt = true
