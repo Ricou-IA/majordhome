@@ -541,7 +541,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Contenu */}
-      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${showScheduling ? 'max-w-2xl' : isSav ? 'max-w-4xl' : 'max-w-lg'} ${MODAL_PANEL_PHONE}`}>
+      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${showScheduling ? 'max-w-6xl' : isSav ? 'max-w-4xl' : 'max-w-lg'} ${MODAL_PANEL_PHONE}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-3 min-w-0">
@@ -581,7 +581,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
               {/* SAV : commande « personnes × jours » (l'entretien est dimensionné par le barème) */}
               {isSav && (
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <span className="text-xs font-semibold text-secondary-500 uppercase tracking-wider">Commande</span>
                   <PlannedOrderFields
                     teamSize={plannedTeamSize}
                     days={plannedDays}
@@ -613,6 +612,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                     : 'Entretien'
                 }
                 multi
+                sideBySide
                 mergeOverlapping={isSav}
                 expectedTeamSize={plannedTeamSize}
                 expectedDays={plannedDays}

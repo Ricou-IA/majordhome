@@ -430,7 +430,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
             <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-3 space-y-3">
               {/* Commande « personnes × jours » : saisie ici, persistée sur le chantier */}
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <span className="text-xs font-semibold text-secondary-500 uppercase tracking-wider">Commande</span>
                 <PlannedOrderFields
                   teamSize={plannedOrder.teamSize}
                   days={plannedOrder.days}

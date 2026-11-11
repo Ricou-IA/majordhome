@@ -111,6 +111,9 @@ export function SchedulingAssistant({
   onCancel,
   isLoading = false,
   embedded = false,
+  // Deux colonnes sur grand écran (grille | créneaux, objet, notes) : la fiche qui l'héberge
+  // s'élargit et n'a plus d'ascenseur (Eric 2026-11-11). Défaut : empilé, comme partout ailleurs.
+  sideBySide = false,
   onSlotsChange,
   initialDate = null,
   mergeOverlapping = false,
@@ -408,6 +411,8 @@ export function SchedulingAssistant({
         </div>
       )}
 
+      <div className={sideBySide ? 'space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-4 lg:items-start' : 'space-y-4'}>
+      <div className="space-y-1">
       {/* Grille jour × colonnes par membre */}
       <DayResourceGrid
         date={selectedDate}
@@ -438,7 +443,9 @@ export function SchedulingAssistant({
             : `Bloc contrat : ${formatDureeHeures(fixedDuration)} au barème — un clic pose le rendez-vous entier.`}
         </p>
       ) : null}
+      </div>
 
+      <div className="space-y-4">
       {/* Liste des créneaux empilés (sélecteur par créneau masqué en mode commercial :
           l'assignation est celle de la carte, pas choisie ici). */}
       <SlotDraftList
@@ -498,6 +505,8 @@ export function SchedulingAssistant({
           {totalConflicts} conflit(s) de disponibilité détecté(s) — la planification reste possible.
         </p>
       )}
+      </div>
+      </div>
 
       {/* En embedded, le host confirme ; en mode autonome la barre collante du haut porte
           « Planifier » et la fermeture. */}
