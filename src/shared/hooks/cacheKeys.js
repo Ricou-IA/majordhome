@@ -295,6 +295,18 @@ export const equipmentDocumentKeys = {
   byEquipments: (orgId, idsKey) => [...equipmentDocumentKeys.all(orgId), 'by-equipments', idsKey || ''],
 };
 
+/**
+ * Modèles fabricant d'appareil (relevé du site du fabricant) : fiche, nomenclature (pièces détachées), images
+ * signées, liste proposée pour une marque.
+ */
+export const equipmentModelKeys = {
+  all: (orgId) => ['equipment-models', orgId],
+  detail: (orgId, modelId) => [...equipmentModelKeys.all(orgId), 'detail', modelId],
+  parts: (orgId, modelId) => [...equipmentModelKeys.all(orgId), 'parts', modelId],
+  images: (orgId, modelId) => [...equipmentModelKeys.all(orgId), 'images', modelId],
+  forBrand: (orgId, brandKey) => [...equipmentModelKeys.all(orgId), 'for-brand', brandKey || ''],
+};
+
 export const catalogItemKeys = {
   all: (orgId) => ['catalog-items', orgId],
   lists: (orgId) => [...catalogItemKeys.all(orgId), 'list'],

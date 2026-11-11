@@ -2,19 +2,41 @@
  * EquipmentModelDocuments.jsx — notice / vue éclatée du modèle, côté terrain
  * ============================================================================
  * Lecture seule des documents du MODÈLE d'appareil (equipment_documents,
- * partagés par marque + modèle) sur la fiche d'intervention et le certificat :
- * le technicien, tablette en main devant l'appareil, ouvre la notice (code
- * erreur) ou la vue éclatée (commande de pièce) sans repasser par la fiche
+ * partagés par marque + modèle, ou relevés sur le site du fabricant pour un
+ * équipement rattaché à son modèle) sur la fiche d'intervention et le
+ * certificat : le technicien, tablette en main devant l'appareil, ouvre la
+ * notice (code erreur) ou la fiche technique sans repasser par la fiche
  * client. Le dépôt reste sur la fiche client (EquipmentDocumentsSection).
+ * Les procédures du fabricant (une dizaine sur un poêle à granulés) sont
+ * repliées derrière un bouton « Procédures (N) ».
  * Rien n'est affiché quand le modèle n'a aucun document.
  * ============================================================================
  */
 
-import { BookOpen, Layers, FileText, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { BookOpen, Layers, FileText, ExternalLink, ChevronDown, ChevronUp, ListChecks } from 'lucide-react';
 import { useEquipmentModelDocuments, openEquipmentDocument } from '@hooks/useEquipmentDocuments';
 import { equipmentDocumentTypeLabel } from '@services/equipmentDocuments.service';
+import { rangerDocumentsModele, titreDocumentModele } from '@/lib/catalogue/nomenclature';
 
-const TYPE_ICON = { notice: BookOpen, vue_eclatee: Layers, autre: FileText };
+const TYPE_ICON = { notice: BookOpen, vue_eclatee: Layers, fiche_technique: FileText, procedure: ListChecks, autre: FileText };
+const PUCE = 'inline-flex items-center gap-2 min-h-[44px] px-3 py-2 rounded-lg border text-sm';
+
+function Puce({ doc }) {
+  const Icon = TYPE_ICON[doc.document_type] || FileText;
+  return (
+    <button
+      type="button"
+      onClick={() => openEquipmentDocument(doc)}
+      title={doc.file_name}
+      className={`${PUCE} border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100`}
+    >
+      <Icon className="h-4 w-4" />
+      <span className="truncate max-w-[14rem]">{titreDocumentModele(doc, equipmentDocumentTypeLabel)}</span>
+      <ExternalLink className="h-3.5 w-3.5 text-indigo-400" />
+    </button>
+  );
+}
 
 /**
  * @param {Object} props
@@ -23,27 +45,27 @@ const TYPE_ICON = { notice: BookOpen, vue_eclatee: Layers, autre: FileText };
  */
 export function EquipmentModelDocuments({ equipment, className = '' }) {
   const { documentsByEquipmentId } = useEquipmentModelDocuments(equipment?.id ? [equipment.id] : []);
+  const [proceduresOuvertes, setProceduresOuvertes] = useState(false);
   const docs = equipment?.id ? documentsByEquipmentId[equipment.id] || [] : [];
   if (docs.length === 0) return null;
+  const { principaux, procedures } = rangerDocumentsModele(docs);
 
   return (
     <div className={`flex flex-wrap gap-2 ${className}`}>
-      {docs.map((doc) => {
-        const Icon = TYPE_ICON[doc.document_type] || FileText;
-        return (
-          <button
-            key={doc.id}
-            type="button"
-            onClick={() => openEquipmentDocument(doc)}
-            title={doc.file_name}
-            className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50 text-sm text-indigo-800 hover:bg-indigo-100"
-          >
-            <Icon className="h-4 w-4" />
-            <span className="truncate max-w-[14rem]">{doc.label || equipmentDocumentTypeLabel(doc.document_type)}</span>
-            <ExternalLink className="h-3.5 w-3.5 text-indigo-400" />
-          </button>
-        );
-      })}
+      {principaux.map((doc) => <Puce key={doc.id} doc={doc} />)}
+      {procedures.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setProceduresOuvertes((v) => !v)}
+          aria-expanded={proceduresOuvertes}
+          className={`${PUCE} border-gray-300 bg-white text-gray-700 hover:bg-gray-50`}
+        >
+          <ListChecks className="h-4 w-4" />
+          Procédures ({procedures.length})
+          {proceduresOuvertes ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+      )}
+      {proceduresOuvertes && procedures.map((doc) => <Puce key={doc.id} doc={doc} />)}
     </div>
   );
 }

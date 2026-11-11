@@ -63,6 +63,7 @@ import { urgenceDe } from '@/lib/savUrgency';
 import { peutCloturerSansPlanifier, limiteALaCloture } from '@/lib/savCloture';
 import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
 import { SAVLinkedQuotes } from './SAVLinkedQuotes';
+import { SAVModelPartsSection } from './SAVModelPartsSection';
 import { CertificatsSection } from './CertificatsSection';
 import { PhotoPlaqueAnomalie } from './PhotoPlaqueAnomalie';
 import { logger } from '@lib/logger';
@@ -707,6 +708,17 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                     ) : null}
                   />
                 </SAVDevisSection>
+              )}
+
+              {/* Pièces détachées de l'appareil (vue éclatée, nomenclature, ajout au devis) — SAV uniquement */}
+              {type === 'sav' && (
+                <SAVModelPartsSection
+                  item={item}
+                  equipements={equipementsClient}
+                  referentiel={referentiel}
+                  canEdit={canEditSAV && !clotureSeule}
+                  onUpdated={onUpdated}
+                />
               )}
 
               {/* Section Pièces (SAV uniquement) — après le devis */}

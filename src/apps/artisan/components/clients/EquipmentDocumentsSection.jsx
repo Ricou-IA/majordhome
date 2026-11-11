@@ -13,7 +13,7 @@
  * ============================================================================
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { FileText, BookOpen, Layers, Upload, Trash2, Loader2, X, Download } from 'lucide-react';
 import { EQUIPMENT_DOCUMENT_TYPES, equipmentDocumentTypeLabel, equipmentHasModel } from '@services/equipmentDocuments.service';
@@ -21,6 +21,7 @@ import { openEquipmentDocument } from '@hooks/useEquipmentDocuments';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { logger } from '@lib/logger';
+import { rangerDocumentsModele, titreDocumentModele } from '@/lib/catalogue/nomenclature';
 
 const ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp';
 const MAX_SIZE = 20 * 1024 * 1024; // limite du bucket product-documents
@@ -30,7 +31,7 @@ const TYPE_ICON = { notice: BookOpen, vue_eclatee: Layers, fiche_technique: File
 
 function DocumentRow({ doc, badge, canDelete, onDelete }) {
   const Icon = TYPE_ICON[doc.document_type] || FileText;
-  const titre = doc.label || equipmentDocumentTypeLabel(doc.document_type);
+  const titre = titreDocumentModele(doc, equipmentDocumentTypeLabel);
   return (
     <div className="flex items-center gap-2 rounded-lg hover:bg-gray-50 group">
       <button
@@ -177,6 +178,8 @@ export function EquipmentDocumentsSection({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [proceduresOuvertes, setProceduresOuvertes] = useState(false);
+  const ranges = useMemo(() => rangerDocumentsModele(modelDocuments), [modelDocuments]);
 
   const hasModel = equipmentHasModel(equipment);
   const total = modelDocuments.length + productDocuments.length;
@@ -238,10 +241,26 @@ export function EquipmentDocumentsSection({
 
       {total > 0 ? (
         <div className="mt-1.5 -mx-2">
-          {modelDocuments.map((doc) => (
-            // document relevé sur le site du fabricant : son type en pastille, pas de retrait ici (le relevé suivant le remettrait)
+          {/* Document relevé sur le site du fabricant : son type en pastille, pas de retrait ici (le relevé suivant
+              le remettrait). Les procédures (une dizaine sur un poêle à granulés) sont repliées. */}
+          {ranges.principaux.map((doc) => (
             <DocumentRow key={doc.id} doc={doc} badge={doc.from_site ? equipmentDocumentTypeLabel(doc.document_type) : null}
               canDelete={canDelete && !!onDelete && !doc.from_site} onDelete={setDeleting} />
+          ))}
+          {ranges.procedures.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setProceduresOuvertes((v) => !v)}
+              aria-expanded={proceduresOuvertes}
+              className="w-full flex items-center gap-2.5 p-2 text-left text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+            >
+              <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              Procédures du fabricant ({ranges.procedures.length})
+              <span className="ml-auto text-xs text-indigo-600">{proceduresOuvertes ? 'Masquer' : 'Afficher'}</span>
+            </button>
+          )}
+          {proceduresOuvertes && ranges.procedures.map((doc) => (
+            <DocumentRow key={doc.id} doc={doc} canDelete={canDelete && !!onDelete && !doc.from_site} onDelete={setDeleting} />
           ))}
           {productDocuments.map((doc) => (
             <DocumentRow key={`p-${doc.id}`} doc={{ ...doc, label: doc.file_name, document_type: 'autre' }} badge={doc.document_type || 'Fournisseur'} />

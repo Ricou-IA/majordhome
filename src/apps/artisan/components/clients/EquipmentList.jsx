@@ -38,6 +38,7 @@ import {
   Unlink,
 } from 'lucide-react';
 import { EquipmentDocumentsSection } from './EquipmentDocumentsSection';
+import { EquipmentPartsSection } from '../equipements/EquipmentPartsSection';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { indexReferentiel, libelleEquipement } from '@/lib/equipmentReferential';
 import { formatDateShortFR } from '@/lib/utils';
@@ -368,6 +369,9 @@ const EquipmentCard = ({
           onUpload={onUploadDocument}
           onDelete={onDeleteDocument}
         />
+
+        {/* Pièces détachées du modèle fabricant (vue éclatée + nomenclature), ou choix du modèle */}
+        <EquipmentPartsSection equipment={equipment} canEdit={canUploadDocument} className="mt-3" />
 
         {/* Bouton détails */}
         <button

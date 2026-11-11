@@ -397,6 +397,21 @@ Relevé réel : 470 appareils, 1 771 pièces distinctes, 13 974 lignes de nomenc
 - Résultat : 274 modèles avec photo, 394 avec vue éclatée, 243 notices, 108 fiches techniques, 621 procédures.
   Projet Supabase en offre Pro : le volume n'est pas une contrainte.
 
+## 7 quinquies. Tranche 3 (écrans) — ce qui est livré (2026-11-11)
+
+- Le bloc « Pièces détachées » est **replié par défaut** sur la carte équipement de la fiche client (une ligne :
+  « Pièces détachées · OXANA · réf. P601314 ») et **ouvert** dans la fiche SAV quand l'appareil a son modèle.
+- Sans modèle fabricant : une ligne « Pièces détachées : Choisir le modèle fabricant » (droit `clients.edit`). Le
+  sélecteur montre d'abord « D'après ce qui est saisi » (référence exacte, nom, premier mot), puis toute la marque,
+  avec une recherche ; si la marque saisie n'a aucun modèle relevé, toutes les marques relevées, en le disant.
+- Dans la fiche SAV, l'appareil est celui du SAV s'il est connu, sinon le premier équipement du client qui a un
+  modèle ; une liste permet d'en changer. « Ajouter au devis » demande le droit `devis.create` et un client sur la
+  carte ; le technicien limité à la clôture voit les pièces mais ne crée pas de devis.
+- La colonne de prix montre toujours le **prix public** du fabricant ; la ligne de devis prend le prix de vente du
+  catalogue s'il a été ajusté à la main, sinon le prix public.
+- Non fait : lien vers la nomenclature depuis la fiche article d'un poêle (§ 4, dernier point) ; bloc « relevé de
+  pièces » de la fiche fournisseur (date et compteurs) — la remise y est réglable depuis la tranche 1.
+
 ## 8. Laissé au constructeur
 
 Noms exacts des colonnes et des vues, découpage des composants, forme du champ de repère, taille des lots SQL,
