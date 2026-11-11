@@ -269,7 +269,7 @@ export function EquipmentDocumentsSection({
         </div>
       ) : (
         hasModel && (
-          <p className="mt-1 text-xs text-gray-400">Aucune notice ni vue éclatée pour ce modèle.</p>
+          <p className="mt-1 text-xs text-gray-400">Aucune notice ni fiche technique pour ce modèle.</p>
         )
       )}
 
