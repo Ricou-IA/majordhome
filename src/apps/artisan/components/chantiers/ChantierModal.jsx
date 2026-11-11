@@ -40,8 +40,7 @@ import { CreateContractModal } from '../entretiens/CreateContractModal';
 import { ChantierReceptionSection } from './ChantierReceptionSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';
 import { GroupChantiersDialog } from './GroupChantiersDialog';
-import { EventModal } from '@apps/artisan/components/planning/EventModal';
-import { createPortal } from 'react-dom';
+import { PoserRdvModal } from '@apps/artisan/components/planning/PoserRdvModal';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { logger } from '@lib/logger';
 
@@ -629,11 +628,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     />
 
     {/* Planifier l'installation = la fenêtre unique « Nouveau RDV », rattachée au chantier */}
-    {showScheduler && createPortal(
-      <EventModal
-        isOpen
-        mode="create"
-        prefillClient={{
+    {showScheduler && (
+      <PoserRdvModal
+        client={{
           id: chantier.client_id || null,
           last_name: chantier.last_name || '',
           first_name: chantier.first_name || '',
@@ -643,9 +640,8 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
           postal_code: chantier.postal_code || '',
           city: chantier.city || '',
         }}
-        members={members || []}
+        members={members}
         orgId={orgId}
-        userId={user?.id}
         attachContext={{
           leadId: chantier.lead_id,
           chantierId: chantier.id,
@@ -660,11 +656,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
         }}
         onCreated={handleInstallationPosee}
         onClose={() => setShowScheduler(false)}
-        onSave={async () => false}
-        onDelete={async () => {}}
-        onCancel={async () => {}}
-      />,
-      document.body,
+      />
     )}
     </>
   );

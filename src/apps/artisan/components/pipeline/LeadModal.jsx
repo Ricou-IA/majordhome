@@ -61,8 +61,7 @@ import { useLeadClientLinking } from './useLeadClientLinking';
 import { LeadHardDeleteDialog } from './LeadHardDeleteDialog';
 import { LeadModalHeader, LeadModalFooter } from './LeadModalFrame';
 import SectionDevis from '../devis/SectionDevis';
-import { EventModal } from '@apps/artisan/components/planning/EventModal';
-import { createPortal } from 'react-dom';
+import { PoserRdvModal } from '@apps/artisan/components/planning/PoserRdvModal';
 import { FicheTechniqueModal } from './FicheTechniqueModal';
 import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
@@ -723,11 +722,9 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       />
       {/* Planifier la VT = la fenêtre unique « Nouveau RDV », rattachée au lead, sur la colonne
           du commercial de la carte (ids `commercials`, comme avant). */}
-      {pendingRdvStatusId && createPortal(
-        <EventModal
-          isOpen
-          mode="create"
-          prefillClient={{
+      {pendingRdvStatusId && (
+        <PoserRdvModal
+          client={{
             id: linkedClient?.id || null,
             last_name: form.last_name || '',
             first_name: form.first_name || '',
@@ -737,9 +734,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
             postal_code: form.postal_code || '',
             city: form.city || '',
           }}
-          members={[]}
           orgId={orgId}
-          userId={userId}
           attachContext={{
             leadId,
             lockedType: 'rdv_technical',
@@ -748,11 +743,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           }}
           onCreated={handleVtPosee}
           onClose={cancelScheduling}
-          onSave={async () => false}
-          onDelete={async () => {}}
-          onCancel={async () => {}}
-        />,
-        document.body,
+        />
       )}
     </>
   );

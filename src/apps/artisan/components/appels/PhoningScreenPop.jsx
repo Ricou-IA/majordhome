@@ -5,8 +5,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { callCampaignsService } from '@services/callCampaigns.service';
 import { entretiensService } from '@services/entretiens.service';
 import { useTeamMembers } from '@hooks/useAppointments';
-import { EventModal } from '../planning/EventModal';
-import { createPortal } from 'react-dom';
+import { PoserRdvModal } from '../planning/PoserRdvModal';
 
 /**
  * Screen-pop affiché quand un transfert d'appel est accepté.
@@ -115,22 +114,15 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
       )}
 
       {/* RDV = la fenêtre unique « Nouveau RDV », rattachée à la carte entretien (elle passe en Planifié) */}
-      {mode === 'rdv' && createPortal(
-        <EventModal
-          isOpen
-          mode="create"
-          prefillClient={{ id: ctx?.client_id ?? null, last_name: contact.name || '', phone: contact.phone || '' }}
-          members={members || []}
+      {mode === 'rdv' && (
+        <PoserRdvModal
+          client={{ id: ctx?.client_id ?? null, last_name: contact.name || '', phone: contact.phone || '' }}
+          members={members}
           orgId={orgId}
-          userId={user?.id}
           attachContext={{ interventionId: contact.id, lockedType: 'maintenance' }}
-          onCreated={() => onClosed({ result: 'rdv_booked' })}   // hook journalise rdv_booked + avance la file
+          onCreated={() => onClosed({ result: 'rdv_booked' })}
           onClose={() => setMode(null)}
-          onSave={async () => false}
-          onDelete={async () => {}}
-          onCancel={async () => {}}
-        />,
-        document.body,
+        />
       )}
 
       {/* Panneau Refus — inchangé */}

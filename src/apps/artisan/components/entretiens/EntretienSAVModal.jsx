@@ -53,7 +53,8 @@ import { EntretienPartsSection } from './EntretienPartsSection';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { useTeamMembers } from '@hooks/useAppointments';
 import { FormField, TextArea } from '@apps/artisan/components/FormFields';
-import { EventModal } from '@apps/artisan/components/planning/EventModal';
+import { PoserRdvModal } from '@apps/artisan/components/planning/PoserRdvModal';
+import { clientDepuisCarte } from '@/lib/eventForm';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
@@ -82,7 +83,7 @@ const TYPE_LABELS = {
 export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling = false }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { organization, user } = useAuth();
+  const { organization } = useAuth();
   const { can, effectiveRole } = useCanAccess();
   const orgId = organization?.id;
   const [lienBusy, setLienBusy] = useState(false); // copie du lien de prise de RDV (auto-RDV)
@@ -484,25 +485,11 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
 
   // Planifier = la fenêtre unique « Nouveau RDV », rattachée à cette carte (type figé)
   if (showScheduling) {
-    const prefill = {
-      id: item.client_id,
-      display_name: name,
-      last_name: item.client_last_name || item.client_name || '',
-      first_name: item.client_first_name || '',
-      phone: item.client_phone || '',
-      email: item.client_email || '',
-      address: item.client_address || '',
-      postal_code: item.client_postal_code || '',
-      city: item.client_city || '',
-    };
     return (
-      <EventModal
-        isOpen
-        mode="create"
-        prefillClient={item.client_id ? prefill : null}
-        members={teamMembers || []}
+      <PoserRdvModal
+        client={item.client_id ? clientDepuisCarte(item) : null}
+        members={teamMembers}
         orgId={orgId}
-        userId={user?.id}
         attachContext={{
           interventionId: item.id,
           lockedType: isSav ? 'service' : 'maintenance',
@@ -515,9 +502,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
         }}
         onCreated={handleRdvPoses}
         onClose={() => setShowScheduling(false)}
-        onSave={async () => false}
-        onDelete={async () => {}}
-        onCancel={async () => {}}
       />
     );
   }

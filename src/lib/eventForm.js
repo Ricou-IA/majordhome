@@ -130,6 +130,26 @@ export function linkedLeadFromAppointment(a) {
   };
 }
 
+/**
+ * Client pré-rempli de la fenêtre « Nouveau RDV » depuis une carte Entretien / SAV
+ * (ligne de `majordhome_entretien_sav`) : identité et adresse de la carte.
+ * @param {object} item
+ * @returns {object}
+ */
+export function clientDepuisCarte(item) {
+  return {
+    id: item?.client_id || null,
+    display_name: item?.client_name || [item?.client_last_name, item?.client_first_name].filter(Boolean).join(' '),
+    last_name: item?.client_last_name || item?.client_name || '',
+    first_name: item?.client_first_name || '',
+    phone: item?.client_phone || '',
+    email: item?.client_email || '',
+    address: item?.client_address || '',
+    postal_code: item?.client_postal_code || '',
+    city: item?.client_city || '',
+  };
+}
+
 /** Client pré-lié depuis une fiche client (création), ou null. */
 export function linkedClientFromPrefill(p) {
   if (!p?.id) return null;

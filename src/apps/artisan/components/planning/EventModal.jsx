@@ -391,7 +391,7 @@ export function EventModal({
 
       {/* Panel modale — taille uniforme pour tous les types de RDV (largeur de la grille assistant).
           Sous `sm` (téléphone) le gabarit partagé MODAL_PANEL_PHONE le passe en plein écran. */}
-      <div className={`fixed sm:inset-y-4 sm:left-auto sm:right-4 sm:w-full ${usesAssistant ? 'max-w-6xl' : 'max-w-2xl'} bg-white rounded-xl shadow-2xl ${attachContext ? 'z-[61]' : 'z-50'} flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
+      <div className={`fixed sm:inset-4 sm:m-auto sm:h-fit sm:max-h-[calc(100vh-2rem)] sm:w-full ${usesAssistant ? 'max-w-6xl' : 'max-w-2xl'} bg-white rounded-xl shadow-2xl ${attachContext ? 'z-[61]' : 'z-50'} flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
         <EventModalHeader
           typeConfig={typeConfig}
           title={continuationMode ? 'Programmer une suite' : (isEdit ? 'Modifier le RDV' : 'Nouveau RDV')}
@@ -400,7 +400,7 @@ export function EventModal({
         />
 
         {/* ---- Contenu scrollable ---- */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
           {/* Confirmation annulation */}
           {confirmAction === 'cancel' && (
             <CancelConfirmation

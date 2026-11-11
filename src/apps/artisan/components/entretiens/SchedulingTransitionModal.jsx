@@ -12,16 +12,14 @@
  */
 
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { ClipboardCheck, Check } from 'lucide-react';
 import { SouplesseSelect } from '@/apps/artisan/components/shared/SouplesseSelect';
-import { useAuth } from '@/contexts/AuthContext';
 import { useTeamMembers } from '@hooks/useAppointments';
 import { formatEuro } from '@/lib/utils';
-import { EventModal } from '@apps/artisan/components/planning/EventModal';
+import { PoserRdvModal } from '@apps/artisan/components/planning/PoserRdvModal';
+import { clientDepuisCarte } from '@/lib/eventForm';
 
 export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, souplesseDefaut = 30 }) {
-  const { user } = useAuth();
   const { members: teamMembers } = useTeamMembers(orgId);
   const [includesEntretien, setIncludesEntretien] = useState(item?.includes_entretien || false);
   // Souplesse du RDV (spec 2026-09-12) : null = défaut d'org, 0 = figé.
@@ -30,7 +28,6 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, so
   if (!item) return null;
 
   const isSAV = item.intervention_type === 'sav';
-  const name = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim() || 'Sans nom';
   const contractAmount = Number(item.contract_amount) || 0;
   const devisAmount = Number(item.devis_amount) || 0;
   const totalAmount = isSAV && includesEntretien ? devisAmount + contractAmount : devisAmount;
@@ -67,24 +64,11 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, so
     </div>
   );
 
-  return createPortal(
-    <EventModal
-      isOpen
-      mode="create"
-      prefillClient={{
-        id: item.client_id || null,
-        display_name: name,
-        last_name: item.client_last_name || item.client_name || '',
-        first_name: item.client_first_name || '',
-        phone: item.client_phone || '',
-        email: item.client_email || '',
-        address: item.client_address || '',
-        postal_code: item.client_postal_code || '',
-        city: item.client_city || '',
-      }}
-      members={teamMembers || []}
+  return (
+    <PoserRdvModal
+      client={clientDepuisCarte(item)}
+      members={teamMembers}
       orgId={orgId}
-      userId={user?.id}
       attachContext={{
         interventionId: item.id,
         lockedType: isSAV ? 'service' : 'maintenance',
@@ -95,11 +79,7 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, so
         submitSlots: (slots) => onConfirm(slots, includesEntretien, { timeFlexMinutes }),
       }}
       onClose={onCancel}
-      onSave={async () => false}
-      onDelete={async () => {}}
-      onCancel={async () => {}}
-    />,
-    document.body,
+    />
   );
 }
 
