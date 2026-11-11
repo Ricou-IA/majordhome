@@ -35,6 +35,8 @@ import ProductCompatibilitySection from './product-detail/ProductCompatibilitySe
 import { ProductDocumentsInline } from './ProductDocumentsPanel';
 import ProductReleveBlock from './product-detail/ProductReleveBlock';
 import ProductArticleBlock from './product-detail/ProductArticleBlock';
+import ArticleDrawer from './catalogue/ArticleDrawer';
+import { useCanAccess } from '@hooks/usePermissions';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supplierKeys } from '@hooks/cacheKeys';
@@ -70,6 +72,8 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const queryClient = useQueryClient();
+  const { can } = useCanAccess();
+  const [enrichissement, setEnrichissement] = useState(false);
 
   // Sync state local avec product
   useEffect(() => {
@@ -150,6 +154,13 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
   // Champs humains (libellé, marque, catégorie, gamme, prix de vente) : portés par l'article Majord'home dès que la
   // ligne y est rattachée — ils se corrigent sur la fiche article, plus ici (spec articles § 5.6 / § 9).
   const verrouArticle = !!product?.catalog_item_id;
+  // « Enrichir web » : l'enrichissement appartient à l'ARTICLE (photo, fiche technique, caractéristiques lues par le
+  // devis). Le bouton ouvre donc la fiche article sur sa fenêtre d'enrichissement ; il dit pourquoi quand il est fermé.
+  const enrichirFerme = !product?.catalog_item_id
+    ? 'Cette ligne n’est rattachée à aucun article : l’enrichissement se fait sur l’article'
+    : !can('articles', 'edit')
+      ? 'L’enrichissement d’un article est réservé aux responsables'
+      : dirty ? 'Enregistrez d’abord vos modifications' : null;
 
   // Auto-reset tab si onglet désactivé
   useEffect(() => {
@@ -202,9 +213,10 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
           </div>
           <button
             type="button"
-            disabled
-            className="btn-secondary btn-sm opacity-50 cursor-not-allowed"
-            title="Enrichissement web — bientôt"
+            onClick={() => setEnrichissement(true)}
+            disabled={!!enrichirFerme}
+            className={`btn-secondary btn-sm ${enrichirFerme ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title={enrichirFerme || 'Chercher photo, fiche technique et caractéristiques sur le web (fiche de l’article)'}
           >
             <Sparkles className="w-4 h-4 mr-1" /> Enrichir web
           </button>
@@ -430,6 +442,19 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
           )}
         </div>
       </div>
+
+      {enrichissement && product?.catalog_item_id && (
+        <ArticleDrawer
+          orgId={orgId}
+          itemId={product.catalog_item_id}
+          enrichirDOffice
+          onClose={() => {
+            setEnrichissement(false);
+            // la photo de l'article peut redescendre sur la ligne : on relit la fiche
+            queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(orgId, productId) });
+          }}
+        />
+      )}
     </>
   );
 }

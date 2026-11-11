@@ -35,9 +35,10 @@ function formDepuis(item) {
 }
 
 /**
- * @param {{ orgId: string, itemId: string, onClose: () => void }} p
+ * @param {{ orgId: string, itemId: string, onClose: () => void, enrichirDOffice?: boolean }} p — `enrichirDOffice` : ouvre
+ *   tout de suite la fenêtre « Enrichir depuis le web » (bouton de la fiche d'une ligne fournisseur)
  */
-export default function ArticleDrawer({ orgId, itemId, onClose }) {
+export default function ArticleDrawer({ orgId, itemId, onClose, enrichirDOffice = false }) {
   const { can } = useCanAccess();
   const { item, isLoading } = useCatalogItem(orgId, itemId);
   const { offers } = useCatalogItemOffers(orgId, itemId ? [itemId] : []);
@@ -46,7 +47,7 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
   const [specs, setSpecs] = useState({ canonical: {}, extras: [] });
   const [dirty, setDirty] = useState(false);
   const [attaching, setAttaching] = useState(false);
-  const [enriching, setEnriching] = useState(false);
+  const [enriching, setEnriching] = useState(enrichirDOffice);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -218,7 +219,7 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
           </div>
         )}
       </div>
-      {enriching && item && (
+      {enriching && item && canEdit && (
         <ArticleEnrichModal item={item} champs={champsEnrichissement} onClose={() => setEnriching(false)}
           propose={proposeEnrichment} apply={applyEnrichment} applying={isApplyingEnrichment} />
       )}
