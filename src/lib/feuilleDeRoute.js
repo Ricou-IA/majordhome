@@ -65,6 +65,48 @@ export function arretsDeLaJournee(rdvs = [], memberIds = []) {
     .sort((a, b) => String(a.scheduled_start || '').localeCompare(String(b.scheduled_start || '')));
 }
 
+/** 'HH:MM[:SS]' → minutes depuis minuit, ou null. */
+function minutesDe(hhmm) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm || ''));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+/** minutes depuis minuit → 'HH:MM'. */
+function hhmm(minutes) {
+  const m = Math.max(0, Math.round(minutes));
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+
+/**
+ * Enchaînements impossibles d'une journée : pour chaque arrêt localisé précédé d'un autre
+ * arrêt localisé, arrivée au plus tôt = fin prévue du précédent + trajet. Au-delà du début
+ * prévu, l'arrêt est en retard (le RDV ne peut pas tenir à cette heure). Chaque paire est
+ * jugée sur les heures PRÉVUES (un retard n'est pas propagé) ; le premier arrêt (depuis le
+ * départ) n'est pas jugé, faute d'heure de départ.
+ * @param {Array} arrets   arrêts dans l'ordre (scheduled_start / scheduled_end, lat / lng)
+ * @param {Array|null} troncons  un par paire de `pointsItineraire`
+ * @returns {Map<string, { retardMinutes: number, arriveeAuPlusTot: string }>} par id d'arrêt
+ */
+export function retardsDeLaJournee(arrets = [], troncons = null) {
+  const retards = new Map();
+  if (!Array.isArray(troncons) || troncons.length === 0) return retards;
+  let leg = 0;
+  let precedentFin = null;
+  for (const a of arrets) {
+    if (!coordValide(a.lat, a.lng)) continue;
+    const trajet = troncons[leg];
+    leg += 1;
+    const debut = minutesDe(a.scheduled_start);
+    if (precedentFin != null && debut != null && trajet && Number.isFinite(trajet.minutes)) {
+      const arrivee = precedentFin + trajet.minutes;
+      if (arrivee > debut) retards.set(a.id, { retardMinutes: arrivee - debut, arriveeAuPlusTot: hhmm(arrivee) });
+    }
+    const fin = minutesDe(a.scheduled_end);
+    precedentFin = fin ?? (debut != null && Number(a.duration_minutes) > 0 ? debut + Number(a.duration_minutes) : null);
+  }
+  return retards;
+}
+
 /**
  * Journée de la personne avec un RDV en cours de pose (fenêtre « Nouveau RDV ») : l'arrêt
  * candidat (`nouveau: true`) est inséré à son heure de début, sans rien retirer.
@@ -267,12 +309,13 @@ export function buildFeuilleDeRoute({
   const aTroncons = Array.isArray(troncons) && troncons.length > 0;
   let leg = 0;
   let rang = 0;
+  const retards = retardsDeLaJournee(arrets, troncons);
   const items = arrets.map((a) => {
     const localise = coordValide(a.lat, a.lng);
     const trajetAvant = localise && aTroncons ? troncons[leg] || null : null;
     if (localise && aTroncons) leg += 1;
     rang += 1;
-    return { ...formatItem(a, ctx), rang, localise, trajetAvant, nouveau: a.nouveau === true };
+    return { ...formatItem(a, ctx), rang, localise, trajetAvant, nouveau: a.nouveau === true, retard: retards.get(a.id) || null };
   });
   const retour = aTroncons ? troncons[troncons.length - 1] || null : null;
   const totaux = aTroncons

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   arretsDeLaJournee, pointsItineraire, urlDirections, lireDirections, estimerTroncons,
   lienGoogleMapsTournee, urlCarteStatique, buildFeuilleDeRoute, formatDureeRoute, formatKm,
-  decoderPolyline, insererArret,
+  decoderPolyline, insererArret, retardsDeLaJournee,
 } from '../src/lib/feuilleDeRoute.js';
 
 const MOH = 'tm-moh';
@@ -167,4 +167,33 @@ test('insererArret : le RDV en cours de pose prend sa place horaire, marqué nou
   assert.equal(insererArret(jour, null), jour);
   const feuille = buildFeuilleDeRoute({ date: '2026-11-11', person: { displayName: 'Lucas' }, depart: depot, arrets: r, troncons: null });
   assert.deepEqual(feuille.items.map((i) => i.nouveau), [false, true, false]);
+});
+
+test('retardsDeLaJournee : fin prévue + trajet au-delà du début = retard ; le premier arrêt n\'est pas jugé', () => {
+  const arrets = [
+    { id: 'a', scheduled_start: '08:30', scheduled_end: '10:00', lat: 43.9, lng: 1.9 },
+    { id: 'b', scheduled_start: '10:00:00', scheduled_end: '11:00:00', lat: 43.8, lng: 1.8 },
+    { id: 'n', scheduled_start: '11:30', scheduled_end: '12:00', lat: 43.5, lng: 0.5 },
+    { id: 'c', scheduled_start: '12:30', scheduled_end: '14:00', lat: 43.8, lng: 1.8 },
+  ];
+  // départ→a, a→b, b→n, n→c, c→retour
+  const troncons = [{ minutes: 20 }, { minutes: 19 }, { minutes: 153 }, { minutes: 117 }, { minutes: 30 }];
+  const r = retardsDeLaJournee(arrets, troncons);
+  assert.equal(r.has('a'), false);
+  assert.deepEqual(r.get('b'), { retardMinutes: 19, arriveeAuPlusTot: '10:19' });
+  assert.deepEqual(r.get('n'), { retardMinutes: 123, arriveeAuPlusTot: '13:33' });
+  assert.deepEqual(r.get('c'), { retardMinutes: 87, arriveeAuPlusTot: '13:57' });
+  assert.equal(retardsDeLaJournee(arrets, null).size, 0);
+  const feuille = buildFeuilleDeRoute({ date: '2026-11-12', person: { displayName: 'Ludovic' }, depart: depot, arrets, troncons });
+  assert.equal(feuille.items.find((i) => i.id === 'n').retard.arriveeAuPlusTot, '13:33');
+});
+
+test('retardsDeLaJournee : un arrêt non localisé est sauté sans décaler les tronçons', () => {
+  const arrets = [
+    { id: 'a', scheduled_start: '08:00', scheduled_end: '09:00', lat: 43.9, lng: 1.9 },
+    { id: 'x', scheduled_start: '09:00', scheduled_end: '09:30', lat: null, lng: null },
+    { id: 'b', scheduled_start: '09:15', scheduled_end: '10:00', lat: 43.8, lng: 1.8 },
+  ];
+  const r = retardsDeLaJournee(arrets, [{ minutes: 10 }, { minutes: 30 }, { minutes: 10 }]);
+  assert.deepEqual(r.get('b'), { retardMinutes: 15, arriveeAuPlusTot: '09:30' });
 });
