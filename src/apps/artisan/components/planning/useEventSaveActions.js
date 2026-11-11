@@ -10,6 +10,7 @@ import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getAppointmentTypeConfig, appointmentsService } from '@services/appointments.service';
+import { savService } from '@services/sav.service';
 import { leadKeys } from '@hooks/useLeads';
 import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, chantierKeys } from '@hooks/cacheKeys';
 import { PHONE_REQUIRED_TYPES } from '@/lib/planningEvents';
@@ -29,9 +30,14 @@ export function useEventSaveActions({
   // Filet anti-doublon walk-in : { candidates, source: 'save'|'assistant'|'reschedule' }
   // — candidats trouvés au moment de sauver + chemin de reprise après décision.
   const [duplicatePrompt, setDuplicatePrompt] = useState(null);
+  // RDV SAV sans demande en cours : la demande se décrit d'abord (description, urgence) dans la
+  // fenêtre SAV, puis le RDV s'y rattache (Eric 2026-11-11 : « pour renseigner correctement »).
+  const [savPrompt, setSavPrompt] = useState(false);
 
-  const resolveActivation = useCallback(({ rdvDate, dupDecision } = {}) => resolveEventActivation({
-    orgId, userId, formData, selectedClient, selectedLead, attachContext, rdvDate, dupDecision,
+  const resolveActivation = useCallback(({ rdvDate, dupDecision, interventionId = null } = {}) => resolveEventActivation({
+    orgId, userId, formData, selectedClient, selectedLead,
+    attachContext: interventionId ? { ...(attachContext || {}), interventionId } : attachContext,
+    rdvDate, dupDecision,
   }), [orgId, userId, formData, selectedClient, selectedLead, attachContext]);
 
   // --------------------------------------------------------------------------
@@ -161,9 +167,20 @@ export function useEventSaveActions({
       toast.error(EMAIL_INVALIDE_MESSAGE);
       return;
     }
+    // RDV SAV : une demande ouverte du client reçoit le RDV ; sinon on la fait décrire d'abord.
+    const savInterventionId = maybeDecision?.savInterventionId || null;
+    if (formData.appointment_type === 'service' && !attachContext?.interventionId && !savInterventionId && selectedClient?.id) {
+      const { data: openSavId, error: openErr } = await savService.getOpenSavCardId(selectedClient.id);
+      if (openErr) {
+        logger.error('[EventModal] getOpenSavCardId error:', openErr);
+        toast.error('Impossible de vérifier les demandes SAV du client');
+        return;
+      }
+      if (!openSavId) { setSavPrompt(true); return; }
+    }
     setBatchSaving(true);
     try {
-      const act = await resolveActivation({ rdvDate: assistantSlots[0]?.date, dupDecision });
+      const act = await resolveActivation({ rdvDate: assistantSlots[0]?.date, dupDecision, interventionId: savInterventionId });
       if (act.error === 'duplicate') {
         setDuplicatePrompt({ candidates: act.candidates, source: 'assistant' });
         setBatchSaving(false);
@@ -234,7 +251,13 @@ export function useEventSaveActions({
       toast.error('Une erreur est survenue');
       setBatchSaving(false);
     }
-  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, isCommercialType, isFreeType, isLeave, allTeamMembers, orgId, formData, selectedClient, queryClient, onClose, setErrors]);
+  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, isCommercialType, isFreeType, isLeave, allTeamMembers, orgId, formData, selectedClient, queryClient, onClose, setErrors, attachContext]);
+
+  // Demande SAV créée depuis la fenêtre SAV : on reprend la création du RDV, rattaché à elle.
+  const resumeAfterSav = useCallback((created) => {
+    setSavPrompt(false);
+    if (created?.id) handleCreateFromAssistant({ savInterventionId: created.id });
+  }, [handleCreateFromAssistant]);
 
   // --------------------------------------------------------------------------
   // Re-planifier (édition) : 1 créneau choisi dans l'assistant → update du RDV
@@ -390,6 +413,7 @@ export function useEventSaveActions({
 
   return {
     batchSaving, setBatchSaving, duplicatePrompt, setDuplicatePrompt, resumeDuplicate,
+    savPrompt, setSavPrompt, resumeAfterSav,
     handleSave, handleCreateFromAssistant, handleRescheduleSave, handleContinuationSave,
   };
 }

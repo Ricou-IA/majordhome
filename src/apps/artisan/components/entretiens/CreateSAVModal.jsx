@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { X, Search, Loader2, Wrench, User } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { supabase } from '@/lib/supabaseClient';
@@ -111,30 +112,48 @@ export function CreateSAVModal({
     if (!selectedClient || !description.trim()) return;
 
     try {
+      // Client pré-rempli sans project_id / indicateur de contrat (ex. fiche choisie dans
+      // « Nouveau RDV ») : relus ici, sinon createSAV refuse (projectId requis) ou perd le contrat.
+      let client = selectedClient;
+      if (!client.project_id || client.has_active_contract === undefined) {
+        const { data: complet, error: lectureErr } = await supabase
+          .from('majordhome_clients_all')
+          .select('project_id, has_active_contract')
+          .eq('id', client.id)
+          .maybeSingle();
+        if (lectureErr || !complet?.project_id) {
+          logger.error('[CreateSAVModal] fiche client incomplète:', lectureErr);
+          toast.error('Fiche client incomplète : impossible de créer la demande SAV');
+          return;
+        }
+        client = { ...client, ...complet };
+      }
+
       // Récupérer le contract_id si le client a un contrat actif
       let contractId = prefillContractId;
-      if (!contractId && selectedClient.has_active_contract) {
+      if (!contractId && client.has_active_contract) {
         const { data: contractData } = await supabase
           .from('majordhome_contracts')
           .select('id')
-          .eq('client_id', selectedClient.id)
+          .eq('client_id', client.id)
           .eq('status', 'active')
           .maybeSingle();
         contractId = contractData?.id || null;
       }
 
-      await createSAV({
+      const created = await createSAV({
         orgId,
-        clientId: selectedClient.id,
+        clientId: client.id,
         contractId,
-        projectId: selectedClient.project_id,
+        projectId: client.project_id,
         savDescription: description.trim(),
         savOrigin,
         savUrgency: urgence,
         createdBy: user?.id,
       });
 
-      onCreated?.();
+      // La carte créée remonte à l'appelant (RDV SAV du planning : le RDV s'y rattache)
+      onCreated?.(created);
       onClose();
     } catch (err) {
       logger.error('[CreateSAVModal] submit error:', err);

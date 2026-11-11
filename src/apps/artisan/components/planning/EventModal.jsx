@@ -50,6 +50,7 @@ import {
 } from '@/lib/eventForm';
 import { useEventClientLinking } from './useEventClientLinking';
 import { useEventSaveActions } from './useEventSaveActions';
+import { CreateSAVModal } from '../entretiens/CreateSAVModal';
 import { useAppointmentEntretien } from './useAppointmentEntretien';
 import { EventModalHeader, EventModalFooter } from './EventModalFrame';
 
@@ -252,6 +253,7 @@ export function EventModal({
 
   const {
     batchSaving, setBatchSaving, duplicatePrompt, setDuplicatePrompt, resumeDuplicate,
+    savPrompt, setSavPrompt, resumeAfterSav,
     handleSave, handleCreateFromAssistant, handleRescheduleSave, handleContinuationSave,
   } = useEventSaveActions({
     orgId, userId, isEdit, appointment, attachContext, formData, setErrors, validate,
@@ -570,6 +572,14 @@ export function EventModal({
         onPrimaryAction={(c) => resumeDuplicate({ action: 'link', leadId: c.id })}
         onCreateAnyway={() => resumeDuplicate({ action: 'create' })}
         onCancel={() => setDuplicatePrompt(null)}
+      />
+
+      {/* RDV SAV sans demande en cours : décrire la demande (problème, urgence), puis le RDV s'y rattache */}
+      <CreateSAVModal
+        isOpen={savPrompt}
+        onClose={() => setSavPrompt(false)}
+        onCreated={resumeAfterSav}
+        prefillClient={selectedClient}
       />
     </>
   );

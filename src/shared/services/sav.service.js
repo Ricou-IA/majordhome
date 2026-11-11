@@ -546,6 +546,27 @@ export const savService = {
    * Créer un SAV (demande de réparation)
    * projectId est obligatoire (NOT NULL + RLS via projects.org_id)
    */
+  /**
+   * Demande SAV ouverte du client (carte parent non réalisée ni facturée), la plus récente —
+   * même règle anti-doublon que `ensureEntretienCard`. Sert au RDV SAV du planning : une
+   * demande en cours reçoit le RDV, sinon on fait d'abord décrire la nouvelle demande.
+   * @param {string} clientId
+   * @returns {Promise<{ data: string|null, error: unknown }>}
+   */
+  async getOpenSavCardId(clientId) {
+    const { data, error } = await supabase
+      .from('majordhome_interventions')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('intervention_type', 'sav')
+      .is('parent_id', null)
+      .not('workflow_status', 'in', '(realise,facture)')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return { data: data?.id || null, error };
+  },
+
   async createSAV({ orgId, clientId, contractId, projectId, savDescription, savOrigin, createdBy, sourceCertificatId = null, equipmentId = null, savUrgency = null }) {
     if (!orgId || !clientId || !projectId) {
       throw new Error('[sav] orgId, clientId et projectId requis');
