@@ -36,8 +36,8 @@
 | Fichier | Rôle |
 |---|---|
 | `scripts/catalogue/dump-invicta-pieces.browser.js` (créé) | Relevé console : parcourt rayons → appareils → documents, télécharge le JSON |
-| `src/lib/catalogue/invictaPiecesReleve.js` (créé) | PUR : forme d'un appareil relevé (`appareilDepuisApi`) et contrôle de complétude (`controlerReleve`), partagés par le script console (copie inline) et les tests |
-| `src/lib/catalogue/invictaPieces.js` (créé) | PUR : relevé → `{ pieces, modeles, nomenclature, compteRendu }` |
+| `scripts/catalogue/invicta-pieces-releve.js` (créé) | PUR : forme d'un appareil relevé (`appareilDepuisApi`) et contrôle de complétude (`controlerReleve`), partagés par le script console (copie inline) et les tests |
+| `scripts/catalogue/invicta-pieces.js` (créé) | PUR : relevé → `{ pieces, modeles, nomenclature, compteRendu }` |
 | `scripts/catalogue/invicta-pieces.test.mjs` (créé) | Tests de l'adaptateur sur fixtures + relevé réel pinné |
 | `scripts/catalogue/data/invicta-pieces-2026-11-11.json` (créé) | Relevé de référence |
 | `supabase/migrations/20261111_1_equipment_models_pieces.sql` (créé) | Tables, vues, RPC, colonne `equipments.equipment_model_id` |
@@ -53,7 +53,7 @@
 ### Task 1 : Relevé du site et fichier de référence
 
 **Files:**
-- Create: `src/lib/catalogue/invictaPiecesReleve.js`, `scripts/catalogue/dump-invicta-pieces.browser.js`, `scripts/catalogue/data/invicta-pieces-2026-11-11.json`
+- Create: `scripts/catalogue/invicta-pieces-releve.js`, `scripts/catalogue/dump-invicta-pieces.browser.js`, `scripts/catalogue/data/invicta-pieces-2026-11-11.json`
 - Test: `scripts/catalogue/invicta-pieces.test.mjs` (première moitié)
 
 **Interfaces:**
@@ -82,7 +82,7 @@ test('controlerReleve refuse un appareil non lu', () => { /* appareil { erreur: 
 
 - [ ] **Step 2 :** `node --test scripts/catalogue/invicta-pieces.test.mjs` → échec (module absent).
 - [ ] **Step 3 :** écrire `invictaPiecesReleve.js`. Photo et vue éclatée : prendre la variante de plus grande largeur (`variants`), `fileId` de cette variante.
-- [ ] **Step 4 :** écrire `dump-invicta-pieces.browser.js` sur le modèle de `dump-woocommerce.browser.js` : constante `MARQUE = 'VdklLfh0Fp'` ; `GET /api/1.0.0/manufacturers/{MARQUE}` puis ses rayons (à lire dans la réponse ; à défaut, la table des quatre rayons Invicta du spec § 2) ; pagination `products?Category=…&Limit=100&Offset=…` ; par appareil `products/{publicId}` + `products/{id}/documents`, 4 à la fois, pause 150 ms entre lots ; progression `console.log` tous les 20 appareils ; `appareilDepuisApi` et `controlerReleve` recopiées dans le script (commentaire : source = `src/lib/catalogue/invictaPiecesReleve.js`) ; si `controlerReleve` échoue → `throw`, rien n'est téléchargé ; sinon téléchargement `invicta-pieces-AAAA-MM-JJ.json`.
+- [ ] **Step 4 :** écrire `dump-invicta-pieces.browser.js` sur le modèle de `dump-woocommerce.browser.js` : constante `MARQUE = 'VdklLfh0Fp'` ; `GET /api/1.0.0/manufacturers/{MARQUE}` puis ses rayons (à lire dans la réponse ; à défaut, la table des quatre rayons Invicta du spec § 2) ; pagination `products?Category=…&Limit=100&Offset=…` ; par appareil `products/{publicId}` + `products/{id}/documents`, 4 à la fois, pause 150 ms entre lots ; progression `console.log` tous les 20 appareils ; `appareilDepuisApi` et `controlerReleve` recopiées dans le script (commentaire : source = `scripts/catalogue/invicta-pieces-releve.js`) ; si `controlerReleve` échoue → `throw`, rien n'est téléchargé ; sinon téléchargement `invicta-pieces-AAAA-MM-JJ.json`.
 - [ ] **Step 5 : prendre le relevé de référence.** Par l'extension Chrome, dans l'onglet d'Eric connecté à `pieces-detachees.invicta-group.fr` : exécuter la logique du script en tâche de fond (résultat dans `window.__releve`, interrogé par appels courts — un appel de plus de 45 s est coupé), puis récupérer le JSON par tranches et l'écrire dans `scripts/catalogue/data/invicta-pieces-2026-11-11.json`. Si la session est fermée, demander à Eric de se reconnecter et s'arrêter là.
 - [ ] **Step 6 :** `node --test …` vert ; vérifier à la main `appareils.length === 470` (ou la somme des `total` des rayons si le site a bougé) et noter les nombres réels pour la Task 2.
 - [ ] **Step 7 :** commit `feat(catalogue): relevé des pièces détachées Invicta (script console + fichier de référence)`.
@@ -90,7 +90,7 @@ test('controlerReleve refuse un appareil non lu', () => { /* appareil { erreur: 
 ### Task 2 : Adaptateur pur
 
 **Files:**
-- Create: `src/lib/catalogue/invictaPieces.js`
+- Create: `scripts/catalogue/invicta-pieces.js`
 - Test: `scripts/catalogue/invicta-pieces.test.mjs` (seconde moitié)
 
 **Interfaces:**

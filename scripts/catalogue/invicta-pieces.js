@@ -1,4 +1,4 @@
-// src/lib/catalogue/invictaPieces.js
+// scripts/catalogue/invicta-pieces.js
 // Adaptateur PUR : relevé du site de pièces détachées du groupe Invicta (format de invictaPiecesReleve.js) →
 // pièces (lignes de l'écrivain public.supplier_pieces_upsert), modèles d'appareil et nomenclature
 // (public.equipment_models_upsert). Aucun import, aucune écriture. Testé sur le relevé réel

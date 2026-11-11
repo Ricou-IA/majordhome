@@ -26,6 +26,7 @@ export const PRODUCT_CATEGORIES = [
   { value: 'batterie', label: 'Batterie' },
   { value: 'photovoltaique', label: 'Photovoltaïque' },
   { value: 'borne_recharge', label: 'Borne de recharge' },
+  { value: 'piece_detachee', label: 'Pièce détachée' },
 ];
 
 /** Tableau de catégories normalisées (vide = pas de filtre). Accepte un texte seul (appelants legacy). */

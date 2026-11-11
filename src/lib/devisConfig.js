@@ -10,7 +10,7 @@ export const DEFAULT_CONDITIONS = `- Devis valable pour la durée indiquée ci-d
 - Garantie matériel selon les conditions du fabricant.`;
 
 /** Catégories produit du picker (valeurs de PRODUCT_CATEGORIES de suppliers.service) ; null = tous les fournisseurs. */
-export const CATEGORIES_PRODUIT = Object.freeze(['poele', 'climatisation', 'chauffage', 'fumisterie', 'batterie', 'photovoltaique', 'borne_recharge']);
+export const CATEGORIES_PRODUIT = Object.freeze(['poele', 'climatisation', 'chauffage', 'fumisterie', 'batterie', 'photovoltaique', 'borne_recharge', 'piece_detachee']);
 
 /**
  * Type d'un chapitre de devis (2026-10-25, décisions d'Eric) — ce que le « + » du chapitre propose :

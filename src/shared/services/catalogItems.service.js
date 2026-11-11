@@ -69,10 +69,11 @@ export const catalogItemsService = {
    * active, ou aucune offre jamais : article créé à la main, main d'œuvre) ; `sansOffreFraiche` = aucune offre active
    * de moins de 30 jours ; `actifsSeulement` (défaut) exclut les désactivés et les absorbés. La recherche porte sur
    * chaque mot, sans accents, dans le libellé, la marque, la gamme, la clé modèle, l'EAN et les références fournisseur.
+   * `sansPiecesDetachees` (sans `categories`) écarte la catégorie des pièces détachées.
    */
   async listItems(orgId, {
     search = '', categories = [], natures = [], brand = null, gamme = null, sansCategorie = false, sansOffreFraiche = false,
-    proposable = false, actifsSeulement = true, page = 0, pageSize = 50,
+    proposable = false, actifsSeulement = true, sansPiecesDetachees = false, page = 0, pageSize = 50,
   } = {}) {
     try {
       if (!orgId) return { data: [], count: 0, error: null };
@@ -82,6 +83,8 @@ export const catalogItemsService = {
       if (natures?.length) q = q.in('product_kind', natures);
       if (sansCategorie) q = q.is('category', null);
       else if (categories?.length) q = q.in('category', categories);
+      // chaîne fixe (aucune saisie) : les articles sans catégorie restent proposés
+      else if (sansPiecesDetachees) q = q.or('category.is.null,category.neq.piece_detachee');
       if (brand) q = q.eq('brand', brand);
       if (gamme) q = q.eq('gamme', gamme);
       if (sansOffreFraiche) q = q.or(`prix_le_plus_recent.is.null,prix_le_plus_recent.lt.${dateSeuilFraicheur()}`);
@@ -93,6 +96,23 @@ export const catalogItemsService = {
     } catch (error) {
       logger.error('[catalogItemsService] listItems:', error);
       return { data: [], count: 0, error };
+    }
+  },
+
+  /**
+   * Référence fournisseur de quelques lignes (≤ 150 ids) : `{ [idLigne]: reference }`. Sert à la ligne de devis d'une
+   * pièce détachée, qui porte la référence qu'on commande.
+   */
+  async getReferencesFournisseur(orgId, ids = []) {
+    try {
+      if (!orgId || !ids.length) return { data: {}, error: null };
+      const { data, error } = await supabase.from('majordhome_supplier_products').select('id, reference')
+        .eq('org_id', orgId).in('id', ids.slice(0, 150));
+      if (error) throw error;
+      return { data: Object.fromEntries((data || []).map((l) => [l.id, l.reference || ''])), error: null };
+    } catch (error) {
+      logger.error('[catalogItemsService] getReferencesFournisseur:', error);
+      return { data: {}, error };
     }
   },
 

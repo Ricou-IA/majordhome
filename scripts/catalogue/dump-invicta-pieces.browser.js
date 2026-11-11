@@ -18,7 +18,7 @@
   const TELECHARGER = true;
   const API = '/api/1.0.0/';
 
-  // --- Copie de src/lib/catalogue/invictaPiecesReleve.js (source unique, testée) — ne pas éditer ici. ---
+  // --- Copie de scripts/catalogue/invicta-pieces-releve.js (source unique, testée) — ne pas éditer ici. ---
   function plusGrandeVariante(image) {
     if (!image) return null;
     const variantes = Array.isArray(image.variants) ? image.variants.filter((v) => v && v.url) : [];

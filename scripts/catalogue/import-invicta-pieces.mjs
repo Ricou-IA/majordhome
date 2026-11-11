@@ -6,7 +6,7 @@
 //   2. public.equipment_models_upsert  — modèles + nomenclature, par lots de 60 modèles ;
 //   3. public.equipment_models_close   — désactive les modèles absents, rattache les équipements dont le modèle
 //      saisi est exactement une référence fabricant.
-// La transformation est l'adaptateur PUR src/lib/catalogue/invictaPieces.js (testé sur le relevé réel).
+// La transformation est l'adaptateur PUR scripts/catalogue/invicta-pieces.js (testé sur le relevé réel).
 //
 // MISE À JOUR (quelques minutes) :
 //   1. navigateur connecté à https://pieces-detachees.invicta-group.fr → coller
@@ -21,8 +21,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { piecesDepuisReleveInvicta, lotsParModele } from '../../src/lib/catalogue/invictaPieces.js';
-import { controlerReleve } from '../../src/lib/catalogue/invictaPiecesReleve.js';
+import { piecesDepuisReleveInvicta, lotsParModele } from './invicta-pieces.js';
+import { controlerReleve } from './invicta-pieces-releve.js';
 
 const racine = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = process.argv.slice(2);

@@ -13,11 +13,14 @@
  */
 
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Package, X, Loader2, Search, Minus, Plus, ShoppingCart } from 'lucide-react';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useDebounce } from '@hooks/useDebounce';
 import { useCatalogItems, useCatalogBrands, useCatalogGammes } from '@hooks/useCatalogItems';
 import { formatEuro } from '@/lib/utils';
+import { catalogItemsService } from '@services/catalogItems.service';
+import { CATEGORIE_PIECE_DETACHEE, exclurePiecesDetachees, referenceLigneArticle } from '@/lib/catalogue/piecesDetachees';
 import DevisCreateArticleForm from './DevisCreateArticleForm';
 
 const LIMITE = 100;
@@ -65,7 +68,9 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
 
   const criteres = useMemo(() => ({
     search: debounced, categories: cats, natures: filtre.natures, brand: brand || null, gamme: gamme || null, proposable: true, pageSize: LIMITE,
-  }), [debounced, cats, filtre.natures, brand, gamme]);
+    // les pièces détachées (des milliers d'« accessoires ») n'ont pas leur place dans le choix d'un équipement / d'une option
+    sansPiecesDetachees: exclurePiecesDetachees(typeChapitre),
+  }), [debounced, cats, filtre.natures, brand, gamme, typeChapitre]);
   const { items, count, isLoading } = useCatalogItems(orgId, criteres);
   const { brands } = useCatalogBrands(orgId, cats);
   const { gammes } = useCatalogGammes(orgId, cats);
@@ -77,7 +82,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
   });
   const totalSelected = Object.values(quantities).reduce((s, q) => s + q, 0);
 
-  const versLigne = (it, quantity) => ({
+  const versLigne = (it, quantity, references = {}) => ({
     line_type: it.product_kind === 'main_oeuvre' ? 'labor' : 'product',
     catalog_item_id: it.id,
     brand: null,
@@ -86,7 +91,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
     supplier_name: null,
     designation: it.name,
     description: it.description || '',
-    reference: it.code || '',
+    reference: referenceLigneArticle(it, references),
     quantity,
     unit: it.unit || 'pièce',
     // marge estimée : le prix d'achat le plus bas connu chez les fournisseurs de l'article (null sans offre)
@@ -98,8 +103,22 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
     caracteristiques: [],
   });
 
-  const handleConfirm = () => {
-    const lines = items.filter((it) => quantities[it.id] > 0).map((it) => versLigne(it, quantities[it.id]));
+  const [ajout, setAjout] = useState(false);
+  const handleConfirm = async () => {
+    if (ajout) return;
+    const choisis = items.filter((it) => quantities[it.id] > 0);
+    // Une pièce détachée sans référence interne porte la référence du fournisseur (celle qu'on commande). La lecture
+    // est secondaire : en cas d'échec la ligne est posée sans référence, avec un avertissement — jamais un refus.
+    const lignesSource = choisis.filter((it) => it.category === CATEGORIE_PIECE_DETACHEE && !it.code && it.source_product_id).map((it) => it.source_product_id);
+    let references = {};
+    if (lignesSource.length > 0) {
+      setAjout(true);
+      const { data, error } = await catalogItemsService.getReferencesFournisseur(orgId, lignesSource);
+      setAjout(false);
+      if (error) toast.warning('Référence des pièces non récupérée : les lignes sont ajoutées sans référence.');
+      else references = data;
+    }
+    const lines = choisis.map((it) => versLigne(it, quantities[it.id], references));
     if (lines.length > 0) onAddLines(lines);
     onClose();
   };
@@ -224,7 +243,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={onClose} className="btn-secondary btn-sm">Annuler</button>
-            <button type="button" onClick={handleConfirm} disabled={totalSelected === 0} className="btn-primary btn-sm">
+            <button type="button" onClick={handleConfirm} disabled={totalSelected === 0 || ajout} className="btn-primary btn-sm">
               <ShoppingCart className="w-4 h-4 mr-1" /> Ajouter au devis
             </button>
           </div>

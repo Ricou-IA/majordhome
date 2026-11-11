@@ -3,8 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { appareilDepuisApi, controlerReleve } from '../../src/lib/catalogue/invictaPiecesReleve.js';
-import { piecesDepuisReleveInvicta, nomModele, lotsParModele, CATEGORIE_PIECE } from '../../src/lib/catalogue/invictaPieces.js';
+import { appareilDepuisApi, controlerReleve } from './invicta-pieces-releve.js';
+import { piecesDepuisReleveInvicta, nomModele, lotsParModele, CATEGORIE_PIECE } from './invicta-pieces.js';
+import { CATEGORIE_PIECE_DETACHEE, exclurePiecesDetachees, referenceLigneArticle, remisePiecesValide, connectorConfigAvecPieces } from '../../src/lib/catalogue/piecesDetachees.js';
 
 // Réponse réduite de GET products/{publicId} (forme relevée sur le site le 2026-11-11).
 const PRODUIT_API = {
@@ -73,7 +74,7 @@ test('controlerReleve refuse un relevé sans rayon et accepte un relevé complet
 // Le script de console recopie les fonctions du module : la copie doit être identique à la source.
 test('dump-invicta-pieces.browser.js recopie invictaPiecesReleve.js à l\'identique', () => {
   const norm = (s) => s.replace(/\s+/g, ' ').trim();
-  const source = readFileSync(new URL('../../src/lib/catalogue/invictaPiecesReleve.js', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('./invicta-pieces-releve.js', import.meta.url), 'utf8');
   const script = norm(readFileSync(new URL('./dump-invicta-pieces.browser.js', import.meta.url), 'utf8'));
   for (const nom of ['plusGrandeVariante', 'appareilDepuisApi', 'controlerReleve']) {
     const m = source.match(new RegExp(`export function ${nom}\\([\\s\\S]*?\\n}\\n`));
@@ -223,6 +224,44 @@ test('lotsParModele ne coupe jamais un modèle', () => {
   assert.equal(lots[1].parts.length, 3);
   assert.ok(lots[1].parts.every((l) => l.modele_reference === 'P601354'));
   assert.equal(lotsParModele(r.modeles, r.nomenclature, 60).length, 1);
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Règles d'écran : devis et fiche fournisseur
+// ---------------------------------------------------------------------------------------------------------------
+test('exclurePiecesDetachees : écartées des chapitres équipement et option seulement', () => {
+  assert.equal(exclurePiecesDetachees('equipement'), true);
+  assert.equal(exclurePiecesDetachees('option'), true);
+  assert.equal(exclurePiecesDetachees('libre'), false);
+  assert.equal(exclurePiecesDetachees('stock'), false);
+  assert.equal(exclurePiecesDetachees(undefined), false);
+  assert.equal(CATEGORIE_PIECE_DETACHEE, CATEGORIE_PIECE);
+});
+
+test('referenceLigneArticle : référence interne, sinon référence fournisseur pour une pièce', () => {
+  const refs = { l1: ' F670108B ' };
+  assert.equal(referenceLigneArticle({ code: 'ME-12', category: 'piece_detachee', source_product_id: 'l1' }, refs), 'ME-12');
+  assert.equal(referenceLigneArticle({ code: null, category: 'piece_detachee', source_product_id: 'l1' }, refs), 'F670108B');
+  assert.equal(referenceLigneArticle({ code: '', category: 'poele', source_product_id: 'l1' }, refs), '');
+  assert.equal(referenceLigneArticle({ category: 'piece_detachee', source_product_id: 'l2' }, refs), '');
+  assert.equal(referenceLigneArticle({ category: 'piece_detachee', source_product_id: 'l1' }), '');
+  assert.equal(referenceLigneArticle(null), '');
+});
+
+test('remisePiecesValide et connectorConfigAvecPieces', () => {
+  assert.equal(remisePiecesValide('30'), 30);
+  assert.equal(remisePiecesValide('27,5'), 27.5);
+  assert.equal(remisePiecesValide(0), 0);
+  for (const v of ['', null, undefined, 'abc', -1, 100, '120']) assert.equal(remisePiecesValide(v), null);
+  const pieces = { remise_pct: 30, marque_site: 'VdklLfh0Fp', site: 'https://x' };
+  // le réglage des pièces survit à l'enregistrement de la fiche, avec la remise saisie
+  assert.deepEqual(connectorConfigAvecPieces({}, pieces, '25'), { pieces: { ...pieces, remise_pct: 25 } });
+  assert.deepEqual(connectorConfigAvecPieces({ sca_path: '/a', site_id: '1' }, pieces, '30'), { sca_path: '/a', site_id: '1', pieces });
+  // saisie invalide : la remise en place est gardée
+  assert.deepEqual(connectorConfigAvecPieces({}, pieces, 'abc'), { pieces });
+  // pas de réglage de pièces : rien n'est inventé
+  assert.deepEqual(connectorConfigAvecPieces({ sca_path: '/a' }, null, '30'), { sca_path: '/a' });
+  assert.deepEqual(connectorConfigAvecPieces({}, undefined, ''), {});
 });
 
 // ---------------------------------------------------------------------------------------------------------------

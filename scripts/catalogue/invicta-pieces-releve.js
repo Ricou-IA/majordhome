@@ -1,4 +1,4 @@
-// src/lib/catalogue/invictaPiecesReleve.js
+// scripts/catalogue/invicta-pieces-releve.js
 // Forme d'un relevé du site de pièces détachées du groupe Invicta (https://pieces-detachees.invicta-group.fr,
 // API JSON /api/1.0.0, session du compte pro). Module PUR (aucun import) : ces deux fonctions sont RECOPIÉES telles
 // quelles dans scripts/catalogue/dump-invicta-pieces.browser.js (la console du navigateur n'importe rien) — toute

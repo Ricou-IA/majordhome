@@ -150,7 +150,7 @@ Le relevé garde les champs bruts utiles et rien d'autre (pas de panier, pas de 
 rayon rend moins d'appareils que son `totalCount`, si un appel répond 401 / 403 (session expirée) ou si un appareil
 n'a pas pu être lu : aucun fichier partiel n'est téléchargé.
 
-### 5.2 Adaptateur pur et import — `src/lib/catalogue/invictaPieces.js`, `scripts/catalogue/import-invicta-pieces.mjs`
+### 5.2 Adaptateur pur et import — `scripts/catalogue/invicta-pieces.js`, `scripts/catalogue/import-invicta-pieces.mjs`
 
 Module PUR (aucun import React / Supabase), testé sur le relevé réel
 (`scripts/catalogue/invicta-pieces.test.mjs`, dans `audit:quality`, qui pinne le nombre d'appareils, de pièces
@@ -350,6 +350,34 @@ change pas pour les autres fournisseurs. Les devis déjà enregistrés ne bougen
 **Question encore ouverte** : lecture de « prix HT = prix public » (prix d'achat = prix public − 30 %, remise
 réglable) et uniformité des 30 % sur toutes les pièces, kits compris. Sans réponse, l'hypothèse du § 7 s'applique ;
 une erreur se corrige en changeant la remise et en rejouant l'import.
+
+## 7 ter. Ce que le relevé complet a appris (tranche 1, 2026-11-11) — décisions prises en cours de route
+
+Relevé réel : 470 appareils, 1 771 pièces distinctes, 13 974 lignes de nomenclature ; 76 appareils sans vue
+éclatée, 196 sans photo, 233 sans document ; documents : 244 notices, 108 fiches techniques, 621 procédures,
+131 micrologiciels.
+
+- **Une référence de pièce n'a pas toujours un seul prix.** 50 références sur 1 771 désignent plusieurs produits du
+  site (kits composés par appareil, visserie vendue à l'unité ou en lot) avec un prix différent selon l'appareil
+  (« KIT ATTACHES VITRE » : de 2,25 € à 21,84 €). Le § 5.2 prévoyait une erreur ; à la place : **le prix public est
+  gardé sur chaque ligne de nomenclature** (`equipment_model_parts.public_price_ht`), et la pièce du catalogue n'a de
+  prix que s'il est le même partout — sinon elle est à 0 € avec `prix_selon_appareil`, donc sans article, et son prix
+  se lit sur l'appareil. Coût si c'est le mauvais choix : ces 50 pièces ne se trouvent pas par la recherche
+  d'articles du devis ; elles se poseront depuis la nomenclature (tranche 3).
+- **Une référence fabricant n'est pas toujours un seul appareil** (P687644 = « FOYER 700 DO INVICTA » et sa version
+  EXPORT). L'identité d'un modèle est l'identifiant de l'appareil sur le site (`source_id`), pas la référence ;
+  unicité `(org, marque, source_id)`. Le rattachement d'office d'un équipement n'a lieu que si un seul modèle actif
+  porte la référence.
+- **Les deux modules purs du relevé vivent dans `scripts/catalogue/`** (`invicta-pieces.js`,
+  `invicta-pieces-releve.js`), pas dans `src/lib` : ils ne sont importés par aucun écran (convention des modules
+  « script-only », audit de code mort). Les règles d'écran sont dans `src/lib/catalogue/piecesDetachees.js`.
+- **Les adresses du site (photo, vues éclatées, documents) sont rangées dans `equipment_models.source`** en
+  attendant la copie des fichiers (tranche 2) ; `photo_path` et `exploded_views` restent vides et ne sont jamais
+  écrasés par un relevé.
+- **La fiche fournisseur effaçait `connector_config` à chaque enregistrement** (sauf boutique SuiteCommerce) : le
+  réglage `pieces` y est désormais conservé (`connectorConfigAvecPieces`).
+- Une pièce désactivée par un relevé garde son article actif (limite connue : la recherche d'articles ne propose
+  que les articles ayant une offre active, donc elle disparaît bien du devis).
 
 ## 8. Laissé au constructeur
 

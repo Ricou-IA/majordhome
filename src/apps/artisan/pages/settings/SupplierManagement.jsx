@@ -14,6 +14,7 @@ import { PRODUCT_CATEGORIES } from '@services/suppliers.service';
 import { suppliersService } from '@services/suppliers.service';
 import { TVA_RATES } from '@services/devis.service';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea, SectionTitle } from '../../components/FormFields';
+import { connectorConfigAvecPieces, remisePiecesValide } from '@/lib/catalogue/piecesDetachees';
 import { formatEuro } from '@/lib/utils';
 import ExcelJS from 'exceljs';
 import {
@@ -69,7 +70,10 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
     siteUrl: supplier?.site_url || '',
     scaPath: supplier?.connector_config?.sca_path || SUITECOMMERCE_DEFAUTS.sca_path,
     siteId: supplier?.connector_config?.site_id || SUITECOMMERCE_DEFAUTS.site_id,
+    remisePieces: supplier?.connector_config?.pieces ? String(supplier.connector_config.pieces.remise_pct ?? 0) : '',
   });
+  // Réglage du relevé de pièces détachées (posé par le premier import) : conservé à l'enregistrement, remise modifiable.
+  const piecesConfig = supplier?.connector_config?.pieces || null;
 
   const setField = useCallback((field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -85,8 +89,13 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
       toast.error('Une boutique connectée demande l\'adresse de son site (https://…)');
       return;
     }
-    const { scaPath, siteId, ...reste } = form;
-    onSave({ ...reste, connectorConfig: form.connector === 'suitecommerce' ? { sca_path: scaPath.trim(), site_id: siteId.trim() } : {} });
+    if (piecesConfig && remisePiecesValide(form.remisePieces) == null) {
+      toast.error('La remise sur les pièces détachées doit être un pourcentage entre 0 et 99');
+      return;
+    }
+    const { scaPath, siteId, remisePieces, ...reste } = form;
+    const boutique = form.connector === 'suitecommerce' ? { sca_path: scaPath.trim(), site_id: siteId.trim() } : {};
+    onSave({ ...reste, connectorConfig: connectorConfigAvecPieces(boutique, piecesConfig, remisePieces) });
   };
 
   return (
@@ -160,6 +169,18 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
             )}
             {form.connector && (
               <p className="text-xs text-secondary-400">Les identifiants du compte, le relevé et la correspondance des rayons se règlent ensuite dans le catalogue du fournisseur (panneau « Connexion catalogue »).</p>
+            )}
+
+            {piecesConfig && (
+              <>
+                <SectionTitle>Pièces détachées</SectionTitle>
+                <FormField label="Remise sur les pièces détachées (%)">
+                  <TextInput value={form.remisePieces} onChange={(v) => setField('remisePieces', v)} placeholder="30" />
+                </FormField>
+                <p className="text-xs text-secondary-400">
+                  Le prix relevé sur le site du fabricant est le prix public ; le prix d&apos;achat est ce prix moins la remise. Appliquée au prochain relevé de pièces.
+                </p>
+              </>
             )}
 
             <div className="flex justify-end gap-3 pt-4 border-t">
