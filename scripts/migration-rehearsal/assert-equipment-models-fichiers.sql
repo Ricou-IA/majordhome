@@ -1,5 +1,6 @@
 -- assert-equipment-models-fichiers.sql — vérifie 20261111_3_equipment_models_fichiers.sql
--- (chaîne : 20261028_5 → 20261111_1 → 20261111_2 → 20261111_3 ; equipment_documents n'est pas photographiée).
+-- et 20261111_4_equipment_models_fichiers_gardes.sql
+-- (chaîne : 20261028_5 → 20261111_1 → 20261111_2 → 20261111_3 → 20261111_4 ; equipment_documents n'est pas photographiée).
 -- Couvre : droits ; types de document étendus ; equipment_models_set_files (photo / vues posées et jamais vidées,
 -- documents remplacés par la liste, rejouable, chemin hors org refusé, modèle inconnu refusé, type invalide refusé) ;
 -- vue par équipement : document relevé visible par le RATTACHEMENT seulement, document manuel par la clé seulement,
@@ -125,6 +126,23 @@ BEGIN
   IF NOT (SELECT with_check LIKE '%equipment_model_id IS NULL%' FROM pg_policies WHERE schemaname = 'majordhome' AND tablename = 'equipment_documents' AND policyname = 'equipment_documents_insert_role_can') THEN
     RAISE EXCEPTION '(5) la policy d''insertion n''interdit pas un document rattaché à un modèle';
   END IF;
+
+  -- (5 bis) gardes du fichier partagé (20261111_4)
+  ok := false;
+  BEGIN INSERT INTO majordhome.equipment_documents (org_id, brand, model, document_type, file_name, storage_path)
+        VALUES (v_org, 'TestFich', 'X2', 'notice', 'alias.pdf', v_base || 'doc-e3.pdf');
+  EXCEPTION WHEN check_violation THEN ok := true; END;
+  IF NOT ok THEN RAISE EXCEPTION '(5 bis) ligne manuelle pointant un fichier relevé acceptée'; END IF;
+  IF NOT (SELECT qual LIKE '%equipment_model_id IS NULL%' FROM pg_policies WHERE schemaname = 'majordhome' AND tablename = 'equipment_documents' AND policyname = 'equipment_documents_delete_role_can') THEN
+    RAISE EXCEPTION '(5 bis) la policy de suppression laisse retirer un document relevé';
+  END IF;
+  IF (SELECT count(*) FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND permissive = 'RESTRICTIVE'
+        AND policyname IN ('product_documents_site_no_insert', 'product_documents_site_no_update', 'product_documents_site_no_delete')) <> 3 THEN
+    RAISE EXCEPTION '(5 bis) policies restrictives du dossier site absentes';
+  END IF;
+  -- la RPC (service_role) continue de remplacer les lignes relevées
+  v_res := public.equipment_models_set_files(v_org, 'TestFich', 'f3', jsonb_build_array(jsonb_build_object('source_id', 'FS1', 'documents', '[]'::jsonb)));
+  IF (v_res ->> 'documents_retires')::int <> 1 THEN RAISE EXCEPTION '(5 bis) la RPC ne retire plus les documents relevés : %', v_res; END IF;
 
   -- (6) garde « même organisation »
   INSERT INTO core.organizations (name) VALUES ('TEST FICHIERS autre org') RETURNING id INTO v_autre;

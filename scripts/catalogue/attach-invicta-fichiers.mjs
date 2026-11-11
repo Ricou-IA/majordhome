@@ -2,7 +2,8 @@
 // Copie des FICHIERS d'un relevé de pièces détachées Invicta dans notre Storage : photo et vues éclatées de chaque
 // appareil, notices, fiches techniques et procédures (micrologiciels ignorés). Bucket privé product-documents,
 // dossier `${orgId}/equipment-models/site/`. Les fichiers du site sont PUBLICS (CDN, sans session) : aucun
-// identifiant n'est utilisé ; 4 téléchargements à la fois.
+// identifiant n'est utilisé ; 2 appels à la fois, avec une pause : le site coupe la connexion si on insiste
+// (vécu le 2026-11-11). Un document déjà rangé ET déjà inscrit en base ne redemande RIEN au site.
 //   - Un fichier est stocké UNE fois par contenu (`doc-<etag>.pdf`, `img-<fileId>.webp`) : 973 documents = 294
 //     contenus distincts au relevé du 2026-11-11.
 //   - INCRÉMENTAL : un objet déjà présent n'est ni retéléchargé ni redéposé (relancer = compléter).
@@ -11,7 +12,7 @@
 //   - Écriture en base par la seule RPC public.equipment_models_set_files (service_role), par lots de 60 modèles,
 //     via l'API de management ; puis photo des articles du tarif de même référence (posée si l'article n'en a pas).
 // Usage : node scripts/catalogue/attach-invicta-fichiers.mjs --fichier scripts/catalogue/data/invicta-pieces-AAAA-MM-JJ.json
-//           [--env .env.local] [--org 3c68193e-…] [--fournisseur INVICTA] [--sans-ecriture] [--limite N]
+//           [--env .env.local] [--org 3c68193e-…] [--fournisseur INVICTA] [--sans-ecriture] [--limite N] [--forcer]
 // À lancer APRÈS import-invicta-pieces.mjs + apply-sql (les modèles doivent exister en base).
 // ============================================================================
 import { readFileSync } from 'node:fs';
@@ -32,7 +33,8 @@ const LIMITE = Number(opt('--limite', 0)) || 0;
 const SANS_ECRITURE = drapeau('--sans-ecriture');
 const BUCKET = 'product-documents';
 const TAILLE_MAX = 20 * 1024 * 1024; // limite du bucket
-const CONCURRENCE = 4;
+const CONCURRENCE = 2; // le site coupe la connexion au-delà (vécu le 2026-11-11 après ~4 000 appels à 4 de front)
+const PAUSE_MS = 300;
 const TAILLE_LOT = 60;
 if (!fichier) { console.error('--fichier <relevé JSON> requis'); process.exit(2); }
 
@@ -56,7 +58,7 @@ async function parLots(liste, fn) {
   for (let i = 0; i < liste.length; i += CONCURRENCE) {
     await Promise.all(liste.slice(i, i + CONCURRENCE).map(fn));
     if ((i / CONCURRENCE) % 25 === 24) console.log(`  … ${Math.min(i + CONCURRENCE, liste.length)} / ${liste.length}`);
-    await pause(100);
+    await pause(PAUSE_MS);
   }
 }
 /** fetch avec 3 essais sur erreur réseau ou 5xx ; rend la réponse (même 4xx) ou lève. */
@@ -129,14 +131,28 @@ await parLots(images, async (img) => {
 });
 console.log(`Images : ${deposes.images.size} / ${images.length} rangées`);
 
-// 2. Documents : HEAD (empreinte, taille, type) puis dépôt du contenu s'il n'est pas déjà là.
+// 2. Documents : HEAD (empreinte, taille, type) puis dépôt du contenu s'il n'est pas déjà là. Un document déjà
+// inscrit en base (même identifiant du site) dont le fichier est toujours rangé est repris tel quel, sans appel.
+const dejaInscrits = await sql(`select d.source ->> 'id' as id, d.storage_path, d.file_size, d.mime_type from majordhome.equipment_documents d
+  join majordhome.equipment_models em on em.id = d.equipment_model_id
+  where d.org_id = ${q(ORG)} and em.brand_key = majordhome.equipment_model_key(${q(marque)})`);
+let repris = 0;
+for (const r of dejaInscrits) {
+  if (!r.id || !r.storage_path?.startsWith(`${dossier}/`) || !presents.has(nomDe(r.storage_path))) continue;
+  deposes.documents.set(r.id, { path: r.storage_path, size: Number(r.file_size), mime: r.mime_type || 'application/pdf', ext: 'pdf' });
+  repris += 1;
+}
+documents = documents.filter((d) => !deposes.documents.has(d.id));
+console.log(`Documents : ${repris} déjà inscrits et rangés, ${documents.length} à demander au site`);
 const nonPdf = [];
 const enCours = new Map(); // clé de contenu → promesse de dépôt (deux documents de même contenu dans le même lot)
 await parLots(documents, async (d) => {
   try {
     const url = `${site}/media/documents/${d.fileKey}`;
     const h = await appel(url, { method: 'HEAD' });
-    if (h.status === 404 || h.status === 403 || h.status === 410) { deposes.documents.set(d.id, { absent: true }); return; }
+    // Seul un lien réellement mort est « absent ». Un 403 (site qui bloque, limitation de débit) est un échec :
+    // le traiter en absent ferait retirer les documents du modèle au lieu d'attendre le passage suivant.
+    if (h.status === 404 || h.status === 410) { deposes.documents.set(d.id, { absent: true }); return; }
     if (!h.ok) throw new Error(`HTTP ${h.status}`);
     const mime = (h.headers.get('content-type') || '').split(';')[0];
     const ext = extensionDepuisMime(mime);
@@ -146,7 +162,11 @@ await parLots(documents, async (d) => {
     const annoncee = Number(h.headers.get('content-length')) || null;
     // Un document qui n'est pas un PDF (un .docx au relevé du 2026-11-11) n'est pas importé : écarté comme un lien
     // mort, pour ne pas bloquer les autres documents du modèle.
-    if (ext !== 'pdf') { deposes.documents.set(d.id, { absent: true }); nonPdf.push(`${d.label} (${mime})`); return; }
+    // Une page HTML (maintenance, blocage) n'est PAS un document d'un autre format : c'est un échec.
+    if (ext !== 'pdf') {
+      if (!mime.startsWith('application/')) throw new Error(`réponse ${mime || 'sans type'} à la place du document`);
+      deposes.documents.set(d.id, { absent: true }); nonPdf.push(`${d.label} (${mime})`); return;
+    }
     if (!cle) throw new Error('empreinte (ETag) absente');
     if (annoncee && annoncee > TAILLE_MAX) throw new Error(`taille ${annoncee} au-dessus de la limite du bucket`);
     const chemin = cheminDocument(ORG, cle, ext);
@@ -170,15 +190,23 @@ await parLots(documents, async (d) => {
   } catch (e) { echecs.push(`document ${d.id} (${d.label}) : ${e.message}`); }
 });
 const absents = [...deposes.documents.values()].filter((v) => v.absent).length;
-console.log(`Documents : ${deposes.documents.size - absents} / ${documents.length} rangés, ${absents} écartés (lien mort ou autre format qu'un PDF)`);
+console.log(`Documents : ${deposes.documents.size - absents} rangés au total, ${absents} écartés (lien mort ou autre format qu'un PDF)`);
 if (nonPdf.length) console.log(`  non importés (pas un PDF) : ${nonPdf.join(' ; ')}`);
 console.log(`Storage : ${compte.deposes} fichiers déposés (${Math.round(compte.octets / 1048576)} Mo), ${compte.deja} déjà présents`);
 
 // 3. Écriture en base.
 const { fichiers, bilan } = fichiersPourModeles(releve, deposes);
 console.table(bilan);
+// Coupe-circuit : la liste envoyée REMPLACE les documents d'un modèle. Trop d'écartés d'un coup = site dégradé, pas
+// des liens morts : on n'écrit rien (--forcer pour passer outre après vérification à la main).
+const SEUIL_ECARTES = 0.03;
+const totalDocuments = deposes.documents.size + echecs.filter((e) => e.startsWith('document')).length;
+const tropEcartes = totalDocuments > 0 && absents / totalDocuments > SEUIL_ECARTES && !drapeau('--forcer');
 if (SANS_ECRITURE || LIMITE) {
   console.log('Pas d\'écriture en base (--sans-ecriture ou --limite).');
+} else if (tropEcartes) {
+  console.error(`✖ ${absents} documents écartés sur ${totalDocuments} (plus de ${SEUIL_ECARTES * 100} %) : rien n'est écrit en base. Vérifier le site, puis relancer (ou --forcer).`);
+  process.exitCode = 1;
 } else {
   const total = { modeles: 0, documents: 0, documents_retires: 0 };
   for (let i = 0; i < fichiers.length; i += TAILLE_LOT) {
