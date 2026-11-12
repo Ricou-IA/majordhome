@@ -279,6 +279,54 @@ export function verdictRun(etatRun, ageMinutes) {
   return Number.isFinite(ageMinutes) && ageMinutes < DUREE_MAX_RECHERCHE_MIN ? 'en_cours' : 'echec_delai';
 }
 
+/** Le corps JSON d'une réponse s'il est un objet, sinon null. Ne jette jamais. @param {unknown} texte */
+function objetJson(texte) {
+  if (typeof texte !== 'string' || !texte.trim()) return null;
+  try {
+    const o = JSON.parse(texte);
+    return o !== null && typeof o === 'object' && !Array.isArray(o) ? o : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Lit la réponse d'Hermes au lancement d'un run (POST /v1/runs). `statut` null = réseau coupé ou délai dépassé ;
+ * `texte` null = corps illisible. Seul un 2xx portant un `run_id` non vide donne un run.
+ * @param {number | null} statut
+ * @param {string | null} texte
+ * @returns {{ runId: string, motif: null } | { runId: null, motif: 'injoignable' | 'occupe' | 'refuse' | 'illisible' | 'sans_run_id' }}
+ */
+export function lireReponseLancement(statut, texte) {
+  if (typeof statut !== 'number') return { runId: null, motif: 'injoignable' };
+  if (statut === 429) return { runId: null, motif: 'occupe' };
+  if (statut < 200 || statut > 299) return { runId: null, motif: 'refuse' };
+  const o = objetJson(texte);
+  if (!o) return { runId: null, motif: 'illisible' };
+  const runId = typeof o.run_id === 'string' ? o.run_id.trim() : '';
+  return runId ? { runId, motif: null } : { runId: null, motif: 'sans_run_id' };
+}
+
+/**
+ * Lit la réponse d'Hermes à la lecture d'un run (GET /v1/runs/{id}). 404 = run inconnu d'Hermes ; un 2xx dont le
+ * corps est un objet JSON = run lu ; tout le reste (réseau, délai, autre statut, corps illisible) = panne passagère.
+ * @param {number | null} statut
+ * @param {string | null} texte
+ * @returns {{ issue: 'inconnu' } | { issue: 'passager' } | { issue: 'lu', etat: unknown, texte: string | null, usage: object | null }}
+ */
+export function lireReponseSuivi(statut, texte) {
+  if (statut === 404) return { issue: 'inconnu' };
+  if (typeof statut !== 'number' || statut < 200 || statut > 299) return { issue: 'passager' };
+  const o = objetJson(texte);
+  if (!o) return { issue: 'passager' };
+  return {
+    issue: 'lu',
+    etat: o.status,
+    texte: typeof o.output === 'string' ? o.output : null,
+    usage: o.usage !== null && typeof o.usage === 'object' && !Array.isArray(o.usage) ? o.usage : null,
+  };
+}
+
 /**
  * Un lien sûr à afficher : seulement `https:`, avec son domaine (sans `www.`). Tout le reste donne null.
  * @param {unknown} url

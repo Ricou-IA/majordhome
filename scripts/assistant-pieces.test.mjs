@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   CODES, STATUTS, DEMANDE_MAX, messageErreurAssistant, controlerDemande, appareilConnu,
   construireConsigne, lireReponse, lienSur, verdictRun, DUREE_MAX_RECHERCHE_MIN,
+  lireReponseLancement, lireReponseSuivi,
 } from '../src/lib/assistantPieces.js';
 
 const client = { nom: 'Gimenez', prenom: 'Joël', societe: null, telephone: '0612345678', telephone2: null, email: 'j.g@exemple.fr' };
@@ -102,4 +103,37 @@ test('verdictRun : état du run Hermes + âge de la ligne → issue de la recher
   assert.equal(verdictRun(undefined, 14.9), 'en_cours');
   assert.equal(verdictRun(null, 16), 'echec_delai');
   assert.equal(verdictRun('running', Number.NaN), 'echec_delai'); // âge illisible : on ferme, on ne boucle pas
+});
+
+test("lireReponseLancement : réponse HTTP du POST /v1/runs → run_id ou motif d'indisponibilité", () => {
+  assert.deepEqual(lireReponseLancement(200, '{"run_id":"run_42","status":"started"}'), { runId: 'run_42', motif: null });
+  assert.deepEqual(lireReponseLancement(202, '{"run_id":"  run_7 "}'), { runId: 'run_7', motif: null });
+  assert.deepEqual(lireReponseLancement(null, null), { runId: null, motif: 'injoignable' }); // réseau ou délai
+  assert.deepEqual(lireReponseLancement(200, null), { runId: null, motif: 'illisible' }); // corps coupé en lecture
+  assert.deepEqual(lireReponseLancement(200, ''), { runId: null, motif: 'illisible' });
+  assert.deepEqual(lireReponseLancement(200, '<html>oups'), { runId: null, motif: 'illisible' });
+  assert.deepEqual(lireReponseLancement(200, '{"run_id":"run_1"'), { runId: null, motif: 'illisible' }); // tronqué
+  assert.deepEqual(lireReponseLancement(200, '["run_1"]'), { runId: null, motif: 'illisible' });
+  assert.deepEqual(lireReponseLancement(200, '{"status":"started"}'), { runId: null, motif: 'sans_run_id' });
+  assert.deepEqual(lireReponseLancement(200, '{"run_id":"  "}'), { runId: null, motif: 'sans_run_id' });
+  assert.deepEqual(lireReponseLancement(200, '{"run_id":42}'), { runId: null, motif: 'sans_run_id' });
+  assert.deepEqual(lireReponseLancement(401, '{"error":"unauthorized"}'), { runId: null, motif: 'refuse' });
+  assert.deepEqual(lireReponseLancement(429, ''), { runId: null, motif: 'occupe' });
+  assert.deepEqual(lireReponseLancement(500, '{"run_id":"run_1"}'), { runId: null, motif: 'refuse' });
+  assert.deepEqual(lireReponseLancement(503, null), { runId: null, motif: 'refuse' });
+});
+
+test('lireReponseSuivi : réponse HTTP du GET /v1/runs/{id} → run lu, inconnu ou panne passagère', () => {
+  const run = '{"object":"run","run_id":"r","status":"completed","output":"texte","usage":{"total_tokens":12}}';
+  assert.deepEqual(lireReponseSuivi(200, run), { issue: 'lu', etat: 'completed', texte: 'texte', usage: { total_tokens: 12 } });
+  assert.deepEqual(lireReponseSuivi(200, '{"status":"running","output":null,"usage":null}'),
+    { issue: 'lu', etat: 'running', texte: null, usage: null });
+  assert.deepEqual(lireReponseSuivi(200, '{"status":"running","output":7,"usage":[1]}'),
+    { issue: 'lu', etat: 'running', texte: null, usage: null });
+  assert.deepEqual(lireReponseSuivi(404, ''), { issue: 'inconnu' });
+  assert.deepEqual(lireReponseSuivi(404, null), { issue: 'inconnu' });
+  for (const [statut, corps] of [[null, null], [200, null], [200, ''], [200, 'pas du json'], [200, '{"status":"run'],
+    [200, 'null'], [200, '"completed"'], [401, '{}'], [429, ''], [500, run], [502, null]]) {
+    assert.deepEqual(lireReponseSuivi(statut, corps), { issue: 'passager' }, `${statut} ${corps}`);
+  }
 });
