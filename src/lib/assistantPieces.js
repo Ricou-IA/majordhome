@@ -5,6 +5,12 @@
 //
 // Règle qui tient tout le module : la consigne envoyée à l'agent ne porte QUE l'appareil et la demande du
 // technicien — jamais une donnée du client. `controlerDemande` refuse une demande qui en contiendrait une.
+//
+// Ce que ce contrôle couvre : chaque mot du nom de famille (3 lettres et plus, hors civilités et liaisons), la
+// société en entier, chaque numéro de téléphone rangé sur la fiche (sur ses 9 derniers chiffres) et l'e-mail.
+// Ce qu'il ne couvre PAS : l'adresse et la ville, le nom d'une autre personne, le prénom seul (il n'identifie
+// personne et « pierre », « rose », « olivier » sont des mots du métier), ni les champs libres de l'appareil.
+// C'est une garde contre l'erreur de saisie, pas une anonymisation : la consigne, elle, ne lit jamais le client.
 
 /** Longueur maximale de la demande du technicien, en caractères. */
 export const DEMANDE_MAX = 500;
@@ -36,7 +42,7 @@ export const STATUTS = Object.freeze(['en_cours', 'terminee', 'echec']);
 /**
  * @typedef {Object} ClientProtege
  * @property {string|null} [nom]
- * @property {string|null} [prenom]
+ * @property {string|null} [prenom] Accepté mais non consulté : un prénom seul n'identifie personne.
  * @property {string|null} [societe]
  * @property {string|null} [telephone]
  * @property {string|null} [telephone2]
@@ -77,7 +83,7 @@ const MESSAGES = {
   appareil_inconnu: "On ne sait rien de cet appareil : renseignez au moins la marque, le modèle, le numéro de série ou la plaque avant de chercher.",
   demande_vide: 'Décrivez la pièce recherchée avant de lancer la recherche.',
   demande_trop_longue: 'La demande est trop longue : résumez la pièce recherchée en quelques mots.',
-  donnee_client: "La demande contient une information sur le client (nom, téléphone ou e-mail). Retirez-la : seule la pièce doit être décrite.",
+  donnee_client: "La demande contient le nom, le téléphone ou l'e-mail du client. Un nom de famille qui est aussi un mot courant (« Petit », « Blanc ») suffit à la bloquer : reformulez sans ce mot.",
   quota_atteint: "La limite de recherches de la journée est atteinte. Réessayez demain.",
   assistant_indisponible: "L'assistant ne répond pas pour le moment. Réessayez dans quelques minutes.",
   recherche_introuvable: "Cette recherche n'a pas été retrouvée.",
@@ -117,15 +123,38 @@ function contientMotEntier(texteNorm, nomNorm) {
   return new RegExp(`(^|[^a-z0-9])${echapper(nomNorm)}(?=$|[^a-z0-9])`).test(texteNorm);
 }
 
-/** Les neuf derniers chiffres d'un numéro, ou null s'il en a moins de neuf. @param {unknown} tel @returns {string|null} */
-function neufDerniersChiffres(tel) {
-  const chiffres = String(tel ?? '').replace(/\D/g, '');
-  return chiffres.length >= 9 ? chiffres.slice(-9) : null;
+/** Civilités et liaisons d'un nom de famille, qui ne désignent personne (comparées sans casse ni accents). */
+const MOTS_IGNORES = new Set([
+  'm', 'mr', 'mme', 'mlle', 'monsieur', 'madame', 'mademoiselle', 'epoux', 'epouse', 'veuve', 'vve',
+  'et', 'ou', 'de', 'du', 'des', 'la', 'le', 'les', 'aux', 'chez', 'nee',
+]);
+
+/**
+ * Les mots d'un nom de famille qui font refuser : découpé sur tout ce qui n'est ni lettre ni chiffre, après
+ * normalisation ; mots de 3 lettres et plus, hors `MOTS_IGNORES`. @param {unknown} nom @returns {string[]}
+ */
+function motsDuNom(nom) {
+  return normaliser(nom).split(/[^a-z0-9]+/)
+    .filter((m) => m.replace(/[^a-z]/g, '').length >= 3 && !MOTS_IGNORES.has(m));
 }
 
 /**
- * La demande est-elle recevable ? Refuse une demande vide, trop longue, ou qui contient une donnée du client
- * (nom, prénom ou société en mot entier de 3 lettres ou plus ; téléphone sur ses 9 derniers chiffres ; e-mail).
+ * Les numéros d'un champ téléphone, qui peut en porter plusieurs (« 05 63 11 22 33 / 06 12 34 56 78 ») : chaque
+ * suite de chiffres, séparateurs internes (espace, point, tiret, parenthèses) et `+` retirés, d'au moins 9 chiffres,
+ * réduite à ses 9 derniers. @param {unknown} champ @returns {string[]}
+ */
+function numerosDuChamp(champ) {
+  return (String(champ ?? '').match(/\+?\d[\d\s().+-]*\d/g) || [])
+    .map((s) => s.replace(/\D/g, ''))
+    .filter((c) => c.length >= 9)
+    .map((c) => c.slice(-9));
+}
+
+/**
+ * La demande est-elle recevable ? Refuse une demande vide, trop longue, ou qui contient une donnée du client :
+ * un mot du nom de famille (3 lettres et plus, hors civilités et liaisons) en mot entier ; la société en entier
+ * (3 lettres et plus), en mot(s) entier(s) ; un des numéros de téléphone de la fiche, sur ses 9 derniers chiffres ;
+ * l'e-mail. Le prénom n'est pas consulté. Ne couvre ni l'adresse, ni la ville, ni une autre personne.
  * @param {unknown} texte
  * @param {ClientProtege | null | undefined} client
  * @returns {null | 'demande_vide' | 'demande_trop_longue' | 'donnee_client'}
@@ -138,23 +167,38 @@ export function controlerDemande(texte, client) {
 
   const norm = normaliser(brut);
 
-  for (const champ of [client.nom, client.prenom, client.societe]) {
-    const n = normaliser(champ).trim();
-    if (n.replace(/[^a-z]/g, '').length >= 3 && contientMotEntier(norm, n)) return 'donnee_client';
-  }
+  if (motsDuNom(client.nom).some((mot) => contientMotEntier(norm, mot))) return 'donnee_client';
+
+  const societe = normaliser(client.societe).trim();
+  if (societe.replace(/[^a-z]/g, '').length >= 3 && contientMotEntier(norm, societe)) return 'donnee_client';
 
   // Les suites de chiffres séparées par des espaces, points, tirets ou parenthèses valent un numéro.
   const suites = brut.match(/\+?\d[\d\s().-]{6,}\d/g) || [];
   const chiffresDemande = suites.map((s) => s.replace(/\D/g, ''));
-  for (const tel of [client.telephone, client.telephone2]) {
-    const fin = neufDerniersChiffres(tel);
-    if (fin && chiffresDemande.some((c) => c.includes(fin))) return 'donnee_client';
+  for (const fin of [...numerosDuChamp(client.telephone), ...numerosDuChamp(client.telephone2)]) {
+    if (chiffresDemande.some((c) => c.includes(fin))) return 'donnee_client';
   }
 
   const email = normaliser(client.email).trim();
   if (email.includes('@') && norm.includes(email)) return 'donnee_client';
 
   return null;
+}
+
+/**
+ * Le chemin de la photo de plaque peut-il être signé ? Seulement s'il est rangé sous l'org validée et nomme
+ * l'équipement validé : `<orgId>/…/equipements/<equipmentId>-plaque.jpg`, sans segment `..`. Les deux
+ * identifiants sont ceux déjà contrôlés par l'appelant ; vides, rien n'est signé.
+ * @param {unknown} chemin
+ * @param {unknown} orgId
+ * @param {unknown} equipmentId
+ * @returns {boolean}
+ */
+export function cheminPlaqueValide(chemin, orgId, equipmentId) {
+  if (typeof chemin !== 'string' || typeof orgId !== 'string' || typeof equipmentId !== 'string') return false;
+  if (!orgId || !equipmentId) return false;
+  if (chemin.split('/').some((segment) => segment === '..' || segment === '.')) return false;
+  return chemin.startsWith(`${orgId}/`) && chemin.endsWith(`/equipements/${equipmentId}-plaque.jpg`);
 }
 
 /** Une valeur texte renseignée ? @param {unknown} v @returns {boolean} */
@@ -308,14 +352,16 @@ export function lireReponseLancement(statut, texte) {
 }
 
 /**
- * Lit la réponse d'Hermes à la lecture d'un run (GET /v1/runs/{id}). 404 = run inconnu d'Hermes ; un 2xx dont le
- * corps est un objet JSON = run lu ; tout le reste (réseau, délai, autre statut, corps illisible) = panne passagère.
+ * Lit la réponse d'Hermes à la lecture d'un run (GET /v1/runs/{id}). Un 404 dont le corps est un objet JSON = run
+ * inconnu (le relais répond toujours en JSON) ; un 404 au corps vide, non JSON ou non objet vient d'ailleurs (reverse
+ * proxy) et vaut panne passagère : il ne doit pas clore une recherche vivante. Un 2xx dont le corps est un objet
+ * JSON = run lu ; tout le reste (réseau, délai, autre statut, corps illisible) = panne passagère.
  * @param {number | null} statut
  * @param {string | null} texte
  * @returns {{ issue: 'inconnu' } | { issue: 'passager' } | { issue: 'lu', etat: unknown, texte: string | null, usage: object | null }}
  */
 export function lireReponseSuivi(statut, texte) {
-  if (statut === 404) return { issue: 'inconnu' };
+  if (statut === 404) return objetJson(texte) ? { issue: 'inconnu' } : { issue: 'passager' };
   if (typeof statut !== 'number' || statut < 200 || statut > 299) return { issue: 'passager' };
   const o = objetJson(texte);
   if (!o) return { issue: 'passager' };

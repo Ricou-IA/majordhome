@@ -6,6 +6,10 @@ import {
   construireConsigne, lireReponse, lienSur, verdictRun, DUREE_MAX_RECHERCHE_MIN,
   lireReponseLancement, lireReponseSuivi,
 } from '../src/lib/assistantPieces.js';
+import * as regles from '../src/lib/assistantPieces.js';
+
+// Lue par l'espace de noms : une fonction absente fait échouer son seul test, pas le chargement du fichier.
+const cheminPlaqueValide = (...a) => regles.cheminPlaqueValide(...a);
 
 const client = { nom: 'Gimenez', prenom: 'Joël', societe: null, telephone: '0612345678', telephone2: null, email: 'j.g@exemple.fr' };
 
@@ -19,6 +23,51 @@ test('controlerDemande', () => {
   assert.equal(controlerDemande("bougie d'allumage", client), null);
   assert.equal(controlerDemande('joint de porte', { ...client, nom: 'Porte' }), 'donnee_client'); // mot entier = nom
   assert.equal(controlerDemande('transporteur', { ...client, nom: 'Port' }), null); // pas un mot entier
+});
+
+test('controlerDemande : nom de famille découpé en mots, prénom ignoré, société en champ entier', () => {
+  const base = { nom: null, prenom: null, societe: null, telephone: null, telephone2: null, email: null };
+  // Nom de famille : chaque mot de 3 lettres et plus (hors civilités et liaisons) suffit à refuser.
+  assert.equal(controlerDemande('gimenez', { ...base, nom: 'Giménez' }), 'donnee_client');
+  assert.equal(controlerDemande('poêle de Durand', { ...base, nom: 'Martin Durand' }), 'donnee_client');
+  assert.equal(controlerDemande('dupont', { ...base, nom: 'M. et Mme Dupont' }), 'donnee_client');
+  assert.equal(controlerDemande('et', { ...base, nom: 'M. et Mme Dupont' }), null);
+  assert.equal(controlerDemande('mme', { ...base, nom: 'M. et Mme Dupont' }), null);
+  assert.equal(controlerDemande('saint-martin', { ...base, nom: 'Saint Martin' }), 'donnee_client');
+  assert.equal(controlerDemande('petit ventilateur', { ...base, nom: 'Petit' }), 'donnee_client');
+  // Un nom de 2 lettres ne fait jamais refuser sur ce mot.
+  assert.equal(controlerDemande('joint de la porte le plus fin', { ...base, nom: 'Le' }), null);
+  assert.equal(controlerDemande('ly sonde ly', { ...base, nom: 'Ly' }), null);
+  // Le prénom seul n'identifie personne, et c'est souvent un mot du métier.
+  assert.equal(controlerDemande('pierre réfractaire', { ...base, nom: 'Durand', prenom: 'Pierre' }), null);
+  // Société : comparée en champ entier.
+  assert.equal(controlerDemande('chauffage', { ...base, societe: 'SARL Chauffage Dupuis' }), null);
+  assert.equal(controlerDemande('sarl chauffage dupuis', { ...base, societe: 'SARL Chauffage Dupuis' }), 'donnee_client');
+});
+
+test('controlerDemande : téléphones, plusieurs numéros par champ', () => {
+  const base = { nom: null, prenom: null, societe: null, telephone: null, telephone2: null, email: null };
+  assert.equal(controlerDemande('0612345678', { ...base, telephone: '+33 6 12 34 56 78' }), 'donnee_client');
+  const deux = { ...base, telephone2: '05 63 11 22 33 / 06 12 34 56 78' };
+  assert.equal(controlerDemande('05.63.11.22.33', deux), 'donnee_client');
+  assert.equal(controlerDemande('06 12 34 56 78', deux), 'donnee_client');
+  assert.equal(controlerDemande('joint 300 mm', deux), null);
+});
+
+test('cheminPlaqueValide : seulement <org>/…/equipements/<équipement>-plaque.jpg', () => {
+  const org = '11111111-1111-4111-8111-111111111111';
+  const eq = '22222222-2222-4222-8222-222222222222';
+  const autre = '33333333-3333-4333-8333-333333333333';
+  assert.equal(cheminPlaqueValide(`${org}/${autre}/equipements/${eq}-plaque.jpg`, org, eq), true);
+  assert.equal(cheminPlaqueValide(`${autre}/${autre}/equipements/${eq}-plaque.jpg`, org, eq), false); // autre org
+  assert.equal(cheminPlaqueValide(`${org}/${autre}/equipements/${autre}-plaque.jpg`, org, eq), false); // autre équipement
+  assert.equal(cheminPlaqueValide(`${org}/${autre}/2026/${autre}-plaque.jpg`, org, eq), false); // photo de certificat
+  assert.equal(cheminPlaqueValide(`${org}/equipements/${eq}-plaque.jpg.exe`, org, eq), false);
+  assert.equal(cheminPlaqueValide(`${org}/../${autre}/equipements/${eq}-plaque.jpg`, org, eq), false);
+  assert.equal(cheminPlaqueValide(`${org}${eq}-plaque.jpg`, org, eq), false);
+  for (const c of [null, undefined, '', 42]) assert.equal(cheminPlaqueValide(c, org, eq), false);
+  assert.equal(cheminPlaqueValide(`/equipements/${eq}-plaque.jpg`, '', eq), false);
+  assert.equal(cheminPlaqueValide(`${org}/x/equipements/-plaque.jpg`, org, ''), false);
 });
 
 test('controlerDemande : client absent ou incomplet, bornes de longueur', () => {
@@ -130,10 +179,14 @@ test('lireReponseSuivi : réponse HTTP du GET /v1/runs/{id} → run lu, inconnu 
     { issue: 'lu', etat: 'running', texte: null, usage: null });
   assert.deepEqual(lireReponseSuivi(200, '{"status":"running","output":7,"usage":[1]}'),
     { issue: 'lu', etat: 'running', texte: null, usage: null });
-  assert.deepEqual(lireReponseSuivi(404, ''), { issue: 'inconnu' });
-  assert.deepEqual(lireReponseSuivi(404, null), { issue: 'inconnu' });
+  // 404 = run inconnu seulement si le corps est un objet JSON (le relais répond toujours en JSON) ; une page
+  // d'erreur du reverse proxy, un corps vide ou coupé est une panne passagère, qui ne clôt pas la recherche.
+  assert.deepEqual(lireReponseSuivi(404, '{}'), { issue: 'inconnu' });
+  assert.deepEqual(lireReponseSuivi(404, '{"error":"x"}'), { issue: 'inconnu' });
   for (const [statut, corps] of [[null, null], [200, null], [200, ''], [200, 'pas du json'], [200, '{"status":"run'],
-    [200, 'null'], [200, '"completed"'], [401, '{}'], [429, ''], [500, run], [502, null]]) {
+    [200, 'null'], [200, '"completed"'], [401, '{}'], [429, ''], [500, run], [502, null],
+    [404, ''], [404, null], [404, '<html><body>404 page not found</body></html>'], [404, '404 page not found'],
+    [404, '[]'], [404, 'null'], [404, '{"error"']]) {
     assert.deepEqual(lireReponseSuivi(statut, corps), { issue: 'passager' }, `${statut} ${corps}`);
   }
 });
