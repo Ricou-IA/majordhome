@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CODES, STATUTS, DEMANDE_MAX, messageErreurAssistant, controlerDemande, appareilConnu,
-  construireConsigne, lireReponse, lienSur,
+  construireConsigne, lireReponse, lienSur, verdictRun, DUREE_MAX_RECHERCHE_MIN,
 } from '../src/lib/assistantPieces.js';
 
 const client = { nom: 'Gimenez', prenom: 'Joël', societe: null, telephone: '0612345678', telephone2: null, email: 'j.g@exemple.fr' };
@@ -86,4 +86,20 @@ test('messageErreurAssistant : Error, code inconnu, service injoignable', () => 
   assert.equal(messageErreurAssistant('nimporte_quoi'), messageErreurAssistant('service_injoignable'));
   assert.ok(!CODES.map(messageErreurAssistant).includes(messageErreurAssistant('service_injoignable')));
   assert.ok(!/\d/.test(messageErreurAssistant('quota_atteint')));
+});
+
+test('verdictRun : état du run Hermes + âge de la ligne → issue de la recherche', () => {
+  assert.equal(DUREE_MAX_RECHERCHE_MIN, 15);
+  for (const etat of ['queued', 'started', 'running', 'stopping']) {
+    assert.equal(verdictRun(etat, 1), 'en_cours');
+    assert.equal(verdictRun(etat, 15), 'echec_delai'); // la limite d'âge clôt un run resté en route
+  }
+  assert.equal(verdictRun('completed', 2), 'terminee');
+  assert.equal(verdictRun('completed', 60), 'terminee'); // une réponse arrivée l'emporte sur l'âge
+  for (const etat of ['failed', 'cancelled', 'interrupted']) assert.equal(verdictRun(etat, 3), 'echec_recherche');
+  // état inconnu (ou absent : Hermes injoignable) : encore en cours, jusqu'à la limite d'âge
+  assert.equal(verdictRun('bizarre', 14.9), 'en_cours');
+  assert.equal(verdictRun(undefined, 14.9), 'en_cours');
+  assert.equal(verdictRun(null, 16), 'echec_delai');
+  assert.equal(verdictRun('running', Number.NaN), 'echec_delai'); // âge illisible : on ferme, on ne boucle pas
 });
