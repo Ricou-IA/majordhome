@@ -1,0 +1,24 @@
+# Unité systemd UTILISATEUR (utilisateur « hermes ») : relais à forme fixe devant l'API d'Hermes.
+# Installation : voir README.md. Emplacement : ~/.config/systemd/user/hermes-relais-majordhome.service
+[Unit]
+Description=Relais à forme fixe devant l'API Hermes (Majordhome)
+After=hermes-gateway-majordhome.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/hermes-relais/relais.py
+# RELAIS_CLE, HERMES_CLE, RELAIS_HOTE, RELAIS_PORT, HERMES_AMONT, RELAIS_DELAI (fichier en mode 600).
+EnvironmentFile=%h/.config/hermes-relais/env
+Restart=always
+RestartSec=5
+# Code 2 = configuration refusée au démarrage : inutile de relancer en boucle, il faut corriger le fichier env.
+RestartPreventExitStatus=2
+
+# Durcissement compatible avec une unité utilisateur.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=default.target
