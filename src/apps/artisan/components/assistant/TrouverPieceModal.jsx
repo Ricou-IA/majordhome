@@ -20,6 +20,7 @@ import { assistantPiecesKeys } from '@hooks/cacheKeys';
 import { DEMANDE_MAX, controlerDemande, messageErreurAssistant } from '@/lib/assistantPieces';
 import { libelleEquipement } from '@/lib/equipmentReferential';
 import { formatDateTimeFR } from '@/lib/utils';
+import { logger } from '@lib/logger';
 import ReponsePieces from './ReponsePieces';
 
 const ETATS = { en_cours: 'En cours', terminee: 'Terminée', echec: 'Échec' };
@@ -73,7 +74,7 @@ export default function TrouverPieceModal({ equipment, interventionId = null, on
   const orgId = organization?.id;
   const queryClient = useQueryClient();
   const { index: referentiel } = useEquipmentReferential();
-  const { recherches, isLoading } = useRecherchesPieces(equipment.id);
+  const { recherches, isLoading, error: erreurHistorique } = useRecherchesPieces(equipment.id);
   const { lancer, isLaunching } = useLancerRecherche(equipment.id);
 
   const [demande, setDemande] = useState('');
@@ -87,6 +88,10 @@ export default function TrouverPieceModal({ equipment, interventionId = null, on
   const aSuivre = idAffiche && (!ligne || ligne.statut === 'en_cours') ? idAffiche : null;
   const termine = () => queryClient.invalidateQueries({ queryKey: assistantPiecesKeys.parEquipement(orgId, equipment.id) });
   const { suivi, error: erreurSuivi } = useSuiviRecherche(aSuivre, termine);
+
+  useEffect(() => {
+    if (erreurHistorique) logger.error('[TrouverPieceModal] historique des recherches illisible', erreurHistorique);
+  }, [erreurHistorique]);
 
   const lancement = useRef(false);
   useEffect(() => {
@@ -166,7 +171,8 @@ export default function TrouverPieceModal({ equipment, interventionId = null, on
                   <Loader2 className="w-4 h-4 animate-spin mt-0.5 flex-shrink-0" aria-hidden="true" />
                   <div>
                     <p>Recherche en cours, environ deux minutes. Vous pouvez fermer cette fenêtre.</p>
-                    {erreurSuivi && <p className="mt-1 text-xs text-secondary-600">Le suivi a rencontré un problème : {messageErreurAssistant(erreurSuivi)}</p>}
+                    {erreurSuivi && !suivi && <p className="mt-1 text-xs text-secondary-600">Suivi momentanément impossible, nouvel essai automatique…</p>}
+                    {erreurSuivi && suivi && <p className="mt-1 text-xs text-secondary-600">Le suivi a rencontré un problème : {messageErreurAssistant(erreurSuivi)}</p>}
                   </div>
                 </div>
               ) : <ReponsePieces recherche={courante} />}
@@ -174,7 +180,8 @@ export default function TrouverPieceModal({ equipment, interventionId = null, on
           )}
 
           {isLoading ? <p className="text-sm text-secondary-500">Chargement de l&apos;historique…</p>
-            : <Historique recherches={recherches} idAffiche={idAffiche} onChoisir={setChoix} />}
+            : erreurHistorique ? <p className="text-sm text-secondary-600">Historique indisponible pour le moment.</p>
+              : <Historique recherches={recherches} idAffiche={idAffiche} onChoisir={setChoix} />}
         </div>
       </div>
     </div>,
