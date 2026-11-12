@@ -22,7 +22,10 @@ Pourquoi : la clé de l'API d'Hermes permet, par des champs supplémentaires du 
   quel) et `session_id` (UUID). Tout autre champ reçu est ignoré.
 - Aucun en-tête reçu n'est transmis. Vers Hermes partent seulement : `Authorization: Bearer <HERMES_CLE>`,
   `Accept`, `User-Agent: relais-majordhome`, et pour `POST` `Content-Type` et `Idempotency-Key` (l'en-tête reçu
-  s'il est un UUID, sinon `session_id`).
+  s'il est un UUID, sinon `session_id`) ; s'y ajoutent ceux que la bibliothèque standard (`urllib` /
+  `http.client`) pose d'elle-même : `Host`, `Accept-Encoding: identity`, `Connection: close`, et pour `POST`
+  `Content-Length`. Liste complète : `Host`, `Accept-Encoding`, `Authorization`, `Accept`, `User-Agent`,
+  `Connection`, plus `Content-Type`, `Content-Length` et `Idempotency-Key` pour `POST`.
 - `run_id` accepté : `run_` suivi de 1 à 80 caractères `[A-Za-z0-9_-]`. Toute cible contenant `?`, `#`, `%`, `;`
   ou `\` répond 404.
 - La réponse d'Hermes est filtrée : seuls `run_id`, `status`, `output`, `usage`, `created_at`, `updated_at`
@@ -32,6 +35,10 @@ Pourquoi : la clé de l'API d'Hermes permet, par des champs supplémentaires du 
   `Transfer-Encoding` présent) ; `502 amont_indisponible` (Hermes injoignable, plus de `RELAIS_DELAI` secondes pour
   l'appel entier, redirection, 5xx, 401 d'Hermes, réponse non JSON ou de plus de 2 Mo) ; `503 sature` (plus de
   8 requêtes en cours).
+- Le plafond de 8 requêtes ne compte qu'à partir de la lecture des en-têtes terminée : la phase de lecture de la
+  ligne de requête et des en-têtes n'est pas bornée par ce plafond (chaque connexion a seulement son délai de
+  socket). La protection contre un client lent ou une avalanche de connexions est le **reverse proxy** (délais,
+  limite de débit) : le relais ne doit jamais être exposé sans lui.
 - Journal (stdout, donc `journalctl --user`) : une ligne par requête — horodatage, méthode, nom de route
   (`sante`, `lancer`, `suivre`, `inconnue`), statut, durée, et pour un 502 la raison (`amont=delai`,
   `amont=cle_hermes_refusee`…). Jamais la cible brute, le corps, le texte de la recherche, une clé ni un en-tête.
@@ -51,6 +58,11 @@ Le relais refuse de démarrer (code de sortie 2, message sur stderr qui nomme la
 valeur) si une clé est vide ou contient autre chose que de l'ASCII visible, si les deux clés sont identiques, si
 `HERMES_AMONT` sort de la boucle locale, ou si un nombre est invalide.
 
+Le fichier est lu par `EnvironmentFile` de systemd, qui **interprète** certains caractères : une clé contenant
+`\`, `"` ou `$` arriverait modifiée au relais (qui verrait alors une autre clé que celle de Supabase). Générer la
+clé du relais par `openssl rand -hex 32` (hexadécimal seul) ; si la clé d'Hermes contient un de ces caractères,
+la régénérer côté Hermes plutôt que de l'échapper à la main.
+
 ## Installation (utilisateur `hermes` sur le VPS)
 
 ```sh
@@ -58,15 +70,25 @@ mkdir -p ~/hermes-relais ~/.config/hermes-relais ~/.config/systemd/user
 cp relais.py ~/hermes-relais/relais.py
 cp hermes-relais-majordhome.service ~/.config/systemd/user/
 
-# Fichier des variables, lisible par hermes seul. Clé du relais neuve et distincte de celle d'Hermes :
-#   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+# Fichier des variables, lisible par hermes seul. Clé du relais neuve et distincte de celle d'Hermes,
+# en hexadécimal (aucun caractère interprété par EnvironmentFile) :
+#   openssl rand -hex 32
 install -m 600 /dev/null ~/.config/hermes-relais/env
 "${EDITOR:-nano}" ~/.config/hermes-relais/env      # RELAIS_CLE=…  HERMES_CLE=…  (une variable par ligne)
 
+# AVANT systemctl --user, une fois, par un administrateur : sans « linger », le gestionnaire utilisateur de hermes
+# n'existe que pendant une session ouverte, et l'unité s'arrêterait à la déconnexion.
+loginctl enable-linger hermes
+
 systemctl --user daemon-reload
 systemctl --user enable --now hermes-relais-majordhome.service
-loginctl enable-linger hermes        # une fois, par un administrateur : l'unité vit sans session ouverte
 ```
+
+Durcissement de l'unité : seul `NoNewPrivileges=yes` s'applique réellement. Constaté sur le VPS (Ubuntu 24.04,
+unité utilisateur, AppArmor restreint les espaces de noms non privilégiés) : `PrivateTmp`, `ProtectSystem` et
+`ProtectHome` sont acceptés mais **ignorés sans message**. Ils restent dans l'unité pour le jour où elle deviendrait
+une unité système ; d'ici là, le relais n'a ni `/tmp` privé ni système de fichiers en lecture seule, et rien ne doit
+supposer le contraire.
 
 Puis : l'API d'Hermes n'écoute plus que sur `127.0.0.1` ; le reverse proxy expose le relais (TLS, limite de
 débit) ; les secrets Supabase `MDH_HERMES_URL` et `MDH_HERMES_KEY` désignent le relais et sa clé.
