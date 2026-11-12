@@ -234,6 +234,60 @@ ne perd pas le résultat ; couper Hermes laisse la fiche SAV utilisable avec un 
 - **Machine partagée** : un navigateur par recherche sur un VPS à 2 cœurs ; d'où le plafond de deux recherches à la fois.
 - **Prix qui bougent** : une recherche relue dans l'historique porte sa date ; elle n'est pas rafraîchie.
 
+## 11. Révision du 2026-11-12 — relais à forme fixe, et garanties réelles après vérification
+
+Les preuves de l'étape 0 ont été refaites par un vérificateur indépendant, en lecture seule sur le VPS. Ce qu'il a
+établi change le branchement du § 4 et précise ce que le § 2 peut réellement promettre.
+
+### 11.1 Ce qui a été trouvé
+
+- **La clé de l'API d'Hermes donne plus que les trois outils réglés.** Un corps de `POST /v1/runs` qui porte les champs
+  `hosted_room_dispatch` et `_room_execution_policy` (fonction « salons hébergés » d'Hermes, empreinte recalculable
+  sans secret) remplace la liste d'outils de la configuration : 21 outils au lieu de 13, confirmations coupées, nombre
+  de tours choisi par l'appelant. Terminal et fichiers restent absents, et l'exécution de code échouerait, **uniquement**
+  parce que `TERMINAL_ENV=none` est posé dans le `.env` du profil. Prouvé au niveau des fonctions d'Hermes, pas par une
+  vraie requête. Il faut détenir la clé : une page web piégée ne peut pas s'en servir.
+- **Avant durcissement, le navigateur local d'Hermes ouvrait les adresses internes du serveur** (n8n, conteneurs) et,
+  d'après le code, les fichiers locaux (`file:`). `TERMINAL_ENV=none` réactive la garde native d'Hermes : adresses
+  privées, noms publics qui résolvent en privé, écritures exotiques d'une IP et `file:` sont refusés (preuve par un
+  essai réel : l'outil a été appelé et a refusé).
+
+### 11.2 Décision — un relais devant Hermes (Eric, 2026-11-12)
+
+L'edge function ne parle plus à l'API d'Hermes mais à un **relais** installé sur le VPS :
+
+```
+écran → edge function → relais (VPS, exposé en HTTPS) → API d'Hermes (boucle locale du VPS) → web
+```
+
+- Le relais n'accepte que **deux requêtes** : démarrer une recherche (`POST /v1/runs`) et lire son état
+  (`GET /v1/runs/{id}`), plus un contrôle de vie. Tout le reste répond 404.
+- Il **reconstruit** le corps envoyé à Hermes à partir de deux champs seulement, le texte de la recherche et
+  l'identifiant de notre ligne. Aucun autre champ reçu n'est transmis : les deux champs en cause n'atteignent jamais
+  Hermes. Il ne renvoie de l'état que les champs utiles (état, texte, consommation, dates).
+- **La clé d'Hermes ne quitte plus le VPS.** Le relais a sa propre clé, la seule confiée à Supabase. L'API d'Hermes
+  n'écoute plus que sur la boucle locale (`127.0.0.1`) : même un conteneur du VPS ne la joint plus.
+- Le relais est un petit programme sans dépendance, versionné dans ce dépôt (`ops/hermes-relais/`), lancé par une
+  unité systemd de l'utilisateur `hermes`. Il ne journalise jamais le texte des recherches.
+- `TERMINAL_ENV=none` **porte une partie de la sécurité** : il est doublé par `terminal.backend: none` dans le
+  `config.yaml` du profil, et tout changement de l'un ou de l'autre impose de rejouer les preuves.
+
+Côté application, rien ne change dans le code : les secrets `MDH_HERMES_URL` et `MDH_HERMES_KEY` désignent le relais.
+
+### 11.3 Ce que l'on garantit vraiment (remplace les formulations plus fortes des § 2 et § 5)
+
+- **`tereva.fr` et Domos** *(constat de la vérification, formulation à valider par Eric)* : refusés par consigne et à
+  la première page ouverte. Une redirection, un lien cliqué ou une adresse déguisée peuvent encore y mener le
+  navigateur : la liste noire d'Hermes ne revérifie pas ces chemins. Un blocage étanche demande un filtrage réseau
+  sur le VPS (pare-feu ou proxy sortant), non fait.
+- **Page piégée** : elle ne peut ni lire une adresse interne ni un fichier, ni obtenir d'autres outils. Elle peut
+  encore faire partir des requêtes « à l'aveugle » vers un service interne (sans en lire la réponse), fausser une
+  réponse, et faire durer une recherche jusqu'au plafond de tours. Le navigateur tourne sans bac à sable
+  (`--no-sandbox`) : une faille de Chromium donnerait la main sur l'utilisateur `hermes`, donc sur les deux profils.
+- **Durcissements proposés, non faits (décision d'Eric)** : pare-feu du noyau limité au service du profil, contre les
+  requêtes à l'aveugle et pour un blocage étanche des sites exclus ; mise à jour d'Hermes si une version corrige le
+  remplacement d'outils par le corps de requête.
+
 ## Annexe — l'essai du 2026-11-11, référence de qualité
 
 **Consigne envoyée (aucune donnée du client)**
