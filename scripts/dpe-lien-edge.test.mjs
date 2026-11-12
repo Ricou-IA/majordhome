@@ -71,13 +71,14 @@ test("projeterCandidat : ne laisse passer que les champs lus par l'écran", () =
 });
 
 // --- Refonte 2026-11-12 : décision de rattachement automatique ------------------------------------------------
-import { decisionRattachement, cleBatiment, SCORE_GEOCODAGE_MIN, TYPES_GEOCODAGE_ACCEPTES, FIABILITES_BDNB_ACCEPTEES, RATTACHEMENT_AUTO_ACTIF } from '../supabase/functions/dpe-lien/regles.js';
+import { decisionRattachement, cleBatiment, cleBanAdeme, SCORE_GEOCODAGE_MIN, TYPES_GEOCODAGE_ACCEPTES, FIABILITES_BDNB_ACCEPTEES, RATTACHEMENT_AUTO_ACTIF } from '../supabase/functions/dpe-lien/regles.js';
 
 const GEO = { score: Math.max(SCORE_GEOCODAGE_MIN, 0.95), type: TYPES_GEOCODAGE_ACCEPTES[0], cle_ban: '31570_0080_00423' };
 const CAND = (o = {}) => ({ identifiant_dpe: '2631E0482288Y', date_etablissement_dpe: '2026-02-18', etiquette_dpe: 'A',
   surface_habitable_logement: 114, type_batiment: 'dpe maison individuelle', fiabilite_geocodage: FIABILITES_BDNB_ACCEPTEES[0], ...o });
 const MAISON = { dossier: { methode_application_dpe: 'dpe maison individuelle' }, composants: [{}] };
-const decide = (o) => decisionRattachement({ geocodage: GEO, candidats: [CAND()], dossierUnique: MAISON, ecartes: [], autoActif: true, ...o });
+const decide = (o) => decisionRattachement({ geocodage: GEO, candidats: [CAND()], dossierUnique: MAISON, ecartes: [],
+  cleBanDpe: GEO.cle_ban, autoActif: true, ...o });
 
 test('decisionRattachement : automatique coupé ⇒ le DPE unique et sûr est PROPOSÉ, pas rattaché', () => {
   const d = decide({ autoActif: false });
@@ -86,9 +87,11 @@ test('decisionRattachement : automatique coupé ⇒ le DPE unique et sûr est PR
   assert.equal(d.candidats.length, 1);
 });
 
-test('decisionRattachement : sans option, la constante RATTACHEMENT_AUTO_ACTIF décide', () => {
-  const d = decisionRattachement({ geocodage: GEO, candidats: [CAND()], dossierUnique: MAISON, ecartes: [] });
+test('decisionRattachement : sans option, la constante RATTACHEMENT_AUTO_ACTIF décide — active depuis la mesure', () => {
+  const d = decisionRattachement({ geocodage: GEO, candidats: [CAND()], dossierUnique: MAISON, ecartes: [], cleBanDpe: GEO.cle_ban });
   assert.equal(d.etat, RATTACHEMENT_AUTO_ACTIF ? 'rattache' : 'candidats');
+  // Mesure sur toute la base Mayer le 2026-11-12 : 263 rattachements, aucun mauvais connu.
+  assert.equal(RATTACHEMENT_AUTO_ACTIF, true);
 });
 
 test('decisionRattachement : un seul DPE, tout est sûr ⇒ rattaché automatiquement', () => {
@@ -143,6 +146,26 @@ test('decisionRattachement : automatique pour une MAISON seulement — un appart
   assert.equal(decide({ dossierUnique: { dossier: {} } }).etat, 'candidats');
   assert.equal(decide({ dossierUnique: dossier('dpe issu d\'une étude thermique réglementaire RE2020 bâtiment : maison individuelle') }).etat, 'rattache');
   assert.equal(decide({ dossierUnique: dossier('DPE Maison Individuelle') }).etat, 'rattache');
+});
+
+test('decisionRattachement : automatique seulement si la clé BAN du DPE est celle de la fiche', () => {
+  // Mesure sur toute la base (2026-11-12) : un groupe de bâtiments BDNB couvre parfois plusieurs adresses voisines
+  // (17 / 15 Côte du Tarn, 49 / 49 bis, 384 / 398…) — 6 mauvais rattachements sur 281 sans cette condition, 0 avec.
+  assert.equal(decide({}).etat, 'rattache');
+  assert.equal(decide({ cleBanDpe: '31570_0080_00425' }).etat, 'candidats');
+  assert.equal(decide({ cleBanDpe: '31570_0080_00423_bis' }).etat, 'candidats');
+  assert.equal(decide({ cleBanDpe: null }).etat, 'candidats');
+  assert.equal(decide({ cleBanDpe: undefined }).etat, 'candidats');
+  assert.equal(decide({ cleBanDpe: '' }).etat, 'candidats');
+});
+
+test('cleBanAdeme : clé BAN d\'un DPE lue dans la réponse ADEME, null sinon', () => {
+  assert.equal(cleBanAdeme({ results: [{ identifiant_ban: '81099_1030_00003' }] }), '81099_1030_00003');
+  assert.equal(cleBanAdeme({ results: [{ identifiant_ban: '' }] }), null);
+  assert.equal(cleBanAdeme({ results: [{}] }), null);
+  assert.equal(cleBanAdeme({ results: [] }), null);
+  assert.equal(cleBanAdeme(null), null);
+  assert.equal(cleBanAdeme('pas un objet'), null);
 });
 
 test('decisionRattachement : un numéro écarté (« Ce n\'est pas le bon ») n\'est plus proposé', () => {

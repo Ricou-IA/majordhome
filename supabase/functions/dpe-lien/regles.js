@@ -107,15 +107,16 @@ export function projeterCandidat(ligne) {
 
 // ============================================================================
 // Rattachement automatique (refonte 2026-11-12, spec 2026-11-12-logement-monsieurdpe-fiche-client-design.md §5).
-// Seuils PROVISOIRES : à remplacer par la mesure de scripts/dpe/mesure-rattachement-auto.mjs (plan, tâche 1).
+// Seuils fixés par la mesure sur TOUTE la base Mayer le 2026-11-12 (3 493 clients, scripts/dpe/
+// mesure-rattachement-auto.mjs) : 431 bâtiments à DPE unique, 263 rattachés d'office, aucun mauvais connu. Sans la
+// condition de clé BAN, 6 mauvais sur 281 (groupe de bâtiments BDNB couvrant plusieurs adresses voisines).
 // ============================================================================
 
 /**
- * Interrupteur du rattachement AUTOMATIQUE. Faux tant que la mesure de la tâche 1 n'a pas fixé les seuils
- * (le géocodeur national répondait 504 le 2026-11-12, la mesure n'a pas pu tourner) : un DPE unique et sûr est
- * alors PROPOSÉ en un clic, jamais rattaché seul. Spec §10 : pas d'automatique avant la mesure.
+ * Interrupteur du rattachement AUTOMATIQUE (activé le 2026-11-12 après la mesure). Faux : un DPE unique et sûr est
+ * PROPOSÉ en un clic, jamais rattaché seul.
  */
-export const RATTACHEMENT_AUTO_ACTIF = false;
+export const RATTACHEMENT_AUTO_ACTIF = true;
 
 /** Score minimal du géocodage IGN de l'adresse du client (0 à 1). */
 export const SCORE_GEOCODAGE_MIN = 0.8;
@@ -137,16 +138,30 @@ export function cleBatiment(geocodage) {
 }
 
 /**
+ * Clé BAN propre à un DPE, lue dans la réponse du fichier ADEME (`identifiant_ban` : l'adresse du diagnostic
+ * géocodée par l'ADEME). `null` si absente (DPE neuf hors du fichier des logements existants, réponse illisible).
+ * @param {unknown} reponse corps JSON de `GET …/datasets/<dpe-existants>/lines?qs=numero_dpe:"…"`
+ * @returns {string | null}
+ */
+export function cleBanAdeme(reponse) {
+  const r0 = reponse && typeof reponse === 'object' && Array.isArray(reponse.results) ? reponse.results[0] : null;
+  const cle = r0 && typeof r0 === 'object' ? r0.identifiant_ban : null;
+  return typeof cle === 'string' && cle ? cle : null;
+}
+
+/**
  * Décide du rattachement à partir du géocodage de l'adresse du client, des DPE du bâtiment et, quand il n'y en a
- * qu'un, de son dossier. La machine ne choisit JAMAIS entre plusieurs candidats.
- * @param {{ geocodage: { score?: number, type?: string } | null, candidats: unknown[],
- *   dossierUnique: { dossier?: Record<string, unknown> | null } | null, ecartes: string[], autoActif?: boolean }} p
+ * qu'un, de son dossier et de sa clé BAN ADEME. La machine ne choisit JAMAIS entre plusieurs candidats.
+ * @param {{ geocodage: { score?: number, type?: string, cle_ban?: string } | null, candidats: unknown[],
+ *   dossierUnique: { dossier?: Record<string, unknown> | null } | null, ecartes: string[],
+ *   cleBanDpe?: string | null, autoActif?: boolean }} p
  * @returns {{ etat: 'rattache' | 'candidats' | 'aucun_dpe' | 'adresse_non_trouvee', numero?: string,
  *   candidats: Record<string, unknown>[] }}
  */
-export function decisionRattachement({ geocodage, candidats, dossierUnique, ecartes, autoActif = RATTACHEMENT_AUTO_ACTIF }) {
+export function decisionRattachement({ geocodage, candidats, dossierUnique, ecartes, cleBanDpe = null, autoActif = RATTACHEMENT_AUTO_ACTIF }) {
   // Adresse introuvable OU reconnue seulement à la rue / au lieu-dit : le bâtiment n'est pas identifié.
-  if (!cleBatiment(geocodage)) return { etat: 'adresse_non_trouvee', candidats: [] };
+  const cle = cleBatiment(geocodage);
+  if (!cle) return { etat: 'adresse_non_trouvee', candidats: [] };
   const exclus = new Set(ecartes || []);
   const liste = (Array.isArray(candidats) ? candidats : [])
     .map(projeterCandidat)
@@ -159,11 +174,14 @@ export function decisionRattachement({ geocodage, candidats, dossierUnique, ecar
   // Maison individuelle seulement (neuf RT2012 / RE2020 compris) : le seul DPE d'un immeuble peut être celui d'un
   // AUTRE appartement à la même adresse, ce que ni le géocodage ni la BDNB ne distinguent. Un appartement est
   // proposé en un clic. Couvre aussi l'appartement dérivé de l'immeuble (piège d'échelle).
+  // Clé BAN du DPE = clé de la fiche : le groupe de bâtiments BDNB peut couvrir plusieurs adresses voisines, et son
+  // seul DPE être celui du 15 quand le client habite au 17 — la même adresse, au numéro près, ou rien d'office.
   const sur = autoActif === true
     && typeof geocodage.score === 'number' && geocodage.score >= SCORE_GEOCODAGE_MIN
     && TYPES_GEOCODAGE_ACCEPTES.includes(geocodage.type)
     && FIABILITES_BDNB_ACCEPTEES.includes(seul.fiabilite_geocodage)
-    && methode.includes('maison individuelle');
+    && methode.includes('maison individuelle')
+    && typeof cleBanDpe === 'string' && cleBanDpe === cle;
   return sur ? { etat: 'rattache', numero: seul.identifiant_dpe, candidats: liste } : { etat: 'candidats', candidats: liste };
 }
 

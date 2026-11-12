@@ -63,9 +63,12 @@ But : sur la fiche client, un seul bloc Logement, alimenté par le corpus Monsie
 **Règle** — automatique seulement si TOUT est vrai :
 
 1. Le bâtiment à l'adresse porte **exactement un** DPE dans le corpus.
-2. Le géocodage de l'adresse du client par le corpus est fiable (score mesuré, seuil à fixer par la mesure du §10).
-3. Le rattachement BDNB de ce DPE est fiable (`fiabilite_geocodage`, valeurs retenues fixées par la mesure du §10).
-4. Le DPE n'est pas un appartement dérivé de l'immeuble.
+2. Le géocodage de l'adresse du client est au numéro (`housenumber`) avec un score ≥ 0,8.
+3. Le rattachement BDNB de ce DPE est « très fiable » ou « fiable » (`fiabilite_geocodage`).
+4. Le DPE est celui d'une **maison individuelle** (neuf RT2012 / RE2020 compris) : le seul DPE d'un immeuble peut être celui d'un autre appartement à la même adresse.
+5. La clé BAN propre au DPE (`identifiant_ban` du fichier ADEME) est **celle de la fiche** : un groupe de bâtiments BDNB couvre parfois plusieurs adresses voisines.
+
+**Mesure (2026-11-12, toute la base Mayer, 3 493 clients)** : 835 adresses reconnues seulement à la rue ou au lieu-dit (pas de bâtiment identifiable, « adresse non reconnue au numéro près »), 431 bâtiments à DPE unique, **263 rattachés d'office, aucun mauvais connu**. Sans la condition 5, 6 mauvais sur 281 (17 / 15 Côte du Tarn, 49 / 49 bis, 384 / 398…). La condition 5 renvoie en « à confirmer » 5 bons cas (écarts de version de la BAN, géocodage ADEME approximatif) et les 7 DPE neufs absents du fichier ADEME.
 
 Tout le reste (plusieurs DPE, une condition douteuse) produit des **candidats proposés**, choisis en un clic. Aucun candidat n'est présélectionné.
 

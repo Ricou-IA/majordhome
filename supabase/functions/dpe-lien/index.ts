@@ -34,7 +34,7 @@ import { adresseNormalisee } from "../_shared/dpeLien.js";
 import { DPE_RAPPORT_EMAIL_TEMPLATE_KEY } from "../_shared/dpeRapportEmailTemplate.js";
 import {
   numeroValide, adresseDeRecherche, codeDepuisCorpus, resumeDossier, rapportCompletPossible, projeterCandidat,
-  decisionRattachement, controleNumero, cleBatiment,
+  decisionRattachement, controleNumero, cleBatiment, cleBanAdeme,
 } from "./regles.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -46,6 +46,8 @@ const PARTENAIRE_SECRET = Deno.env.get("MDH_DPE_PARTENAIRE_SECRET") || "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 
 const GEOCODAGE_URL = "https://data.geopf.fr/geocodage/search";
+/** Fichier public ADEME des DPE de logements existants (même jeu que la recherche « DPE publics » de la fiche). */
+const ADEME_DPE_URL = "https://data.ademe.fr/data-fair/api/v1/datasets/meg-83tjwtg8dyz4vv7h1dqe/lines";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DELAI_MS = 10_000;
 /** Le PDF du rapport complet se fabrique à la demande chez MonsieurDPE (maxDuration 60 s côté site). */
@@ -97,6 +99,25 @@ async function geocoder(adresse: string): Promise<{ score: number; type: string;
   } catch (e) {
     console.error(`[dpe-lien] géocodage injoignable : ${sanitizeError(e, "erreur réseau")}`);
     return undefined;
+  }
+}
+
+/**
+ * Clé BAN propre à un DPE (ADEME `identifiant_ban`), condition du rattachement automatique. Ne lève jamais :
+ * une panne ADEME ou un DPE absent du fichier rend `null`, donc un candidat à confirmer, jamais un rattachement.
+ */
+async function cleBanDuDpe(numero: string): Promise<string | null> {
+  try {
+    const qs = encodeURIComponent(`numero_dpe:"${numero}"`);
+    const r = await fetch(`${ADEME_DPE_URL}?qs=${qs}&select=identifiant_ban&size=1`, { signal: AbortSignal.timeout(DELAI_MS) });
+    if (!r.ok) {
+      console.error(`[dpe-lien] ADEME HTTP ${r.status}`);
+      return null;
+    }
+    return cleBanAdeme(await r.json().catch(() => null));
+  } catch (e) {
+    console.error(`[dpe-lien] ADEME injoignable : ${sanitizeError(e, "erreur réseau")}`);
+    return null;
   }
 }
 
@@ -235,6 +256,7 @@ Deno.serve(async (req) => {
       }
       let candidats: unknown[] = [];
       let dossierUnique: Record<string, unknown> | null = null;
+      let cleBanDpe: string | null = null;
       // Pas de clé de bâtiment (lieu-dit, rue sans numéro) : on n'interroge pas le corpus, qui refuserait une clé
       // de rue — la décision rend « adresse non trouvée », jamais une panne.
       const cle = cleBatiment(geocodage);
@@ -246,11 +268,13 @@ Deno.serve(async (req) => {
         candidats = Array.isArray(b.data?.dpe) ? (b.data?.dpe as unknown[]) : [];
         const restants = candidats.map(projeterCandidat).filter((c) => c && numeroValide(c.identifiant_dpe) && !ecartes.includes(c.identifiant_dpe as string));
         if (restants.length === 1) {
-          const d = await corpus(`/dossier/${encodeURIComponent(restants[0]!.identifiant_dpe as string)}`);
+          const numero = restants[0]!.identifiant_dpe as string;
+          const d = await corpus(`/dossier/${encodeURIComponent(numero)}`);
           dossierUnique = d.code ? null : d.data;
+          if (dossierUnique) cleBanDpe = await cleBanDuDpe(numero);
         }
       }
-      const decision = decisionRattachement({ geocodage, candidats, dossierUnique, ecartes });
+      const decision = decisionRattachement({ geocodage, candidats, dossierUnique, ecartes, cleBanDpe });
       const patch: Record<string, unknown> = { etat: decision.etat, adresse_tentee: adresseTentee, candidats: decision.candidats };
       if (decision.etat === "rattache") Object.assign(patch, { dpe_number: decision.numero }, patchCarte(dossierUnique));
       return reponseEcriture(await enregistrer(client.id, "tentative", patch));
