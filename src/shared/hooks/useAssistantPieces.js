@@ -31,7 +31,10 @@ export function useRecherchesPieces(equipmentId) {
   return { recherches: data || [], isLoading, error };
 }
 
-/** `{ lancer, isLaunching }` — lance une recherche ; rafraîchit l'historique de l'appareil. */
+/**
+ * `{ lancer, isLaunching }` — lance une recherche ; rafraîchit l'historique de l'appareil, que le lancement
+ * réussisse ou échoue (un échec après l'ouverture de la ligne laisse une recherche en échec à afficher).
+ */
 export function useLancerRecherche(equipmentId) {
   const { organization } = useAuth();
   const orgId = organization?.id;
@@ -39,14 +42,15 @@ export function useLancerRecherche(equipmentId) {
   const mutation = useMutation({
     mutationFn: ({ interventionId = null, demande }) =>
       unwrapResult(assistantPiecesService.lancer(orgId, { equipmentId, interventionId, demande })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: assistantPiecesKeys.parEquipement(orgId, equipmentId) }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: assistantPiecesKeys.parEquipement(orgId, equipmentId) }),
   });
   return { lancer: mutation.mutateAsync, isLaunching: mutation.isPending };
 }
 
 /**
- * `{ suivi, isLoading, error }` — suit une recherche toutes les 5 s tant qu'elle est `en_cours`.
- * `onTermine` est appelé UNE fois par recherche, quand son état devient final.
+ * `{ suivi, isLoading, error }` — suit une recherche toutes les 5 s tant qu'elle est `en_cours`, ou tant qu'aucun
+ * suivi n'a encore abouti (un premier appel en échec ne doit pas arrêter le suivi : on réessaie toutes les 5 s, et
+ * `error` le dit à l'écran). `onTermine` est appelé UNE fois par recherche, quand son état devient final.
  */
 export function useSuiviRecherche(id, onTermine) {
   const { organization } = useAuth();
@@ -55,7 +59,7 @@ export function useSuiviRecherche(id, onTermine) {
     queryKey: assistantPiecesKeys.detail(orgId, id),
     queryFn: lire(() => assistantPiecesService.suivre(orgId, id)),
     enabled: !!orgId && !!id,
-    refetchInterval: (query) => (query.state.data?.statut === 'en_cours' ? 5000 : false),
+    refetchInterval: (query) => (!query.state.data || query.state.data.statut === 'en_cours' ? 5000 : false),
     retry: 1,
   });
 
