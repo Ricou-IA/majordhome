@@ -109,7 +109,8 @@ export async function suivreRecherche(
 
   const reponse = await appeler(`/v1/runs/${encodeURIComponent(r.run_id)}`, { method: "GET" });
   const lu = lireReponseSuivi(reponse.statut, reponse.texte);
-  // Hermes ne connaît plus ce run (fini depuis plus d'une heure, ou redémarré).
+  // Hermes ne connaît plus ce run (fini depuis plus d'une heure, ou redémarré) : 404 dont le corps est un objet JSON,
+  // forme de toutes les réponses du relais. Un 404 d'ailleurs (page du reverse proxy) est une panne passagère.
   if (lu.issue === "inconnu") return await delaiDepasse();
   if (lu.issue === "passager" && reponse.statut !== null && reponse.statut >= 400 && reponse.statut < 500) {
     console.error(`[assistant-pieces] Hermes a refusé la lecture du run : HTTP ${reponse.statut}`);

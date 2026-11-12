@@ -23,7 +23,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOrgMembership, jsonResponse, buildCorsHeaders, sanitizeError } from "../_shared/auth.ts";
 import { moduleActif } from "../_shared/modules.js";
-import { appareilConnu, controlerDemande, construireConsigne } from "../_shared/assistantPieces.js";
+import { appareilConnu, cheminPlaqueValide, controlerDemande, construireConsigne } from "../_shared/assistantPieces.js";
 import { demarrerRun, hermesConfigure, suivreRecherche } from "../_shared/assistantHermes.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -80,6 +80,7 @@ Deno.serve(async (req) => {
     const { data: autorise, error: errDroit } = await user.rpc("user_can", {
       p_org_id: orgId, p_resource: "assistant_pieces", p_action: "use",
     });
+    if (errDroit) console.error(`[assistant-pieces] user_can en erreur : code ${errDroit.code ?? "inconnu"}`);
     if (errDroit || autorise !== true) return refus("droit_requis");
 
     // ------------------------------------------------------------------ lancer
@@ -165,19 +166,25 @@ Deno.serve(async (req) => {
       if (errOuvrir) {
         if (errOuvrir.code === "P0002") return refus("equipement_introuvable"); // équipement ou intervention
         if (errOuvrir.code === "22023") return refus("demande_vide");
-        if (errOuvrir.code === "42501") return refus("droit_requis");
+        // Le refus explicite de la RPC (RAISE … 'not_authorized') ; un autre 42501 est un privilège manquant → 500.
+        if (errOuvrir.code === "42501" && errOuvrir.message === "not_authorized") return refus("droit_requis");
         throw errOuvrir;
       }
       if (typeof idRecherche !== "string" || !UUID.test(idRecherche)) throw new Error("assistant_recherche_ouvrir sans id");
 
       // Photo de la plaque : seulement si la lecture en a été prouvée (ASSISTANT_PIECES_PLAQUE=on) et si le chemin
-      // est bien rangé sous l'org. Lien signé 15 min ; un échec n'empêche pas la recherche.
+      // est celui de CET équipement sous l'org validée (<org>/…/equipements/<equipment_id>-plaque.jpg). Lien signé
+      // 15 min ; un chemin hors de cette forme ou un échec de signature n'empêche pas la recherche (sans plaque).
       let plaqueUrl: string | null = null;
       const chemin = equipement.nameplate_photo_path;
-      if (PLAQUE_ACTIVE && chemin && chemin.startsWith(`${orgId}/`)) {
-        const { data: signe, error: errSigne } = await admin.storage.from(BUCKET_PLAQUE).createSignedUrl(chemin, DUREE_LIEN_PLAQUE_S);
-        if (errSigne) console.error(`[assistant-pieces] lien de la plaque impossible : ${sanitizeError(errSigne, "erreur storage")}`);
-        plaqueUrl = signe?.signedUrl ?? null;
+      if (PLAQUE_ACTIVE && chemin) {
+        if (!cheminPlaqueValide(chemin, orgId, equipmentId)) {
+          console.error(`[assistant-pieces] chemin de plaque hors forme attendue, plaque non envoyée (équipement ${equipmentId})`);
+        } else {
+          const { data: signe, error: errSigne } = await admin.storage.from(BUCKET_PLAQUE).createSignedUrl(chemin, DUREE_LIEN_PLAQUE_S);
+          if (errSigne) console.error(`[assistant-pieces] lien de la plaque impossible : ${sanitizeError(errSigne, "erreur storage")}`);
+          plaqueUrl = signe?.signedUrl ?? null;
+        }
       }
 
       const consigne = construireConsigne({ appareil, demande, plaqueUrl });
@@ -225,7 +232,10 @@ Deno.serve(async (req) => {
 
     return refus("action_inconnue");
   } catch (e) {
-    console.error(`[assistant-pieces] ${action || "?"} : ${sanitizeError(e, "erreur interne")}`);
+    // Le code Postgres / PostgREST quand il existe (jamais la demande, le client ni une clé).
+    const code = e && typeof e === "object" && typeof (e as { code?: unknown }).code === "string"
+      ? (e as { code: string }).code : null;
+    console.error(`[assistant-pieces] ${action || "?"}${code ? ` (code ${code})` : ""} : ${sanitizeError(e, "erreur interne")}`);
     return jsonResponse({ error: sanitizeError(e, "erreur interne") }, 500, req);
   }
 });
