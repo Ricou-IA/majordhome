@@ -235,3 +235,7 @@ verify_jwt = true
 # assistant-pieces : pièce détachée cherchée par Hermes (VPS) pour un appareil. JWT user + module assistant + assistant_pieces.use + plafond jour. 2026-11-12.
 [functions.assistant-pieces]
 verify_jwt = true
+
+# assistant-pieces-cron : balayage chaque minute des recherches de pièces restées en cours — protégée par MDH_CRON_SECRET. 2026-11-13.
+[functions.assistant-pieces-cron]
+verify_jwt = false
