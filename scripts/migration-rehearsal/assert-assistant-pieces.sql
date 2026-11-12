@@ -218,7 +218,8 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'majordhome' AND tablename = 'assistant_quotas') THEN
     RAISE EXCEPTION '(5) une policy existe sur les quotas';
   END IF;
-  IF (SELECT array_to_string(c.reloptions, ',') FROM pg_class c WHERE c.oid = 'public.majordhome_assistant_recherches'::regclass) NOT LIKE '%security_invoker=true%' THEN
+  -- IS NOT TRUE : des reloptions NULL (aucune option) donnent NULL au LIKE, et doivent aussi lever.
+  IF ((SELECT array_to_string(c.reloptions, ',') FROM pg_class c WHERE c.oid = 'public.majordhome_assistant_recherches'::regclass) LIKE '%security_invoker=true%') IS NOT TRUE THEN
     RAISE EXCEPTION '(5) vue sans security_invoker';
   END IF;
 
