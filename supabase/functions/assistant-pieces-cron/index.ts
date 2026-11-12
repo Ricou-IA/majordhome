@@ -15,6 +15,8 @@
 //   3. suivreRecherche(admin, ligne), une ligne après l'autre (le serveur d'Hermes est petit
 //      et n'accepte que deux runs simultanés) ; budget de 40 s, le reste passe à la minute suivante.
 //
+// Réponse : 200 { vues, closes, en_cours, erreurs, reportees } ; 500 avec le même corps quand des suivis ont
+// échoué et qu'aucun n'a abouti (closes + en_cours = 0).
 // Journal : l'id de la ligne seulement, jamais la demande ni la réponse.
 // Env requis : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, MDH_CRON_SECRET (+ MDH_HERMES_URL / MDH_HERMES_KEY
 // lus par le module partagé, et seulement s'il y a des lignes à suivre).
@@ -78,7 +80,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return jsonResponse({ vues: lignes.length, closes, en_cours: enCours, erreurs, reportees }, 200, req);
+    // Tous les suivis tentés ont échoué (base ou Hermes injoignable…) : 500, pour que la panne se voie dans
+    // net._http_response et les journaux ; le corps garde les compteurs.
+    const statutHttp = erreurs > 0 && closes + enCours === 0 ? 500 : 200;
+    return jsonResponse({ vues: lignes.length, closes, en_cours: enCours, erreurs, reportees }, statutHttp, req);
   } catch (e) {
     return jsonResponse({ error: sanitizeError(e, "assistant-pieces-cron failed") }, 500, req);
   }
