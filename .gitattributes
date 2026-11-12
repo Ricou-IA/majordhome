@@ -1,0 +1,3 @@
+# Fins de ligne LF forcées pour le relais installé sur le VPS (Linux) : empreinte de relais.py vérifiée au déploiement,
+# unité systemd et README lus sur le serveur. Ne renormalise rien d'autre dans le dépôt.
+ops/hermes-relais/* text eol=lf

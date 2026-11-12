@@ -14,7 +14,10 @@ RestartSec=5
 # Code 2 = configuration refusée au démarrage : inutile de relancer en boucle, il faut corriger le fichier env.
 RestartPreventExitStatus=2
 
-# Durcissement compatible avec une unité utilisateur.
+# Durcissement. Constaté sur le VPS (Ubuntu 24.04, unité UTILISATEUR, AppArmor restreint les espaces de noms
+# non privilégiés) : seul NoNewPrivileges s'applique. PrivateTmp, ProtectSystem et ProtectHome sont acceptés
+# mais IGNORÉS sans message (ils demandent un espace de noms que le gestionnaire utilisateur ne peut pas créer).
+# Gardés pour le jour où l'unité deviendrait une unité système, où ils s'appliqueraient ; ne pas compter dessus.
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
