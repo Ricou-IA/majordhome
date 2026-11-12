@@ -327,7 +327,7 @@ export function ClientLogementDpe({ client, formHousingType, formSurface, onAppl
 
   const messages = {
     erreur: 'La recherche du DPE n’a pas abouti (service indisponible). Réessayez dans quelques minutes.',
-    adresse_non_trouvee: 'L’adresse du client n’a pas été reconnue par la Base Adresse Nationale.',
+    adresse_non_trouvee: 'L’adresse du client n’est pas reconnue au numéro près (lieu-dit, numéro manquant ou inconnu de la Base Adresse Nationale) : le bâtiment ne peut pas être identifié. Complétez l’adresse, ou cherchez dans les DPE publics.',
     detache: 'Aucun DPE rattaché à cette fiche.',
   };
   return (

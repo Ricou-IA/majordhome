@@ -51,7 +51,7 @@ const corpus = (chemin) => json(`${dpe.DPE_CORPUS_URL}${chemin}`, { headers: { '
 
 const lignes = [];
 for (const c of clients) {
-  const ligne = { candidats: null, score: null, type: null, fiabilite: null, derive: null, concordance: null, erreur: null };
+  const ligne = { candidats: null, score: null, type: null, fiabilite: null, derive: null, maison: null, concordance: null, erreur: null };
   try {
     const g = await json(`https://data.geopf.fr/geocodage/search?q=${encodeURIComponent(`${c.address} ${c.postal_code} ${c.city}`)}&limit=1`);
     // Une panne du géocodeur (504 vécu le 2026-11-12) n'est PAS une adresse non trouvée : on la compte en erreur.
@@ -67,7 +67,10 @@ for (const c of clients) {
       ligne.fiabilite = liste[0].fiabilite_geocodage ?? null;
       const num = liste[0].identifiant_dpe;
       const d = await corpus(`/dossier/${num}`);
-      ligne.derive = String(d.corps?.data?.dossier?.methode_application_dpe || '').toLowerCase().startsWith('dpe appartement généré');
+      const methode = String(d.corps?.data?.dossier?.methode_application_dpe || '').toLowerCase();
+      ligne.derive = methode.startsWith('dpe appartement généré');
+      // Même test que decisionRattachement : l'automatique est réservé aux maisons individuelles.
+      ligne.maison = methode.includes('maison individuelle');
       const a = await json(`https://data.ademe.fr/data-fair/api/v1/datasets/meg-83tjwtg8dyz4vv7h1dqe/lines?qs=${encodeURIComponent(`numero_dpe:"${num}"`)}&select=adresse_brut,code_postal_brut,nom_commune_brut&size=1`);
       const r0 = a.corps?.results?.[0];
       if (r0) {
@@ -87,7 +90,7 @@ const uniques = lignes.filter((l) => l.candidats === 1);
 const tranche = (s) => (s == null ? 'aucun' : s >= 0.9 ? '>=0.90' : s >= 0.8 ? '0.80-0.90' : s >= 0.7 ? '0.70-0.80' : s >= 0.6 ? '0.60-0.70' : '<0.60');
 const croise = {};
 for (const l of uniques) {
-  const k = `${tranche(l.score)} | ${l.type} | ${l.fiabilite} | derive=${l.derive}`;
+  const k = `${tranche(l.score)} | ${l.type} | ${l.fiabilite} | derive=${l.derive} | maison=${l.maison}`;
   croise[k] ||= { n: 0, concordant: 0, discordant: 0, inconnu: 0 };
   croise[k].n += 1;
   if (l.concordance === true) croise[k].concordant += 1; else if (l.concordance === false) croise[k].discordant += 1; else croise[k].inconnu += 1;
@@ -97,7 +100,7 @@ for (const l of uniques) {
 const candidatsSeuils = [];
 for (const min of [0.6, 0.7, 0.8, 0.9]) {
   for (const fiab of [['très fiable'], ['très fiable', 'fiable'], null]) {
-    const retenus = uniques.filter((l) => !l.derive && l.type === 'housenumber' && l.score >= min && (fiab === null || fiab.includes(l.fiabilite)));
+    const retenus = uniques.filter((l) => l.maison && l.type === 'housenumber' && l.score >= min && (fiab === null || fiab.includes(l.fiabilite)));
     candidatsSeuils.push({
       score_min: min, fiabilites: fiab ? fiab.join('+') : 'toutes',
       retenus: retenus.length, sur_uniques: uniques.length,
@@ -115,6 +118,7 @@ console.log(JSON.stringify({
   candidats: { zero: compte((l) => l.candidats === 0), un: uniques.length, plusieurs: compte((l) => typeof l.candidats === 'number' && l.candidats > 1) },
   types_geocodage: Object.fromEntries([...new Set(lignes.map((l) => l.type))].map((t) => [t, compte((l) => l.type === t)])),
   fiabilites_uniques: Object.fromEntries([...new Set(uniques.map((l) => l.fiabilite))].map((f) => [f, uniques.filter((l) => l.fiabilite === f).length])),
+  logement_uniques: { maison: uniques.filter((l) => l.maison).length, autre: uniques.filter((l) => !l.maison).length },
   croisement_uniques: croise,
   seuils: candidatsSeuils,
 }, null, 2));

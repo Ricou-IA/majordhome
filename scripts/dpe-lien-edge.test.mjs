@@ -71,7 +71,7 @@ test("projeterCandidat : ne laisse passer que les champs lus par l'écran", () =
 });
 
 // --- Refonte 2026-11-12 : décision de rattachement automatique ------------------------------------------------
-import { decisionRattachement, SCORE_GEOCODAGE_MIN, TYPES_GEOCODAGE_ACCEPTES, FIABILITES_BDNB_ACCEPTEES, RATTACHEMENT_AUTO_ACTIF } from '../supabase/functions/dpe-lien/regles.js';
+import { decisionRattachement, cleBatiment, SCORE_GEOCODAGE_MIN, TYPES_GEOCODAGE_ACCEPTES, FIABILITES_BDNB_ACCEPTEES, RATTACHEMENT_AUTO_ACTIF } from '../supabase/functions/dpe-lien/regles.js';
 
 const GEO = { score: Math.max(SCORE_GEOCODAGE_MIN, 0.95), type: TYPES_GEOCODAGE_ACCEPTES[0], cle_ban: '31570_0080_00423' };
 const CAND = (o = {}) => ({ identifiant_dpe: '2631E0482288Y', date_etablissement_dpe: '2026-02-18', etiquette_dpe: 'A',
@@ -109,11 +109,40 @@ test('decisionRattachement : plusieurs DPE ⇒ candidats, jamais de choix machin
 
 test('decisionRattachement : chaque critère douteux suffit à refuser l\'automatique', () => {
   assert.equal(decide({ geocodage: { ...GEO, score: SCORE_GEOCODAGE_MIN - 0.01 } }).etat, 'candidats');
-  assert.equal(decide({ geocodage: { ...GEO, type: 'street' } }).etat, 'candidats');
+  assert.equal(decide({ geocodage: { ...GEO, type: 'street' } }).etat, 'adresse_non_trouvee');
   assert.equal(decide({ candidats: [CAND({ fiabilite_geocodage: 'peu fiable' })] }).etat, 'candidats');
   assert.equal(decide({ candidats: [CAND({ fiabilite_geocodage: null })] }).etat, 'candidats');
   assert.equal(decide({ dossierUnique: null }).etat, 'candidats');
   assert.equal(decide({ dossierUnique: { dossier: { methode_application_dpe: 'dpe appartement généré à partir des données DPE immeuble' } } }).etat, 'candidats');
+});
+
+test('cleBatiment : seul un géocodage au numéro donne une clé de bâtiment (le corpus refuse une clé de rue)', () => {
+  // Vécu 2026-11-12 : « le claux 81190 almayrac » → clé de rue 81008_0036 → corpus 400 « cle_ban mal formee »,
+  // enregistré en erreur et affiché « service indisponible » en permanence.
+  assert.equal(cleBatiment({ score: 0.95, type: 'housenumber', cle_ban: '81099_1030_00003' }), '81099_1030_00003');
+  for (const type of ['street', 'locality', 'municipality', '', undefined]) {
+    assert.equal(cleBatiment({ score: 0.95, type, cle_ban: '81008_0036' }), null, String(type));
+  }
+  assert.equal(cleBatiment({ score: 0.95, type: 'housenumber' }), null);
+  assert.equal(cleBatiment(null), null);
+  assert.equal(cleBatiment(undefined), null);
+  // Lieu-dit, rue sans numéro : adresse non reconnue au numéro près, jamais candidats ni erreur.
+  for (const type of ['street', 'locality', 'municipality']) {
+    assert.deepEqual(decisionRattachement({ geocodage: { score: 0.9, type, cle_ban: '81008_0036' }, candidats: [], dossierUnique: null, ecartes: [] }),
+      { etat: 'adresse_non_trouvee', candidats: [] });
+  }
+});
+
+test('decisionRattachement : automatique pour une MAISON seulement — un appartement seul DPE de l\'immeuble est proposé', () => {
+  // Le seul DPE d'un immeuble peut être celui d'un autre appartement, à la même adresse : la concordance d'adresse
+  // ne le voit pas, seul le type du DPE le dit (spec §2 : rattacher le DPE d'un autre appartement = pire défaut).
+  const dossier = (m) => ({ dossier: { methode_application_dpe: m }, composants: [{}] });
+  assert.equal(decide({ dossierUnique: dossier('dpe appartement individuel') }).etat, 'candidats');
+  assert.equal(decide({ dossierUnique: dossier('dpe immeuble collectif') }).etat, 'candidats');
+  assert.equal(decide({ dossierUnique: dossier('') }).etat, 'candidats');
+  assert.equal(decide({ dossierUnique: { dossier: {} } }).etat, 'candidats');
+  assert.equal(decide({ dossierUnique: dossier('dpe issu d\'une étude thermique réglementaire RE2020 bâtiment : maison individuelle') }).etat, 'rattache');
+  assert.equal(decide({ dossierUnique: dossier('DPE Maison Individuelle') }).etat, 'rattache');
 });
 
 test('decisionRattachement : un numéro écarté (« Ce n\'est pas le bon ») n\'est plus proposé', () => {

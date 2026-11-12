@@ -125,6 +125,18 @@ export const TYPES_GEOCODAGE_ACCEPTES = Object.freeze(['housenumber']);
 export const FIABILITES_BDNB_ACCEPTEES = Object.freeze(['très fiable', 'fiable']);
 
 /**
+ * Clé BAN du BÂTIMENT de l'adresse : seul un géocodage au numéro (`housenumber`) en porte une. Un lieu-dit ou une
+ * rue sans numéro donne une clé de rue, que le corpus refuse (400 « cle_ban mal formee ») : enregistrée en panne,
+ * elle affichait « service indisponible » en permanence (2026-11-12). Sans clé de bâtiment, pas d'appel au corpus.
+ * @param {{ type?: string, cle_ban?: string } | null | undefined} geocodage
+ * @returns {string | null}
+ */
+export function cleBatiment(geocodage) {
+  if (!geocodage || geocodage.type !== 'housenumber') return null;
+  return typeof geocodage.cle_ban === 'string' && geocodage.cle_ban ? geocodage.cle_ban : null;
+}
+
+/**
  * Décide du rattachement à partir du géocodage de l'adresse du client, des DPE du bâtiment et, quand il n'y en a
  * qu'un, de son dossier. La machine ne choisit JAMAIS entre plusieurs candidats.
  * @param {{ geocodage: { score?: number, type?: string } | null, candidats: unknown[],
@@ -133,7 +145,8 @@ export const FIABILITES_BDNB_ACCEPTEES = Object.freeze(['très fiable', 'fiable'
  *   candidats: Record<string, unknown>[] }}
  */
 export function decisionRattachement({ geocodage, candidats, dossierUnique, ecartes, autoActif = RATTACHEMENT_AUTO_ACTIF }) {
-  if (!geocodage) return { etat: 'adresse_non_trouvee', candidats: [] };
+  // Adresse introuvable OU reconnue seulement à la rue / au lieu-dit : le bâtiment n'est pas identifié.
+  if (!cleBatiment(geocodage)) return { etat: 'adresse_non_trouvee', candidats: [] };
   const exclus = new Set(ecartes || []);
   const liste = (Array.isArray(candidats) ? candidats : [])
     .map(projeterCandidat)
@@ -143,12 +156,14 @@ export function decisionRattachement({ geocodage, candidats, dossierUnique, ecar
 
   const [seul] = liste;
   const methode = String(dossierUnique?.dossier?.methode_application_dpe || '').toLowerCase();
+  // Maison individuelle seulement (neuf RT2012 / RE2020 compris) : le seul DPE d'un immeuble peut être celui d'un
+  // AUTRE appartement à la même adresse, ce que ni le géocodage ni la BDNB ne distinguent. Un appartement est
+  // proposé en un clic. Couvre aussi l'appartement dérivé de l'immeuble (piège d'échelle).
   const sur = autoActif === true
     && typeof geocodage.score === 'number' && geocodage.score >= SCORE_GEOCODAGE_MIN
     && TYPES_GEOCODAGE_ACCEPTES.includes(geocodage.type)
     && FIABILITES_BDNB_ACCEPTEES.includes(seul.fiabilite_geocodage)
-    && Boolean(dossierUnique?.dossier)
-    && !methode.startsWith('dpe appartement généré');
+    && methode.includes('maison individuelle');
   return sur ? { etat: 'rattache', numero: seul.identifiant_dpe, candidats: liste } : { etat: 'candidats', candidats: liste };
 }
 

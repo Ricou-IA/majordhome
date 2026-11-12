@@ -147,10 +147,11 @@ test('actionALouverture : tentative sans DPE — même adresse ⇒ rien, adresse
   const sans = { dpe_number: null, origine: null, etat: 'aucun_dpe', adresse_tentee: ADR, carte: null, version_carte: null };
   assert.equal(ouvrir({ clientDpe: sans, dpeNumberFiche: '' }), 'rien');
   assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'candidats' }, dpeNumberFiche: '' }), 'rien');
-  // Une panne (géocodeur, corpus) se retente après une heure, pas avant ; jamais si la date manque.
+  // Une panne (géocodeur, corpus) se retente après dix minutes, pas avant ; tout de suite si la date manque.
+  // Une heure affichait « service indisponible » une heure après le retour du service (2026-11-12).
   const maintenant = new Date('2026-11-12T12:00:00Z');
-  assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'erreur', tente_le: '2026-11-12T11:30:00Z' }, dpeNumberFiche: '', maintenant }), 'rien');
-  assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'erreur', tente_le: '2026-11-12T10:30:00Z' }, dpeNumberFiche: '', maintenant }), 'rattacher');
+  assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'erreur', tente_le: '2026-11-12T11:55:00Z' }, dpeNumberFiche: '', maintenant }), 'rien');
+  assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'erreur', tente_le: '2026-11-12T11:45:00Z' }, dpeNumberFiche: '', maintenant }), 'rattacher');
   assert.equal(ouvrir({ clientDpe: { ...sans, etat: 'erreur', tente_le: null }, dpeNumberFiche: '', maintenant }), 'rattacher');
   assert.equal(ouvrir({ clientDpe: sans, dpeNumberFiche: '', adresseFiche: '1 rue neuve 81600 gaillac' }), 'rattacher');
 });
@@ -171,11 +172,11 @@ test('disponibiliteEnvoi : invisible sans module Communication ou sans droit ; r
 // --- Corrections de la revue finale (2026-11-12) -----------------------------------------------------------
 import { etatDuBloc } from '../src/lib/dpeLien.js';
 
-test('actionALouverture : carte indisponible récente ⇒ rien ; vieille d\'une heure ⇒ actualiser', () => {
+test('actionALouverture : carte indisponible récente ⇒ rien ; vieille de dix minutes ⇒ actualiser', () => {
   const maintenant = new Date('2026-11-12T12:00:00Z');
   const sansCarte = { ...LIGNE, origine: 'choisi', carte: null, carte_erreur: 'numero_absent' };
-  assert.equal(ouvrir({ clientDpe: { ...sansCarte, tente_le: '2026-11-12T11:30:00Z' }, maintenant }), 'rien');
-  assert.equal(ouvrir({ clientDpe: { ...sansCarte, tente_le: '2026-11-12T10:00:00Z' }, maintenant }), 'actualiser');
+  assert.equal(ouvrir({ clientDpe: { ...sansCarte, tente_le: '2026-11-12T11:55:00Z' }, maintenant }), 'rien');
+  assert.equal(ouvrir({ clientDpe: { ...sansCarte, tente_le: '2026-11-12T11:45:00Z' }, maintenant }), 'actualiser');
   assert.equal(ouvrir({ clientDpe: { ...sansCarte, tente_le: null }, maintenant }), 'actualiser');
 });
 

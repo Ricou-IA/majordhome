@@ -6,8 +6,12 @@
 
 import { VERSION_CARTE } from './dpeCorpus.js';
 
-/** Délai avant de retenter un rattachement ou une lecture tombés sur un refus ou une panne. */
-const DELAI_NOUVEL_ESSAI_MS = 60 * 60 * 1000;
+/**
+ * Délai avant de retenter un rattachement ou une lecture tombés sur un refus ou une panne. Dix minutes : une
+ * heure laissait « service indisponible » affiché une heure après le retour du service (2026-11-12). Un essai
+ * par ouverture de fiche, jamais en boucle : pas de quoi charger un service en panne.
+ */
+const DELAI_NOUVEL_ESSAI_MS = 10 * 60 * 1000;
 
 /** La dernière tentative date-t-elle d'au moins DELAI_NOUVEL_ESSAI_MS ? Une date absente ou illisible : oui. */
 function assezVieux(tenteLe, maintenant) {
@@ -173,7 +177,7 @@ export function actionALouverture({ adresseFiche, dpeNumberFiche, peutModifier, 
     return 'signaler_adresse';
   }
   if (numeroLigne && (!clientDpe.carte || (clientDpe.version_carte ?? 0) < VERSION_CARTE)) {
-    // Carte refusée ou en panne à la dernière lecture : on attend une heure avant de redemander.
+    // Carte refusée ou en panne à la dernière lecture : on attend DELAI_NOUVEL_ESSAI_MS avant de redemander.
     if (!clientDpe.carte && clientDpe.carte_erreur && !assezVieux(clientDpe.tente_le, maintenant)) return 'rien';
     return 'actualiser';
   }

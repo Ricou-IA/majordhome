@@ -34,7 +34,7 @@ import { adresseNormalisee } from "../_shared/dpeLien.js";
 import { DPE_RAPPORT_EMAIL_TEMPLATE_KEY } from "../_shared/dpeRapportEmailTemplate.js";
 import {
   numeroValide, adresseDeRecherche, codeDepuisCorpus, resumeDossier, rapportCompletPossible, projeterCandidat,
-  decisionRattachement, controleNumero,
+  decisionRattachement, controleNumero, cleBatiment,
 } from "./regles.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -235,8 +235,11 @@ Deno.serve(async (req) => {
       }
       let candidats: unknown[] = [];
       let dossierUnique: Record<string, unknown> | null = null;
-      if (geocodage) {
-        const b = await corpus(`/dossier-batiment?cle_ban=${encodeURIComponent(geocodage.cle_ban)}`);
+      // Pas de clé de bâtiment (lieu-dit, rue sans numéro) : on n'interroge pas le corpus, qui refuserait une clé
+      // de rue — la décision rend « adresse non trouvée », jamais une panne.
+      const cle = cleBatiment(geocodage);
+      if (cle) {
+        const b = await corpus(`/dossier-batiment?cle_ban=${encodeURIComponent(cle)}`);
         if (b.code) {
           return reponseEcriture(await enregistrer(client.id, "tentative", { etat: "erreur", adresse_tentee: adresseTentee }));
         }
