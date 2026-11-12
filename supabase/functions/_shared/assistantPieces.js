@@ -260,6 +260,26 @@ export function lireReponse(texteBrut) {
   }
 }
 
+/** Âge, en minutes, au-delà duquel une recherche encore en route est close en `delai_depasse`. */
+export const DUREE_MAX_RECHERCHE_MIN = 15;
+
+const RUN_ECHOUE = new Set(['failed', 'cancelled', 'interrupted']);
+
+/**
+ * L'issue d'une recherche d'après l'état de son run chez Hermes et l'âge de la ligne. `completed` l'emporte
+ * toujours ; `failed` / `cancelled` / `interrupted` sont un échec de la recherche ; tout autre état (`queued`,
+ * `started`, `running`, `stopping`, inconnu, ou absent quand Hermes n'a pas répondu) reste en cours jusqu'à
+ * `DUREE_MAX_RECHERCHE_MIN`. Un âge illisible ferme la recherche plutôt que de la laisser tourner.
+ * @param {unknown} etatRun
+ * @param {number} ageMinutes
+ * @returns {'en_cours' | 'terminee' | 'echec_recherche' | 'echec_delai'}
+ */
+export function verdictRun(etatRun, ageMinutes) {
+  if (etatRun === 'completed') return 'terminee';
+  if (typeof etatRun === 'string' && RUN_ECHOUE.has(etatRun)) return 'echec_recherche';
+  return Number.isFinite(ageMinutes) && ageMinutes < DUREE_MAX_RECHERCHE_MIN ? 'en_cours' : 'echec_delai';
+}
+
 /**
  * Un lien sûr à afficher : seulement `https:`, avec son domaine (sans `www.`). Tout le reste donne null.
  * @param {unknown} url
