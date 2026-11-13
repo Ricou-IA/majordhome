@@ -41,7 +41,8 @@ export default function LecteurDocument({ source, pageInitiale = 1 }) {
   const nature = urlVue ? 'image' : natureDocument(doc);
   const titre = doc?.label || doc?.file_name || 'Document';
 
-  if (!urlVue && etat.erreur) {
+  const sansAdresse = (source?.kind === 'vue' && !urlVue) || (source?.kind === 'doc' && !chemin) || !source;
+  if (sansAdresse || (!urlVue && etat.erreur)) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-2 p-6 text-center">
         <AlertCircle className="w-8 h-8 text-red-500" />

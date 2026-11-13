@@ -19,7 +19,7 @@ let pdfjsPromise = null;
 /** Charge pdf.js et son worker une seule fois, à la première ouverture d'un PDF. */
 const chargerPdfjs = () => {
   if (!pdfjsPromise) {
-    pdfjsPromise = Promise.all([import('pdfjs-dist'), import('pdfjs-dist/build/pdf.worker.min.mjs?url')])
+    pdfjsPromise = Promise.all([import('pdfjs-dist/legacy/build/pdf.mjs'), import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')])
       .then(([pdfjs, worker]) => {
         pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
         return pdfjs;
@@ -32,6 +32,29 @@ const chargerPdfjs = () => {
 const sansAccent = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
 /**
+ * Texte d'une page : les éléments de texte de pdf.js sont mis bout à bout, séparés d'une espace sauf quand l'un
+ * prolonge l'autre sur la même ligne. `segments` garde, pour chaque élément, sa plage dans le texte.
+ */
+const texteDePage = (items) => {
+  let texte = '';
+  const segments = [];
+  items.forEach((it, idx) => {
+    const prec = items[idx - 1];
+    const colle = prec && Math.abs(prec.transform[5] - it.transform[5]) < 1 && Math.abs(prec.transform[4] + prec.width - it.transform[4]) < 1;
+    if (texte && !colle) texte += ' ';
+    const debut = texte.length;
+    texte += sansAccent(it.str);
+    segments.push({ item: idx, debut, fin: texte.length });
+  });
+  return { texte, segments };
+};
+
+/** Parties d'éléments couvertes par la plage [debut, fin[ du texte de page. */
+const partiesCouvertes = (segments, debut, fin) => segments
+  .filter((sg) => sg.fin > debut && sg.debut < fin && sg.fin > sg.debut)
+  .map((sg) => ({ item: sg.item, debut: Math.max(debut, sg.debut) - sg.debut, fin: Math.min(fin, sg.fin) - sg.debut, longueur: sg.fin - sg.debut }));
+
+/**
  * @param {{ url: string, pageInitiale?: number }} p
  */
 export default function LecteurPdf({ url, pageInitiale = 1 }) {
@@ -41,9 +64,10 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
   const [zoom, setZoom] = useState(1);
   const [largeur, setLargeur] = useState(0);
   const [requete, setRequete] = useState('');
-  const [trouves, setTrouves] = useState(null); // null = pas de recherche ; sinon [{ page, item, debut, fin }]
+  const [trouves, setTrouves] = useState(null); // null = pas de recherche ; sinon [{ page, parts: [{ item, debut, fin, longueur }] }]
   const [rang, setRang] = useState(0);
   const [rects, setRects] = useState([]);
+  const pageInitialeRef = useRef(pageInitiale);
   const zoneRef = useRef(null);
   const canvasRef = useRef(null);
   const textesRef = useRef(new Map()); // page -> items de getTextContent()
@@ -63,11 +87,11 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
         if (!doc) return;
         if (!actif) { doc.destroy(); return; }
         setPdf(doc);
-        setPage(Math.min(Math.max(1, Math.round(pageInitiale) || 1), doc.numPages));
+        setPage(Math.min(Math.max(1, Math.round(pageInitialeRef.current) || 1), doc.numPages));
       })
       .catch((e) => { logger.error('LecteurPdf : chargement', e); if (actif) setErreur(true); });
     return () => { actif = false; if (tache) tache.destroy(); };
-  }, [url, pageInitiale]);
+  }, [url]);
 
   // Largeur de la zone.
   useEffect(() => {
@@ -81,11 +105,12 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
 
   // Rendu de la page affichée, avec les rectangles de surlignage de la recherche.
   const occurrencesPage = trouves ? trouves.filter((t) => t.page === page) : [];
-  const cleOccurrences = occurrencesPage.map((o) => `${o.item}:${o.debut}`).join(',');
+  const cleOccurrences = occurrencesPage.map((o) => `${o.parts.map((q) => `${q.item}:${q.debut}`).join('+')}`).join(',');
   useEffect(() => {
     if (!pdf || !largeur) return undefined;
     let actif = true;
     let rendu = null;
+    setRects([]);
     (async () => {
       try {
         const p = await pdf.getPage(page);
@@ -105,14 +130,14 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
         if (occurrencesPage.length > 0) {
           const pdfjs = await chargerPdfjs();
           const items = textesRef.current.get(page) || [];
-          setRects(occurrencesPage.map((o) => {
-            const it = items[o.item];
+          setRects(occurrencesPage.flatMap((o) => o.parts.map((q) => {
+            const it = items[q.item];
             const tx = pdfjs.Util.transform(vp.transform, it.transform);
             const h = Math.hypot(tx[2], tx[3]);
             const larg = it.width * vp.scale;
-            const n = it.str.length || 1;
-            return { left: tx[4] + (larg * o.debut) / n, top: tx[5] - h, width: (larg * (o.fin - o.debut)) / n, height: h };
-          }));
+            const n = q.longueur || 1;
+            return { left: tx[4] + (larg * q.debut) / n, top: tx[5] - h, width: (larg * (q.fin - q.debut)) / n, height: h };
+          })));
         } else setRects([]);
       } catch (e) {
         if (e?.name !== 'RenderingCancelledException' && actif) { logger.error('LecteurPdf : rendu', e); setErreur(true); }
@@ -133,17 +158,18 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
 
   const chercher = async (e) => {
     e?.preventDefault();
-    const q = sansAccent(requete.trim());
+    const q = sansAccent(requete.trim()).replace(/\s+/g, ' ');
     if (!pdf || !q) { setTrouves(null); setRects([]); return; }
     try {
       await chargerTextes();
       const liste = [];
       for (let n = 1; n <= pdf.numPages; n += 1) {
-        (textesRef.current.get(n) || []).forEach((it, idx) => {
-          const t = sansAccent(it.str);
-          let i = t.indexOf(q);
-          while (i !== -1) { liste.push({ page: n, item: idx, debut: i, fin: i + q.length }); i = t.indexOf(q, i + q.length); }
-        });
+        const { texte, segments } = texteDePage(textesRef.current.get(n) || []);
+        let i = texte.indexOf(q);
+        while (i !== -1) {
+          liste.push({ page: n, parts: partiesCouvertes(segments, i, i + q.length) });
+          i = texte.indexOf(q, i + q.length);
+        }
       }
       setTrouves(liste);
       setRang(0);
