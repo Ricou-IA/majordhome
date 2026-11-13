@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  photoPiece, retrouverLigne, quantitesParLigne, ligneDepuisIdentifiee, choixDepuisIdentifiees, quantiteAffichee,
+  photoPiece, retrouverLigne, quantitesParLigne, ligneDepuisIdentifiee, choixDepuisIdentifiees,
   quantitesPourEquipement, photoDepuisIdentifiee, mentionIdentification, modelesPourDevis, nomenclaturesParEquipement,
   selectionModifiable, etatDevisPieces, dedoublonnerPhotos, messagePiecesRangees,
 } from '../../src/lib/catalogue/piecesIdentifiees.js';
@@ -28,9 +28,8 @@ test('choixDepuisIdentifiees : une entrée par pièce, quantité enregistrée', 
   assert.equal(c.length, 1); assert.equal(c[0].quantite, 2); assert.equal(c[0].ligne.catalog_item_id, 'ci1');
   assert.deepEqual(choixDepuisIdentifiees(null, null), []);
 });
-test('quantitesParLigne / quantiteAffichee', () => {
+test('quantitesParLigne', () => {
   assert.deepEqual(quantitesParLigne([{ part_line_id: 'l1', piece_reference: 'F6107098', repere: '14', quantity: 3 }], [L()]), { l1: 3 });
-  assert.equal(quantiteAffichee(2, undefined), 2); assert.equal(quantiteAffichee(2, 0), 0); assert.equal(quantiteAffichee(undefined, undefined), 0);
 });
 
 test('quantitesPourEquipement : deux appareils du même modèle ne s\'additionnent pas', () => {

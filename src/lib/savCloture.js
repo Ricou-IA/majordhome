@@ -92,17 +92,22 @@ export function limiteALaCloture(item, role) {
 }
 
 /**
- * Peut-on identifier les pièces d'une carte SAV (module « Pièces identifiées ») ? Garde d'écran :
- * SAV seulement, jamais une fois Réalisé ni facturé, et pour qui gère le SAV ou le technicien
- * qui se rend chez le client.
+ * Peut-on identifier les pièces d'une carte SAV (module « Pièces identifiées ») ? Garde d'écran
+ * alignée sur la base : la RLS des pièces identifiées exige `clients.edit`, donc on n'autorise
+ * QUE si `canEditClient === true` (autorisation positive : indéfini = refus), ET si l'on gère le
+ * SAV ou si l'on est le technicien qui se rend chez le client, ET si la carte SAV n'est ni
+ * Réalisée ni facturée.
  * @param {{ intervention_type?: string, workflow_status?: string } | null | undefined} item
- * @param {{ role?: string | null, canEditSAV?: boolean }} droits `role` = `useCanAccess().effectiveRole`, `canEditSAV` = droit d'édition SAV
+ * @param {{ role?: string | null, canEditSAV?: boolean, canEditClient?: boolean }} droits
+ *   `role` = `useCanAccess().effectiveRole`, `canEditSAV` = droit d'édition SAV,
+ *   `canEditClient` = `can('clients', 'edit')`
  * @returns {boolean}
  */
-export function peutIdentifierPieces(item, { role, canEditSAV }) {
+export function peutIdentifierPieces(item, { role, canEditSAV, canEditClient } = {}) {
+  if (canEditClient !== true) return false;
   if (!item || item.intervention_type !== 'sav') return false;
   if (item.workflow_status === 'realise' || item.workflow_status === 'facture') return false;
-  return !!canEditSAV || role === 'technicien';
+  return canEditSAV === true || role === 'technicien';
 }
 
 /**

@@ -113,11 +113,20 @@ test('limiteALaCloture : le technicien seulement, et seulement sur une demande e
 
 // ── Gardes d'écran : pièces identifiées et rangement (2026-11-12) ──────────
 test('peutIdentifierPieces : technicien sur demande, planifiée ; jamais sur Réalisé', () => {
-  assert.equal(peutIdentifierPieces(carte(), { role: 'technicien', canEditSAV: false }), true);
-  assert.equal(peutIdentifierPieces(carte({ workflow_status: 'planifie' }), { role: 'technicien', canEditSAV: false }), true);
-  assert.equal(peutIdentifierPieces(carte({ workflow_status: 'realise' }), { role: 'org_admin', canEditSAV: true }), false);
-  assert.equal(peutIdentifierPieces(carte(), { role: 'commercial', canEditSAV: false }), false);
-  assert.equal(peutIdentifierPieces(carte({ intervention_type: 'entretien' }), { role: 'technicien', canEditSAV: true }), false);
+  const ok = { canEditClient: true };
+  assert.equal(peutIdentifierPieces(carte(), { role: 'technicien', canEditSAV: false, ...ok }), true);
+  assert.equal(peutIdentifierPieces(carte({ workflow_status: 'planifie' }), { role: 'technicien', canEditSAV: false, ...ok }), true);
+  assert.equal(peutIdentifierPieces(carte(), { role: 'team_leader', canEditSAV: true, ...ok }), true);
+  assert.equal(peutIdentifierPieces(carte({ workflow_status: 'realise' }), { role: 'org_admin', canEditSAV: true, ...ok }), false);
+  assert.equal(peutIdentifierPieces(carte({ workflow_status: 'facture' }), { role: 'org_admin', canEditSAV: true, ...ok }), false);
+  assert.equal(peutIdentifierPieces(carte(), { role: 'commercial', canEditSAV: false, ...ok }), false);
+  assert.equal(peutIdentifierPieces(carte({ intervention_type: 'entretien' }), { role: 'technicien', canEditSAV: true, ...ok }), false);
+});
+test('peutIdentifierPieces : sans clients.edit, jamais (garde alignée sur la RLS)', () => {
+  assert.equal(peutIdentifierPieces(carte(), { role: 'technicien', canEditSAV: false, canEditClient: false }), false);
+  assert.equal(peutIdentifierPieces(carte(), { role: 'org_admin', canEditSAV: true, canEditClient: false }), false);
+  assert.equal(peutIdentifierPieces(carte(), { role: 'technicien', canEditSAV: true }), false);
+  assert.equal(peutIdentifierPieces(carte(), { role: 'technicien', canEditSAV: true, canEditClient: undefined }), false);
 });
 test('peutRangerSurDemandeSav : clients.edit suffit', () => {
   assert.equal(peutRangerSurDemandeSav({ canEditClient: true }), true);

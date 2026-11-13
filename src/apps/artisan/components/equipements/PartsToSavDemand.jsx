@@ -5,7 +5,8 @@
  * demande SAV déjà ouverte pour le client (`savService.getOpenSavCardId`, une par client), sinon créée ici
  * (`CreateSAVModal`, description pré-remplie, appareil rattaché) ; puis les pièces sont rangées dans ses pièces
  * identifiées (`useRangerPiecesSurSav`, la quantité de la fiche client remplace celle déjà enregistrée).
- * Aucun voile pendant la lecture et le rangement : un toast suit l'opération. Tout échec se dit et la sélection est
+ * Aucun voile pendant la lecture et le rangement : un toast suit l'opération DÈS le clic (avant même la lecture de la
+ * demande ouverte — un second clic n'est jamais avalé en silence), remplacé ou retiré à chaque sortie. Tout échec se dit et la sélection est
  * gardée par l'appelant (`onRanged` n'est appelé qu'après un rangement réussi).
  * ============================================================================
  */
@@ -32,12 +33,14 @@ export function PartsToSavDemand({ client, equipment, choix, onClose, onRanged }
   const [creer, setCreer] = useState(false);
   const demarre = useRef(false);
   const savCree = useRef(false); // la fenêtre SAV appelle onClose juste après onCreated : ce n'est pas un abandon
+  const toastRef = useRef(null); // toast de suivi en cours, repris d'une étape à l'autre
 
   const rangerSur = async (interventionId, { creee = false } = {}) => {
     const photos = dedoublonnerPhotos(choix.map((c) => photoPiece(
       c.ligne, { equipmentId: equipment.id, equipmentModelId: equipment.equipment_model_id }, c.quantite,
     )));
-    const id = toast.loading('Pièces en cours d\'enregistrement sur la demande SAV…');
+    const id = toast.loading('Pièces en cours d\'enregistrement sur la demande SAV…', toastRef.current ? { id: toastRef.current } : undefined);
+    toastRef.current = null;
     try {
       const { count } = await ranger({ interventionId, photos });
       toast.success(messagePiecesRangees(count ?? photos.length), { id });
@@ -55,16 +58,25 @@ export function PartsToSavDemand({ client, equipment, choix, onClose, onRanged }
   useEffect(() => {
     if (demarre.current) return;
     demarre.current = true;
+    toastRef.current = toast.loading('Recherche de la demande SAV du client…');
     (async () => {
-      const { data: openId, error } = await savService.getOpenSavCardId(client.id);
-      if (error) {
+      let openId = null;
+      try {
+        const { data, error } = await savService.getOpenSavCardId(client.id);
+        if (error) throw error;
+        openId = data;
+      } catch (error) {
         logger.error('[PartsToSavDemand] demande SAV ouverte illisible:', error);
-        toast.error('Les demandes SAV du client n\'ont pas pu être lues. Votre sélection est conservée, réessayez.');
+        toast.error('Les demandes SAV du client n\'ont pas pu être lues. Votre sélection est conservée, réessayez.', { id: toastRef.current });
+        toastRef.current = null;
         onClose();
         return;
       }
-      if (openId) await rangerSur(openId);
-      else setCreer(true);
+      if (openId) { await rangerSur(openId); return; }
+      // Pas de demande ouverte : la fenêtre de création prend le relais, le toast d'attente n'a plus lieu d'être
+      toast.dismiss(toastRef.current);
+      toastRef.current = null;
+      setCreer(true);
     })();
     // Une seule lecture par enchaînement : l'appelant démonte le composant à la fin.
     // eslint-disable-next-line react-hooks/exhaustive-deps

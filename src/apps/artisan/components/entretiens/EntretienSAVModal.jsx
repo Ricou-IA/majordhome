@@ -720,7 +720,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                   equipements={equipementsClient}
                   referentiel={referentiel}
                   canEdit={canEditSAV && !clotureSeule}
-                  peutIdentifier={peutIdentifierPieces(item, { role: effectiveRole, canEditSAV })}
+                  peutIdentifier={peutIdentifierPieces(item, { role: effectiveRole, canEditSAV, canEditClient: can('clients', 'edit') })}
                   membres={teamMembers}
                   onUpdated={onUpdated}
                   onAtelierChange={setAtelierOuvert}

@@ -39,15 +39,20 @@ export const savPiecesService = {
   setQuantity(orgId, interventionId, photo) {
     return withErrorHandling(async () => {
       if (!(photo.quantity > 0)) {
-        const { error } = await supabase
-          .from(VUE)
-          .delete()
-          .eq('org_id', orgId)
-          .eq('intervention_id', interventionId)
-          .eq('equipment_id', photo.equipment_id)
-          .eq('piece_reference', photo.piece_reference)
-          .eq('repere', photo.repere ?? '');
+        const parCle = (q) =>
+          q
+            .eq('org_id', orgId)
+            .eq('intervention_id', interventionId)
+            .eq('equipment_id', photo.equipment_id)
+            .eq('piece_reference', photo.piece_reference)
+            .eq('repere', photo.repere ?? '');
+        const { data: supprimees, error } = await parCle(supabase.from(VUE).delete()).select('id');
         if (error) throw error;
+        if (supprimees && supprimees.length > 0) return null;
+        // 0 ligne supprimée : soit elle n'existait plus (succès), soit la RLS a refusé en silence.
+        const { data: restante, error: errLecture } = await parCle(supabase.from(VUE).select('id')).maybeSingle();
+        if (errLecture) throw errLecture;
+        if (restante) throw new Error('Retrait refusé : la pièce est toujours enregistrée');
         return null;
       }
       const { data, error } = await supabase

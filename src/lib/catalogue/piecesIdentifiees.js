@@ -99,17 +99,6 @@ export function choixDepuisIdentifiees(selections, lignesParEquipement) {
 }
 
 /**
- * Quantité à afficher : l'écriture en vol (`enCours`) si définie, sinon la valeur en base, sinon 0.
- * @param {number|undefined} enBase
- * @param {number|undefined} enCours
- * @returns {number}
- */
-export function quantiteAffichee(enBase, enCours) {
-  if (enCours !== undefined && enCours !== null) return enCours;
-  return enBase ?? 0;
-}
-
-/**
  * Quantités de la nomenclature affichée pour UN équipement : seules ses pièces identifiées comptent (deux appareils
  * du même modèle ne s'additionnent pas sur une même ligne).
  * @param {object[]} selections toutes les pièces identifiées de la fiche

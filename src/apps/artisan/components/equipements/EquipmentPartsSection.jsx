@@ -3,8 +3,8 @@
  * ============================================================================
  * Fiche client (carte équipement) et fiche SAV. Si l'équipement est rattaché à un modèle fabricant : les vues éclatées,
  * un champ de recherche (repère, référence ou mot) et le tableau repère · référence · désignation · quantité · prix
- * public HT (`NomenclatureTable`). Sinon : « Choisir le modèle fabricant ». Avec `onAddToQuote` (ou une sélection
- * contrôlée), les pièces se choisissent avec + / −.
+ * public HT (`NomenclatureTable`). Sinon : « Choisir le modèle fabricant ». Avec `onQuantiteChange`, `actionsSelection`
+ * ou une sélection contrôlée, les pièces se choisissent avec + / −.
  * « Lire avec la liste » (ou une vignette) ouvre le MODE ATELIER (`AtelierPieces`) : document en face de la liste,
  * dans la page, sans voile. Ouverture contrôlable de l'extérieur (`atelier` / `onAtelierChange`) : la fiche client
  * l'ouvre sur un document cliqué dans « Documents » (`doc:<id>`), y compris pour un appareil sans modèle fabricant
@@ -16,7 +16,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronUp, Wrench, Loader2, Maximize2, ShoppingCart, AlertTriangle, ExternalLink, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronUp, Wrench, Loader2, Maximize2, AlertTriangle, ExternalLink, BookOpen } from 'lucide-react';
 import { useEquipmentModel, useEquipmentModelParts, useEquipmentModelImages, useSetEquipmentModel } from '@hooks/useEquipmentModels';
 import { useEquipmentModelDocuments } from '@hooks/useEquipmentDocuments';
 import { listePiecesDisponible, liensFabricant } from '@/lib/catalogue/nomenclature';
@@ -32,26 +32,24 @@ const ATELIER_FERME = { ouvert: false, ongletId: null };
  * @param {object} p.equipment équipement client (id, brand, model, equipment_model_id)
  * @param {boolean} [p.canEdit] peut choisir / changer le modèle fabricant (droit clients.edit)
  * @param {boolean} [p.defaultOpen] bloc ouvert au montage (fiche SAV)
- * @param {(choix: Array<{ ligne: object, quantite: number }>) => void} [p.onAddToQuote] active la sélection de pièces
  * @param {(modelId: string|null) => void} [p.onModelChanged] après un rattachement réussi (appelant sans cache)
  * @param {number} [p.selectionVersion] change quand la sélection doit être vidée (devis créé) — la sélection est
  *   gardée tant que le devis n'existe pas (fermer la fenêtre de devis ne perd pas les pièces cochées). Sélection
  *   locale seulement : une sélection contrôlée est vidée par l'appelant.
- * @param {string} [p.quoteLabel] libellé du bouton de devis (fiche client : « Créer un devis SAV »)
  * @param {{ [ligneId: string]: number }} [p.quantites] sélection CONTRÔLÉE par l'appelant (sinon état local)
  * @param {(ligne: object, quantite: number) => void} [p.onQuantiteChange] + / − sur une ligne (sélection contrôlée)
  * @param {boolean} [p.selectionLectureSeule] + / − désactivés, quantités affichées
  * @param {{ ouvert: boolean, ongletId?: string|null }} [p.atelier] mode atelier CONTRÔLÉ (sinon état interne)
  * @param {(atelier: { ouvert: boolean, ongletId: string|null }) => void} [p.onAtelierChange] ouverture, onglet, « Réduire »
  * @param {import('react').ReactNode | ((choix: Array<{ ligne: object, quantite: number }>) => import('react').ReactNode)} [p.actionsSelection]
- *   boutons sous la liste, à la place du bouton de devis interne ; une fonction reçoit les pièces choisies
+ *   boutons sous la liste ; une fonction reçoit les pièces choisies
  * @param {Array<object>} [p.documents] documents de l'appareil déjà chargés par l'appelant (fiche client) ; absent ⇒
  *   lus ici par l'équipement
  * @param {string} [p.className]
  */
 export function EquipmentPartsSection({
-  equipment, canEdit = false, defaultOpen = false, onAddToQuote = null, onModelChanged = null, selectionVersion = 0,
-  quoteLabel = 'Créer un devis avec ces pièces', quantites: quantitesControlees = null, onQuantiteChange = null,
+  equipment, canEdit = false, defaultOpen = false, onModelChanged = null, selectionVersion = 0,
+  quantites: quantitesControlees = null, onQuantiteChange = null,
   selectionLectureSeule = false, atelier: atelierControle = null, onAtelierChange = null, actionsSelection = null,
   documents: documentsFournis, className = '',
 }) {
@@ -67,7 +65,7 @@ export function EquipmentPartsSection({
   const atelier = atelierControle || atelierInterne;
   const actif = ouvert || !!atelier.ouvert;
   const quantites = quantitesControlees || quantitesLocales;
-  const avecSelection = !!(onAddToQuote || onQuantiteChange || actionsSelection || quantitesControlees);
+  const avecSelection = !!(onQuantiteChange || actionsSelection || quantitesControlees);
 
   const { model, isLoading: chargementModele, error: erreurModele } = useEquipmentModel(modelId);
   const { parts, isLoading: chargementPieces, error: erreurPieces } = useEquipmentModelParts(modelId, actif);
@@ -117,11 +115,6 @@ export function EquipmentPartsSection({
       if (quantite <= 0) delete next[ligne.id]; else next[ligne.id] = quantite;
       return next;
     });
-  };
-
-  const ajouterAuDevis = () => {
-    if (!choisies.length) return;
-    onAddToQuote(choisies);
   };
 
   const selecteurModele = choixModele && (
@@ -205,28 +198,19 @@ export function EquipmentPartsSection({
   );
 
   const nbChoisies = `${choisies.length} pièce${choisies.length > 1 ? 's' : ''} choisie${choisies.length > 1 ? 's' : ''}`;
-  const actions = actionsSelection
-    ? (
-      <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
-        {choisies.length > 0 && <span className="text-xs text-secondary-500">{nbChoisies}</span>}
-        {typeof actionsSelection === 'function' ? actionsSelection(choisies) : actionsSelection}
-      </div>
-    )
-    : onAddToQuote && (
-      <div className="flex items-center justify-end gap-3 pt-1">
-        <span className="text-xs text-secondary-500">{choisies.length > 0 ? nbChoisies : 'Choisissez les pièces avec + pour créer un devis'}</span>
-        <button type="button" onClick={ajouterAuDevis} disabled={choisies.length === 0} className="btn-primary btn-sm inline-flex items-center gap-1.5 disabled:opacity-50">
-          <ShoppingCart className="w-4 h-4" />{quoteLabel}
-        </button>
-      </div>
-    );
+  const actions = actionsSelection && (
+    <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+      {choisies.length > 0 && <span className="text-xs text-secondary-500">{nbChoisies}</span>}
+      {typeof actionsSelection === 'function' ? actionsSelection(choisies) : actionsSelection}
+    </div>
+  );
 
   const liste = (
     <>
       <NomenclatureTable
         parts={parts} chargement={chargementPieces} recherche={reperes} onRecherche={setReperes}
         quantites={quantites} onRegler={regler} avecSelection={avecSelection}
-        libelleSelection={onAddToQuote && !onQuantiteChange ? 'Pour le devis' : 'Choisies'} lectureSeule={selectionLectureSeule}
+        libelleSelection="Choisies" lectureSeule={selectionLectureSeule}
       />
       {!chargementPieces && !erreurPieces && model && parts.length === 0 && (
         <p className="text-sm text-secondary-500">Aucune pièce détachée relevée pour ce modèle.</p>

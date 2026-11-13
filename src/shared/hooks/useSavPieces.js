@@ -19,14 +19,15 @@ const memeLigne = (a, b) =>
   a.piece_reference === b.piece_reference &&
   (a.repere ?? '') === (b.repere ?? '');
 
-/** `{ selections, isLoading, error, setQuantity, isSaving }` */
+/** `{ selections, isLoading, error, setQuantity, isSaving }` — `isLoading` vrai tant que la liste est inconnue. */
 export function useSavPieces(interventionId) {
   const { organization } = useAuth();
   const orgId = organization?.id;
   const queryClient = useQueryClient();
   const key = savPieceKeys.byCard(orgId, interventionId);
 
-  const { data, isLoading, error } = useQuery({
+  // `isPending` (et non `isLoading`) : une requête désactivée faute d'orgId reste « liste inconnue ».
+  const { data, isPending, error } = useQuery({
     queryKey: key,
     queryFn: async () => {
       const { data: rows, error: err } = await savPiecesService.list(orgId, interventionId);
@@ -41,11 +42,13 @@ export function useSavPieces(interventionId) {
     onMutate: async (photo) => {
       await queryClient.cancelQueries({ queryKey: key });
       const snapshot = queryClient.getQueryData(key);
+      // Remplacement EN PLACE : une ligne qui changerait de position déplacerait les boutons
+      // sous le doigt, et un second tap modifierait une AUTRE pièce.
       queryClient.setQueryData(key, (old = []) => {
-        const sans = old.filter((l) => !memeLigne(l, photo));
-        if (!(photo.quantity > 0)) return sans;
-        const existante = old.find((l) => memeLigne(l, photo));
-        return [...sans, { ...existante, ...photo, repere: photo.repere ?? '' }];
+        if (!(photo.quantity > 0)) return old.filter((l) => !memeLigne(l, photo));
+        const nouvelle = { ...photo, repere: photo.repere ?? '' };
+        if (!old.some((l) => memeLigne(l, photo))) return [...old, nouvelle];
+        return old.map((l) => (memeLigne(l, photo) ? { ...l, ...nouvelle } : l));
       });
       return { snapshot };
     },
@@ -58,7 +61,7 @@ export function useSavPieces(interventionId) {
 
   return {
     selections: data || [],
-    isLoading,
+    isLoading: isPending,
     error,
     setQuantity: mutation.mutateAsync,
     isSaving: mutation.isPending,
