@@ -86,3 +86,63 @@ export function bornerPartDocument(part) {
   if (!Number.isFinite(part)) return PART_DOCUMENT.defaut;
   return Math.min(PART_DOCUMENT.max, Math.max(PART_DOCUMENT.min, part));
 }
+
+/** Plafond de pixels d'un canvas de page PDF (même principe que `maxCanvasPixels` de pdf.js). */
+export const MAX_PIXELS_CANVAS = 16777216;
+
+/**
+ * Densité de rendu d'une page PDF : pixels du canvas par pixel CSS. Vaut la densité d'écran, réduite pour que
+ * le canvas ne dépasse jamais `maxPixels` (au-delà, une tablette rend un canvas blanc ou plante). La taille
+ * affichée (CSS) ne change pas : seule la netteté baisse sur une page très zoomée.
+ * @param {{ largeur: number, hauteur: number, zoom?: number, dpr?: number, maxPixels?: number }} p
+ *   `largeur` / `hauteur` = taille CSS de la page à zoom 1, `zoom` = facteur d'agrandissement appliqué
+ * @returns {number}
+ */
+export function echelleRendu({ largeur, hauteur, zoom = 1, dpr = 1, maxPixels = MAX_PIXELS_CANVAS }) {
+  const densite = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+  const z = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  const surface = largeur * z * hauteur * z;
+  if (!(surface > 0)) return densite;
+  return Math.min(densite, Math.sqrt(maxPixels / surface));
+}
+
+const sansAccent = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+/**
+ * Requête de recherche normalisée comme le texte des pages : sans accent, en minuscules, blancs réduits à une
+ * espace, bords retirés.
+ * @param {string} s
+ * @returns {string}
+ */
+export function normaliserRecherchePdf(s) {
+  return sansAccent(String(s || '')).replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Texte d'une page PDF pour la recherche : les éléments de texte de pdf.js mis bout à bout, séparés d'une espace
+ * sauf quand l'un prolonge l'autre sur la même ligne. Jamais deux espaces de suite (élément vide ou blanc ignoré,
+ * blancs internes réduits), même normalisation que `normaliserRecherchePdf`. `segments` garde, pour chaque
+ * élément retenu, son indice et sa plage dans le texte.
+ * @param {Array<{ str?: string, transform?: number[], width?: number }>} items
+ * @returns {{ texte: string, segments: Array<{ item: number, debut: number, fin: number }> }}
+ */
+export function texteDePagePdf(items) {
+  let texte = '';
+  const segments = [];
+  let prec = null;
+  (Array.isArray(items) ? items : []).forEach((it, idx) => {
+    const brut = typeof it?.str === 'string' ? it.str : '';
+    if (!brut.trim()) return;
+    let morceau = sansAccent(brut).replace(/\s+/g, ' ');
+    const colle = !!(prec?.transform && it.transform)
+      && Math.abs(prec.transform[5] - it.transform[5]) < 1
+      && Math.abs(prec.transform[4] + (prec.width || 0) - it.transform[4]) < 1;
+    if (!texte || texte.endsWith(' ')) morceau = morceau.trimStart();
+    else if (!colle && !morceau.startsWith(' ')) texte += ' ';
+    const debut = texte.length;
+    texte += morceau;
+    segments.push({ item: idx, debut, fin: texte.length });
+    prec = it;
+  });
+  return { texte, segments };
+}

@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Search, ZoomIn, ZoomOut, MoveHorizontal, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { logger } from '@lib/logger';
+import { echelleRendu, texteDePagePdf, normaliserRecherchePdf } from '@/lib/catalogue/documentsAppareil';
 
 const PAS_ZOOM = 0.25;
 
@@ -27,26 +28,6 @@ const chargerPdfjs = () => {
       .catch((e) => { pdfjsPromise = null; throw e; });
   }
   return pdfjsPromise;
-};
-
-const sansAccent = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
-
-/**
- * Texte d'une page : les éléments de texte de pdf.js sont mis bout à bout, séparés d'une espace sauf quand l'un
- * prolonge l'autre sur la même ligne. `segments` garde, pour chaque élément, sa plage dans le texte.
- */
-const texteDePage = (items) => {
-  let texte = '';
-  const segments = [];
-  items.forEach((it, idx) => {
-    const prec = items[idx - 1];
-    const colle = prec && Math.abs(prec.transform[5] - it.transform[5]) < 1 && Math.abs(prec.transform[4] + prec.width - it.transform[4]) < 1;
-    if (texte && !colle) texte += ' ';
-    const debut = texte.length;
-    texte += sansAccent(it.str);
-    segments.push({ item: idx, debut, fin: texte.length });
-  });
-  return { texte, segments };
 };
 
 /** Parties d'éléments couvertes par la plage [debut, fin[ du texte de page. */
@@ -67,6 +48,7 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
   const [trouves, setTrouves] = useState(null); // null = pas de recherche ; sinon [{ page, parts: [{ item, debut, fin, longueur }] }]
   const [rang, setRang] = useState(0);
   const [rects, setRects] = useState([]);
+  const [erreurRecherche, setErreurRecherche] = useState(false);
   const pageInitialeRef = useRef(pageInitiale);
   const zoneRef = useRef(null);
   const canvasRef = useRef(null);
@@ -76,7 +58,7 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
   useEffect(() => {
     let actif = true;
     let tache = null;
-    setPdf(null); setErreur(false); setTrouves(null); setRects([]); textesRef.current = new Map();
+    setPdf(null); setErreur(false); setTrouves(null); setRects([]); setErreurRecherche(false); textesRef.current = new Map();
     chargerPdfjs()
       .then((pdfjs) => {
         if (!actif) return null;
@@ -119,7 +101,8 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
         const vp = p.getViewport({ scale: echelle });
         const canvas = canvasRef.current;
         if (!canvas || !actif) return;
-        const dpr = window.devicePixelRatio || 1;
+        // Densité plafonnée : au-delà de 16 Mpx une tablette rend un canvas blanc. La taille CSS ne bouge pas.
+        const dpr = echelleRendu({ largeur: vp.width, hauteur: vp.height, dpr: window.devicePixelRatio || 1 });
         canvas.width = Math.floor(vp.width * dpr);
         canvas.height = Math.floor(vp.height * dpr);
         canvas.style.width = `${Math.floor(vp.width)}px`;
@@ -158,13 +141,14 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
 
   const chercher = async (e) => {
     e?.preventDefault();
-    const q = sansAccent(requete.trim()).replace(/\s+/g, ' ');
+    setErreurRecherche(false);
+    const q = normaliserRecherchePdf(requete);
     if (!pdf || !q) { setTrouves(null); setRects([]); return; }
     try {
       await chargerTextes();
       const liste = [];
       for (let n = 1; n <= pdf.numPages; n += 1) {
-        const { texte, segments } = texteDePage(textesRef.current.get(n) || []);
+        const { texte, segments } = texteDePagePdf(textesRef.current.get(n) || []);
         let i = texte.indexOf(q);
         while (i !== -1) {
           liste.push({ page: n, parts: partiesCouvertes(segments, i, i + q.length) });
@@ -174,7 +158,10 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
       setTrouves(liste);
       setRang(0);
       if (liste.length) setPage(liste[0].page);
-    } catch (err) { logger.error('LecteurPdf : recherche', err); }
+    } catch (err) {
+      logger.error('LecteurPdf : recherche', err);
+      setTrouves(null); setRects([]); setErreurRecherche(true);
+    }
   };
 
   const suivante = () => {
@@ -214,6 +201,11 @@ export default function LecteurPdf({ url, pageInitiale = 1 }) {
             className="h-8 w-44 px-2 text-sm border border-secondary-300 rounded"
           />
           <button type="submit" className={bouton} aria-label="Chercher"><Search className="w-4 h-4" /></button>
+          {erreurRecherche && (
+            <span role="alert" className="inline-flex items-center gap-1 text-xs text-red-700 whitespace-nowrap">
+              <AlertCircle className="w-3.5 h-3.5" />Recherche impossible : texte illisible
+            </span>
+          )}
           {trouves && (
             <>
               <span className="text-xs text-secondary-600 whitespace-nowrap">{trouves.length ? `${rang + 1} / ${trouves.length}` : 'Aucun résultat'}</span>

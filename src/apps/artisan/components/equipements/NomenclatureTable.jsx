@@ -95,9 +95,9 @@ export default function NomenclatureTable({
                     {avecSelection && (
                       <td className="px-1 py-1.5">
                         <div className="flex items-center justify-end gap-1">
-                          <button type="button" onClick={() => onRegler?.(l, q - 1)} disabled={lectureSeule || q === 0} aria-label={`Retirer ${l.piece_reference}`} className="w-6 h-6 rounded-full border border-secondary-300 flex items-center justify-center hover:bg-secondary-100 disabled:opacity-30"><Minus className="w-3 h-3" /></button>
+                          <button type="button" onClick={() => onRegler?.(l, q - 1)} disabled={lectureSeule || q === 0} aria-label={`Retirer ${l.piece_reference}`} className="group w-9 h-9 -my-1.5 flex items-center justify-center disabled:opacity-30"><span className="w-6 h-6 rounded-full border border-secondary-300 flex items-center justify-center group-hover:bg-secondary-100"><Minus className="w-3 h-3" /></span></button>
                           <span className="w-5 text-center tabular-nums text-sm">{q}</span>
-                          <button type="button" onClick={() => onRegler?.(l, q + 1)} disabled={lectureSeule} aria-label={`Ajouter ${l.piece_reference}`} className="w-6 h-6 rounded-full border border-secondary-300 flex items-center justify-center hover:bg-secondary-100 disabled:opacity-30"><Plus className="w-3 h-3" /></button>
+                          <button type="button" onClick={() => onRegler?.(l, q + 1)} disabled={lectureSeule} aria-label={`Ajouter ${l.piece_reference}`} className="group w-9 h-9 -my-1.5 flex items-center justify-center disabled:opacity-30"><span className="w-6 h-6 rounded-full border border-secondary-300 flex items-center justify-center group-hover:bg-secondary-100"><Plus className="w-3 h-3" /></span></button>
                         </div>
                       </td>
                     )}
