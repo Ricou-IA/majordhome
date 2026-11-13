@@ -15,7 +15,7 @@
 - Travail sur `main` uniquement, commits par chemins explicites, `git pull --rebase --autostash` puis push. **Avant de commencer : vérifier `git branch --show-current` = `main`** (une autre session a laissé le dossier sur `spec/assistant-pieces-sav` le 2026-11-12 ; ne jamais commiter sur sa branche, ne pas changer de branche sans l'accord d'Eric).
 - Charte multi-tenant de `CLAUDE.md` : `org_id` = org CORE (`organization.id` de `useAuth`, celle de `majordhome.project_org_id`), filtre `.eq('org_id', orgId)` explicite sur toute mutation, `{ error }` lu partout, `REVOKE ALL … FROM PUBLIC, anon` sur la vue, `GRANT SELECT … TO service_role` sur la table, vue `security_invoker=true`.
 - Écritures RLS sous `majordhome.role_can(org_id, 'clients', 'edit')` ; lecture = membres de l'org (même prédicat que `equipment_models_select`).
-- Migration versionnée `supabase/migrations/20261112_9_sav_pieces_identifiees.sql`, répétée d'abord sur `scripts/migration-rehearsal/` avant `apply_migration` en prod.
+- Migration versionnée `supabase/migrations/20261113_5_sav_pieces_identifiees.sql`, répétée d'abord sur `scripts/migration-rehearsal/` avant `apply_migration` en prod.
 - Mutations de hooks via `unwrapResult()` ; cache keys dans `cacheKeys.js`, `all: (orgId) => [domain, orgId]` ; `enabled: !!orgId && …`.
 - Composants < 500 lignes ; aucune règle métier dans le JSX ; `logger`, jamais `console.*` ; Tailwind seul ; jamais la couleur seule pour porter un état.
 - Libellés d'écran (Eric) : bouton **« Lire avec la liste »**, retour **« Réduire »**, bouton fiche client **« Mettre sur la demande SAV »**.
@@ -35,7 +35,7 @@
 ### Task 1: Table des pièces identifiées (base)
 
 **Files:**
-- Create: `supabase/migrations/20261112_9_sav_pieces_identifiees.sql`
+- Create: `supabase/migrations/20261113_5_sav_pieces_identifiees.sql`
 - Create: `scripts/migration-rehearsal/assert-sav-pieces-identifiees.sql`
 - Modify: `scripts/migration-rehearsal/snapshot.mjs` (seulement si une table / fonction citée manque : `majordhome.interventions`, `majordhome.equipments`, `majordhome.project_org_id`, `majordhome.role_can`)
 
@@ -58,10 +58,10 @@
   `delete` = `majordhome.role_can(org_id, 'clients', 'edit')`.
   Vue `CREATE VIEW public.majordhome_sav_part_selections WITH (security_invoker=true) AS SELECT … FROM majordhome.sav_part_selections` ; `REVOKE ALL ON public.majordhome_sav_part_selections FROM PUBLIC, anon` ; `GRANT SELECT, INSERT, UPDATE, DELETE ON public.majordhome_sav_part_selections TO authenticated` ; `GRANT SELECT ON majordhome.sav_part_selections TO service_role`. Commentaires `COMMENT ON` (photo = affichage et survie au relevé, pas le prix du devis).
 - [ ] **Step 4: Répéter avec la migration**
-  Run: `node scripts/migration-rehearsal/run.mjs --migration supabase/migrations/20261112_9_sav_pieces_identifiees.sql --assert scripts/migration-rehearsal/assert-sav-pieces-identifiees.sql`
+  Run: `node scripts/migration-rehearsal/run.mjs --migration supabase/migrations/20261113_5_sav_pieces_identifiees.sql --assert scripts/migration-rehearsal/assert-sav-pieces-identifiees.sql`
   Expected: PASS, aucun `RAISE EXCEPTION`.
-- [ ] **Step 5: Appliquer en prod** (`apply_migration`, projet `ejqqqwudmizqisdkxohw`, nom `20261112_9_sav_pieces_identifiees`) puis vérifier : `select to_regclass('public.majordhome_sav_part_selections')` non NULL et `has_table_privilege('anon', 'public.majordhome_sav_part_selections', 'SELECT')` = false.
-- [ ] **Step 6: Commit** `git add supabase/migrations/20261112_9_sav_pieces_identifiees.sql scripts/migration-rehearsal/assert-sav-pieces-identifiees.sql [snapshot.mjs si modifié]` — `feat(sav): pièces identifiées enregistrées sur la carte SAV (base)`.
+- [ ] **Step 5: Appliquer en prod** (`apply_migration`, projet `ejqqqwudmizqisdkxohw`, nom `20261113_5_sav_pieces_identifiees`) puis vérifier : `select to_regclass('public.majordhome_sav_part_selections')` non NULL et `has_table_privilege('anon', 'public.majordhome_sav_part_selections', 'SELECT')` = false.
+- [ ] **Step 6: Commit** `git add supabase/migrations/20261113_5_sav_pieces_identifiees.sql scripts/migration-rehearsal/assert-sav-pieces-identifiees.sql [snapshot.mjs si modifié]` — `feat(sav): pièces identifiées enregistrées sur la carte SAV (base)`.
 
 ### Task 2: Règles pures des pièces identifiées
 
@@ -244,6 +244,7 @@ test('ongletsAtelier : vues d\'abord, procédures en dernier, rien d\'absent', (
   - `SAVModelPartsSection` nouvelle prop `onAtelierChange?: (ouvert: boolean) => void`.
   - `EntretienSAVModal` : largeur `max-w-4xl` → `max-w-[calc(100vw-2rem)]` tant que l'atelier est ouvert.
 
+- [ ] **Step 0: Garder l'assistant « Trouver une pièce »** fusionné le 2026-11-13 (`TrouverPieceButton`, branche « sans modèle » sous `moduleActif(settings, 'assistant')`) : ni retiré ni déplacé ; même chose dans `EquipmentList` (Task 8).
 - [ ] **Step 1: Brancher la sélection sur la base** : `quantites = quantitesParLigne(selections de cet équipement, parts)` ; `onQuantiteChange(ligne, q)` → `setQuantity(photoPiece(ligne, { equipmentId, equipmentModelId }, q))` ; `selectionLectureSeule = !peutIdentifierPieces(item, { role: effectiveRole, canEditSAV })`. `canEditSAV && !clotureSeule` reste la garde du choix de modèle et du devis.
 - [ ] **Step 2: Liste « Pièces identifiées »** en tête du bloc : appareil (si plusieurs), référence, désignation, quantité, prix public HT, « par Prénom, le jj/mm » (`added_by` résolu par le nom de membre déjà disponible dans la fiche, sinon « — »), retrait (– jusqu'à 0) si `peutIdentifierPieces`.
 - [ ] **Step 3: Devis depuis la liste enregistrée** : « Créer un devis avec ces pièces » → `lignesDevisAvecPieces(sections, choixDepuisIdentifiees(selections, { [equipmentId]: parts }), tva)` ; ne vide pas la liste ; bouton visible seulement si `peutCreerDevis` (inchangé).
