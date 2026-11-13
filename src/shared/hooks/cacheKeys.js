@@ -574,3 +574,8 @@ export const assistantPiecesKeys = {
   parEquipement: (orgId, equipmentId) => [...assistantPiecesKeys.all(orgId), 'equipement', equipmentId],
   detail: (orgId, id) => [...assistantPiecesKeys.all(orgId), 'detail', id],
 };
+
+export const savPieceKeys = {
+  all: (orgId) => ['sav-pieces', orgId],
+  byCard: (orgId, interventionId) => [...savPieceKeys.all(orgId), 'card', interventionId],
+};
