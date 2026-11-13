@@ -14,6 +14,8 @@ import { reduireImage } from '@/lib/imageResize';
 import { EquipmentList } from '@/apps/artisan/components/clients/EquipmentList';
 import { EquipmentFormModal } from '@/apps/artisan/components/clients/EquipmentFormModal';
 import { PartsToSavQuote } from '@/apps/artisan/components/equipements/PartsToSavQuote';
+import { PartsToSavDemand } from '@/apps/artisan/components/equipements/PartsToSavDemand';
+import { peutRangerSurDemandeSav } from '@/lib/savCloture';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { logger } from '@lib/logger';
 
@@ -23,7 +25,11 @@ export const TabEquipments = ({ clientId, client = null, prefillDraft = null, on
   const { can } = useCanAccess();
   // Pièces détachées choisies sur une carte équipement → demande SAV → devis (PartsToSavQuote)
   const [partsFlow, setPartsFlow] = useState(null); // { equipment, choix, carte }
-  const [partsSelectionVersion, setPartsSelectionVersion] = useState(0);
+  // Pièces choisies → demande SAV ouverte du client, créée au besoin (PartsToSavDemand) — ouvert au technicien
+  const [partsDemand, setPartsDemand] = useState(null); // { equipment, choix }
+  // Par équipement : changer la valeur vide SA sélection de pièces (devis créé, pièces rangées)
+  const [partsSelectionVersions, setPartsSelectionVersions] = useState({});
+  const viderSelection = (equipmentId) => setPartsSelectionVersions((v) => ({ ...v, [equipmentId]: (v[equipmentId] || 0) + 1 }));
   const [showModal, setShowModal] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState(null);
   const [isUploadingNameplate, setIsUploadingNameplate] = useState(false);
@@ -95,6 +101,11 @@ export const TabEquipments = ({ clientId, client = null, prefillDraft = null, on
   // Une demande SAV déjà ouverte pour le client reçoit le devis (même anti-doublon que le RDV SAV du planning) ;
   // sinon la demande est d'abord créée. Les services renvoient { error } sans throw : on le lit.
   const peutDevisSav = !!client?.id && can('devis', 'create') && can('sav', 'create');
+  const peutRanger = !!client?.id && peutRangerSurDemandeSav({ canEditClient: can('clients', 'edit') });
+  const handlePartsToSav = (equipment, choix) => {
+    if (partsDemand || !choix?.length) return; // un enchaînement à la fois
+    setPartsDemand({ equipment, choix });
+  };
   const handlePartsToQuote = async (equipment, choix) => {
     const { data: openId, error } = await savService.getOpenSavCardId(clientId);
     if (error) {
@@ -342,7 +353,8 @@ export const TabEquipments = ({ clientId, client = null, prefillDraft = null, on
         onUploadDocument={handleUploadDocument}
         onDeleteDocument={removeModelDocument}
         onPartsToQuote={peutDevisSav ? handlePartsToQuote : undefined}
-        partsSelectionVersion={partsSelectionVersion}
+        onPartsToSav={peutRanger ? handlePartsToSav : undefined}
+        partsSelectionVersions={partsSelectionVersions}
       />
       {partsFlow && (
         <PartsToSavQuote
@@ -351,7 +363,16 @@ export const TabEquipments = ({ clientId, client = null, prefillDraft = null, on
           choix={partsFlow.choix}
           carteOuverte={partsFlow.carte}
           onClose={() => setPartsFlow(null)}
-          onQuoteCreated={() => setPartsSelectionVersion((v) => v + 1)}
+          onQuoteCreated={() => viderSelection(partsFlow.equipment.id)}
+        />
+      )}
+      {partsDemand && (
+        <PartsToSavDemand
+          client={client}
+          equipment={partsDemand.equipment}
+          choix={partsDemand.choix}
+          onClose={() => setPartsDemand(null)}
+          onRanged={() => viderSelection(partsDemand.equipment.id)}
         />
       )}
       <EquipmentFormModal

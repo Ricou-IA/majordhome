@@ -6,7 +6,9 @@
  * public HT (`NomenclatureTable`). Sinon : « Choisir le modèle fabricant ». Avec `onAddToQuote` (ou une sélection
  * contrôlée), les pièces se choisissent avec + / −.
  * « Lire avec la liste » (ou une vignette) ouvre le MODE ATELIER (`AtelierPieces`) : document en face de la liste,
- * dans la page, sans voile. Ouverture contrôlable de l'extérieur (`atelier` / `onAtelierChange`).
+ * dans la page, sans voile. Ouverture contrôlable de l'extérieur (`atelier` / `onAtelierChange`) : la fiche client
+ * l'ouvre sur un document cliqué dans « Documents » (`doc:<id>`), y compris pour un appareil sans modèle fabricant
+ * (document seul, sans liste).
  * Le prix affiché est le PRIX PUBLIC HT du fabricant au dernier relevé, libellé comme tel.
  * Règles (filtre, mentions, prix) : src/lib/catalogue/nomenclature.js (pur, testé). Aucun calcul ici.
  * ============================================================================
@@ -43,12 +45,15 @@ const ATELIER_FERME = { ouvert: false, ongletId: null };
  * @param {(atelier: { ouvert: boolean, ongletId: string|null }) => void} [p.onAtelierChange] ouverture, onglet, « Réduire »
  * @param {import('react').ReactNode | ((choix: Array<{ ligne: object, quantite: number }>) => import('react').ReactNode)} [p.actionsSelection]
  *   boutons sous la liste, à la place du bouton de devis interne ; une fonction reçoit les pièces choisies
+ * @param {Array<object>} [p.documents] documents de l'appareil déjà chargés par l'appelant (fiche client) ; absent ⇒
+ *   lus ici par l'équipement
  * @param {string} [p.className]
  */
 export function EquipmentPartsSection({
   equipment, canEdit = false, defaultOpen = false, onAddToQuote = null, onModelChanged = null, selectionVersion = 0,
   quoteLabel = 'Créer un devis avec ces pièces', quantites: quantitesControlees = null, onQuantiteChange = null,
-  selectionLectureSeule = false, atelier: atelierControle = null, onAtelierChange = null, actionsSelection = null, className = '',
+  selectionLectureSeule = false, atelier: atelierControle = null, onAtelierChange = null, actionsSelection = null,
+  documents: documentsFournis, className = '',
 }) {
   const modelId = equipment?.equipment_model_id || null;
   const [ouvert, setOuvert] = useState(defaultOpen);
@@ -56,7 +61,8 @@ export function EquipmentPartsSection({
   const [reperes, setReperes] = useState('');
   const [atelierInterne, setAtelierInterne] = useState(ATELIER_FERME);
   const [quantitesLocales, setQuantitesLocales] = useState({}); // { idLigne: quantité }
-  useEffect(() => { setQuantitesLocales({}); }, [selectionVersion]);
+  // Vidée quand l'appelant le demande, et quand le modèle change (les lignes d'un autre modèle n'ont plus de sens)
+  useEffect(() => { setQuantitesLocales({}); }, [selectionVersion, modelId]);
 
   const atelier = atelierControle || atelierInterne;
   const actif = ouvert || !!atelier.ouvert;
@@ -66,10 +72,11 @@ export function EquipmentPartsSection({
   const { model, isLoading: chargementModele, error: erreurModele } = useEquipmentModel(modelId);
   const { parts, isLoading: chargementPieces, error: erreurPieces } = useEquipmentModelParts(modelId, actif);
   const { vues, manquantes, isLoading: chargementImages } = useEquipmentModelImages(model, actif);
-  const { documentsByEquipmentId } = useEquipmentModelDocuments(modelId && equipment?.id ? [equipment.id] : []);
+  const lireDocuments = documentsFournis === undefined && modelId && equipment?.id;
+  const { documentsByEquipmentId } = useEquipmentModelDocuments(lireDocuments ? [equipment.id] : []);
   const { setModel, isSaving } = useSetEquipmentModel();
 
-  const documents = modelId ? documentsByEquipmentId[equipment.id] : null;
+  const documents = documentsFournis !== undefined ? documentsFournis : (modelId ? documentsByEquipmentId[equipment.id] : null);
   const onglets = useMemo(() => ongletsAtelier({ vues, documents }), [vues, documents]);
   const lisible = onglets.length > 0 || vuesDeclarees(model) > 0;
   const vuesDeNotice = vues.some((v) => v.origine === 'notice');
@@ -120,7 +127,11 @@ export function EquipmentPartsSection({
   const selecteurModele = choixModele && (
     <EquipmentModelPicker equipment={equipment} currentModelId={modelId} isSaving={isSaving} onSelect={choisirModele} onClose={() => setChoixModele(false)} />
   );
-  const titreModele = model ? `${model.model_name || model.name} · réf. ${model.reference}` : (chargementModele ? 'Chargement…' : 'Modèle introuvable');
+  const titreModele = !modelId
+    ? [equipment?.brand, equipment?.model].filter(Boolean).join(' ')
+    : model ? `${model.model_name || model.name} · réf. ${model.reference}` : (chargementModele ? 'Chargement…' : 'Modèle introuvable');
+  // Un document demandé s'affiche tout de suite : l'attente des vues éclatées ne concerne qu'un onglet de vue (ou aucun)
+  const attenteVues = chargementImages && !String(atelier.ongletId || '').startsWith('doc:');
   const boutonLire = (libelle) => (
     <button type="button" onClick={() => lireAvecLaListe()} className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium flex-shrink-0">
       <BookOpen className="w-3.5 h-3.5" />{libelle}
@@ -131,12 +142,13 @@ export function EquipmentPartsSection({
       titre={titreModele} onglets={onglets} ongletId={atelier.ongletId ?? null}
       onOnglet={(id) => changerAtelier({ ouvert: true, ongletId: id })}
       vueNotice={ongletActif(onglets, atelier.ongletId)?.vueDeNotice === true}
-      chargement={chargementImages} liste={liste} onReduire={() => changerAtelier(ATELIER_FERME)}
+      chargement={attenteVues} liste={liste} onReduire={() => changerAtelier(ATELIER_FERME)}
     />
   );
 
-  // Équipement sans modèle fabricant : une ligne discrète, un seul geste.
+  // Équipement sans modèle fabricant : une ligne discrète, un seul geste — ou le document seul, ouvert depuis « Documents ».
   if (!modelId) {
+    if (atelier.ouvert) return <div className={className}>{atelierOuvert(null)}{selecteurModele}</div>;
     if (!canEdit) return null;
     return (
       <div className={`flex items-center gap-2 text-xs text-secondary-500 ${className}`}>

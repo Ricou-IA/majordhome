@@ -39,12 +39,14 @@ import {
 } from 'lucide-react';
 import { EquipmentDocumentsSection } from './EquipmentDocumentsSection';
 import { EquipmentPartsSection } from '../equipements/EquipmentPartsSection';
+import PiecesSelectionActions from '../equipements/PiecesSelectionActions';
 import TrouverPieceButton from '../assistant/TrouverPieceButton';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { indexReferentiel, libelleEquipement } from '@/lib/equipmentReferential';
 import { formatDateShortFR } from '@/lib/utils';
 
 const REFERENTIEL_VIDE = indexReferentiel();
+const ATELIER_FERME = { ouvert: false, ongletId: null };
 
 // ============================================================================
 // UTILITAIRES
@@ -196,15 +198,23 @@ const EquipmentCard = ({
   hasContract = false,
   isLinkedToContract = false,
   productDocuments = [],
-  modelDocuments = [],
+  modelDocuments,
   canUploadDocument = false,
   canDeleteDocument = false,
   onUploadDocument,
   onDeleteDocument,
   onPartsToQuote,
+  onPartsToSav,
   partsSelectionVersion = 0,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
+  // Mode atelier du bloc « Pièces détachées », ouvert aussi par un clic dans « Documents » (doc:<id>)
+  const [atelier, setAtelier] = useState(ATELIER_FERME);
+  // Documentation fournisseur dans l'atelier : mêmes lignes que la section Documents (id distincts des documents du modèle)
+  const documentsAtelier = modelDocuments === undefined ? undefined : [
+    ...modelDocuments,
+    ...productDocuments.map((d) => ({ ...d, label: d.file_name, document_type: 'autre' })),
+  ];
 
   const {
     brand,
@@ -365,8 +375,9 @@ const EquipmentCard = ({
         {/* Documents du modèle (notice, vue éclatée) + documentation fournisseur */}
         <EquipmentDocumentsSection
           equipment={equipment}
-          modelDocuments={modelDocuments}
+          modelDocuments={modelDocuments || []}
           productDocuments={productDocuments}
+          onOpenDocument={(doc) => setAtelier({ ouvert: true, ongletId: `doc:${doc.id}` })}
           canUpload={canUploadDocument}
           canDelete={canDeleteDocument}
           onUpload={onUploadDocument}
@@ -374,13 +385,21 @@ const EquipmentCard = ({
         />
 
         {/* Pièces détachées du modèle fabricant (vue éclatée + nomenclature), ou choix du modèle */}
-        {/* Avec `onPartsToQuote` (fiche client) : les pièces se choisissent et partent dans un devis SAV */}
+        {/* Fiche client : les pièces se choisissent et partent sur la demande SAV (`onPartsToSav`) ou dans un devis SAV */}
         <EquipmentPartsSection
           equipment={equipment}
           canEdit={canUploadDocument}
-          onAddToQuote={onPartsToQuote ? (choix) => onPartsToQuote(equipment, choix) : null}
+          documents={documentsAtelier}
+          atelier={atelier}
+          onAtelierChange={setAtelier}
+          actionsSelection={(onPartsToSav || onPartsToQuote) ? (choix) => (
+            <PiecesSelectionActions
+              choix={choix}
+              onRanger={onPartsToSav ? (c) => onPartsToSav(equipment, c) : null}
+              onDevis={onPartsToQuote ? (c) => onPartsToQuote(equipment, c) : null}
+            />
+          ) : null}
           selectionVersion={partsSelectionVersion}
-          quoteLabel="Créer un devis SAV"
           className="mt-3"
         />
 
@@ -475,7 +494,9 @@ const EquipmentCard = ({
  * @param {Function} [props.onEdit] - Callback édition
  * @param {Function} [props.onDelete] - Callback suppression
  * @param {Function} [props.onPartsToQuote] - (equipment, choix) : pièces détachées choisies → devis SAV (fiche client)
- * @param {number} [props.partsSelectionVersion] - change quand la sélection de pièces doit être vidée (devis créé)
+ * @param {Function} [props.onPartsToSav] - (equipment, choix) : pièces détachées choisies → demande SAV du client
+ * @param {Object<string, number>} [props.partsSelectionVersions] - par équipement : change quand sa sélection doit être vidée
+ * @param {Object<string, Array>|null} [props.modelDocumentsMap] - documents du modèle par équipement ; absent ⇒ lus par le bloc pièces
  * @param {boolean} [props.readOnly] - Mode lecture seule
  */
 export function EquipmentList({
@@ -489,13 +510,14 @@ export function EquipmentList({
   hasContract = false,
   contractEquipmentIds = new Set(),
   productDocumentsMap = {},
-  modelDocumentsMap = {},
+  modelDocumentsMap = null,
   canUploadDocument = false,
   canDeleteDocument = false,
   onUploadDocument,
   onDeleteDocument,
   onPartsToQuote,
-  partsSelectionVersion = 0,
+  onPartsToSav,
+  partsSelectionVersions = {},
   readOnly = false,
 }) {
   const [expandedId, setExpandedId] = useState(null);
@@ -579,13 +601,14 @@ export function EquipmentList({
           onToggleExpand={() => toggleExpand(equipment.id)}
           referentiel={referentiel}
           productDocuments={productDocumentsMap[equipment.supplier_product_id] || []}
-          modelDocuments={modelDocumentsMap[equipment.id] || []}
+          modelDocuments={modelDocumentsMap ? modelDocumentsMap[equipment.id] || [] : undefined}
           canUploadDocument={!readOnly && canUploadDocument}
           canDeleteDocument={!readOnly && canDeleteDocument}
           onUploadDocument={readOnly ? undefined : onUploadDocument}
           onDeleteDocument={readOnly ? undefined : onDeleteDocument}
           onPartsToQuote={readOnly ? undefined : onPartsToQuote}
-          partsSelectionVersion={partsSelectionVersion}
+          onPartsToSav={readOnly ? undefined : onPartsToSav}
+          partsSelectionVersion={partsSelectionVersions[equipment.id] || 0}
         />
       ))}
     </div>

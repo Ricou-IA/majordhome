@@ -7,7 +7,8 @@
  *     déposés ici, visibles sur tous les équipements identiques ;
  *   - la documentation de la ligne fournisseur liée (product_documents), en
  *     lecture seule (elle se gère sur la fiche fournisseur).
- * Ouverture = visionneuse dans le logiciel (EquipmentDocumentViewer), URL signée à l'ouverture.
+ * Ouverture = `onOpenDocument(doc)` : la carte équipement ouvre le document dans le mode atelier de son bloc
+ * « Pièces détachées » (onglet `doc:<id>`), dans la page — plus de visionneuse plein écran ici.
  * Sans marque ni modèle : pas de dépôt possible, on dit pourquoi.
  * Présentationnel : les mutations sont passées par le parent (onUpload / onDelete).
  * ============================================================================
@@ -17,7 +18,6 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { FileText, BookOpen, Layers, Upload, Trash2, Loader2, X, Eye } from 'lucide-react';
 import { EQUIPMENT_DOCUMENT_TYPES, equipmentDocumentTypeLabel, equipmentHasModel } from '@services/equipmentDocuments.service';
-import EquipmentDocumentViewer from '../equipements/EquipmentDocumentViewer';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { logger } from '@lib/logger';
@@ -36,7 +36,8 @@ function DocumentRow({ doc, badge, canDelete, onDelete, onOpen }) {
     <div className="flex items-center gap-2 rounded-lg hover:bg-gray-50 group">
       <button
         type="button"
-        onClick={() => onOpen(doc)}
+        onClick={() => onOpen?.(doc)}
+        disabled={!onOpen}
         className="flex-1 min-w-0 flex items-center gap-2.5 p-2 text-left"
         title={`Consulter ${doc.file_name || titre}`}
       >
@@ -164,6 +165,7 @@ function UploadModal({ equipment, onClose, onSubmit, isSubmitting }) {
  * @param {boolean} [props.canDelete] - org_admin
  * @param {Function} [props.onUpload] - (equipment, { file, documentType, label }) => Promise
  * @param {Function} [props.onDelete] - (doc) => Promise
+ * @param {Function} [props.onOpenDocument] - (doc) : ouvre le document (mode atelier de la carte équipement)
  */
 export function EquipmentDocumentsSection({
   equipment,
@@ -173,13 +175,13 @@ export function EquipmentDocumentsSection({
   canDelete = false,
   onUpload,
   onDelete,
+  onOpenDocument,
 }) {
   const [uploading, setUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [proceduresOuvertes, setProceduresOuvertes] = useState(false);
-  const [consulte, setConsulte] = useState(null); // document ouvert dans la visionneuse
   const ranges = useMemo(() => rangerDocumentsModele(modelDocuments), [modelDocuments]);
 
   const hasModel = equipmentHasModel(equipment);
@@ -245,7 +247,7 @@ export function EquipmentDocumentsSection({
           {/* Document relevé sur le site du fabricant : pastille « Fabricant », pas de retrait ici (le relevé suivant
               le remettrait). Les procédures (une dizaine sur un poêle à granulés) sont repliées. */}
           {ranges.principaux.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} badge={doc.from_site ? 'Fabricant' : null} onOpen={setConsulte}
+            <DocumentRow key={doc.id} doc={doc} badge={doc.from_site ? 'Fabricant' : null} onOpen={onOpenDocument}
               canDelete={canDelete && !!onDelete && !doc.from_site} onDelete={setDeleting} />
           ))}
           {ranges.procedures.length > 0 && (
@@ -261,10 +263,10 @@ export function EquipmentDocumentsSection({
             </button>
           )}
           {proceduresOuvertes && ranges.procedures.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} onOpen={setConsulte} canDelete={canDelete && !!onDelete && !doc.from_site} onDelete={setDeleting} />
+            <DocumentRow key={doc.id} doc={doc} onOpen={onOpenDocument} canDelete={canDelete && !!onDelete && !doc.from_site} onDelete={setDeleting} />
           ))}
           {productDocuments.map((doc) => (
-            <DocumentRow key={`p-${doc.id}`} doc={{ ...doc, label: doc.file_name, document_type: 'autre' }} badge={doc.document_type || 'Fournisseur'} onOpen={setConsulte} />
+            <DocumentRow key={`p-${doc.id}`} doc={{ ...doc, label: doc.file_name, document_type: 'autre' }} badge={doc.document_type || 'Fournisseur'} onOpen={onOpenDocument} />
           ))}
         </div>
       ) : (
@@ -281,8 +283,6 @@ export function EquipmentDocumentsSection({
           isSubmitting={isSubmitting}
         />
       )}
-
-      {consulte && <EquipmentDocumentViewer doc={consulte} onClose={() => setConsulte(null)} />}
 
       <ConfirmDialog
         open={!!deleting}

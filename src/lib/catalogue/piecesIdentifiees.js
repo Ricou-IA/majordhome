@@ -210,3 +210,30 @@ export function etatDevisPieces({
   if (!(nbSelections > 0)) return { pret: false, raison: 'Aucune pièce identifiée' };
   return { pret: true, raison: null };
 }
+
+/**
+ * Photos à ranger en un seul envoi : une par clé d'unicité de la table (équipement + référence + repère, à
+ * l'identique de la contrainte). Postgres refuse un upsert qui porte deux fois la même clé ; la dernière l'emporte.
+ * @param {object[]} photos sorties de `photoPiece`
+ * @returns {object[]}
+ */
+export function dedoublonnerPhotos(photos) {
+  const parCle = new Map();
+  for (const p of photos || []) {
+    if (!p) continue;
+    const k = `${p.equipment_id}\u0000${p.piece_reference}\u0000${p.repere == null ? '' : String(p.repere)}`;
+    parCle.delete(k); // la dernière l'emporte et prend sa place dans l'ordre
+    parCle.set(k, p);
+  }
+  return [...parCle.values()];
+}
+
+/**
+ * Message après rangement sur la demande SAV : « 1 pièce mise… », « 3 pièces mises… ».
+ * @param {number} n nombre de pièces rangées
+ * @returns {string}
+ */
+export function messagePiecesRangees(n) {
+  const nb = Math.max(0, Number(n) || 0);
+  return nb > 1 ? `${nb} pièces mises sur la demande SAV` : `${nb} pièce mise sur la demande SAV`;
+}

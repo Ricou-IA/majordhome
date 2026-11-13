@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   photoPiece, retrouverLigne, quantitesParLigne, ligneDepuisIdentifiee, choixDepuisIdentifiees, quantiteAffichee,
   quantitesPourEquipement, photoDepuisIdentifiee, mentionIdentification, modelesPourDevis, nomenclaturesParEquipement,
-  selectionModifiable, etatDevisPieces,
+  selectionModifiable, etatDevisPieces, dedoublonnerPhotos, messagePiecesRangees,
 } from '../../src/lib/catalogue/piecesIdentifiees.js';
 
 const L = (x) => ({ id: 'l1', repere: '14', piece_reference: 'F6107098', piece_name: 'DEFLECTEUR POELE BALHAM', supplier_product_id: 'sp1', prix_public_ht: 58.64, catalog_item_id: 'ci1', ...x });
@@ -78,4 +78,18 @@ test('etatDevisPieces : nomenclature en échec ⇒ refus explicite, jamais des l
   assert.equal(etatDevisPieces({ ...base, chargementSelections: true }).pret, false);
   assert.equal(etatDevisPieces({ ...base, nbSelections: 0 }).pret, false);
   assert.match(etatDevisPieces({ ...base, familleActive: false }).raison, /inactive/);
+});
+
+test('dedoublonnerPhotos : une photo par équipement + référence + repère, la dernière l\'emporte', async () => {
+  const p = (x) => ({ equipment_id: 'e1', piece_reference: 'R1', repere: '14', quantity: 1, ...x });
+  const out = dedoublonnerPhotos([p(), p({ repere: '15' }), p({ quantity: 3 }), p({ equipment_id: 'e2' })]);
+  assert.equal(out.length, 3);
+  assert.equal(out.find((x) => x.equipment_id === 'e1' && x.repere === '14').quantity, 3);
+  assert.deepEqual(dedoublonnerPhotos([p({ repere: null }), p({ repere: '', quantity: 2 })]).map((x) => x.quantity), [2]);
+  assert.deepEqual(dedoublonnerPhotos(null), []);
+});
+
+test('messagePiecesRangees : singulier / pluriel', () => {
+  assert.equal(messagePiecesRangees(1), '1 pièce mise sur la demande SAV');
+  assert.equal(messagePiecesRangees(3), '3 pièces mises sur la demande SAV');
 });
