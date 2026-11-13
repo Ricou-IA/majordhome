@@ -88,7 +88,6 @@ function isReferenced(targetFile, allFiles) {
 // À retirer une fois les imports en place.
 const ALLOW_ORPHAN = new Set([
   'src/apps/artisan/components/equipements/ExplodedViewViewer.jsx', // plus d'appelant depuis la Task 6 (mode atelier) — supprimé en Task 9, retirer cette ligne avec
-  'src/shared/hooks/useSavPieces.js', // branché en Task 7/8 (pièces identifiées SAV) — à retirer
   'src/lib/logger.js',          // P1.7 — wrapper créé, migration au fil de l'eau
   'src/lib/permissionsRegistry.js', // Phase 1 — inerte (seed only) ; consommé par can() en Phase 3
   'src/apps/solaire/lib/pvgisHourly.js', // cœur moteur autoconso horaire (testé scripts/pvgis-hourly.test.mjs) — branchement UI à venir
@@ -111,7 +110,6 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/catalogue/cataloguePieces.js', // accord du marchand + mode « boutique publique » : lu par l'edge supplier-catalog-sync via la copie _shared/catalogue
   'src/lib/catalogue/modelKey.js',
   'src/lib/catalogue/mapping.js',
-  'src/lib/catalogue/piecesIdentifiees.js', // pièces identifiées d'une fiche SAV : consommé par les hooks / l'écran SAV des tâches suivantes — retirer cette ligne une fois branché
 ]);
 
 const allFiles = walk(SRC);

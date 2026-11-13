@@ -60,7 +60,7 @@ import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
 import { SAVUrgencySelect, SAVUrgencyBadge } from './SAVUrgency';
 import { urgenceDe } from '@/lib/savUrgency';
-import { peutCloturerSansPlanifier, limiteALaCloture } from '@/lib/savCloture';
+import { peutCloturerSansPlanifier, limiteALaCloture, peutIdentifierPieces } from '@/lib/savCloture';
 import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
 import { SAVLinkedQuotes } from './SAVLinkedQuotes';
 import { SAVModelPartsSection } from './SAVModelPartsSection';
@@ -88,6 +88,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
   const { can, effectiveRole } = useCanAccess();
   const orgId = organization?.id;
   const [lienBusy, setLienBusy] = useState(false); // copie du lien de prise de RDV (auto-RDV)
+  const [atelierOuvert, setAtelierOuvert] = useState(false); // mode atelier des pièces : la fiche s'élargit
 
   const {
     updateWorkflowStatus,
@@ -515,7 +516,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Contenu */}
-      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${isSav ? 'max-w-4xl' : 'max-w-lg'} ${MODAL_PANEL_PHONE}`}>
+      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${isSav ? (atelierOuvert ? 'max-w-[calc(100vw-2rem)]' : 'max-w-4xl') : 'max-w-lg'} ${MODAL_PANEL_PHONE}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-3 min-w-0">
@@ -719,7 +720,10 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                   equipements={equipementsClient}
                   referentiel={referentiel}
                   canEdit={canEditSAV && !clotureSeule}
+                  peutIdentifier={peutIdentifierPieces(item, { role: effectiveRole, canEditSAV })}
+                  membres={teamMembers}
                   onUpdated={onUpdated}
+                  onAtelierChange={setAtelierOuvert}
                 />
               )}
 

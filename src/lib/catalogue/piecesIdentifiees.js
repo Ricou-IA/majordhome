@@ -108,3 +108,78 @@ export function quantiteAffichee(enBase, enCours) {
   if (enCours !== undefined && enCours !== null) return enCours;
   return enBase ?? 0;
 }
+
+/**
+ * Quantités de la nomenclature affichée pour UN équipement : seules ses pièces identifiées comptent (deux appareils
+ * du même modèle ne s'additionnent pas sur une même ligne).
+ * @param {object[]} selections toutes les pièces identifiées de la fiche
+ * @param {string} equipmentId équipement affiché
+ * @param {object[]} lignes nomenclature affichée
+ * @returns {Object<string, number>}
+ */
+export function quantitesPourEquipement(selections, equipmentId, lignes) {
+  return quantitesParLigne((selections || []).filter((s) => s.equipment_id === equipmentId), lignes);
+}
+
+/**
+ * Photo d'une pièce déjà enregistrée, à une autre quantité (+ / − / retrait depuis la liste) : mêmes champs que
+ * `photoPiece`, rien d'autre (ni id, ni auteur, ni dates).
+ * @param {object} selection ligne de sav_part_selections
+ * @param {number} quantite nouvelle quantité (0 = retrait)
+ * @returns {{equipment_id: string, equipment_model_id: (string|null), part_line_id: (string|null), piece_reference: string, piece_name: string, repere: string, supplier_product_id: (string|null), public_price_ht: (number|null), quantity: number}}
+ */
+export function photoDepuisIdentifiee(selection, quantite) {
+  return {
+    equipment_id: selection?.equipment_id,
+    equipment_model_id: selection?.equipment_model_id ?? null,
+    part_line_id: selection?.part_line_id ?? null,
+    piece_reference: selection?.piece_reference,
+    piece_name: selection?.piece_name,
+    repere: selection?.repere == null ? '' : String(selection.repere),
+    supplier_product_id: selection?.supplier_product_id ?? null,
+    public_price_ht: selection?.public_price_ht ?? null,
+    quantity: Math.max(0, Number(quantite) || 0),
+  };
+}
+
+const deuxChiffres = (n) => String(n).padStart(2, '0');
+
+/**
+ * Mention « par Prénom, le jj/mm » d'une pièce identifiée. Prénom = membre de l'équipe dont `user_id` est l'auteur
+ * (`added_by`), sinon « — ».
+ * @param {object} selection
+ * @param {Array<{user_id?: string, first_name?: string}>} membres
+ * @returns {string}
+ */
+export function mentionIdentification(selection, membres) {
+  const membre = selection?.added_by ? (membres || []).find((m) => m?.user_id === selection.added_by) : null;
+  const prenom = membre?.first_name?.trim() || '—';
+  const d = selection?.added_at ? new Date(selection.added_at) : null;
+  if (!d || Number.isNaN(d.getTime())) return `par ${prenom}`;
+  return `par ${prenom}, le ${deuxChiffres(d.getDate())}/${deuxChiffres(d.getMonth() + 1)}`;
+}
+
+/**
+ * Modèles dont la nomenclature sert au devis : ceux, actuels, des équipements qui portent une pièce identifiée.
+ * @param {object[]} selections
+ * @param {Array<{id: string, equipment_model_id?: string|null}>} equipements
+ * @returns {string[]} id de modèles, sans doublon
+ */
+export function modelesPourDevis(selections, equipements) {
+  const avecPieces = new Set((selections || []).map((s) => s.equipment_id));
+  const ids = (equipements || []).filter((e) => avecPieces.has(e.id) && e.equipment_model_id).map((e) => e.equipment_model_id);
+  return [...new Set(ids)];
+}
+
+/**
+ * Nomenclature actuelle par équipement (entrée de `choixDepuisIdentifiees`) : un équipement sans modèle, ou dont la
+ * nomenclature n'est pas chargée, n'a pas de lignes — ses pièces partent en lignes libres au prix de la photo.
+ * @param {Array<{id: string, equipment_model_id?: string|null}>} equipements
+ * @param {Object<string, object[]>} partsParModele
+ * @returns {Object<string, object[]>}
+ */
+export function nomenclaturesParEquipement(equipements, partsParModele) {
+  const out = {};
+  for (const e of equipements || []) out[e.id] = (e.equipment_model_id && partsParModele?.[e.equipment_model_id]) || [];
+  return out;
+}

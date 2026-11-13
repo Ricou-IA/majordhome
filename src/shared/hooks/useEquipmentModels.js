@@ -6,7 +6,7 @@
  * ============================================================================
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { equipmentModelsService } from '@services/equipmentModels.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
@@ -45,6 +45,30 @@ export function useEquipmentModelParts(modelId, enabled = true) {
     staleTime: 10 * 60 * 1000,
   });
   return { parts: data || [], isLoading, error };
+}
+
+/**
+ * `{ partsByModel, isLoading, error }` — nomenclatures de plusieurs modèles (devis depuis les pièces identifiées d'une
+ * fiche SAV). Même clé de cache que `useEquipmentModelParts`.
+ */
+export function useEquipmentModelPartsMany(modelIds = []) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const resultats = useQueries({
+    queries: modelIds.map((id) => ({
+      queryKey: equipmentModelKeys.parts(orgId, id),
+      queryFn: lire(() => equipmentModelsService.getParts(orgId, id)),
+      enabled: !!orgId && !!id,
+      staleTime: 10 * 60 * 1000,
+    })),
+  });
+  const partsByModel = {};
+  modelIds.forEach((id, i) => { partsByModel[id] = resultats[i]?.data || []; });
+  return {
+    partsByModel,
+    isLoading: resultats.some((r) => r.isLoading),
+    error: resultats.find((r) => r.error)?.error || null,
+  };
 }
 
 /** `{ photo, vues, manquantes, isLoading }` — URL signées (1 h) ; rafraîchies avant leur expiration. */

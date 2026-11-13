@@ -2,15 +2,16 @@
  * SAVModelPartsSection.jsx — Pièces détachées de l'appareil, dans la fiche SAV
  * ============================================================================
  * Le bloc « Pièces détachées » (vue éclatée + nomenclature du modèle fabricant) pour l'équipement du SAV, ou celui
- * que l'on choisit parmi les équipements du client. Les pièces cochées partent dans un NOUVEAU devis fléché vers la carte
- * (même fenêtre que « Créer un devis » de la fiche : aucun lead, devis sur le client), rangées sous le chapitre
- * « PIÈCES » de la famille « Dépannage / SAV », au prix public.
+ * que l'on choisit parmi les équipements du client. Une pièce cochée est ENREGISTRÉE aussitôt sur la carte
+ * (`useSavPieces`, table sav_part_selections) et listée en tête (« Pièces identifiées »). « Créer un devis avec ces
+ * pièces » part de cette liste enregistrée (tous appareils) : NOUVEAU devis fléché vers la carte (aucun lead, devis sur
+ * le client), chapitre « PIÈCES » de la famille « Dépannage / SAV ». Le devis ne vide pas la liste.
  * ============================================================================
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Wrench } from 'lucide-react';
+import { ShoppingCart, Wrench } from 'lucide-react';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { moduleActif } from '@lib/modules';
@@ -19,9 +20,15 @@ import { buildDevisConfig, famillesActives, tvaFamille } from '@/lib/devisConfig
 import { lignesDevisAvecPieces } from '@/lib/catalogue/nomenclature';
 import { leadDepuisCarteSav } from '@/lib/savDevis';
 import { libelleEquipement } from '@/lib/equipmentReferential';
+import {
+  photoPiece, photoDepuisIdentifiee, quantitesPourEquipement, choixDepuisIdentifiees, modelesPourDevis, nomenclaturesParEquipement,
+} from '@/lib/catalogue/piecesIdentifiees';
+import { useSavPieces } from '@hooks/useSavPieces';
+import { useEquipmentModelParts, useEquipmentModelPartsMany } from '@hooks/useEquipmentModels';
 import { EquipmentPartsSection } from '../equipements/EquipmentPartsSection';
 import CreateDevisModal from '../devis/CreateDevisModal';
 import TrouverPieceButton from '../assistant/TrouverPieceButton';
+import PiecesIdentifieesListe from './PiecesIdentifieesListe';
 
 const nomEquipement = (eq, referentiel) => [libelleEquipement(eq, referentiel), eq.brand, eq.model].filter(Boolean).join(' · ');
 
@@ -31,9 +38,12 @@ const nomEquipement = (eq, referentiel) => [libelleEquipement(eq, referentiel), 
  * @param {object[]} p.equipements équipements du client
  * @param {object} p.referentiel index du référentiel d'équipements (libellés)
  * @param {boolean} [p.canEdit] peut choisir le modèle fabricant et créer un devis depuis la fiche
+ * @param {boolean} [p.peutIdentifier] peut cocher / changer / retirer une pièce identifiée (`peutIdentifierPieces`)
+ * @param {object[]} [p.membres] équipe (user_id, first_name) : auteur d'une pièce identifiée
  * @param {() => void} [p.onUpdated] rafraîchir le kanban après la création d'un devis
+ * @param {(ouvert: boolean) => void} [p.onAtelierChange] mode atelier ouvert / fermé (la fiche s'élargit)
  */
-export function SAVModelPartsSection({ item, equipements = [], referentiel, canEdit = false, onUpdated }) {
+export function SAVModelPartsSection({ item, equipements = [], referentiel, canEdit = false, peutIdentifier = false, membres = [], onUpdated, onAtelierChange }) {
   const { can } = useCanAccess();
   const { settings } = useOrgSettings();
   const config = useMemo(() => buildDevisConfig(settings), [settings]);
@@ -49,34 +59,68 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
   }, [liste, item?.equipment_id, choisi]);
   const equipement = liste.find((e) => e.id === choisi) || null;
 
+  // Pièces identifiées, enregistrées sur la carte. La nomenclature affichée ne compte que celles de SON appareil.
+  const { selections, error: erreurSelections, setQuantity } = useSavPieces(item?.id);
+  const modelId = equipement?.equipment_model_id || null;
+  const { parts } = useEquipmentModelParts(modelId);
+  const quantites = useMemo(() => quantitesPourEquipement(selections, equipement?.id, parts), [selections, equipement?.id, parts]);
+  // Nomenclatures des appareils qui portent une pièce : le devis retrouve la ligne actuelle (prix de vente, article).
+  const modelesDevis = useMemo(() => modelesPourDevis(selections, liste), [selections, liste]);
+  const { partsByModel, isLoading: chargementNomenclatures } = useEquipmentModelPartsMany(modelesDevis);
+
+  const enregistrer = (photo) => setQuantity(photo).catch(() => {}); // refus : toast + retour à la base (hook)
+  const changerQuantite = (ligne, q) => enregistrer(photoPiece(ligne, { equipmentId: equipement.id, equipmentModelId: modelId }, q));
+  const changerAtelier = (ouvert) => onAtelierChange?.(ouvert);
+
   const [lignesDevis, setLignesDevis] = useState(null);
-  const [versionSelection, setVersionSelection] = useState(0); // incrémentée quand le devis est créé : vide la sélection
   const familleSav = useMemo(() => famillesActives(config).find((f) => f.key === 'sav') || null, [config]);
   const peutCreerDevis = canEdit && can('devis', 'create') && !!item?.client_id;
 
-  const ajouterAuDevis = (choix) => {
+  const creerDevis = () => {
     const label = familleSav?.label || '';
     const sections = label ? buildDefaultSections(label, config) : [];
+    const choix = choixDepuisIdentifiees(selections, nomenclaturesParEquipement(liste, partsByModel));
     setLignesDevis({ famille: label, lignes: lignesDevisAvecPieces(sections, choix, tvaFamille(config, label)) });
   };
 
   if (!liste.length) return null;
   const selecteur = liste.length > 1 && (
     <select
-      value={choisi || ''} onChange={(e) => setChoisi(e.target.value)} aria-label="Appareil concerné"
+      value={choisi || ''} onChange={(e) => { setChoisi(e.target.value); changerAtelier(false); }} aria-label="Appareil concerné"
       className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
     >
       {liste.map((e) => <option key={e.id} value={e.id}>{nomEquipement(e, referentiel)}{e.id === item?.equipment_id ? ' (appareil du SAV)' : ''}</option>)}
     </select>
   );
+  const nomAppareil = liste.length > 1
+    ? (id) => { const e = liste.find((x) => x.id === id); return e ? nomEquipement(e, referentiel) : null; }
+    : null;
+  const identifiees = (
+    <PiecesIdentifieesListe
+      selections={selections} erreur={erreurSelections} nomAppareil={nomAppareil} membres={membres}
+      peutModifier={peutIdentifier} onQuantite={(s, q) => enregistrer(photoDepuisIdentifiee(s, q))}
+      action={peutCreerDevis && (
+        <button
+          type="button" onClick={creerDevis} disabled={chargementNomenclatures || !familleSav}
+          title={!familleSav ? 'Famille de devis « Dépannage / SAV » inactive (Réglages → Devis)' : undefined}
+          className="btn-primary btn-sm inline-flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <ShoppingCart className="w-4 h-4" />Créer un devis avec ces pièces
+        </button>
+      )}
+    />
+  );
+
   // Rien à montrer de la nomenclature à qui ne peut pas choisir un modèle, quand aucun équipement n'en a.
   // L'assistant « Trouver une pièce » n'en dépend pas : module ouvert + droit suffisent (état local, rien d'enregistré).
   if (!canEdit && !liste.some((e) => e.equipment_model_id)) {
-    if (!equipement || !moduleActif(settings, 'assistant') || !can('assistant_pieces', 'use')) return null;
+    const assistant = equipement && moduleActif(settings, 'assistant') && can('assistant_pieces', 'use');
+    if (!assistant && !selections.length && !erreurSelections) return null;
     return (
       <div className="space-y-2">
-        {selecteur}
-        <TrouverPieceButton key={`assistant-${equipement.id}`} equipment={equipement} interventionId={item.id} />
+        {identifiees}
+        {assistant && selecteur}
+        {assistant && <TrouverPieceButton key={`assistant-${equipement.id}`} equipment={equipement} interventionId={item.id} />}
       </div>
     );
   }
@@ -87,6 +131,7 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
         <Wrench className="w-4 h-4" />
         Pièces détachées de l&apos;appareil
       </h3>
+      {identifiees}
       {selecteur}
       {liste.length === 1 && equipement && <p className="text-sm text-gray-600">{nomEquipement(equipement, referentiel)}</p>}
       {equipement && (
@@ -95,9 +140,11 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
           equipment={equipement}
           canEdit={canEdit}
           defaultOpen={!!equipement.equipment_model_id}
-          onModelChanged={(modelId) => setModeles((prev) => ({ ...prev, [equipement.id]: modelId }))}
-          onAddToQuote={peutCreerDevis ? ajouterAuDevis : null}
-          selectionVersion={versionSelection}
+          onModelChanged={(id) => setModeles((prev) => ({ ...prev, [equipement.id]: id }))}
+          quantites={quantites}
+          onQuantiteChange={changerQuantite}
+          selectionLectureSeule={!peutIdentifier}
+          onAtelierChange={(a) => changerAtelier(a.ouvert)}
         />
       )}
       {equipement && <TrouverPieceButton key={`assistant-${equipement.id}`} equipment={equipement} interventionId={item.id} />}
@@ -112,7 +159,7 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
           initialFamily={lignesDevis.famille}
           initialLines={lignesDevis.lignes}
           onClose={() => setLignesDevis(null)}
-          onCreated={() => { setVersionSelection((v) => v + 1); onUpdated?.(); }}
+          onCreated={() => onUpdated?.()}
         />,
         document.body,
       )}

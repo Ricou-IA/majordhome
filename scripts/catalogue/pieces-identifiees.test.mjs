@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   photoPiece, retrouverLigne, quantitesParLigne, ligneDepuisIdentifiee, choixDepuisIdentifiees, quantiteAffichee,
+  quantitesPourEquipement, photoDepuisIdentifiee, mentionIdentification, modelesPourDevis, nomenclaturesParEquipement,
 } from '../../src/lib/catalogue/piecesIdentifiees.js';
 
 const L = (x) => ({ id: 'l1', repere: '14', piece_reference: 'F6107098', piece_name: 'DEFLECTEUR POELE BALHAM', supplier_product_id: 'sp1', prix_public_ht: 58.64, catalog_item_id: 'ci1', ...x });
@@ -29,4 +30,33 @@ test('choixDepuisIdentifiees : une entrée par pièce, quantité enregistrée', 
 test('quantitesParLigne / quantiteAffichee', () => {
   assert.deepEqual(quantitesParLigne([{ part_line_id: 'l1', piece_reference: 'F6107098', repere: '14', quantity: 3 }], [L()]), { l1: 3 });
   assert.equal(quantiteAffichee(2, undefined), 2); assert.equal(quantiteAffichee(2, 0), 0); assert.equal(quantiteAffichee(undefined, undefined), 0);
+});
+
+test('quantitesPourEquipement : deux appareils du même modèle ne s\'additionnent pas', () => {
+  const sels = [
+    { equipment_id: 'e1', part_line_id: 'l1', piece_reference: 'F6107098', repere: '14', quantity: 2 },
+    { equipment_id: 'e2', part_line_id: 'l1', piece_reference: 'F6107098', repere: '14', quantity: 3 },
+  ];
+  assert.deepEqual(quantitesPourEquipement(sels, 'e1', [L()]), { l1: 2 });
+  assert.deepEqual(quantitesPourEquipement(sels, 'e3', [L()]), {});
+  assert.deepEqual(quantitesPourEquipement(null, 'e1', [L()]), {});
+});
+test('photoDepuisIdentifiee : mêmes champs que photoPiece, sans id ni auteur, quantité ≥ 0', () => {
+  const sel = { id: 'x', org_id: 'o', added_by: 'u', added_at: '2026-11-12', ...photoPiece(L(), { equipmentId: 'e1', equipmentModelId: 'm1' }, 2) };
+  assert.deepEqual(photoDepuisIdentifiee(sel, 3), photoPiece(L(), { equipmentId: 'e1', equipmentModelId: 'm1' }, 3));
+  assert.equal(photoDepuisIdentifiee(sel, -1).quantity, 0);
+  assert.equal(photoDepuisIdentifiee({ ...sel, repere: null }, 1).repere, '');
+});
+test('mentionIdentification : prénom du membre, sinon « — » ; date jj/mm', () => {
+  const added_at = new Date(2026, 10, 5, 10, 30).toISOString();
+  const membres = [{ user_id: 'u1', first_name: 'Philippe' }];
+  assert.equal(mentionIdentification({ added_by: 'u1', added_at }, membres), 'par Philippe, le 05/11');
+  assert.equal(mentionIdentification({ added_by: 'u2', added_at }, membres), 'par —, le 05/11');
+  assert.equal(mentionIdentification({ added_by: null, added_at: null }, membres), 'par —');
+});
+test('modelesPourDevis / nomenclaturesParEquipement : seulement les appareils qui portent une pièce', () => {
+  const eqs = [{ id: 'e1', equipment_model_id: 'm1' }, { id: 'e2', equipment_model_id: 'm1' }, { id: 'e3', equipment_model_id: null }, { id: 'e4', equipment_model_id: 'm4' }];
+  const sels = [{ equipment_id: 'e1' }, { equipment_id: 'e2' }, { equipment_id: 'e3' }];
+  assert.deepEqual(modelesPourDevis(sels, eqs), ['m1']);
+  assert.deepEqual(nomenclaturesParEquipement(eqs, { m1: [L()] }), { e1: [L()], e2: [L()], e3: [], e4: [] });
 });
