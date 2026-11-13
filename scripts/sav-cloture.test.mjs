@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   STATUTS_CLOTURE_DIRECTE, dateLocale, minutesDe, heureDe, peutCloturerSansPlanifier,
-  clotureParDefaut, validerCloture, construireRdvCloture,
+  clotureParDefaut, validerCloture, construireRdvCloture, peutIdentifierPieces, peutRangerSurDemandeSav,
 } from '../src/lib/savCloture.js';
 
 const carte = (extra = {}) => ({
@@ -109,4 +109,17 @@ test('limiteALaCloture : le technicien seulement, et seulement sur une demande e
   assert.equal(limiteALaCloture(carte({ workflow_status: 'demande' }), 'team_leader'), false);
   assert.equal(limiteALaCloture(carte({ workflow_status: 'demande' }), 'org_admin'), false);
   assert.equal(limiteALaCloture(carte({ workflow_status: 'demande' }), null), false);
+});
+
+// ── Gardes d'écran : pièces identifiées et rangement (2026-11-12) ──────────
+test('peutIdentifierPieces : technicien sur demande, planifiée ; jamais sur Réalisé', () => {
+  assert.equal(peutIdentifierPieces(carte(), { role: 'technicien', canEditSAV: false }), true);
+  assert.equal(peutIdentifierPieces(carte({ workflow_status: 'planifie' }), { role: 'technicien', canEditSAV: false }), true);
+  assert.equal(peutIdentifierPieces(carte({ workflow_status: 'realise' }), { role: 'org_admin', canEditSAV: true }), false);
+  assert.equal(peutIdentifierPieces(carte(), { role: 'commercial', canEditSAV: false }), false);
+  assert.equal(peutIdentifierPieces(carte({ intervention_type: 'entretien' }), { role: 'technicien', canEditSAV: true }), false);
+});
+test('peutRangerSurDemandeSav : clients.edit suffit', () => {
+  assert.equal(peutRangerSurDemandeSav({ canEditClient: true }), true);
+  assert.equal(peutRangerSurDemandeSav({ canEditClient: false }), false);
 });

@@ -92,6 +92,30 @@ export function limiteALaCloture(item, role) {
 }
 
 /**
+ * Peut-on identifier les pièces d'une carte SAV (module « Pièces identifiées ») ? Garde d'écran :
+ * SAV seulement, jamais une fois Réalisé ni facturé, et pour qui gère le SAV ou le technicien
+ * qui se rend chez le client.
+ * @param {{ intervention_type?: string, workflow_status?: string } | null | undefined} item
+ * @param {{ role?: string | null, canEditSAV?: boolean }} droits `role` = `useCanAccess().effectiveRole`, `canEditSAV` = droit d'édition SAV
+ * @returns {boolean}
+ */
+export function peutIdentifierPieces(item, { role, canEditSAV }) {
+  if (!item || item.intervention_type !== 'sav') return false;
+  if (item.workflow_status === 'realise' || item.workflow_status === 'facture') return false;
+  return !!canEditSAV || role === 'technicien';
+}
+
+/**
+ * Peut-on ranger une pièce identifiée sur une demande SAV créée à la volée ? La demande se crée par
+ * cette voie sans `sav.create` : `clients.edit` suffit (Eric, 2026-11-12).
+ * @param {{ canEditClient?: boolean }} droits `canEditClient` = `can('clients', 'edit')`
+ * @returns {boolean}
+ */
+export function peutRangerSurDemandeSav({ canEditClient }) {
+  return !!canEditClient;
+}
+
+/**
  * Saisie proposée à l'ouverture : aujourd'hui, une intervention de 30 min qui vient de se
  * terminer (début ramené au quart d'heure, jamais avant minuit).
  * @param {Date} maintenant
