@@ -87,6 +87,8 @@ function isReferenced(targetFile, allFiles) {
 // Whitelist : fichiers récemment créés non encore propagés.
 // À retirer une fois les imports en place.
 const ALLOW_ORPHAN = new Set([
+  'src/apps/artisan/components/equipements/lecteur/LecteurDocument.jsx', // branché en Task 6/9 — à retirer
+  'src/lib/catalogue/documentsAppareil.js', // branché en Task 6/9 (ongletsAtelier) — à retirer
   'src/shared/hooks/useSavPieces.js', // branché en Task 7/8 (pièces identifiées SAV) — à retirer
   'src/lib/logger.js',          // P1.7 — wrapper créé, migration au fil de l'eau
   'src/lib/permissionsRegistry.js', // Phase 1 — inerte (seed only) ; consommé par can() en Phase 3
