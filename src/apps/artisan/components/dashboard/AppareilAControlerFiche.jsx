@@ -14,7 +14,7 @@ import { filtrerModeles } from '@/lib/catalogue/nomenclature';
 import { messageErreurAppareil } from '@/lib/equipements/saisieAppareil';
 import { formatDateShortFR } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import EquipmentDocumentViewer from '../equipements/EquipmentDocumentViewer';
+import LecteurEnLigne from '../equipements/LecteurEnLigne';
 
 const INPUT = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg';
 
@@ -85,8 +85,9 @@ export default function AppareilAControlerFiche({ fiche, onDone }) {
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Documents</p>
         {documents.length === 0 && <p className="text-xs text-gray-500">Aucun document.</p>}
         {documents.map((d) => (
-          <div key={d.id} className="flex items-center gap-2 text-sm">
-            <button type="button" onClick={() => setConsulte(d)} className="inline-flex items-center gap-1.5 text-indigo-700 hover:text-indigo-900">
+          <div key={d.id} className="space-y-1.5">
+          <div className="flex items-center gap-2 text-sm">
+            <button type="button" onClick={() => setConsulte((c) => (c?.id === d.id ? null : d))} className="inline-flex items-center gap-1.5 text-indigo-700 hover:text-indigo-900">
               <FileText className="w-4 h-4" />{d.label || d.file_name}
             </button>
             {mode === 'corriger' && (
@@ -95,6 +96,8 @@ export default function AppareilAControlerFiche({ fiche, onDone }) {
                 Retirer
               </label>
             )}
+          </div>
+          {consulte?.id === d.id && <LecteurEnLigne doc={d} onClose={() => setConsulte(null)} />}
           </div>
         ))}
         {(fiche.source_urls || []).length > 0 && (
@@ -165,7 +168,6 @@ export default function AppareilAControlerFiche({ fiche, onDone }) {
         description={cible ? `« ${fiche.model_name} » sera absorbée par « ${cible.model_name || cible.name} » : ${fiche.nb_equipements} équipement(s) et ses documents passeront sur cette fiche.` : ''}
         confirmLabel="Fusionner" variant="default" onConfirm={fusionner} loading={isSaving}
       />
-      {consulte && <EquipmentDocumentViewer doc={consulte} onClose={() => setConsulte(null)} />}
     </div>
   );
 }

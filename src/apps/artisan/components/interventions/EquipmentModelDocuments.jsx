@@ -18,7 +18,7 @@ import { BookOpen, Layers, FileText, Eye, ChevronDown, ChevronUp, ListChecks } f
 import { useEquipmentModelDocuments } from '@hooks/useEquipmentDocuments';
 import { equipmentDocumentTypeLabel } from '@services/equipmentDocuments.service';
 import { rangerDocumentsModele, titreDocumentModele } from '@/lib/catalogue/nomenclature';
-import EquipmentDocumentViewer from '../equipements/EquipmentDocumentViewer';
+import LecteurEnLigne from '../equipements/LecteurEnLigne';
 
 const TYPE_ICON = { notice: BookOpen, vue_eclatee: Layers, fiche_technique: FileText, procedure: ListChecks, autre: FileText };
 const PUCE = 'inline-flex items-center gap-2 min-h-[44px] px-3 py-2 rounded-lg border text-sm';
@@ -47,14 +47,15 @@ function Puce({ doc, onOpen }) {
 export function EquipmentModelDocuments({ equipment, className = '' }) {
   const { documentsByEquipmentId } = useEquipmentModelDocuments(equipment?.id ? [equipment.id] : []);
   const [proceduresOuvertes, setProceduresOuvertes] = useState(false);
-  const [consulte, setConsulte] = useState(null); // document ouvert dans la visionneuse
+  const [consulte, setConsulte] = useState(null); // document ouvert dans la page, sous la liste
+  const ouvrir = (doc) => setConsulte((courant) => (courant?.id === doc.id ? null : doc)); // même document = fermer
   const docs = equipment?.id ? documentsByEquipmentId[equipment.id] || [] : [];
   if (docs.length === 0) return null;
   const { principaux, procedures } = rangerDocumentsModele(docs);
 
   return (
     <div className={`flex flex-wrap gap-2 ${className}`}>
-      {principaux.map((doc) => <Puce key={doc.id} doc={doc} onOpen={setConsulte} />)}
+      {principaux.map((doc) => <Puce key={doc.id} doc={doc} onOpen={ouvrir} />)}
       {procedures.length > 0 && (
         <button
           type="button"
@@ -67,8 +68,8 @@ export function EquipmentModelDocuments({ equipment, className = '' }) {
           {proceduresOuvertes ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
       )}
-      {proceduresOuvertes && procedures.map((doc) => <Puce key={doc.id} doc={doc} onOpen={setConsulte} />)}
-      {consulte && <EquipmentDocumentViewer doc={consulte} onClose={() => setConsulte(null)} />}
+      {proceduresOuvertes && procedures.map((doc) => <Puce key={doc.id} doc={doc} onOpen={ouvrir} />)}
+      {consulte && <LecteurEnLigne doc={consulte} onClose={() => setConsulte(null)} className="basis-full w-full" />}
     </div>
   );
 }

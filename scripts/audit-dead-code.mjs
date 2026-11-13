@@ -87,7 +87,6 @@ function isReferenced(targetFile, allFiles) {
 // Whitelist : fichiers récemment créés non encore propagés.
 // À retirer une fois les imports en place.
 const ALLOW_ORPHAN = new Set([
-  'src/apps/artisan/components/equipements/ExplodedViewViewer.jsx', // plus d'appelant depuis la Task 6 (mode atelier) — supprimé en Task 9, retirer cette ligne avec
   'src/lib/logger.js',          // P1.7 — wrapper créé, migration au fil de l'eau
   'src/lib/permissionsRegistry.js', // Phase 1 — inerte (seed only) ; consommé par can() en Phase 3
   'src/apps/solaire/lib/pvgisHourly.js', // cœur moteur autoconso horaire (testé scripts/pvgis-hourly.test.mjs) — branchement UI à venir
