@@ -109,6 +109,7 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/catalogue/cataloguePieces.js', // accord du marchand + mode « boutique publique » : lu par l'edge supplier-catalog-sync via la copie _shared/catalogue
   'src/lib/catalogue/modelKey.js',
   'src/lib/catalogue/mapping.js',
+  'src/lib/catalogue/piecesIdentifiees.js', // pièces identifiées d'une fiche SAV : consommé par les hooks / l'écran SAV des tâches suivantes — retirer cette ligne une fois branché
 ]);
 
 const allFiles = walk(SRC);
