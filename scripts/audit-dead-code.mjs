@@ -105,6 +105,8 @@ const ALLOW_ORPHAN = new Set([
   // supplier-catalog-sync via leurs copies _shared/catalogue (sync-tournee-engine), jamais importés depuis src/.
   'src/lib/catalogue/suitecommerce.js',
   'src/lib/catalogue/woocommerce.js',
+  'src/lib/catalogue/woocommercePieces.js', // relevé de pièces détachées (Energies Bois Distribution) : même chemin, via la copie _shared/catalogue
+  'src/lib/catalogue/cataloguePieces.js', // accord du marchand + mode « boutique publique » : lu par l'edge supplier-catalog-sync via la copie _shared/catalogue
   'src/lib/catalogue/modelKey.js',
   'src/lib/catalogue/mapping.js',
 ]);

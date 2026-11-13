@@ -16,6 +16,8 @@ import { useAuth } from '@contexts/AuthContext';
 import { useSuppliers, useSupplierConnector, useSupplierMutations } from '@hooks/useSuppliers';
 import { libelleResultat, libelleCodeErreur } from '@/lib/catalogue/syncResult.js';
 import { CIBLES, CLE_SANS_CATEGORIE, DEFAUTS_MAPPING, CLE_DEFAUT } from '@/lib/catalogue/mapping.js';
+import { configCataloguePieces } from '@/lib/catalogue/cataloguePieces.js';
+import { raisonRelevePublicBloque, compteRenduPieces, messageErreurFournisseur } from '@/lib/catalogue/reglagesCataloguePublic.js';
 import { formatDateShortFR } from '@/lib/utils';
 import { FormField, TextInput } from '../../../components/FormFields';
 
@@ -85,12 +87,18 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
   const result = frais.catalog_sync_result;
   const erreur = frais.catalog_sync_error;
   const busy = isSyncing || isImporting || isApplyingMapping;
+  // Boutique publique (catalogue de pièces) : aucun identifiant ; le relevé dépend de l'accord ENREGISTRÉ, celui que lira l'edge.
+  const cfgPublique = frais.connector === 'woocommerce' ? configCataloguePieces(frais.connector_config) : null;
+  const modePublic = !!cfgPublique && cfgPublique.public && cfgPublique.pieces;
+  const raisonBloque = modePublic ? raisonRelevePublicBloque(frais.connector_config) : null;
+  const compteRendu = modePublic ? compteRenduPieces(result) : null;
 
   const annoncer = (data, verbe) => {
     if (data?.ok) {
       const r = data.resultat || {};
       const m = r.matches ? ` · rapprochements : ${r.matches.confirmes ?? 0} confirmés, ${r.matches.proposes ?? 0} à confirmer` : '';
-      toast.success(`${verbe} : ${r.total ?? '?'} articles (${r.inseres ?? 0} nouveaux, ${r.desactives ?? 0} désactivés)${m}`);
+      // Même phrase que la ligne d'état de la fiche (« pièces » / « articles », vrais compteurs).
+      toast.success(`${verbe} — ${libelleResultat({ ...r, ok: true, ...(modePublic ? { releve: 'pieces' } : {}) })}${m}`);
     } else {
       toast.error(`Échec : ${libelleCodeErreur(data?.code)}`);
     }
@@ -105,6 +113,7 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
     catch (err) { toast.error(err?.message || 'Suppression refusée'); }
   };
   const handleSync = async () => {
+    if (raisonBloque) return;
     try { annoncer(await sync(), 'Catalogue actualisé'); }
     catch (err) { toast.error(err?.message || 'Le relevé a échoué'); }
   };
@@ -117,7 +126,7 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
   };
   const handleAutoSync = async (coche) => {
     try { await updateSupplier(frais.id, { autoSync: coche }); toast.success(coche ? 'Relevé automatique activé (chaque nuit)' : 'Relevé automatique désactivé'); }
-    catch (err) { toast.error(err?.message || 'Réglage refusé'); }
+    catch (err) { toast.error(messageErreurFournisseur(err, 'Réglage refusé')); }
   };
   const handleMapping = async () => {
     try {
@@ -125,7 +134,7 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
       const r = await applyMapping();
       const manuels = r?.ignores_manuels ? `, ${r.ignores_manuels} corrigé${r.ignores_manuels > 1 ? 's' : ''} à la main non touché${r.ignores_manuels > 1 ? 's' : ''}` : '';
       toast.success(`Correspondance appliquée : ${r?.reclasses ?? 0} reclassés, ${r?.exclus ?? 0} exclus, ${r?.reactives ?? 0} réactivés${manuels}`);
-    } catch (err) { toast.error(err?.message || 'Application refusée'); }
+    } catch (err) { toast.error(messageErreurFournisseur(err, 'Application refusée')); }
   };
 
   return (
@@ -139,19 +148,35 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
           </p>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-          {status?.exists && frais.site_url && (
-            <button type="button" onClick={handleSync} disabled={busy} className="btn-primary btn-sm">
+          {(modePublic || status?.exists) && frais.site_url && (
+            <button type="button" onClick={handleSync} disabled={busy || !!raisonBloque} className="btn-primary btn-sm">
               {isSyncing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />} Actualiser le catalogue
             </button>
           )}
-          <input ref={fileRef} type="file" accept=".json,application/json" onChange={handleFile} className="hidden" />
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="btn-secondary btn-sm">
-            {isImporting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />} Importer un relevé
-          </button>
+          {!modePublic && (
+            <>
+              <input ref={fileRef} type="file" accept=".json,application/json" onChange={handleFile} className="hidden" />
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="btn-secondary btn-sm">
+                {isImporting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />} Importer un relevé
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {isLoadingStatus ? (
+      {modePublic ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-secondary-600">
+          <span>Boutique publique : aucun identifiant n&apos;est utilisé.</span>
+          {plateforme?.auto && (
+            <label htmlFor="releve-auto-public" className="flex items-center gap-1.5 ml-auto">
+              <input id="releve-auto-public" type="checkbox" checked={!!frais.auto_sync} disabled={isUpdating || (!!raisonBloque && !frais.auto_sync)} onChange={(e) => handleAutoSync(e.target.checked)} />
+              Relevé automatique chaque nuit
+            </label>
+          )}
+          {raisonBloque && frais.auto_sync && <p className="basis-full text-amber-700">Le relevé de cette nuit sera refusé tant que l&apos;accord n&apos;est pas renseigné.</p>}
+          {raisonBloque && <p className="basis-full text-amber-700 font-medium flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {raisonBloque}</p>}
+        </div>
+      ) : isLoadingStatus ? (
         <p className="text-xs text-secondary-400">Vérification des identifiants…</p>
       ) : status?.exists && !replacing ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-secondary-600">
@@ -175,6 +200,18 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
           <p className="text-xs text-amber-700 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> {libelleResultat(erreur)}</p>
         )}
       </div>
+
+      {compteRendu && (
+        <div className="rounded-lg border border-secondary-200 bg-white px-3 py-2 text-xs text-secondary-700 space-y-1">
+          <p className="font-medium text-secondary-800">Dernier relevé de pièces : {compteRendu.retenues} fiche{compteRendu.retenues > 1 ? 's' : ''} retenue{compteRendu.retenues > 1 ? 's' : ''}</p>
+          {compteRendu.exclus.length > 0 && (
+            <ul className="list-disc ml-4">
+              {compteRendu.exclus.map((m) => <li key={m.cle}>{m.nombre} exclue{m.nombre > 1 ? 's' : ''} : {m.libelle}</li>)}
+            </ul>
+          )}
+          {compteRendu.rayons.length > 0 && <p>Rayons relevés : {compteRendu.rayons.join(', ')}</p>}
+        </div>
+      )}
 
       {categoriesVues.length > 0 && (
         <details className="rounded-lg border border-secondary-200 bg-white">
@@ -215,7 +252,7 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <span className="text-[11px] text-secondary-400">Clés modèle (IA) et fusions d&apos;articles : page <Link to="/settings/suppliers/harmoniser" className="text-primary-700 hover:underline">Harmoniser les bases</Link>.</span>
-        <span className="ml-auto text-[11px] text-secondary-400">Relevé manuel : coller <code className="font-mono">{plateforme?.script}</code> dans la console du navigateur connecté, puis importer le fichier.</span>
+        {!modePublic && <span className="ml-auto text-[11px] text-secondary-400">Relevé manuel : coller <code className="font-mono">{plateforme?.script}</code> dans la console du navigateur connecté, puis importer le fichier.</span>}
       </div>
     </div>
   );

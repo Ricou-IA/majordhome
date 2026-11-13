@@ -190,3 +190,11 @@ test('lireReponseSuivi : réponse HTTP du GET /v1/runs/{id} → run lu, inconnu 
     assert.deepEqual(lireReponseSuivi(statut, corps), { issue: 'passager' }, `${statut} ${corps}`);
   }
 });
+
+test('nbPiecesBaseValide : entier 0..999, sinon null (ignoré, jamais une erreur)', () => {
+  const f = (v) => regles.nbPiecesBaseValide(v);
+  assert.equal(f(0), 0);
+  assert.equal(f(7), 7);
+  assert.equal(f(999), 999);
+  for (const v of [1000, -1, 1.5, NaN, Infinity, '7', null, undefined, true, {}, []]) assert.equal(f(v), null, String(v));
+});

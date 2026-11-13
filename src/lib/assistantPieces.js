@@ -388,3 +388,13 @@ export function lienSur(url) {
     return null;
   }
 }
+
+/**
+ * Nombre de pièces des catalogues montrées au technicien avant la recherche web (note de la recherche) : un entier de
+ * 0 à 999, sinon null — la valeur est alors ignorée, ce n'est jamais un refus de lancer.
+ * @param {unknown} v
+ * @returns {number|null}
+ */
+export function nbPiecesBaseValide(v) {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 999 ? v : null;
+}

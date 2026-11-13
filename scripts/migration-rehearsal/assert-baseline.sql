@@ -38,7 +38,8 @@ BEGIN
       ('majordhome.role_can(uuid, text, text)'),
       ('majordhome.lead_pennylane_quotes_invariant_winning()'),
       ('majordhome.chantier_ensure_for_quote()'),
-      ('public.lead_merge(uuid, uuid)')
+      ('public.lead_merge(uuid, uuid)'),
+      ('public.supplier_pieces_upsert(uuid, uuid, text, text, jsonb)') -- 20261113_3 : écrivain des pièces tel qu'en prod
     ) AS t(fn)
   LOOP
     IF to_regprocedure(r.fn) IS NULL THEN RAISE EXCEPTION 'fonction absente : %', r.fn; END IF;
@@ -118,7 +119,8 @@ BEGIN
   -- RLS activée + au moins une policy (POLICY_TABLES)
   FOR r IN SELECT * FROM (VALUES ('pricing_zones'), ('pricing_equipment_types'), ('team_members'),
                                  ('leads'), ('contracts'), ('quotes'), ('tasks'), ('role_permissions'), ('app_role_permissions'),
-                                 ('webshop_sectors'), ('webshop_sector_postcodes'), ('webshop_shipping_rates'), ('webshop_pickup_points')) AS t(tbl)
+                                 ('webshop_sectors'), ('webshop_sector_postcodes'), ('webshop_shipping_rates'), ('webshop_pickup_points'),
+                                 ('suppliers'), ('supplier_products')) AS t(tbl) -- 20261113_3 : RLS lue par la vue des pièces
   LOOP
     PERFORM 1 FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
      WHERE ns.nspname = 'majordhome' AND c.relname = r.tbl AND c.relrowsecurity;
