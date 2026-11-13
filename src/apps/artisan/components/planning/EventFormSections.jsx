@@ -10,6 +10,7 @@
  * ============================================================================
  */
 
+import { useState } from 'react';
 import {
   Clock, User, UserCircle, Tag, FileText, Wrench,
   Search, ExternalLink, Link2, X, Loader2,
@@ -24,6 +25,7 @@ import {
   TECHNICIAN_TYPES,
 } from '@services/appointments.service';
 import { TechnicianSelect } from './TechnicianSelect';
+import { FicheSavDepuisRdv } from './FicheSavDepuisRdv';
 import { SouplesseSelect } from '@/apps/artisan/components/shared/SouplesseSelect';
 import { AdresseItineraire } from '@/apps/artisan/components/shared/AdresseItineraire';
 import { ClientLocationMap } from '@/apps/artisan/components/clients/ClientLocationMap';
@@ -238,6 +240,8 @@ export const SectionClient = ({
   selectedLead,
   // quotes : devis Pennylane de la carte (RDV d'installation = chantier), liens PDF.
   quotes = [],
+  // savInterventionId : carte (intervention) liée au RDV — puce « SAV » si c'est une demande SAV.
+  savInterventionId = null,
   navigate,
   handleUnlinkClient,
   handleUnlinkLead,
@@ -281,6 +285,7 @@ export const SectionClient = ({
       formData.client_city || (showClientChip ? selectedClient.city : ''),
     ].filter(Boolean).join(' '),
   ].filter(Boolean).join(', ');
+  const [savOuvert, setSavOuvert] = useState(false);
   const { settings } = useOrgSettings();
   const siege = getOrgHeadquarters(settings);
   // Adresse affichée, éclatée pour la carte (photo du RDV, fiche liée en repli).
@@ -325,6 +330,15 @@ export const SectionClient = ({
               unlinkTitle="Délier le client"
             />
           )}
+          {savInterventionId && (
+            <LinkChip
+              icon={Wrench}
+              label="SAV"
+              title="Ouvrir la demande SAV liée à ce RDV"
+              tone="border-amber-200 bg-amber-50 text-amber-700"
+              onOpen={() => setSavOuvert(true)}
+            />
+          )}
           {selectedLead && (
             <LinkChip
               icon={Link2}
@@ -337,6 +351,9 @@ export const SectionClient = ({
             />
           )}
         </div>
+        {savOuvert && savInterventionId && (
+          <FicheSavDepuisRdv interventionId={savInterventionId} onClose={() => setSavOuvert(false)} />
+        )}
         {contactPhone && (
           <a
             href={`tel:${contactPhone}`}

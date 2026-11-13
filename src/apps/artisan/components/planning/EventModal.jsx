@@ -398,6 +398,7 @@ export function EventModal({
       selectedClient={selectedClientView}
       selectedLead={selectedLead}
       quotes={installQuotes}
+      savInterventionId={isEdit ? appointment?.intervention_id || null : null}
       navigate={navigate}
       handleUnlinkClient={handleUnlinkClient}
       handleUnlinkLead={handleUnlinkLead}
