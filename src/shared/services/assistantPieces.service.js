@@ -18,9 +18,13 @@ const COLONNES = 'id, org_id, equipment_id, intervention_id, demande, statut, ru
 
 export const assistantPiecesService = {
   /** Lance une recherche (retour immédiat, l'agent travaille environ deux minutes). → { id } */
-  lancer(orgId, { equipmentId, interventionId = null, demande }) {
+  lancer(orgId, { equipmentId, interventionId = null, demande, nbPiecesBase = null }) {
     return withErrorHandling(
-      () => appeler('lancer', orgId, { equipment_id: equipmentId, intervention_id: interventionId, demande }),
+      () => appeler('lancer', orgId, {
+        equipment_id: equipmentId, intervention_id: interventionId, demande,
+        // Note facultative (nombre de pièces des catalogues vues avant la recherche) : l'edge l'ignore si elle est hors 0..999.
+        ...(Number.isInteger(nbPiecesBase) ? { nb_pieces_base: nbPiecesBase } : {}),
+      }),
       'assistantPieces.lancer',
     );
   },

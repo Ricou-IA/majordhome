@@ -40,8 +40,8 @@ export function useLancerRecherche(equipmentId) {
   const orgId = organization?.id;
   const queryClient = useQueryClient();
   const mutation = useMutation({
-    mutationFn: ({ interventionId = null, demande }) =>
-      unwrapResult(assistantPiecesService.lancer(orgId, { equipmentId, interventionId, demande })),
+    mutationFn: ({ interventionId = null, demande, nbPiecesBase = null }) =>
+      unwrapResult(assistantPiecesService.lancer(orgId, { equipmentId, interventionId, demande, nbPiecesBase })),
     onSettled: () => queryClient.invalidateQueries({ queryKey: assistantPiecesKeys.parEquipement(orgId, equipmentId) }),
   });
   return { lancer: mutation.mutateAsync, isLaunching: mutation.isPending };

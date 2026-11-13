@@ -103,6 +103,9 @@ const FUNCTIONS = [
   // catalog_items_ensure), les modèles d'appareil dérivent leurs clés d'equipment_model_key
   'public.catalog_items_ensure(uuid, integer)',
   'majordhome.equipment_model_key(text)',
+  // 20261113_3 : en prod depuis 20261111_1/_2 — l'assertion de la vue de recherche (assert-pieces-catalogue.sql)
+  // appelle l'écrivain des pièces tel qu'en prod, sans rejouer la chaîne 20261111_x
+  'public.supplier_pieces_upsert(uuid, uuid, text, text, jsonb)',
   // 20261026_1 : articles Majord'home — apply_mapping v3 remplace la v2, les RPC des rapprochements sont droppées par 20261026_2
   'public.supplier_catalog_apply_mapping(uuid)',
   'majordhome.catalog_item_merge_impl(uuid, uuid)', // 20261028_2 : recréée avec la reprise du code (dernière définition : 20261027_2)
@@ -287,6 +290,9 @@ const POLICY_TABLES = [
   'org_roles', 'member_org_roles', // 20261006_1
   'product_documents', // 20261027_6 : documents d'article réservés à l'org_admin ; 20261028_3 : sous role_can(articles)
   'catalog_items', // 20261028_3 : écritures org_admin → role_can(articles)
+  // 20261113_3 : la vue majordhome_pieces_catalogue (security_invoker) repose sur la RLS de ces deux tables — sans
+  // elles, un membre lirait les pièces d'une autre org sur le cluster et l'assertion d'isolement ne prouverait rien
+  'suppliers', 'supplier_products',
   'webshop_delivery_slots', 'webshop_orders', // 20261013_2
   'webshop_products', 'webshop_categories', // 20261014_1
   // 20261018_1 : écritures directes retirées (policy FOR ALL membres → SELECT membres)

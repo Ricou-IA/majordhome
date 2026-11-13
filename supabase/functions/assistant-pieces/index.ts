@@ -5,7 +5,7 @@
 // verify_jwt:true + requireOrgMembership + module `assistant` actif + user_can(assistant_pieces, use). Actions
 // FERMÉES, aucun relais générique vers Hermes :
 //
-//   - lancer { equipment_id, intervention_id?, demande }  → { id }
+//   - lancer { equipment_id, intervention_id?, demande, nb_pieces_base? }  → { id }
 //       relit l'appareil EN BASE (équipement, type, fiche modèle) et le client (pour le seul contrôle de la demande),
 //       refuse une demande qui contient une donnée du client, consomme le quota, ouvre la ligne, démarre le run.
 //   - suivre { id }                                        → { id, statut, reponse, texte, erreur, created_at, finished_at }
@@ -23,7 +23,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOrgMembership, jsonResponse, buildCorsHeaders, sanitizeError } from "../_shared/auth.ts";
 import { moduleActif } from "../_shared/modules.js";
-import { appareilConnu, cheminPlaqueValide, controlerDemande, construireConsigne } from "../_shared/assistantPieces.js";
+import { appareilConnu, cheminPlaqueValide, controlerDemande, construireConsigne, nbPiecesBaseValide } from "../_shared/assistantPieces.js";
 import { demarrerRun, hermesConfigure, suivreRecherche } from "../_shared/assistantHermes.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -171,6 +171,19 @@ Deno.serve(async (req) => {
         throw errOuvrir;
       }
       if (typeof idRecherche !== "string" || !UUID.test(idRecherche)) throw new Error("assistant_recherche_ouvrir sans id");
+
+      // Combien de pièces des catalogues le technicien avait sous les yeux : une note, jamais une condition. Valeur
+      // hors 0..999 ignorée ; seulement sur la ligne que CETTE requête vient d'ouvrir (la RPC ne contrôle pas l'org) ;
+      // l'erreur est journalisée (code seul) et ne fait ni échouer ni répondre autre chose que le lancement.
+      const nbPiecesBase = nbPiecesBaseValide(body.nb_pieces_base);
+      if (nbPiecesBase !== null) {
+        try {
+          const { error: errNote } = await admin.rpc("assistant_recherche_noter_base", { p_id: idRecherche, p_nb: nbPiecesBase });
+          if (errNote) console.error(`[assistant-pieces] note des pièces de la base impossible (code ${errNote.code ?? "inconnu"})`);
+        } catch {
+          console.error("[assistant-pieces] note des pièces de la base impossible (appel en échec)");
+        }
+      }
 
       // Photo de la plaque : seulement si la lecture en a été prouvée (ASSISTANT_PIECES_PLAQUE=on) et si le chemin
       // est celui de CET équipement sous l'org validée (<org>/…/equipements/<equipment_id>-plaque.jpg). Lien signé

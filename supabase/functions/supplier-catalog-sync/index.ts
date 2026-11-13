@@ -18,7 +18,9 @@
 // `catalog_sync_error` { ok:false, code, detail, at } — jamais catalog_sync_result (le dernier relevé réussi reste).
 // Codes : identifiants_absents | connexion_refusee | acces_bloque | releve_incomplet | releve_instable |
 //         releve_invalide | connector_inconnu | site_absent | ecriture_refusee | erreur_inattendue |
-//         document_absent | document_illisible | document_existant.
+//         accord_absent | import_catalogue_pieces | document_absent | document_illisible | document_existant.
+// Boutique publique de pièces (connector woocommerce + connector_config.public + .catalogue_pieces) : relevé sans identifiants,
+// sous la garde `accord_absent` (contact + date de l'accord du marchand), écrit par supplier_pieces_upsert (marque CATALOGUE).
 // On ne contourne JAMAIS une protection anti-robot (acces_bloque ⇒ relevé depuis le navigateur).
 // Spec : docs/superpowers/specs/2026-10-24-catalogue-photovoltaique-connexion-generique-design.md § 5.
 // ============================================================================
@@ -27,7 +29,9 @@ import { requireOrgMembership, requireSharedSecret, jsonResponse, buildCorsHeade
 import { articlesDepuisReleveSuitecommerce } from "../_shared/catalogue/suitecommerce.js";
 import { articlesDepuisReleveWoocommerce } from "../_shared/catalogue/woocommerce.js";
 import { SuitecommerceError, configSuitecommerce, connecterSuitecommerce, releverCatalogueSuitecommerce } from "./suitecommerceClient.ts";
-import { WooError, siteWoo, connecterWoocommerce, releverCatalogueWoocommerce } from "./woocommerceClient.ts";
+import { piecesDepuisReleveWoocommerce, MARQUE_RELEVE } from "../_shared/catalogue/woocommercePieces.js";
+import { configCataloguePieces, accordValide } from "../_shared/catalogue/cataloguePieces.js";
+import { WooError, siteWoo, connecterWoocommerce, releverCatalogueWoocommerce, lireBoutiquePublique } from "./woocommerceClient.ts";
 
 const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 const BUCKET_DOCS = "product-documents";
@@ -59,6 +63,15 @@ function versionDe(connector: string, releveAt: string | null): string {
   return `${connector}_${(releveAt || new Date().toISOString()).slice(0, 10)}`;
 }
 
+/** Erreur levée par un adaptateur de relevé → erreur métier (code lisible sur la fiche fournisseur). */
+function erreurAdaptateur(e: unknown): SyncError {
+  const msg = e instanceof Error ? e.message : String(e);
+  const code = msg.startsWith("releve_incomplet") ? "releve_incomplet"
+    : msg.startsWith("reference_en_double") ? "releve_instable"
+    : "releve_invalide";
+  return new SyncError(code, msg);
+}
+
 /** Échec : écrit catalog_sync_error seulement (le dernier relevé réussi reste affiché). */
 async function marquerEchec(admin: Admin, supplier: Supplier, code: string, detail?: string) {
   const { error } = await admin.from("majordhome_suppliers_write")
@@ -81,11 +94,7 @@ async function ecrireReleve(admin: Admin, supplier: Supplier, connector: Connect
   try {
     res = adaptateur(releve, { version: versionDe(connector, (releve as { fetched_at?: string })?.fetched_at ?? null), mapping: supplier.category_mapping || null });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const code = msg.startsWith("releve_incomplet") ? "releve_incomplet"
-      : msg.startsWith("reference_en_double") ? "releve_instable"
-      : "releve_invalide";
-    throw new SyncError(code, msg);
+    throw erreurAdaptateur(e);
   }
   if (!res.retenus) throw new SyncError("releve_invalide", "aucun article retenu (tout exclu par la correspondance ?)");
   const { data, error } = await admin.rpc("supplier_catalog_upsert", {
@@ -108,8 +117,56 @@ async function lireIdentifiants(admin: Admin, supplier: Supplier): Promise<{ ema
   return { email: creds.email, password: creds.password };
 }
 
+/** Fournisseur WooCommerce en mode « boutique publique, catalogue de pièces » (les deux drapeaux, rien de moins). */
+function estBoutiquePubliquePieces(supplier: Supplier): boolean {
+  if (supplier.connector !== "woocommerce") return false;
+  const cfg = configCataloguePieces(supplier.connector_config);
+  return cfg.public && cfg.pieces;
+}
+
+/**
+ * Boutique publique d'un marchand qui a donné son accord : AUCUN identifiant (rien au Vault), pas de connexion.
+ * La garde d'accord passe AVANT tout appel réseau. Écrivain unique : supplier_pieces_upsert (un seul appel, marque
+ * de relevé CATALOGUE) ; il pose catalog_sync_at / catalog_sync_result et efface catalog_sync_error. Un relevé en
+ * échec (page en panne, borne de pages, rayon introuvable…) lève avant toute écriture : le relevé précédent reste.
+ */
+async function synchroniserBoutiquePublique(admin: Admin, supplier: Supplier) {
+  const cfg = configCataloguePieces(supplier.connector_config);
+  if (!accordValide(supplier.connector_config)) throw new SyncError("accord_absent", "contact et date de l'accord du marchand requis dans connector_config.accord");
+  const site = siteWoo(supplier);
+  const releve = await lireBoutiquePublique(site);
+  let res: ReturnType<typeof piecesDepuisReleveWoocommerce>;
+  try {
+    res = piecesDepuisReleveWoocommerce(releve as never, { version: versionDe("woocommerce", releve.fetched_at), remisePct: cfg.remisePct, releveLe: releve.fetched_at });
+  } catch (e) {
+    throw erreurAdaptateur(e);
+  }
+  const { data, error } = await admin.rpc("supplier_pieces_upsert", {
+    p_org_id: supplier.org_id, p_supplier_id: supplier.id,
+    p_source_version: versionDe("woocommerce", releve.fetched_at), p_marque: MARQUE_RELEVE, p_rows: res.lignes,
+  });
+  if (error) throw new SyncError("ecriture_refusee", error.message);
+  // Compte rendu du relevé (lu sur la fiche fournisseur) : écarts et rayons relevés, ajoutés à ce que la RPC a posé.
+  // Les pièces sont déjà écrites : un échec ici n'est pas un échec du relevé, il est journalisé et signalé.
+  const compteRendu = { ...(data as Record<string, unknown>), compte: res.compte, rayons: res.rayons };
+  const { error: errCompte } = await admin.from("majordhome_suppliers_write")
+    .update({ catalog_sync_result: compteRendu })
+    .eq("id", supplier.id).eq("org_id", supplier.org_id);
+  if (errCompte) console.error("[supplier-catalog-sync] compte rendu du relevé de pièces", errCompte.message);
+  const matches = await proposerMatches(admin, supplier.org_id);
+  return { ...compteRendu, matches, ...(errCompte ? { avertissement: "compte_rendu_non_range" } : {}) };
+}
+
 /** Connexion au site avec les identifiants Vault de l'org, relevé, écriture. */
 async function synchroniser(admin: Admin, supplier: Supplier, connector: Connector) {
+  if (estBoutiquePubliquePieces(supplier)) {
+    try {
+      return await synchroniserBoutiquePublique(admin, supplier);
+    } catch (e) {
+      if (e instanceof WooError) throw new SyncError(e.code, e.detail);
+      throw e;
+    }
+  }
   const creds = await lireIdentifiants(admin, supplier);
   try {
     if (connector === "suitecommerce") {
@@ -170,6 +227,9 @@ async function traiter(admin: Admin, supplier: Supplier, action: "sync" | "impor
     }
     if (!supplier.connector || !(supplier.connector in ADAPTATEURS)) throw new SyncError("connector_inconnu", String(supplier.connector));
     if (action === "import") {
+      // Un fournisseur relevé depuis sa boutique publique (pièces) n'accepte pas de fichier : l'adaptateur d'articles
+      // écrirait des articles ordinaires et désactiverait les pièces relevées. Refus AVANT toute lecture et écriture.
+      if (estBoutiquePubliquePieces(supplier)) throw new SyncError("import_catalogue_pieces");
       const releve = body.releve;
       if (!releve || typeof releve !== "object" || !Array.isArray((releve as { items?: unknown }).items)) throw new SyncError("releve_invalide", "items manquants");
       return { ok: true, resultat: await ecrireReleve(admin, supplier, supplier.connector, releve) };
@@ -211,7 +271,8 @@ Deno.serve(async (req) => {
       const authError = requireSharedSecret(req, MDH_CRON_SECRET, "MDH_CRON_SECRET");
       if (authError) return authError;
       const { data, error } = await admin.from("majordhome_suppliers").select(COLONNES_SUPPLIER)
-        .eq("auto_sync", true).eq("is_active", true).not("connector", "is", null);
+        .eq("auto_sync", true).eq("is_active", true).not("connector", "is", null)
+        .order("name", { ascending: true }).order("id", { ascending: true }); // ordre déterministe d'une nuit à l'autre
       if (error) return jsonResponse({ error: error.message }, 500, req);
       const rapports = [];
       for (const s of (data as Supplier[]) || []) {

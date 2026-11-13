@@ -22,6 +22,7 @@ import { libelleEquipement } from '@/lib/equipmentReferential';
 import { formatDateTimeFR } from '@/lib/utils';
 import { logger } from '@lib/logger';
 import ReponsePieces from './ReponsePieces';
+import PiecesCatalogueBloc from './PiecesCatalogueBloc';
 
 const ETATS = { en_cours: 'En cours', terminee: 'Terminée', echec: 'Échec' };
 
@@ -78,6 +79,8 @@ export default function TrouverPieceModal({ equipment, interventionId = null, on
   const { lancer, isLaunching } = useLancerRecherche(equipment.id);
 
   const [demande, setDemande] = useState('');
+  // Pièces « citées » des catalogues que le technicien avait sous les yeux (null = lecture non aboutie) : notées avec la recherche web.
+  const [nbPiecesBase, setNbPiecesBase] = useState(null);
   // undefined = rien choisi (on reprend une recherche en cours s'il y en a une) ; null = nouvelle recherche ; id = cette recherche.
   const [choix, setChoix] = useState(undefined);
   const enCoursTrouvee = recherches.find((r) => r.statut === 'en_cours');
@@ -107,7 +110,7 @@ export default function TrouverPieceModal({ equipment, interventionId = null, on
     if (refus) { toast.error(messageErreurAssistant(refus)); return; }
     lancement.current = true;
     try {
-      const res = await lancer({ interventionId, demande: demande.trim() });
+      const res = await lancer({ interventionId, demande: demande.trim(), nbPiecesBase });
       setDemande('');
       setChoix(res?.id ?? null);
     } catch (err) {
@@ -144,13 +147,14 @@ export default function TrouverPieceModal({ equipment, interventionId = null, on
                 placeholder="Ex. : résistance d’allumage, ou le poêle s’éteint après 10 minutes"
                 className="w-full border border-secondary-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-secondary-500">Décrivez la pièce ou la panne, pas le client. ({demande.length}/{DEMANDE_MAX})</p>
+              <p className="text-xs text-secondary-500">Décrivez la pièce ou la panne, pas le client. ({demande.length}/{DEMANDE_MAX})</p>
+              <PiecesCatalogueBloc equipment={equipment} saisie={demande} onCompte={setNbPiecesBase} />
+              <div className="flex justify-end">
                 <button
                   type="submit" disabled={isLaunching || !demande.trim()}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isLaunching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}Chercher
+                  {isLaunching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}Rien de probant ? Chercher sur le web (environ deux minutes)
                 </button>
               </div>
             </form>

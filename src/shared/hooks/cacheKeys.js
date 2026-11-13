@@ -562,7 +562,13 @@ export const webshopSettingsKeys = {
   pickupPoints: (orgId) => [...webshopSettingsKeys.all(orgId), 'pickupPoints'],
 };
 
-// --- Assistant « Trouver une pièce » : recherches web par appareil (module `assistant`) ---
+// --- Assistant « Trouver une pièce » : pièces des catalogues, puis recherches web par appareil (module `assistant`) ---
+/** Pièces des catalogues de marchands (vue majordhome_pieces_catalogue), lues par marque de l'appareil. */
+export const piecesCatalogueKeys = {
+  all: (orgId) => ['pieces-catalogue', orgId],
+  parMarque: (orgId, marque, motModele) => [...piecesCatalogueKeys.all(orgId), 'marque', marque || '', motModele || ''],
+};
+
 export const assistantPiecesKeys = {
   all: (orgId) => ['assistant-pieces', orgId],
   parEquipement: (orgId, equipmentId) => [...assistantPiecesKeys.all(orgId), 'equipement', equipmentId],

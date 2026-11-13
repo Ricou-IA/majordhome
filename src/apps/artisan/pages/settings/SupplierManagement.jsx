@@ -14,7 +14,9 @@ import { PRODUCT_CATEGORIES } from '@services/suppliers.service';
 import { suppliersService } from '@services/suppliers.service';
 import { TVA_RATES } from '@services/devis.service';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea, SectionTitle } from '../../components/FormFields';
-import { connectorConfigAvecPieces, remisePiecesValide } from '@/lib/catalogue/piecesDetachees';
+import { remisePiecesValide } from '@/lib/catalogue/piecesDetachees';
+import { configCataloguePieces } from '@/lib/catalogue/cataloguePieces';
+import { connectorConfigFusionne, etatAccord, adresseBoutiquePubliqueValide, RAISON_ADRESSE_HTTPS, messageErreurFournisseur } from '@/lib/catalogue/reglagesCataloguePublic';
 import { formatEuro } from '@/lib/utils';
 import ExcelJS from 'exceljs';
 import {
@@ -37,6 +39,7 @@ import { Link } from 'react-router-dom';
 import { ProductDocumentsPanel } from './ProductDocumentsPanel';
 import ProductDetailDrawer from './ProductDetailDrawer';
 import CatalogConnectorPanel from './suppliers/CatalogConnectorPanel';
+import CataloguePiecesPublicFields from './suppliers/CataloguePiecesPublicFields';
 import ImportOffreCatalogueModal from './suppliers/ImportOffreCatalogueModal';
 import { useCatalogItemsResume } from '@hooks/useCatalogItems';
 import { photoDeLigne, autresFournisseurs } from '@/lib/catalogue/articleLigne.js';
@@ -56,6 +59,7 @@ const CONNECTOR_OPTIONS = [
 const SUITECOMMERCE_DEFAUTS = { sca_path: '/sca-lux-2019-2', site_id: '6376560' };
 
 function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
+  const configPublique = configCataloguePieces(supplier?.connector_config);
   const [form, setForm] = useState({
     name: supplier?.name || '',
     contactName: supplier?.contact_name || '',
@@ -71,9 +75,17 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
     scaPath: supplier?.connector_config?.sca_path || SUITECOMMERCE_DEFAUTS.sca_path,
     siteId: supplier?.connector_config?.site_id || SUITECOMMERCE_DEFAUTS.site_id,
     remisePieces: supplier?.connector_config?.pieces ? String(supplier.connector_config.pieces.remise_pct ?? 0) : '',
+    public: configPublique.public,
+    cataloguePieces: configPublique.pieces,
+    accordContact: configPublique.accord?.contact || '',
+    accordDate: configPublique.accord?.date || '',
   });
   // Réglage du relevé de pièces détachées (posé par le premier import) : conservé à l'enregistrement, remise modifiable.
   const piecesConfig = supplier?.connector_config?.pieces || null;
+  const estWoo = form.connector === 'woocommerce';
+  // Boutique publique : le relevé refuse une adresse qui ne commence pas par https://.
+  const erreurAdresseHttps = estWoo && form.public && form.siteUrl.trim() !== '' && !adresseBoutiquePubliqueValide(form.siteUrl);
+  const afficheRemise = !!piecesConfig || (estWoo && form.public && form.cataloguePieces);
 
   const setField = useCallback((field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -89,13 +101,30 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
       toast.error('Une boutique connectée demande l\'adresse de son site (https://…)');
       return;
     }
-    if (piecesConfig && remisePiecesValide(form.remisePieces) == null) {
+    if (erreurAdresseHttps) {
+      toast.error(RAISON_ADRESSE_HTTPS);
+      return;
+    }
+    const remiseSaisie = form.remisePieces.trim() !== '';
+    if ((piecesConfig || (remiseSaisie && afficheRemise)) && remisePiecesValide(form.remisePieces) == null) {
       toast.error('La remise sur les pièces détachées doit être un pourcentage entre 0 et 99');
       return;
     }
-    const { scaPath, siteId, remisePieces, ...reste } = form;
+    if (estWoo && form.public && ['futur', 'invalide'].includes(etatAccord({ contact: form.accordContact, date: form.accordDate }))) {
+      toast.error("La date de l'accord du fournisseur est invalide (ni dans le futur, ni inexistante).");
+      return;
+    }
+    const { scaPath, siteId, remisePieces, public: boutiquePublique, cataloguePieces, accordContact, accordDate, ...reste } = form;
     const boutique = form.connector === 'suitecommerce' ? { sca_path: scaPath.trim(), site_id: siteId.trim() } : {};
-    onSave({ ...reste, connectorConfig: connectorConfigAvecPieces(boutique, piecesConfig, remisePieces) });
+    // Fusion sur la configuration EXISTANTE : aucune clé (connue ou non) n'est perdue à l'enregistrement.
+    const changements = { boutique, remisePieces: afficheRemise ? remisePieces : undefined };
+    if (estWoo) {
+      // Un drapeau n'est écrit que s'il change : un WooCommerce classique n'acquiert aucune clé nouvelle.
+      if (boutiquePublique !== configPublique.public) changements.public = boutiquePublique;
+      if (cataloguePieces !== configPublique.pieces && (boutiquePublique || configPublique.pieces)) changements.cataloguePieces = cataloguePieces;
+      changements.accord = { contact: accordContact, date: accordDate };
+    }
+    onSave({ ...reste, connectorConfig: connectorConfigFusionne(supplier?.connector_config, changements) });
   };
 
   return (
@@ -148,6 +177,7 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
             <SectionTitle>Connexion catalogue</SectionTitle>
             <FormField label="Site du fournisseur (boutique en ligne)">
               <TextInput value={form.siteUrl} onChange={(v) => setField('siteUrl', v)} placeholder="https://…" />
+              {erreurAdresseHttps && <p className="text-xs text-amber-700 mt-1" role="alert">{RAISON_ADRESSE_HTTPS}</p>}
             </FormField>
             <FormField label="Type de boutique">
               <SelectInput
@@ -171,7 +201,9 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
               <p className="text-xs text-secondary-400">Les identifiants du compte, le relevé et la correspondance des rayons se règlent ensuite dans le catalogue du fournisseur (panneau « Connexion catalogue »).</p>
             )}
 
-            {piecesConfig && (
+            {estWoo && <CataloguePiecesPublicFields form={form} setField={setField} />}
+
+            {afficheRemise && (
               <>
                 <SectionTitle>Pièces détachées</SectionTitle>
                 <FormField label="Remise sur les pièces détachées (%)">
@@ -961,7 +993,7 @@ export default function SupplierManagement() {
       setShowModal(false);
       setEditSupplier(null);
     } catch (err) {
-      toast.error(err?.message || 'Erreur lors de la sauvegarde');
+      toast.error(messageErreurFournisseur(err, 'Erreur lors de la sauvegarde'));
     }
   };
 

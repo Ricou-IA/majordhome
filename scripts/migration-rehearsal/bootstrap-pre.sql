@@ -29,6 +29,11 @@ LANGUAGE sql STABLE AS $$
   SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
 GRANT EXECUTE ON FUNCTION auth.uid() TO PUBLIC;
+-- Comme en prod (has_schema_privilege('authenticated', 'auth', 'USAGE') = true, vérifié 2026-11-13) : une fonction
+-- SECURITY INVOKER en PL/pgSQL qui appelle auth.uid() résout le nom à l'exécution et exige USAGE sur le schéma
+-- (les policies, stockées en OID, n'en ont pas besoin — c'est pourquoi l'absence était passée inaperçue).
+-- Premier consommateur : trigger majordhome.suppliers_connecteur_admin (20261113_4).
+GRANT USAGE ON SCHEMA auth TO authenticated, service_role;
 
 -- ACL par défaut observées en prod (pg_default_acl, 2026-09-12) :
 --   majordhome : authenticated=arwd, baikal_reader=r — PAS service_role, PLUS d'anon (20261029_1, 2026-10-27 ; avant : anon=arwd)
