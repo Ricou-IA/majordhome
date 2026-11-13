@@ -29,7 +29,7 @@ export function natureDocument(doc) {
  * Onglets du mode atelier : une entrée par vue éclatée (`vue:<i>`), puis les documents dans l'ordre de
  * `rangerDocumentsModele` (principaux puis procédures, `doc:<id>`). Rien n'est proposé pour un type absent.
  * @param {{ vues?: Array<object>, documents?: Array<object> }} p
- * @returns {Array<{ id: string, type: 'vue'|'notice'|'fiche_technique'|'procedure'|'autre', libelle: string, source: object }>}
+ * @returns {Array<{ id: string, type: 'vue'|'notice'|'fiche_technique'|'procedure'|'autre', libelle: string, source: object, vueDeNotice?: boolean }>}
  */
 export function ongletsAtelier({ vues, documents } = {}) {
   const lesVues = Array.isArray(vues) ? vues : [];
@@ -38,6 +38,8 @@ export function ongletsAtelier({ vues, documents } = {}) {
     type: 'vue',
     libelle: lesVues.length > 1 ? `Vue éclatée ${i + 1}/${lesVues.length}` : 'Vue éclatée',
     source: { kind: 'vue', url: v?.url, width: v?.width ?? null, height: v?.height ?? null },
+    // vue tirée de la notice : ses repères ne sont pas ceux de la liste — l'atelier doit l'écrire au-dessus
+    vueDeNotice: v?.origine === 'notice',
   }));
   const { principaux, procedures } = rangerDocumentsModele(documents || []);
   for (const doc of [...principaux, ...procedures]) {
@@ -49,4 +51,38 @@ export function ongletsAtelier({ vues, documents } = {}) {
     });
   }
   return onglets;
+}
+
+/**
+ * Onglet affiché : celui demandé s'il existe encore, sinon le premier (aucun si la liste est vide).
+ * @param {Array<{ id: string }>} onglets
+ * @param {string|null|undefined} ongletId
+ * @returns {object|null}
+ */
+export function ongletActif(onglets, ongletId) {
+  const liste = Array.isArray(onglets) ? onglets : [];
+  return liste.find((o) => o.id === ongletId) || liste[0] || null;
+}
+
+/**
+ * Nombre de vues éclatées déclarées sur la fiche du modèle (avant toute URL signée) : sert à proposer le mode
+ * atelier sans charger les images d'un bloc replié.
+ * @param {{ exploded_views?: Array<{ path?: string }> }|null|undefined} model
+ * @returns {number}
+ */
+export function vuesDeclarees(model) {
+  return Array.isArray(model?.exploded_views) ? model.exploded_views.filter((v) => v?.path).length : 0;
+}
+
+/** Part de la largeur donnée au document dans l'atelier : départ et bornes de la poignée. */
+export const PART_DOCUMENT = { defaut: 0.6, min: 0.3, max: 0.75 };
+
+/**
+ * Part du document bornée (poignée glissée hors limites, valeur absurde → départ).
+ * @param {number} part entre 0 et 1
+ * @returns {number}
+ */
+export function bornerPartDocument(part) {
+  if (!Number.isFinite(part)) return PART_DOCUMENT.defaut;
+  return Math.min(PART_DOCUMENT.max, Math.max(PART_DOCUMENT.min, part));
 }

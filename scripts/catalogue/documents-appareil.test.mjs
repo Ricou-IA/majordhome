@@ -2,7 +2,7 @@
 // node --test scripts/catalogue/documents-appareil.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { natureDocument, ongletsAtelier } from '../../src/lib/catalogue/documentsAppareil.js';
+import { natureDocument, ongletsAtelier, ongletActif, vuesDeclarees, PART_DOCUMENT, bornerPartDocument } from '../../src/lib/catalogue/documentsAppareil.js';
 
 test('natureDocument', () => {
   assert.equal(natureDocument({ mime_type: 'application/pdf' }), 'pdf');
@@ -23,4 +23,29 @@ test('ongletsAtelier : une seule vue, libellés et types', () => {
   assert.equal(o[1].libelle, 'Notice technique');
   assert.equal(o[1].type, 'notice');
   assert.equal(o[2].type, 'autre');
+});
+test('ongletsAtelier : vue tirée de la notice signalée', () => {
+  const o = ongletsAtelier({ vues: [{ url: 'a', origine: 'site' }, { url: 'b', origine: 'notice', page: 12 }] });
+  assert.deepEqual(o.map((x) => x.vueDeNotice), [false, true]);
+});
+test('ongletActif : demandé s\'il existe, sinon le premier, sinon rien', () => {
+  const o = [{ id: 'vue:0' }, { id: 'doc:n' }];
+  assert.equal(ongletActif(o, 'doc:n').id, 'doc:n');
+  assert.equal(ongletActif(o, 'doc:disparu').id, 'vue:0');
+  assert.equal(ongletActif(o, null).id, 'vue:0');
+  assert.equal(ongletActif([], 'vue:0'), null);
+  assert.equal(ongletActif(undefined, null), null);
+});
+test('vuesDeclarees : vues avec chemin seulement', () => {
+  assert.equal(vuesDeclarees({ exploded_views: [{ path: 'a' }, { url: 'x' }, null, { path: 'b' }] }), 2);
+  assert.equal(vuesDeclarees({}), 0);
+  assert.equal(vuesDeclarees(null), 0);
+});
+test('bornerPartDocument : bornes 30 % – 75 %, départ 60 %', () => {
+  assert.equal(PART_DOCUMENT.defaut, 0.6);
+  assert.equal(bornerPartDocument(0.5), 0.5);
+  assert.equal(bornerPartDocument(0.1), 0.3);
+  assert.equal(bornerPartDocument(0.9), 0.75);
+  assert.equal(bornerPartDocument(Number.NaN), 0.6);
+  assert.equal(bornerPartDocument(undefined), 0.6);
 });
