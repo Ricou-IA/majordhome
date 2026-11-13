@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ShoppingCart, Wrench } from 'lucide-react';
+import { toast } from 'sonner';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { moduleActif } from '@lib/modules';
@@ -22,6 +23,7 @@ import { leadDepuisCarteSav } from '@/lib/savDevis';
 import { libelleEquipement } from '@/lib/equipmentReferential';
 import {
   photoPiece, photoDepuisIdentifiee, quantitesPourEquipement, choixDepuisIdentifiees, modelesPourDevis, nomenclaturesParEquipement,
+  selectionModifiable, etatDevisPieces,
 } from '@/lib/catalogue/piecesIdentifiees';
 import { useSavPieces } from '@hooks/useSavPieces';
 import { useEquipmentModelParts, useEquipmentModelPartsMany } from '@hooks/useEquipmentModels';
@@ -60,13 +62,15 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
   const equipement = liste.find((e) => e.id === choisi) || null;
 
   // Pièces identifiées, enregistrées sur la carte. La nomenclature affichée ne compte que celles de SON appareil.
-  const { selections, error: erreurSelections, setQuantity } = useSavPieces(item?.id);
+  const { selections, isLoading: chargementSelections, error: erreurSelections, setQuantity } = useSavPieces(item?.id);
+  // Liste inconnue (chargement / échec) ⇒ verrouillée : un « + » écraserait une quantité déjà enregistrée.
+  const modifiable = selectionModifiable({ peutIdentifier, chargement: chargementSelections, erreur: erreurSelections });
   const modelId = equipement?.equipment_model_id || null;
   const { parts } = useEquipmentModelParts(modelId);
   const quantites = useMemo(() => quantitesPourEquipement(selections, equipement?.id, parts), [selections, equipement?.id, parts]);
   // Nomenclatures des appareils qui portent une pièce : le devis retrouve la ligne actuelle (prix de vente, article).
   const modelesDevis = useMemo(() => modelesPourDevis(selections, liste), [selections, liste]);
-  const { partsByModel, isLoading: chargementNomenclatures } = useEquipmentModelPartsMany(modelesDevis);
+  const { partsByModel, isLoading: chargementNomenclatures, error: erreurNomenclatures } = useEquipmentModelPartsMany(modelesDevis);
 
   const enregistrer = (photo) => setQuantity(photo).catch(() => {}); // refus : toast + retour à la base (hook)
   const changerQuantite = (ligne, q) => enregistrer(photoPiece(ligne, { equipmentId: equipement.id, equipmentModelId: modelId }, q));
@@ -76,7 +80,12 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
   const familleSav = useMemo(() => famillesActives(config).find((f) => f.key === 'sav') || null, [config]);
   const peutCreerDevis = canEdit && can('devis', 'create') && !!item?.client_id;
 
+  const etatDevis = etatDevisPieces({
+    familleActive: !!familleSav, chargementSelections, erreurSelections, chargementNomenclatures, erreurNomenclatures,
+    nbSelections: selections.length,
+  });
   const creerDevis = () => {
+    if (!etatDevis.pret) { toast.error(etatDevis.raison || 'Le devis ne peut pas être créé pour le moment'); return; }
     const label = familleSav?.label || '';
     const sections = label ? buildDefaultSections(label, config) : [];
     const choix = choixDepuisIdentifiees(selections, nomenclaturesParEquipement(liste, partsByModel));
@@ -98,15 +107,17 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
   const identifiees = (
     <PiecesIdentifieesListe
       selections={selections} erreur={erreurSelections} nomAppareil={nomAppareil} membres={membres}
-      peutModifier={peutIdentifier} onQuantite={(s, q) => enregistrer(photoDepuisIdentifiee(s, q))}
+      peutModifier={modifiable} onQuantite={(s, q) => enregistrer(photoDepuisIdentifiee(s, q))}
       action={peutCreerDevis && (
-        <button
-          type="button" onClick={creerDevis} disabled={chargementNomenclatures || !familleSav}
-          title={!familleSav ? 'Famille de devis « Dépannage / SAV » inactive (Réglages → Devis)' : undefined}
-          className="btn-primary btn-sm inline-flex items-center gap-1.5 disabled:opacity-50"
-        >
-          <ShoppingCart className="w-4 h-4" />Créer un devis avec ces pièces
-        </button>
+        <span className="inline-flex flex-wrap items-center justify-end gap-2">
+          {etatDevis.raison && <span className="text-xs text-amber-800">{etatDevis.raison}</span>}
+          <button
+            type="button" onClick={creerDevis} disabled={!etatDevis.pret}
+            className="btn-primary btn-sm inline-flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <ShoppingCart className="w-4 h-4" />Créer un devis avec ces pièces
+          </button>
+        </span>
       )}
     />
   );
@@ -143,7 +154,7 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
           onModelChanged={(id) => setModeles((prev) => ({ ...prev, [equipement.id]: id }))}
           quantites={quantites}
           onQuantiteChange={changerQuantite}
-          selectionLectureSeule={!peutIdentifier}
+          selectionLectureSeule={!modifiable}
           onAtelierChange={(a) => changerAtelier(a.ouvert)}
         />
       )}

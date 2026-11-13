@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   photoPiece, retrouverLigne, quantitesParLigne, ligneDepuisIdentifiee, choixDepuisIdentifiees, quantiteAffichee,
   quantitesPourEquipement, photoDepuisIdentifiee, mentionIdentification, modelesPourDevis, nomenclaturesParEquipement,
+  selectionModifiable, etatDevisPieces,
 } from '../../src/lib/catalogue/piecesIdentifiees.js';
 
 const L = (x) => ({ id: 'l1', repere: '14', piece_reference: 'F6107098', piece_name: 'DEFLECTEUR POELE BALHAM', supplier_product_id: 'sp1', prix_public_ht: 58.64, catalog_item_id: 'ci1', ...x });
@@ -59,4 +60,22 @@ test('modelesPourDevis / nomenclaturesParEquipement : seulement les appareils qu
   const sels = [{ equipment_id: 'e1' }, { equipment_id: 'e2' }, { equipment_id: 'e3' }];
   assert.deepEqual(modelesPourDevis(sels, eqs), ['m1']);
   assert.deepEqual(nomenclaturesParEquipement(eqs, { m1: [L()] }), { e1: [L()], e2: [L()], e3: [], e4: [] });
+});
+
+test('selectionModifiable : liste inconnue (chargement ou échec) ⇒ verrouillée', () => {
+  assert.equal(selectionModifiable({ peutIdentifier: true }), true);
+  assert.equal(selectionModifiable({ peutIdentifier: true, chargement: true }), false);
+  assert.equal(selectionModifiable({ peutIdentifier: true, erreur: new Error('x') }), false);
+  assert.equal(selectionModifiable({ peutIdentifier: false }), false);
+  assert.equal(selectionModifiable(), false);
+});
+test('etatDevisPieces : nomenclature en échec ⇒ refus explicite, jamais des lignes libres', () => {
+  const base = { familleActive: true, nbSelections: 2 };
+  assert.deepEqual(etatDevisPieces(base), { pret: true, raison: null });
+  assert.deepEqual(etatDevisPieces({ ...base, erreurNomenclatures: new Error('réseau') }), { pret: false, raison: 'Liste de pièces indisponible, réessayez' });
+  assert.equal(etatDevisPieces({ ...base, erreurSelections: new Error('x') }).pret, false);
+  assert.equal(etatDevisPieces({ ...base, chargementNomenclatures: true }).pret, false);
+  assert.equal(etatDevisPieces({ ...base, chargementSelections: true }).pret, false);
+  assert.equal(etatDevisPieces({ ...base, nbSelections: 0 }).pret, false);
+  assert.match(etatDevisPieces({ ...base, familleActive: false }).raison, /inactive/);
 });

@@ -183,3 +183,30 @@ export function nomenclaturesParEquipement(equipements, partsParModele) {
   for (const e of equipements || []) out[e.id] = (e.equipment_model_id && partsParModele?.[e.equipment_model_id]) || [];
   return out;
 }
+
+/**
+ * La liste des pièces identifiées est-elle modifiable ? Seulement quand elle est CONNUE : en chargement ou en échec,
+ * l'écran afficherait 0 partout et un « + » écraserait une quantité déjà enregistrée (upsert). Inconnue ⇒ verrouillée.
+ * @param {{ peutIdentifier?: boolean, chargement?: boolean, erreur?: unknown }} etat
+ * @returns {boolean}
+ */
+export function selectionModifiable({ peutIdentifier, chargement, erreur } = {}) {
+  return !!peutIdentifier && !chargement && !erreur;
+}
+
+/**
+ * Peut-on créer le devis depuis les pièces identifiées ? Une nomenclature en échec n'est PAS une pièce disparue du
+ * relevé : on refuse plutôt que d'envoyer toutes les pièces en lignes libres (sans article, prix de vente ni marge).
+ * @param {{ familleActive?: boolean, chargementSelections?: boolean, erreurSelections?: unknown, chargementNomenclatures?: boolean, erreurNomenclatures?: unknown, nbSelections?: number }} etat
+ * @returns {{ pret: boolean, raison: (string|null) }} `raison` = texte à afficher quand ce n'est pas prêt
+ */
+export function etatDevisPieces({
+  familleActive, chargementSelections, erreurSelections, chargementNomenclatures, erreurNomenclatures, nbSelections,
+} = {}) {
+  if (!familleActive) return { pret: false, raison: 'Famille de devis « Dépannage / SAV » inactive (Réglages → Devis)' };
+  if (erreurSelections) return { pret: false, raison: 'Pièces identifiées indisponibles, réessayez' };
+  if (erreurNomenclatures) return { pret: false, raison: 'Liste de pièces indisponible, réessayez' };
+  if (chargementSelections || chargementNomenclatures) return { pret: false, raison: 'Chargement de la liste de pièces…' };
+  if (!(nbSelections > 0)) return { pret: false, raison: 'Aucune pièce identifiée' };
+  return { pret: true, raison: null };
+}
