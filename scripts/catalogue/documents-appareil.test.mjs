@@ -4,7 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { natureDocument, ongletsAtelier, ongletActif, vuesDeclarees, PART_DOCUMENT, bornerPartDocument,
   MAX_PIXELS_CANVAS, echelleRendu, texteDePagePdf, normaliserRecherchePdf,
-  PORTEES_DOCUMENT, porteesProposees, porteeDocument, rangerEnTiroirs, peutRetirerDocument, messageRetraitDocument } from '../../src/lib/catalogue/documentsAppareil.js';
+  PORTEES_DOCUMENT, porteesProposees, porteeDocument, rangerEnTiroirs, peutRetirerDocument, messageRetraitDocument,
+  titreTiroir, destinatairesPortee, messageDepotDocument, messageErreurDepotDocument } from '../../src/lib/catalogue/documentsAppareil.js';
 
 test('natureDocument', () => {
   assert.equal(natureDocument({ mime_type: 'application/pdf' }), 'pdf');
@@ -137,4 +138,28 @@ test('messageRetraitDocument : une phrase par portée', () => {
     "« Notice » sera retiré pour tous les équipements Invicta Lp9 de l'entreprise.");
   assert.equal(messageRetraitDocument({ scope: 'marque', brand: 'Invicta' }),
     '« ce document » sera retiré pour tous les équipements de la marque Invicta.');
+});
+test('titreTiroir : modèle tel que saisi, marque en majuscules, mot seul sans nom', () => {
+  assert.equal(titreTiroir('appareil', { marque: 'Invicta', modele: 'Lp9' }), 'Cet appareil');
+  assert.equal(titreTiroir('modele', { marque: 'Invicta', modele: ' Lp9 ' }), 'Modèle Lp9');
+  assert.equal(titreTiroir('marque', { marque: 'Invicta', modele: 'Lp9' }), 'Marque INVICTA');
+  assert.equal(titreTiroir('modele'), 'Modèle');
+  assert.equal(titreTiroir('marque', {}), 'Marque');
+});
+test('destinatairesPortee : dit à qui le document s’applique', () => {
+  assert.equal(destinatairesPortee('appareil', { marque: 'Invicta', modele: 'Lp9' }), 'Visible seulement sur cet appareil, chez ce client.');
+  assert.equal(destinatairesPortee('modele', { marque: 'Invicta', modele: 'Lp9' }), "Visible sur tous les équipements Invicta Lp9 de l'entreprise.");
+  assert.equal(destinatairesPortee('marque', { marque: 'Invicta' }), "Visible sur tous les équipements de la marque INVICTA de l'entreprise.");
+});
+test('messageDepotDocument : un message par portée', () => {
+  assert.match(messageDepotDocument('appareil'), /cet appareil seulement/);
+  assert.match(messageDepotDocument('modele'), /ce modèle/);
+  assert.match(messageDepotDocument('marque'), /cette marque/);
+});
+test('messageErreurDepotDocument : codes traduits, sinon message générique', () => {
+  assert.match(messageErreurDepotDocument(new Error('equipment_document_brand_required')), /^Renseignez la marque de l'équipement/);
+  assert.match(messageErreurDepotDocument({ message: 'x equipment_document_model_required y' }), /marque et le modèle/);
+  assert.match(messageErreurDepotDocument(new Error('equipment_document_equipment_required')), /Enregistrez l'équipement/);
+  assert.equal(messageErreurDepotDocument(null), "Le document n'a pas pu être déposé");
+  assert.equal(messageErreurDepotDocument(new Error('boom')), "Le document n'a pas pu être déposé");
 });

@@ -1,5 +1,5 @@
 /**
- * useEquipmentDocuments.js — Documents du modèle d'appareil (notice, vue éclatée…)
+ * useEquipmentDocuments.js — Documents d'un équipement (portée appareil, modèle ou marque)
  * ============================================================================
  * Lecture par equipment_id (vue majordhome_equipment_model_documents) ; mutations
  * au contrat unique : `mutateAsync` résout avec la donnée et REJETTE sur refus
@@ -45,8 +45,8 @@ export function useEquipmentDocumentMutations() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: equipmentDocumentKeys.all(orgId) });
 
   const uploadMutation = useMutation({
-    mutationFn: ({ equipment, file, documentType, label }) =>
-      unwrapResult(equipmentDocumentsService.upload({ orgId, equipment, file, documentType, label, userId: user?.id || null })),
+    mutationFn: ({ equipment, file, documentType, label, scope }) =>
+      unwrapResult(equipmentDocumentsService.upload({ orgId, equipment, file, documentType, label, scope, userId: user?.id || null })),
     onSuccess: invalidate,
   });
 

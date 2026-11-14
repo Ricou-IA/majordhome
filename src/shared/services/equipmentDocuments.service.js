@@ -1,16 +1,23 @@
 /**
- * equipmentDocuments.service.js — Documents du MODÈLE d'appareil
+ * equipmentDocuments.service.js — Documents d'un équipement (trois portées)
  * ============================================================================
- * Notice technique, vue éclatée… rattachés au couple marque + modèle (table
- * majordhome.equipment_documents, migration 20261028_5) : déposés une fois
- * depuis n'importe quelle fiche client, visibles sur tous les équipements de
- * l'org qui portent le même appareil. La normalisation marque / modèle vit
- * EN BASE (majordhome.equipment_model_key, posée par trigger) : ici on ne
- * calcule jamais de clé, on lit par equipment_id via la vue
- * majordhome_equipment_model_documents.
+ * Notice technique, vue éclatée… (table majordhome.equipment_documents,
+ * migration 20261028_5) déposés depuis la fiche client avec une PORTÉE
+ * (`scope`, 2026-11-14) :
+ *   - `appareil` : cet équipement seulement (`equipment_id`) ;
+ *   - `modele`   : tous les équipements de l'org de même marque + modèle
+ *                  (défaut de la base, ancien et seul comportement) ;
+ *   - `marque`   : tous les équipements de la marque (modèle forcé à NULL en base).
+ * L'écran présélectionne `appareil`, et ce service aussi : un document propre à
+ * un client ne doit jamais s'afficher sur tout le parc par mégarde. Portée et
+ * équipement sont immuables après dépôt (on retire et on redépose).
+ * La normalisation marque / modèle vit EN BASE (majordhome.equipment_model_key,
+ * posée par trigger) : ici on ne calcule jamais de clé, on lit par equipment_id
+ * via la vue majordhome_equipment_model_documents (les trois portées, colonne `scope`).
  *
  * Fichiers : bucket product-documents, chemin `${orgId}/equipment-models/…`
- * (policies Storage org existantes).
+ * (marque, modèle) ou `${orgId}/equipments/${equipmentId}/…` (appareil — forme
+ * exigée par un CHECK en base). Policies Storage org existantes.
  *
  * Depuis 20261111_3, la même vue rend aussi les documents RELEVÉS sur le site du
  * fabricant (notice, fiche technique, procédures) pour un équipement rattaché à
@@ -21,6 +28,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { storageService } from '@services/storage.service';
+import { PORTEES_DOCUMENT } from '@/lib/catalogue/documentsAppareil';
 
 const EQUIPMENT_DOCUMENT_BUCKET = 'product-documents';
 
@@ -54,6 +62,10 @@ const champUtile = (v) => {
   return k.length > 0 && !PLACEHOLDERS.has(k);
 };
 export const equipmentHasModel = (equipment) => champUtile(equipment?.brand) && champUtile(equipment?.model);
+/** Un équipement peut porter des documents de MARQUE s'il a une marque utile (même règle `champUtile`). */
+export const equipmentHasBrand = (equipment) => champUtile(equipment?.brand);
+
+const trimOrNull = (v) => (typeof v === 'string' && v.trim()) || null;
 
 export const equipmentDocumentsService = {
   /**
@@ -81,23 +93,34 @@ export const equipmentDocumentsService = {
   },
 
   /**
-   * Dépose un document pour le modèle de `equipment` (marque + modèle tels que saisis sur la fiche ;
-   * la base en dérive la clé partagée). Fichier téléversé d'abord ; si la ligne est refusée, le fichier est retiré.
+   * Dépose un document pour `equipment` selon sa portée (`scope`, défaut `appareil`) :
+   *   - `appareil` : `equipment_id` posé, fichier sous `${orgId}/equipments/${equipment.id}/`, marque / modèle
+   *     recopiés s'ils sont renseignés (sinon NULL) ;
+   *   - `modele`   : exige marque + modèle utiles (`equipment_document_model_required`) ;
+   *   - `marque`   : exige une marque utile (`equipment_document_brand_required`), aucun modèle envoyé.
+   * Marque + modèle tels que saisis sur la fiche ; la base en dérive la clé partagée. Fichier téléversé d'abord ;
+   * si la ligne est refusée, le fichier est retiré.
    */
-  async upload({ orgId, equipment, file, documentType = 'notice', label = null, userId = null }) {
+  async upload({ orgId, equipment, file, documentType = 'notice', label = null, userId = null, scope = 'appareil' }) {
     return withErrorHandling(async () => {
       if (!orgId || !file) throw new Error('[equipmentDocumentsService] orgId et file requis');
-      if (!equipmentHasModel(equipment)) throw new Error('equipment_document_model_required');
+      if (!PORTEES_DOCUMENT.includes(scope)) throw new Error(`[equipmentDocumentsService] portée inconnue : ${scope}`);
+      if (scope === 'appareil' && !equipment?.id) throw new Error('equipment_document_equipment_required');
+      if (scope === 'modele' && !equipmentHasModel(equipment)) throw new Error('equipment_document_model_required');
+      if (scope === 'marque' && !equipmentHasBrand(equipment)) throw new Error('equipment_document_brand_required');
       const ext = (file.name || 'document').split('.').pop().toLowerCase();
-      const storagePath = `${orgId}/equipment-models/${crypto.randomUUID()}.${ext}`;
+      const dossier = scope === 'appareil' ? `equipments/${equipment.id}` : 'equipment-models';
+      const storagePath = `${orgId}/${dossier}/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await storageService.uploadFile(EQUIPMENT_DOCUMENT_BUCKET, storagePath, file, { contentType: file.type });
       if (upErr) throw upErr;
       const { data, error } = await supabase
         .from('majordhome_equipment_documents')
         .insert({
           org_id: orgId,
-          brand: equipment.brand.trim(),
-          model: equipment.model.trim(),
+          scope,
+          equipment_id: scope === 'appareil' ? equipment.id : null,
+          brand: trimOrNull(equipment?.brand),
+          model: scope === 'marque' ? null : trimOrNull(equipment?.model),
           document_type: documentType,
           label: label?.trim() || null,
           file_name: file.name,
@@ -123,8 +146,9 @@ export const equipmentDocumentsService = {
   },
 
   /**
-   * Retire un document du modèle (org_admin en base : la RLS filtre, 0 ligne = refus bruyant ici,
-   * jamais un succès annoncé sur un fichier resté en place).
+   * Retire un document (en base : `appareil` avec le droit de modifier la fiche client, `marque` / `modele`
+   * avec le droit de supprimer — org_admin ; la RLS filtre, 0 ligne = refus bruyant ici, jamais un succès
+   * annoncé sur un fichier resté en place).
    */
   async remove(orgId, doc) {
     return withErrorHandling(async () => {

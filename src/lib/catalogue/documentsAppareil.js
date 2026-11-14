@@ -212,3 +212,54 @@ export function messageRetraitDocument(doc) {
   if (portee === 'marque') return `${nom} sera retiré pour tous les équipements de la marque ${doc?.brand ?? ''}.`;
   return `${nom} sera retiré pour tous les équipements ${doc?.brand ?? ''} ${doc?.model ?? ''} de l'entreprise.`;
 }
+
+const texte = (v) => String(v ?? '').trim();
+
+/**
+ * Titre d'un tiroir de la carte équipement (sans le nombre) : « Cet appareil », « Modèle <modèle> »,
+ * « Marque <MARQUE> » — modèle tel que saisi, marque en MAJUSCULES comme au dépôt ; sans nom, le mot seul.
+ * @param {'appareil'|'modele'|'marque'} portee
+ * @param {{ marque?: string, modele?: string }} [noms]
+ * @returns {string}
+ */
+export function titreTiroir(portee, { marque, modele } = {}) {
+  if (portee === 'appareil') return 'Cet appareil';
+  if (portee === 'marque') return `Marque ${texte(marque).toUpperCase()}`.trim();
+  return `Modèle ${texte(modele)}`.trim();
+}
+
+/**
+ * Sous-titre de la fenêtre de dépôt : à qui le document s'appliquera selon la portée choisie.
+ * @param {'appareil'|'modele'|'marque'} portee
+ * @param {{ marque?: string, modele?: string }} [noms]
+ * @returns {string}
+ */
+export function destinatairesPortee(portee, { marque, modele } = {}) {
+  if (portee === 'appareil') return 'Visible seulement sur cet appareil, chez ce client.';
+  if (portee === 'marque') return `Visible sur tous les équipements de la marque ${texte(marque).toUpperCase()} de l'entreprise.`;
+  return `Visible sur tous les équipements ${texte(marque)} ${texte(modele)} de l'entreprise.`;
+}
+
+/**
+ * Message de succès d'un dépôt, qui redit à qui le document s'applique.
+ * @param {'appareil'|'modele'|'marque'} portee
+ * @returns {string}
+ */
+export function messageDepotDocument(portee) {
+  if (portee === 'appareil') return 'Document déposé — visible sur cet appareil seulement';
+  if (portee === 'marque') return 'Document déposé — visible sur tous les équipements de cette marque';
+  return 'Document déposé — visible sur tous les équipements de ce modèle';
+}
+
+/**
+ * Message d'erreur d'un dépôt refusé, d'après le code porté par le message de l'erreur (base ou service).
+ * @param {{ message?: string }|null|undefined} err
+ * @returns {string}
+ */
+export function messageErreurDepotDocument(err) {
+  const m = String(err?.message || '');
+  if (m.includes('equipment_document_model_required')) return 'Renseignez la marque et le modèle de l\'équipement avant de déposer un document pour tout le modèle';
+  if (m.includes('equipment_document_brand_required')) return 'Renseignez la marque de l\'équipement avant de déposer un document pour toute la marque';
+  if (m.includes('equipment_document_equipment_required')) return 'Enregistrez l\'équipement avant de lui déposer un document';
+  return 'Le document n\'a pas pu être déposé';
+}
