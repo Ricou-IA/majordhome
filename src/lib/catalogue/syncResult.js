@@ -21,7 +21,7 @@ const LIBELLES = Object.freeze({
   site_non_https: "l'adresse du site doit commencer par https://",
   site_invalide: "l'adresse du site doit être un nom de domaine public (ni localhost, ni adresse IP)",
   site_redirige: "le site du fournisseur redirige vers une autre adresse : corrigez l'adresse du site",
-  accord_absent: 'aucun accord du marchand enregistré (contact et date) : le relevé de son catalogue de pièces est refusé tant qu\'il manque',
+  accord_absent: 'accord du marchand non confirmé : ouvrez la fiche du fournisseur et enregistrez-la pour activer le relevé de son catalogue de pièces',
   import_catalogue_pieces: "Ce fournisseur est relevé automatiquement depuis sa boutique : l'import d'un fichier n'est pas disponible.",
   document_absent: 'le fournisseur ne publie pas de fiche technique pour cet article',
   document_illisible: 'la fiche technique du fournisseur n\'a pas pu être téléchargée',

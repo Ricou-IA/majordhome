@@ -16,7 +16,7 @@ import { TVA_RATES } from '@services/devis.service';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea, SectionTitle } from '../../components/FormFields';
 import { remisePiecesValide } from '@/lib/catalogue/piecesDetachees';
 import { configCataloguePieces } from '@/lib/catalogue/cataloguePieces';
-import { connectorConfigFusionne, etatAccord, adresseBoutiquePubliqueValide, RAISON_ADRESSE_HTTPS, messageErreurFournisseur } from '@/lib/catalogue/reglagesCataloguePublic';
+import { connectorConfigFusionne, accordAConfirmer, adresseBoutiquePubliqueValide, RAISON_ADRESSE_HTTPS, messageErreurFournisseur } from '@/lib/catalogue/reglagesCataloguePublic';
 import { formatEuro } from '@/lib/utils';
 import ExcelJS from 'exceljs';
 import {
@@ -59,6 +59,7 @@ const CONNECTOR_OPTIONS = [
 const SUITECOMMERCE_DEFAUTS = { sca_path: '/sca-lux-2019-2', site_id: '6376560' };
 
 function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
+  const { profile, user } = useAuth();
   const configPublique = configCataloguePieces(supplier?.connector_config);
   const [form, setForm] = useState({
     name: supplier?.name || '',
@@ -77,8 +78,6 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
     remisePieces: supplier?.connector_config?.pieces ? String(supplier.connector_config.pieces.remise_pct ?? 0) : '',
     public: configPublique.public,
     cataloguePieces: configPublique.pieces,
-    accordContact: configPublique.accord?.contact || '',
-    accordDate: configPublique.accord?.date || '',
   });
   // Réglage du relevé de pièces détachées (posé par le premier import) : conservé à l'enregistrement, remise modifiable.
   const piecesConfig = supplier?.connector_config?.pieces || null;
@@ -110,11 +109,7 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
       toast.error('La remise sur les pièces détachées doit être un pourcentage entre 0 et 99');
       return;
     }
-    if (estWoo && form.public && ['futur', 'invalide'].includes(etatAccord({ contact: form.accordContact, date: form.accordDate }))) {
-      toast.error("La date de l'accord du fournisseur est invalide (ni dans le futur, ni inexistante).");
-      return;
-    }
-    const { scaPath, siteId, remisePieces, public: boutiquePublique, cataloguePieces, accordContact, accordDate, ...reste } = form;
+    const { scaPath, siteId, remisePieces, public: boutiquePublique, cataloguePieces, ...reste } = form;
     const boutique = form.connector === 'suitecommerce' ? { sca_path: scaPath.trim(), site_id: siteId.trim() } : {};
     // Fusion sur la configuration EXISTANTE : aucune clé (connue ou non) n'est perdue à l'enregistrement.
     const changements = { boutique, remisePieces: afficheRemise ? remisePieces : undefined };
@@ -122,7 +117,12 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
       // Un drapeau n'est écrit que s'il change : un WooCommerce classique n'acquiert aucune clé nouvelle.
       if (boutiquePublique !== configPublique.public) changements.public = boutiquePublique;
       if (cataloguePieces !== configPublique.pieces && (boutiquePublique || configPublique.pieces)) changements.cataloguePieces = cataloguePieces;
-      changements.accord = { contact: accordContact, date: accordDate };
+      // L'accord n'est plus saisi : enregistrer une boutique publique le confirme (nom de la personne connectée, date du
+      // jour). Un accord déjà valable est gardé ; une boutique non publique garde le sien tel quel.
+      if (boutiquePublique) {
+        const accord = accordAConfirmer(configPublique.accord, profile?.full_name || user?.email);
+        if (accord) changements.accord = accord;
+      }
     }
     onSave({ ...reste, connectorConfig: connectorConfigFusionne(supplier?.connector_config, changements) });
   };
@@ -201,7 +201,7 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
               <p className="text-xs text-secondary-400">Les identifiants du compte, le relevé et la correspondance des rayons se règlent ensuite dans le catalogue du fournisseur (panneau « Connexion catalogue »).</p>
             )}
 
-            {estWoo && <CataloguePiecesPublicFields form={form} setField={setField} />}
+            {estWoo && <CataloguePiecesPublicFields form={form} setField={setField} accord={configPublique.accord} />}
 
             {afficheRemise && (
               <>
