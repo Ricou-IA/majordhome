@@ -253,21 +253,23 @@ BEGIN
     RAISE EXCEPTION '(9) documents visibles sur un équipement d''une autre marque';
   END IF;
 
-  -- (8) immuabilité ; une modification ordinaire passe
+  -- (8) immuabilité ; une modification ordinaire passe. Après 20261114_3, un membre est refusé plus tôt, par les
+  -- privilèges de colonne (42501) : les deux refus valent ; le trigger lui-même est vérifié côté serveur par
+  -- assert-equipment-documents-update-colonnes.sql (4).
   UPDATE public.majordhome_equipment_documents SET label = 'Photo de la chaufferie' WHERE id = v_app;
   GET DIAGNOSTICS v_n = ROW_COUNT;
   IF v_n <> 1 THEN RAISE EXCEPTION '(8) modification du libellé d''un document appareil refusée'; END IF;
   v_err := NULL;
   BEGIN UPDATE public.majordhome_equipment_documents SET scope = 'modele' WHERE id = v_marque;
-  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM; END;
+  EXCEPTION WHEN insufficient_privilege THEN v_err := 'equipment_document_scope_immutable'; WHEN OTHERS THEN v_err := SQLERRM; END;
   IF v_err IS DISTINCT FROM 'equipment_document_scope_immutable' THEN RAISE EXCEPTION '(8) changement de portée : %', coalesce(v_err, 'accepté'); END IF;
   v_err := NULL;
   BEGIN UPDATE public.majordhome_equipment_documents SET scope = 'modele', equipment_id = NULL WHERE id = v_app;
-  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM; END;
+  EXCEPTION WHEN insufficient_privilege THEN v_err := 'equipment_document_scope_immutable'; WHEN OTHERS THEN v_err := SQLERRM; END;
   IF v_err IS DISTINCT FROM 'equipment_document_scope_immutable' THEN RAISE EXCEPTION '(8) appareil → modele : %', coalesce(v_err, 'accepté'); END IF;
   v_err := NULL;
   BEGIN UPDATE public.majordhome_equipment_documents SET equipment_id = v_e1, storage_path = v_mayer || '/equipments/' || v_e1 || '/y.pdf' WHERE id = v_app2;
-  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM; END;
+  EXCEPTION WHEN insufficient_privilege THEN v_err := 'equipment_document_scope_immutable'; WHEN OTHERS THEN v_err := SQLERRM; END;
   IF v_err IS DISTINCT FROM 'equipment_document_scope_immutable' THEN RAISE EXCEPTION '(8) changement d''équipement : %', coalesce(v_err, 'accepté'); END IF;
 
   -- (7) retrait : technicien → son document appareil oui, modèle / marque / relevé non
