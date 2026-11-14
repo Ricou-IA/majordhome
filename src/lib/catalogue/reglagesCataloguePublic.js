@@ -9,7 +9,7 @@ import { accordValide } from './cataloguePieces.js';
 import { remisePiecesValide } from './piecesDetachees.js';
 
 /** Phrase affichée à côté d'un relevé désactivé faute d'accord. */
-export const RAISON_ACCORD_MANQUANT = "Renseignez le contact et la date de l'accord du fournisseur pour activer le relevé.";
+export const RAISON_ACCORD_MANQUANT = 'Ouvrez la fiche du fournisseur et enregistrez-la : cela confirme son accord et active le relevé.';
 
 /**
  * @param {unknown} v
@@ -62,6 +62,34 @@ export function etatAccord(accord, aujourdhui) {
   // La date est « réelle » si elle passe la règle commune en étant sa propre date du jour.
   if (!accordValide({ accord: { contact, date } }, date)) return 'invalide';
   return accordValide({ accord: { contact, date } }, aujourdhui) ? 'ok' : 'futur';
+}
+
+/**
+ * Accord à écrire quand la fiche d'une boutique publique est enregistrée. L'accord n'est plus saisi : cocher « Boutique
+ * publique » et enregistrer vaut confirmation par la personne connectée, à la date du jour (décision Eric 2026-11-14).
+ * Un accord déjà valable est gardé tel quel (auteur et date d'origine) ; absent, incomplet ou à date impossible / future,
+ * il est remplacé. La garde de l'edge (`accordValide`) est inchangée : `contact` porte ici le nom de qui a confirmé.
+ * @param {{ contact?: string, date?: string }|null|undefined} accordExistant accord ENREGISTRÉ sur la fiche
+ * @param {string|null|undefined} declarant nom de la personne qui enregistre
+ * @param {string} [aujourdhui] AAAA-MM-JJ (UTC, comme l'edge) ; défaut = date du jour UTC
+ * @returns {{ contact: string, date: string }|null} null = rien à écrire
+ */
+export function accordAConfirmer(accordExistant, declarant, aujourdhui) {
+  if (etatAccord(accordExistant, aujourdhui) === 'ok') return null;
+  const jour = typeof aujourdhui === 'string' && aujourdhui ? aujourdhui : new Date().toISOString().slice(0, 10);
+  return { contact: String(declarant ?? '').trim() || 'Administrateur', date: jour };
+}
+
+/**
+ * Phrase de la fiche pour un accord valable (« Accord confirmé par X le JJ/MM/AAAA. »), sinon null.
+ * @param {{ contact?: string, date?: string }|null|undefined} accord
+ * @param {string} [aujourdhui]
+ * @returns {string|null}
+ */
+export function libelleAccord(accord, aujourdhui) {
+  if (etatAccord(accord, aujourdhui) !== 'ok') return null;
+  const [a, m, j] = String(accord.date).trim().split('-');
+  return `Accord confirmé par ${String(accord.contact).trim()} le ${j}/${m}/${a}.`;
 }
 
 /**

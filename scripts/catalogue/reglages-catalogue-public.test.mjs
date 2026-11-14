@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  connectorConfigFusionne, etatAccord, compteRenduPieces, raisonRelevePublicBloque,
+  connectorConfigFusionne, etatAccord, accordAConfirmer, libelleAccord, compteRenduPieces, raisonRelevePublicBloque,
   adresseBoutiquePubliqueValide, RAISON_ADRESSE_HTTPS, messageErreurFournisseur, MESSAGE_CONNECTEUR_ADMIN,
 } from '../../src/lib/catalogue/reglagesCataloguePublic.js';
 import { libelleCodeErreur } from '../../src/lib/catalogue/syncResult.js';
@@ -79,8 +79,35 @@ test('etatAccord : incomplet, invalide, futur, ok', () => {
   assert.equal(etatAccord({ contact: 'M. X', date: '2026-11-01' }, AUJOURDHUI), 'ok');
 });
 
+test('accordAConfirmer : un accord valable est gardé, sinon confirmé par la personne qui enregistre, au jour dit', () => {
+  // déjà valable : rien à écrire (la confirmation d'origine reste, avec son auteur et sa date)
+  assert.equal(accordAConfirmer({ contact: 'M. X', date: '2026-11-01' }, 'Eric P', AUJOURDHUI), null);
+  // absent, incomplet, date impossible ou future : confirmé maintenant
+  for (const existant of [null, undefined, { contact: '', date: '' }, { contact: 'M. X', date: '' }, { contact: 'M. X', date: '2026-02-30' }, { contact: 'M. X', date: '2027-01-01' }]) {
+    assert.deepEqual(accordAConfirmer(existant, '  Eric P ', AUJOURDHUI), { contact: 'Eric P', date: AUJOURDHUI });
+  }
+  // personne sans nom connu : un contact non vide quand même (l'edge refuse un contact vide)
+  assert.deepEqual(accordAConfirmer(null, '', AUJOURDHUI), { contact: 'Administrateur', date: AUJOURDHUI });
+  assert.deepEqual(accordAConfirmer(null, undefined, AUJOURDHUI), { contact: 'Administrateur', date: AUJOURDHUI });
+  // l'accord confirmé passe la règle de l'edge le jour même, et débloque le relevé
+  const confirme = accordAConfirmer(null, 'Eric P', AUJOURDHUI);
+  assert.equal(etatAccord(confirme, AUJOURDHUI), 'ok');
+  assert.equal(raisonRelevePublicBloque({ public: true, catalogue_pieces: true, accord: confirme }, AUJOURDHUI), null);
+  // sans date fournie : la date du jour en UTC (celle que compare l'edge), jamais une date future pour lui
+  const sansDate = accordAConfirmer(null, 'Eric P');
+  assert.equal(sansDate.date, new Date().toISOString().slice(0, 10));
+  assert.equal(etatAccord(sansDate), 'ok');
+});
+
+test('libelleAccord : phrase de la fiche, ou rien sans accord valable', () => {
+  assert.equal(libelleAccord({ contact: 'Eric P', date: '2026-11-12' }, AUJOURDHUI), 'Accord confirmé par Eric P le 12/11/2026.');
+  assert.equal(libelleAccord(null, AUJOURDHUI), null);
+  assert.equal(libelleAccord({ contact: '', date: '2026-11-12' }, AUJOURDHUI), null);
+  assert.equal(libelleAccord({ contact: 'Eric P', date: '2027-01-01' }, AUJOURDHUI), null);
+});
+
 test('raisonRelevePublicBloque : seulement pour une boutique publique sans accord valable', () => {
-  const phrase = 'Renseignez le contact et la date de l\'accord du fournisseur pour activer le relevé.';
+  const phrase = 'Ouvrez la fiche du fournisseur et enregistrez-la : cela confirme son accord et active le relevé.';
   assert.equal(raisonRelevePublicBloque({ public: true, catalogue_pieces: true }, AUJOURDHUI), phrase);
   assert.equal(raisonRelevePublicBloque({ public: true, accord: { contact: 'A', date: '2027-01-01' } }, AUJOURDHUI), phrase);
   assert.equal(raisonRelevePublicBloque(EXISTANT, AUJOURDHUI), null);
