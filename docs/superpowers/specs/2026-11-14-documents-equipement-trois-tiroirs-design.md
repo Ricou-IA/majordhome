@@ -56,8 +56,11 @@ Un document propre à un client qui s'affiche sur tout le parc par mégarde.
 - **Retrait** : un document `appareil` se retire avec `clients.edit` (comme modifier la fiche) ; `marque` / `modele`
   restent `clients.delete` (org_admin), comme aujourd'hui, puisqu'ils touchent tout le parc. Dépôt : `clients.edit`
   pour les trois portées (inchangé).
-- Objets Storage d'un document `appareil` rangés sous `product-documents/${org}/equipments/${equipment_id}/…` ;
-  la policy de suppression Storage suit la même règle que la ligne.
+- Objets Storage d'un document `appareil` rangés sous `product-documents/${org}/equipments/${equipment_id}/…`.
+  Aucune policy Storage nouvelle : le bucket est déjà ouvert aux membres de l'org hors dossier `articles` (existant,
+  vérifié en prod le 2026-11-14) ; le garde est la ligne (le fichier n'est retiré qu'après un retrait de ligne réussi).
+- Équipement supprimé : ses documents `appareil` partent avec lui (cascade), leurs fichiers restent dans le bucket
+  (même limite que les autres objets orphelins déjà signalés).
 - Changer la portée d'un document déjà déposé : non livré (on retire et on redépose).
 
 ## Laissé au constructeur
