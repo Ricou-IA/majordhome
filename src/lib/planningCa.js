@@ -139,6 +139,21 @@ export function caProgramme({ rdvs, joursParAffaire, montantParAffaire, technici
 }
 
 /**
+ * Cumul de la période affichée (semaine, jour, mois), tous techniciens confondus.
+ * @param {Map<string, number>|null|undefined} parJour  cf. caProgramme
+ * @param {string} debut  date ISO incluse
+ * @param {string} finExclue  date ISO exclue (convention FullCalendar)
+ * @returns {number}
+ */
+export function cumulPeriode(parJour, debut, finExclue) {
+  let total = 0;
+  for (const [date, montant] of parJour || []) {
+    if (date >= debut && date < finExclue) total += montant;
+  }
+  return total;
+}
+
+/**
  * Montant affiché : euros entiers, espaces ordinaires.
  * @param {number} montant
  * @returns {string}

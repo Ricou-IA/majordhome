@@ -3,8 +3,9 @@
  * ============================================================================
  * Réservées à l'admin d'organisation et au team leader (Planning.jsx).
  * Une puce par technicien planifié par la machine : Vide · Ouverte · Pleine ·
- * Figée · À arbitrer, avec le secteur (déduit des RDV ou étiqueté) — et « À la
- * main » pour un technicien hors tournées (feuille de route seule). Source
+ * Figée · À arbitrer, avec le secteur (déduit des RDV ou étiqueté) — « À la
+ * main » pour un technicien hors tournées, et une ligne sans état pour une
+ * journée que le moteur ne juge pas (jour passé) : feuille de route seule. Source
  * unique de l'état : src/lib/tournee/etat.js, via useEtatsJournees.
  * Répond à « je ne sais pas quand une journée est complète et si le cron l'a
  * organisée » (Eric, 2026-09-29). Le clic ouvre la journée dans le panneau de
@@ -25,6 +26,8 @@ const STYLES = {
   a_arbitrer: 'bg-red-50 text-red-700 border-red-200',
   // Technicien hors tournées : la machine ne juge pas sa journée (Planning.jsx).
   manuelle: 'bg-sky-50 text-sky-700 border-sky-200',
+  // Journée que le moteur ne juge pas (jour passé, non travaillé) : la personne et son chiffre.
+  sans_etat: 'bg-white text-secondary-600 border-secondary-200',
 };
 
 function formatFige(iso) {
@@ -36,11 +39,15 @@ function formatFige(iso) {
 /** Libellé affiché : « Congés » quand la journée ne porte que des congés, sinon l'état du moteur. */
 function libelle(item) {
   if (item.enConges) return 'Congés';
+  if (item.etat === 'sans_etat') return '';
   return item.etat === 'manuelle' ? 'À la main' : LIBELLES_ETAT[item.etat];
 }
 
 /** Aide au survol : ce que la puce ne dit pas (secteur, figeage, reste utile estimé). */
 function titre(item) {
+  if (item.etat === 'sans_etat' && !item.enConges) {
+    return [item.technicienNom, `Journée non évaluée par les tournées (jour passé ou non travaillé) · ${item.nbRdvs} RDV`, 'Clic : feuille de route'].join('\n');
+  }
   const parts = [`${item.technicienNom} — ${libelle(item)}`];
   if (item.enConges) return parts.join('\n');
   if (item.etat === 'manuelle') {
@@ -89,7 +96,7 @@ export function JourneeEtatChips({ date, etats, onOpen, caParTechnicien = null }
             <span className="max-w-[6rem] shrink-0 truncate font-medium">{String(item.technicienNom || '').split(' ')[0]}</span>
             {!item.enConges && item.etat === 'figee' && <Lock className="h-3 w-3 shrink-0" />}
             {!item.enConges && item.etat === 'a_arbitrer' && <AlertTriangle className="h-3 w-3 shrink-0" />}
-            <span className="shrink-0">{libelle(item)}</span>
+            {libelle(item) && <span className="shrink-0">{libelle(item)}</span>}
             {item.etiquette && item.etat !== 'vide' && !item.enConges && <span className="min-w-0 truncate opacity-70">· {item.etiquette}</span>}
             {ca > 0 && <span className="ml-auto shrink-0 pl-1 font-semibold tabular-nums">{formatCa(ca)}</span>}
           </button>

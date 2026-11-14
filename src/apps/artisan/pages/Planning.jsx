@@ -37,7 +37,7 @@ import { useCanAccess } from '@hooks/usePermissions';
 import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
 import { useEtatsJournees } from '@hooks/useTournees';
 import { usePlanningCa } from '@hooks/usePlanningCa';
-import { formatCa } from '@/lib/planningCa';
+import { formatCa, cumulPeriode } from '@/lib/planningCa';
 import { useClientEquipmentLabels } from '@hooks/useClients';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useDeviceClass } from '@hooks/useDeviceClass';
@@ -112,6 +112,8 @@ function CalendarToolbar({
   onViewChange,
   title,
   weekNumber,
+  caCumul,
+  caCumulPartiel,
   onAddEvent,
   onRefresh,
   isLoading,
@@ -166,6 +168,14 @@ function CalendarToolbar({
         <h2 className="text-base sm:text-lg font-semibold text-gray-900 sm:min-w-[200px] first-letter:uppercase">
           {title}
         </h2>
+        {caCumul != null && (
+          <span
+            className="px-2 py-1 text-sm font-semibold tabular-nums bg-secondary-100 text-secondary-900 rounded-md shrink-0"
+            title={`CA HT programmé sur la période affichée, ${caCumulPartiel ? 'part des personnes affichées (filtre équipe actif)' : 'tous techniciens confondus'}.\nDevis validés des installations (au prorata des journées posées) + contrats d’entretien. SAV non compté.`}
+          >
+            {formatCa(caCumul)} HT
+          </span>
+        )}
       </div>
 
       {/* Actions */}
@@ -442,6 +452,8 @@ export default function Planning() {
   const [calendarTitle, setCalendarTitle] = useState('');
   const [calendarWeek, setCalendarWeek] = useState(null);
   const [dateRange, setDateRange] = useState(() => getDateRange(null));
+  // Période que le titre annonce (≠ dateRange en vue Mois : la grille déborde) — cumul du CA.
+  const [periode, setPeriode] = useState(null);
   const [modalState, setModalState] = useState({ open: false, mode: 'create', appointment: null, defaultDate: null, defaultTime: null });
   const [selectedChantier, setSelectedChantier] = useState(null);
   const [loadingChantier, setLoadingChantier] = useState(false);
@@ -471,7 +483,8 @@ export default function Planning() {
   // Technicien hors tournées (puce « À la main ») : pas de remplissage, sa feuille de route seule.
   const [feuilleOuverte, setFeuilleOuverte] = useState(null);
   const ouvrirJournee = useCallback((item) => {
-    if (item.etat === 'manuelle') {
+    // Journée que le moteur ne juge pas (hors tournées, jour passé) : la feuille de route seule.
+    if (item.etat === 'manuelle' || item.etat === 'sans_etat') {
       setFeuilleOuverte(item);
       return;
     }
@@ -564,41 +577,53 @@ export default function Planning() {
   // technicien HORS tournées (`include_in_routing = false`) qui a des RDV ce
   // jour-là : la machine ne le planifie pas, mais sa journée existe et sa
   // feuille de route aussi. Sans elle, il n'avait aucune puce (Mohammed, 2026-10-14).
+  // Même filet pour toute personne posée sur un RDV un jour que le moteur ne juge
+  // pas (jour passé — il ne charge qu'à partir d'aujourd'hui —, jour non travaillé) :
+  // une ligne « sans état », sinon la part de CA d'un chantier à plusieurs ne
+  // s'affichait que sur le technicien hors tournées, comme s'il était seul
+  // (semaine passée, Eric 2026-11-14).
   const etatsAffiches = useMemo(() => {
     const map = new Map();
     for (const [cle, item] of etatsJournees) {
       if (!recordIdsFiltres || recordIdsFiltres.has(item.technicienId)) map.set(cle, item);
     }
-    const horsTournees = new Map((members || [])
-      .filter((m) => m.role === 'technician' && m.include_in_routing !== true)
-      .map((m) => [m.id, m]));
-    if (horsTournees.size === 0) return map;
+    const membreParId = new Map((members || []).map((m) => [m.id, m]));
+    if (membreParId.size === 0) return map;
+    const aujourdhui = new Date().toLocaleDateString('fr-CA');
     const parJournee = new Map();
     for (const e of events) {
       const a = e.extendedProps;
       if (!a?.scheduled_date || a.band) continue;
       for (const techId of a.technician_ids || []) {
-        const m = horsTournees.get(techId);
+        const m = membreParId.get(techId);
         if (!m || (recordIdsFiltres && !recordIdsFiltres.has(techId))) continue;
         const cle = `${a.scheduled_date}|${techId}`;
         if (map.has(cle)) continue;
-        if (!parJournee.has(cle)) parJournee.set(cle, { date: a.scheduled_date, member: m, rdvs: new Map() });
+        const horsTournees = m.role === 'technician' && m.include_in_routing !== true;
+        // Jour à venir d'une personne que le moteur planifie : on attend son verdict
+        // (pas de ligne « sans état » qui clignoterait pendant le chargement).
+        if (!horsTournees && a.scheduled_date >= aujourdhui && etatsLoading) continue;
+        if (!parJournee.has(cle)) parJournee.set(cle, { date: a.scheduled_date, member: m, horsTournees, rdvs: new Map() });
         parJournee.get(cle).rdvs.set(a.id, a.appointment_type);
       }
     }
-    for (const [cle, { date, member, rdvs }] of parJournee) {
+    for (const [cle, { date, member, horsTournees, rdvs }] of parJournee) {
+      const enConges = [...rdvs.values()].every((t) => t === 'leave');
+      // Ligne « sans état » = quelqu'un qui a travaillé ce jour-là ; un jour férié
+      // n'aligne pas toute l'équipe en « Congés ».
+      if (!horsTournees && enConges) continue;
       map.set(cle, {
         date,
         technicienId: member.id,
         technicienNom: String(member.display_name || '').trim(),
         couleur: member.calendar_color,
-        etat: 'manuelle',
+        etat: horsTournees ? 'manuelle' : 'sans_etat',
         nbRdvs: rdvs.size,
-        enConges: [...rdvs.values()].every((t) => t === 'leave'),
+        enConges,
       });
     }
     return map;
-  }, [etatsJournees, recordIdsFiltres, members, events]);
+  }, [etatsJournees, etatsLoading, recordIdsFiltres, members, events]);
 
   // CA HT programmé (devis validés des installations au prorata des journées
   // posées + contrats d'entretien) : total du jour et part par technicien.
@@ -606,6 +631,13 @@ export default function Planning() {
   const { ca: caPlanning, error: caError } = usePlanningCa({
     orgId, appointments, technicienIds: recordIdsFiltres, enabled: voitCharge,
   });
+
+  // Cumul de la période affichée (semaine, jour ou mois — pas la grille, qui
+  // déborde sur les mois voisins), à côté du titre de la barre d'outils.
+  const caCumul = useMemo(() => {
+    if (!voitCharge || caError || !caPlanning || !periode) return null;
+    return cumulPeriode(caPlanning.parJour, periode.debut, periode.finExclue);
+  }, [voitCharge, caError, caPlanning, periode]);
 
   const dayHeaderContent = useCallback((arg) => {
     // Charge par technicien et chiffre : admin d'organisation et team leader seulement.
@@ -719,6 +751,10 @@ export default function Planning() {
     setCalendarTitle(dateInfo.view.title);
     setCurrentView(dateInfo.view.type);
     setDateRange(getDateRange(dateInfo));
+    setPeriode({
+      debut: dateInfo.view.currentStart.toLocaleDateString('fr-CA'),
+      finExclue: dateInfo.view.currentEnd.toLocaleDateString('fr-CA'),
+    });
     // Numéro de semaine ISO — pertinent uniquement sur les vues à 1 semaine
     const viewType = dateInfo.view.type;
     setCalendarWeek(
@@ -935,6 +971,8 @@ export default function Planning() {
           onViewChange={handleViewChange}
           title={calendarTitle}
           weekNumber={calendarWeek}
+          caCumul={caCumul}
+          caCumulPartiel={!!recordIdsFiltres}
           onAddEvent={canCreateAppointment ? () => setModalState({ open: true, mode: 'create', appointment: null, defaultDate: new Date().toISOString().split('T')[0], defaultTime: '09:00' }) : null}
           onRefresh={refresh}
           isLoading={isLoading}

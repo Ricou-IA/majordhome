@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cleAffaire, indexerJours, tauxTvaContrat, montantHtContrat, caProgramme, formatCa,
+  cleAffaire, indexerJours, tauxTvaContrat, montantHtContrat, caProgramme, cumulPeriode, formatCa,
 } from '../src/lib/planningCa.js';
 
 const pose = (id, date, chantierId, techs, extra = {}) => ({
@@ -144,6 +144,13 @@ test('liste des jours absente : les jours affichés font foi (jamais de division
   const rdvs = [pose('a1', '2026-11-16', 'c1', ['t1'])];
   const { parJour } = caProgramme({ rdvs, joursParAffaire: new Map(), montantParAffaire: new Map([['chantier:c1', 3000]]) });
   assert.equal(parJour.get('2026-11-16'), 3000);
+});
+
+test('cumulPeriode : somme des jours de la période, fin exclue', () => {
+  const parJour = new Map([['2026-11-13', 100], ['2026-11-16', 1205], ['2026-11-20', 2311], ['2026-11-21', 50]]);
+  assert.equal(cumulPeriode(parJour, '2026-11-16', '2026-11-21'), 3516);
+  assert.equal(cumulPeriode(parJour, '2026-11-01', '2026-12-01'), 3666);
+  assert.equal(cumulPeriode(null, '2026-11-16', '2026-11-21'), 0);
 });
 
 test('formatCa : euros entiers, espaces ordinaires', () => {
