@@ -344,13 +344,18 @@ function casseTitre(label) {
 
 /**
  * Titre d'un document du modèle : son libellé remis en casse de phrase, sauf libellé générique du site
- * (« datasheet », « Notice ») remplacé par le nom du type.
+ * (« datasheet », « Notice ») remplacé par le nom du type. Un document déposé à la main sans libellé prend le
+ * nom de son fichier sans extension, tel quel (une photo d'installation n'est pas une « Notice technique ») ;
+ * un document relevé sur le site du fabricant (`from_site`, `equipment_model_id`) garde le nom de son type.
  * @param {object} doc
  * @param {(type: string) => string} libelleType
  * @returns {string}
  */
 export function titreDocumentModele(doc, libelleType) {
   const label = String(doc?.label || '').trim();
+  const releve = doc?.from_site === true || !!doc?.equipment_model_id;
+  const fichier = String(doc?.file_name || '').trim();
+  if (!label && !releve && fichier) return fichier.replace(/\.[^.]+$/, '') || fichier;
   if (!label || /^(datasheet|notice|fiche technique)$/i.test(label)) return libelleType(doc?.document_type);
   return casseTitre(label);
 }

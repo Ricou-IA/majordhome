@@ -20,7 +20,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { FileText, BookOpen, Layers, Upload, Trash2, Eye, ChevronDown, ChevronRight } from 'lucide-react';
-import { equipmentDocumentTypeLabel } from '@services/equipmentDocuments.service';
+import { equipmentDocumentTypeLabel, equipmentHasBrand, equipmentHasModel } from '@services/equipmentDocuments.service';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { logger } from '@lib/logger';
 import { rangerDocumentsModele, titreDocumentModele } from '@/lib/catalogue/nomenclature';
@@ -41,7 +41,7 @@ function DocumentRow({ doc, badge, canDelete, onDelete, onOpen }) {
         type="button"
         onClick={() => onOpen?.(doc)}
         disabled={!onOpen}
-        className="flex-1 min-w-0 flex items-center gap-2.5 p-2 text-left"
+        className="flex-1 min-w-0 min-h-[44px] flex items-center gap-2.5 p-2 text-left"
         title={`Consulter ${doc.file_name || titre}`}
       >
         <Icon className="w-4 h-4 text-indigo-500 flex-shrink-0" />
@@ -53,7 +53,7 @@ function DocumentRow({ doc, badge, canDelete, onDelete, onOpen }) {
         <button
           type="button"
           onClick={() => onDelete(doc)}
-          className="p-1.5 mr-1 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded"
+          className="min-w-[36px] min-h-[36px] inline-flex items-center justify-center mr-1 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded"
           title="Retirer ce document"
         >
           <Trash2 className="w-3.5 h-3.5" />
@@ -71,7 +71,7 @@ function Tiroir({ titre, nombre, ouvert, onToggle, children }) {
         type="button"
         onClick={onToggle}
         aria-expanded={ouvert}
-        className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-xs font-medium text-gray-600 hover:text-gray-900"
+        className="w-full min-h-[44px] flex items-center gap-1.5 px-2 py-1 text-left text-xs font-medium text-gray-600 hover:text-gray-900"
       >
         {ouvert ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
         {titre} ({nombre})
@@ -116,7 +116,10 @@ export function EquipmentDocumentsSection({
     return rangerDocumentsModele(tiroirs.modele.filter((d) => !fournisseur.has(d)));
   }, [tiroirs, productDocuments]);
 
-  const noms = { marque: equipment?.brand, modele: equipment?.model };
+  const noms = {
+    marque: equipment?.brand, modele: equipment?.model,
+    aMarque: equipmentHasBrand(equipment), aModele: equipmentHasModel(equipment),
+  };
   const total = modelDocuments.length + productDocuments.length;
   const showUpload = canUpload && !!onUpload;
   if (total === 0 && !showUpload) return null;
@@ -169,7 +172,7 @@ export function EquipmentDocumentsSection({
             type="button"
             onClick={() => setProceduresOuvertes((v) => !v)}
             aria-expanded={proceduresOuvertes}
-            className="w-full flex items-center gap-2.5 p-2 text-left text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+            className="w-full min-h-[44px] flex items-center gap-2.5 p-2 text-left text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
           >
             <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
             Procédures ({rangesModele.procedures.length})

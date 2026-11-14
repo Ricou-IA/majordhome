@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { Upload, Loader2, X } from 'lucide-react';
 import { EQUIPMENT_DOCUMENT_TYPES, equipmentHasBrand, equipmentHasModel } from '@services/equipmentDocuments.service';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
-import { porteesProposees, destinatairesPortee } from '@/lib/catalogue/documentsAppareil';
+import { porteesProposees, destinatairesPortee, typeParDefautPourFichier } from '@/lib/catalogue/documentsAppareil';
 
 const ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp';
 const MAX_SIZE = 20 * 1024 * 1024; // limite du bucket product-documents
@@ -35,6 +35,7 @@ export function EquipmentDocumentUploadModal({ equipment, onClose, onSubmit, isS
   const [file, setFile] = useState(null);
   const [scope, setScope] = useState('appareil');
   const [documentType, setDocumentType] = useState('notice');
+  const [typeChoisi, setTypeChoisi] = useState(false); // un type cliqué n'est jamais remplacé par la présélection
   const [label, setLabel] = useState('');
   const noms = { marque: equipment?.brand?.trim(), modele: equipment?.model?.trim() };
   const portees = porteesProposees({
@@ -47,6 +48,8 @@ export function EquipmentDocumentUploadModal({ equipment, onClose, onSubmit, isS
     const f = e.target.files?.[0] || null;
     if (f && f.size > MAX_SIZE) { toast.error('Fichier trop lourd (20 Mo maximum)'); e.target.value = ''; return; }
     setFile(f);
+    const typeParDefaut = typeParDefautPourFichier({ fichier: f, typeChoisi });
+    if (typeParDefaut) setDocumentType(typeParDefaut);
   };
 
   const submit = async (e) => {
@@ -73,15 +76,14 @@ export function EquipmentDocumentUploadModal({ equipment, onClose, onSubmit, isS
         </div>
 
         <div className="px-5 py-4 space-y-4 flex-1">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Pour qui ?</label>
-            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Portée du document">
+          <fieldset>
+            <legend className="block text-sm font-medium text-gray-700 mb-1.5">Pour qui ?</legend>
+            <div className="flex flex-wrap gap-2">
               {portees.map((p) => (
                 <button
                   key={p.value}
                   type="button"
-                  role="radio"
-                  aria-checked={scope === p.value}
+                  aria-pressed={scope === p.value}
                   onClick={() => setScope(p.value)}
                   className={segmentClass(scope === p.value)}
                 >
@@ -89,7 +91,7 @@ export function EquipmentDocumentUploadModal({ equipment, onClose, onSubmit, isS
                 </button>
               ))}
             </div>
-          </div>
+          </fieldset>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Type de document</label>
             <div className="flex flex-wrap gap-2">
@@ -97,7 +99,8 @@ export function EquipmentDocumentUploadModal({ equipment, onClose, onSubmit, isS
                 <button
                   key={t.value}
                   type="button"
-                  onClick={() => setDocumentType(t.value)}
+                  aria-pressed={documentType === t.value}
+                  onClick={() => { setDocumentType(t.value); setTypeChoisi(true); }}
                   className={segmentClass(documentType === t.value)}
                 >
                   {t.label}

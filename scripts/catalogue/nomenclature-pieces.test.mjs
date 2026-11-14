@@ -174,6 +174,19 @@ test('titreDocumentModele : libellé générique du site remplacé par le type',
   assert.equal(titreDocumentModele({ document_type: 'procedure', label: '' }, type), 'Procédure');
 });
 
+test('titreDocumentModele : document déposé à la main sans libellé = nom du fichier sans extension', () => {
+  const type = (t) => ({ notice: 'Notice technique' })[t] || 'Document';
+  assert.equal(titreDocumentModele({ document_type: 'notice', label: '', file_name: 'Photo installation cave.JPG' }, type), 'Photo installation cave');
+  assert.equal(titreDocumentModele({ document_type: 'notice', label: null, file_name: 'reglage' }, type), 'reglage');
+  // relevé du fabricant sans libellé : nom du type, inchangé
+  assert.equal(titreDocumentModele({ document_type: 'notice', label: '', file_name: 'doc-abc.pdf', from_site: true }, type), 'Notice technique');
+  assert.equal(titreDocumentModele({ document_type: 'notice', file_name: 'doc-abc.pdf', equipment_model_id: 'm1' }, type), 'Notice technique');
+  // document manuel avec libellé : le libellé, inchangé
+  assert.equal(titreDocumentModele({ document_type: 'notice', label: 'Schéma ÉLECTRIQUE', file_name: 'x.pdf' }, type), 'Schéma électrique');
+  // ni libellé ni fichier : nom du type
+  assert.equal(titreDocumentModele({ document_type: 'notice', label: '' }, type), 'Notice technique');
+});
+
 test('titreDocumentModele : majuscule au début, minuscules ensuite (libellés réels du LP9)', () => {
   const type = () => 'Procédure';
   const t = (label) => titreDocumentModele({ document_type: 'procedure', label }, type);

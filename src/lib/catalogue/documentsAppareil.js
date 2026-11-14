@@ -217,15 +217,28 @@ const texte = (v) => String(v ?? '').trim();
 
 /**
  * Titre d'un tiroir de la carte équipement (sans le nombre) : « Cet appareil », « Modèle <modèle> »,
- * « Marque <MARQUE> » — modèle tel que saisi, marque en MAJUSCULES comme au dépôt ; sans nom, le mot seul.
+ * « Marque <MARQUE> » — modèle tel que saisi, marque en MAJUSCULES comme au dépôt. Le nom n'est écrit que s'il
+ * est utile (`aMarque` / `aModele`, même règle que `equipmentHasBrand` / `equipmentHasModel`) : un texte de
+ * remplissage (« À renseigner ») ou un nom vide laisse le mot seul.
  * @param {'appareil'|'modele'|'marque'} portee
- * @param {{ marque?: string, modele?: string }} [noms]
+ * @param {{ marque?: string, modele?: string, aMarque?: boolean, aModele?: boolean }} [noms]
  * @returns {string}
  */
-export function titreTiroir(portee, { marque, modele } = {}) {
+export function titreTiroir(portee, { marque, modele, aMarque, aModele } = {}) {
   if (portee === 'appareil') return 'Cet appareil';
-  if (portee === 'marque') return `Marque ${texte(marque).toUpperCase()}`.trim();
-  return `Modèle ${texte(modele)}`.trim();
+  if (portee === 'marque') return aMarque ? `Marque ${texte(marque).toUpperCase()}`.trim() : 'Marque';
+  return aModele ? `Modèle ${texte(modele)}`.trim() : 'Modèle';
+}
+
+/**
+ * Type présélectionné au choix d'un fichier : « Autre » pour une image (photo d'installation, de plaque…) tant
+ * que l'utilisateur n'a pas choisi lui-même un type ; un type cliqué n'est jamais remplacé.
+ * @param {{ fichier?: { type?: string, name?: string }|null, typeChoisi?: boolean }} [p]
+ * @returns {'autre'|null} le type à poser, ou null pour ne rien changer
+ */
+export function typeParDefautPourFichier({ fichier, typeChoisi } = {}) {
+  if (typeChoisi || !fichier) return null;
+  return natureDocument({ mime_type: fichier.type, file_name: fichier.name }) === 'image' ? 'autre' : null;
 }
 
 /**

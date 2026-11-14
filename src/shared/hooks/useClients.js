@@ -17,7 +17,7 @@ import { equipmentsService } from '@services/equipments.service';
 import { buildKindsByClient, buildEquipmentLabelsByClient } from '@/lib/equipmentIcons';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { buildClientDuplicateProbe } from '@/lib/clientDuplicateMatch';
-import { clientKeys, contractKeys, appointmentKeys, interventionKeys } from '@hooks/cacheKeys';
+import { clientKeys, contractKeys, appointmentKeys, interventionKeys, equipmentDocumentKeys } from '@hooks/cacheKeys';
 import { usePaginatedList } from '@hooks/usePaginatedList';
 import { useDebounce } from '@hooks/useDebounce';
 import { useAuth } from '@contexts/AuthContext';
@@ -248,6 +248,8 @@ export function useClientEquipments(clientId) {
     mutationFn: ({ equipmentId, updates }) => unwrapResult(clientsService.updateEquipment(equipmentId, updates)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
+      // marque / modèle changés : les documents de modèle et de marque de la carte ne sont plus les mêmes
+      queryClient.invalidateQueries({ queryKey: equipmentDocumentKeys.all(orgId) });
     },
   });
 

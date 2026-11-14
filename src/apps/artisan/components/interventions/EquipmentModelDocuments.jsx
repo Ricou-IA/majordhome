@@ -1,9 +1,9 @@
 /**
  * EquipmentModelDocuments.jsx — notice / vue éclatée du modèle, côté terrain
  * ============================================================================
- * Lecture seule des documents du MODÈLE d'appareil (equipment_documents,
- * partagés par marque + modèle, ou relevés sur le site du fabricant pour un
- * équipement rattaché à son modèle) sur la fiche d'intervention et le
+ * Lecture seule des documents de l'équipement (equipment_documents, trois
+ * portées : cet appareil, modèle — dont les documents relevés sur le site du
+ * fabricant — et marque) sur la fiche d'intervention et le
  * certificat : le technicien, tablette en main devant l'appareil, ouvre la
  * notice (code erreur) ou la fiche technique sans repasser par la fiche
  * client. Le dépôt reste sur la fiche client (EquipmentDocumentsSection).

@@ -69,8 +69,8 @@ const trimOrNull = (v) => (typeof v === 'string' && v.trim()) || null;
 
 export const equipmentDocumentsService = {
   /**
-   * Documents du modèle de chaque équipement : `{ [equipmentId]: doc[] }`.
-   * Un document partagé par N équipements apparaît sous chacun d'eux.
+   * Documents de chaque équipement, trois portées confondues (appareil, modèle, marque — colonne `scope`) :
+   * `{ [equipmentId]: doc[] }`. Un document partagé par N équipements apparaît sous chacun d'eux.
    */
   async getByEquipmentIds(orgId, equipmentIds = []) {
     return withErrorHandling(async () => {

@@ -295,7 +295,7 @@ export const supplierKeys = {
 // --- Articles Majord'home (base du devis, matrice fournisseurs, harmonisation) ---
 // Toute mutation d'article invalide aussi supplierKeys.all(orgId) (les lignes fournisseur changent d'article).
 /**
- * Documents du modèle d'appareil (majordhome.equipment_documents) — partagés par marque + modèle,
+ * Documents d'un équipement (majordhome.equipment_documents) — portée appareil, modèle ou marque,
  * lus par equipment_id via la vue majordhome_equipment_model_documents.
  */
 export const equipmentDocumentKeys = {
