@@ -174,6 +174,22 @@ test('titreDocumentModele : libellé générique du site remplacé par le type',
   assert.equal(titreDocumentModele({ document_type: 'procedure', label: '' }, type), 'Procédure');
 });
 
+test('titreDocumentModele : majuscule au début, minuscules ensuite (libellés réels du LP9)', () => {
+  const type = () => 'Procédure';
+  const t = (label) => titreDocumentModele({ document_type: 'procedure', label }, type);
+  assert.equal(t('MISE EN SERVICE LP9'), 'Mise en service LP9');
+  assert.equal(t('guide-changement de pièce'), 'Guide-changement de pièce');
+  assert.equal(t('RÉGLAGE SCREENSAVER ANCIEN HOTTOH'), 'Réglage screensaver ancien hottoh');
+  assert.equal(t('ÉTALONNAGE KCC ANCIEN HOTTOH SOFT VERSION AIR'), 'Étalonnage KCC ancien hottoh soft version AIR');
+  assert.equal(t('Menu Installateur Version AIR + Guide Dépannage'), 'Menu installateur version AIR + guide dépannage');
+  assert.equal(t('Menu Installateur WIFI'), 'Menu installateur wifi');
+  assert.equal(t('ANCIENNE TÉLÉC.HOTTOH'), 'Ancienne téléc.hottoh');
+  assert.equal(t('Mise à jour 10.1 Kit wifi Asrtrel 2.0'), 'Mise à jour 10.1 kit wifi Asrtrel 2.0');
+  // un nom de modèle suivi de son numéro garde sa casse
+  assert.equal(t('POELE LODI 10 NOIR'), 'Poele LODI 10 noir');
+  assert.equal(t('Notice LP9'), 'Notice LP9');
+});
+
 test('trierParRepere : ordre numérique, plages, non numériques puis sans repère, variantes dans l\u2019ordre d\u2019origine', () => {
   const l = (repere, id) => ({ repere, id });
   const tri = trierParRepere([l('35', 1), l('21', 2), l('10', 3), l('7-14', 4), l('2', 5), l('A2', 6), l('', 7), l('10', 8), l('100', 9), l(null, 10)]);

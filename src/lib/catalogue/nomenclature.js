@@ -319,9 +319,32 @@ export function rangerDocumentsModele(docs) {
   return { principaux: tries.filter((d) => d.document_type !== 'procedure'), procedures: tries.filter((d) => d.document_type === 'procedure') };
 }
 
+const PETITS_MOTS = new Set(['a', 'à', 'au', 'aux', 'de', 'des', 'du', 'en', 'et', 'la', 'le', 'les', 'un', 'une', 'sur', 'par', 'pour']);
+
 /**
- * Titre d'un document du modèle : son libellé, sauf libellé générique du site (« datasheet », « Notice ») remplacé
- * par le nom du type.
+ * Casse d'affichage d'un libellé de document : majuscule au début, minuscules ensuite (le site du fabricant écrit
+ * souvent tout en capitales). Restent tels quels : un mot qui porte un chiffre (LP9, 10.1), un mot suivi d'un
+ * nombre (nom de modèle : « LODI 10 »), un sigle de 2-3 capitales qui n'est pas un petit mot (KCC, AIR).
+ * @param {string} label
+ * @returns {string}
+ */
+function casseTitre(label) {
+  const mots = label.split(/(\s+)/);
+  const sortie = mots.map((mot, i) => {
+    if (!mot.trim() || /\d/.test(mot)) return mot;
+    if (/^\d/.test(mots[i + 2] || '')) return mot;
+    return mot.replace(/\p{L}+/gu, (lettres) => {
+      const sigle = lettres.length <= 3 && lettres.length >= 2 && lettres === lettres.toUpperCase()
+        && !PETITS_MOTS.has(lettres.toLowerCase());
+      return sigle ? lettres : lettres.toLowerCase();
+    });
+  }).join('');
+  return sortie.replace(/\p{L}/u, (c) => c.toUpperCase());
+}
+
+/**
+ * Titre d'un document du modèle : son libellé remis en casse de phrase, sauf libellé générique du site
+ * (« datasheet », « Notice ») remplacé par le nom du type.
  * @param {object} doc
  * @param {(type: string) => string} libelleType
  * @returns {string}
@@ -329,5 +352,5 @@ export function rangerDocumentsModele(docs) {
 export function titreDocumentModele(doc, libelleType) {
   const label = String(doc?.label || '').trim();
   if (!label || /^(datasheet|notice|fiche technique)$/i.test(label)) return libelleType(doc?.document_type);
-  return label;
+  return casseTitre(label);
 }
