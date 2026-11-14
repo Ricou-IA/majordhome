@@ -3,7 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { natureDocument, ongletsAtelier, ongletActif, vuesDeclarees, PART_DOCUMENT, bornerPartDocument,
-  MAX_PIXELS_CANVAS, echelleRendu, texteDePagePdf, normaliserRecherchePdf } from '../../src/lib/catalogue/documentsAppareil.js';
+  MAX_PIXELS_CANVAS, echelleRendu, texteDePagePdf, normaliserRecherchePdf,
+  PORTEES_DOCUMENT, porteesProposees, porteeDocument, rangerEnTiroirs, peutRetirerDocument, messageRetraitDocument } from '../../src/lib/catalogue/documentsAppareil.js';
 
 test('natureDocument', () => {
   assert.equal(natureDocument({ mime_type: 'application/pdf' }), 'pdf');
@@ -88,4 +89,52 @@ test('normaliserRecherchePdf : même normalisation que le texte', () => {
   assert.equal(normaliserRecherchePdf(undefined), '');
   const { texte } = texteDePagePdf([el('Joint  de porte', 0)]);
   assert.ok(texte.includes(normaliserRecherchePdf('joint de  porte')));
+});
+
+test('PORTEES_DOCUMENT : trois portées', () => {
+  assert.deepEqual(PORTEES_DOCUMENT, ['appareil', 'modele', 'marque']);
+});
+test('porteesProposees : appareil toujours, modèle et marque selon ce qui existe', () => {
+  assert.deepEqual(porteesProposees({ aMarque: false, aModele: false }).map((p) => p.value), ['appareil']);
+  assert.equal(porteesProposees({}).length, 1);
+  const p = porteesProposees({ marque: 'Invicta', modele: 'Lp9', aMarque: true, aModele: true });
+  assert.deepEqual(p, [
+    { value: 'appareil', label: 'Cet appareil (ce client seulement)' },
+    { value: 'modele', label: 'Tous les Lp9' },
+    { value: 'marque', label: 'Toute la marque INVICTA' },
+  ]);
+  assert.deepEqual(porteesProposees({ marque: 'x', modele: 'y', aMarque: true, aModele: false }).map((q) => q.value), ['appareil', 'marque']);
+});
+test('porteeDocument : absente ou inconnue = modèle', () => {
+  assert.equal(porteeDocument({}), 'modele');
+  assert.equal(porteeDocument(null), 'modele');
+  assert.equal(porteeDocument({ scope: 'bidon' }), 'modele');
+  assert.equal(porteeDocument({ scope: 'appareil' }), 'appareil');
+  assert.equal(porteeDocument({ scope: 'marque' }), 'marque');
+});
+test('rangerEnTiroirs : documents fournisseur dans le modèle, après, ordre gardé', () => {
+  const docs = [{ id: 'a', scope: 'marque' }, { id: 'b', scope: 'modele' }, { id: 'c' }, { id: 'd', scope: 'appareil' }, { id: 'e', scope: 'marque' }];
+  const t = rangerEnTiroirs(docs, [{ id: 'p1' }, { id: 'p2' }]);
+  assert.deepEqual(t.appareil.map((d) => d.id), ['d']);
+  assert.deepEqual(t.modele.map((d) => d.id), ['b', 'c', 'p1', 'p2']);
+  assert.deepEqual(t.marque.map((d) => d.id), ['a', 'e']);
+  assert.deepEqual(rangerEnTiroirs(undefined), { appareil: [], modele: [], marque: [] });
+});
+test('peutRetirerDocument : relevé jamais, appareil = modifier, sinon supprimer', () => {
+  assert.equal(peutRetirerDocument({ scope: 'modele' }, { peutModifier: true, peutSupprimer: false }), false);
+  assert.equal(peutRetirerDocument({ scope: 'modele' }, { peutSupprimer: true }), true);
+  assert.equal(peutRetirerDocument({ scope: 'marque' }, { peutModifier: true }), false);
+  assert.equal(peutRetirerDocument({ scope: 'appareil' }, { peutModifier: true }), true);
+  assert.equal(peutRetirerDocument({ scope: 'appareil' }, { peutSupprimer: true }), false);
+  assert.equal(peutRetirerDocument({ scope: 'appareil', from_site: true }, { peutModifier: true, peutSupprimer: true }), false);
+  assert.equal(peutRetirerDocument({ scope: 'modele', equipment_model_id: 'm' }, { peutSupprimer: true }), false);
+  assert.equal(peutRetirerDocument({}, {}), false);
+  assert.equal(peutRetirerDocument({ scope: 'appareil' }), false);
+});
+test('messageRetraitDocument : une phrase par portée', () => {
+  assert.equal(messageRetraitDocument({ scope: 'appareil', label: 'Notice' }), '« Notice » sera retiré de cet appareil.');
+  assert.equal(messageRetraitDocument({ scope: 'modele', label: 'Notice', brand: 'Invicta', model: 'Lp9' }),
+    "« Notice » sera retiré pour tous les équipements Invicta Lp9 de l'entreprise.");
+  assert.equal(messageRetraitDocument({ scope: 'marque', brand: 'Invicta' }),
+    '« ce document » sera retiré pour tous les équipements de la marque Invicta.');
 });

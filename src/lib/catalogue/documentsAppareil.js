@@ -146,3 +146,69 @@ export function texteDePagePdf(items) {
   });
   return { texte, segments };
 }
+
+/** Portées d'un document déposé sur la fiche d'un équipement, de la plus étroite à la plus large. */
+export const PORTEES_DOCUMENT = ['appareil', 'modele', 'marque'];
+
+/**
+ * Portées proposées au dépôt : « cet appareil » toujours, « tous les <modèle> » si l'appareil a un modèle,
+ * « toute la marque » s'il a une marque. Marque en MAJUSCULES, modèle tel que saisi.
+ * @param {{ marque?: string, modele?: string, aMarque?: boolean, aModele?: boolean }} [p]
+ * @returns {Array<{ value: 'appareil'|'modele'|'marque', label: string }>}
+ */
+export function porteesProposees({ marque, modele, aMarque, aModele } = {}) {
+  const portees = [{ value: 'appareil', label: 'Cet appareil (ce client seulement)' }];
+  if (aModele) portees.push({ value: 'modele', label: `Tous les ${modele ?? ''}` });
+  if (aMarque) portees.push({ value: 'marque', label: `Toute la marque ${String(marque ?? '').toUpperCase()}` });
+  return portees;
+}
+
+/**
+ * Portée d'un document ; une ligne sans portée (ancienne ligne, ancien cache) ou inconnue vaut « modèle »,
+ * l'ancien comportement.
+ * @param {{ scope?: string }|null|undefined} doc
+ * @returns {'appareil'|'modele'|'marque'}
+ */
+export function porteeDocument(doc) {
+  return PORTEES_DOCUMENT.includes(doc?.scope) ? doc.scope : 'modele';
+}
+
+/**
+ * Range les documents en trois tiroirs par portée, ordre d'origine gardé. Les documents des lignes fournisseur
+ * (`productDocuments`) vont dans le tiroir « modèle », après les documents du modèle.
+ * @param {Array<object>} [docs]
+ * @param {Array<object>} [productDocuments]
+ * @returns {{ appareil: Array<object>, modele: Array<object>, marque: Array<object> }}
+ */
+export function rangerEnTiroirs(docs, productDocuments = []) {
+  const tiroirs = { appareil: [], modele: [], marque: [] };
+  for (const d of Array.isArray(docs) ? docs : []) tiroirs[porteeDocument(d)].push(d);
+  for (const d of Array.isArray(productDocuments) ? productDocuments : []) tiroirs.modele.push(d);
+  return tiroirs;
+}
+
+/**
+ * Le geste « Retirer » est-il offert ? Un document relevé (copié du site fabricant : `from_site` ou
+ * `equipment_model_id`) ne se retire jamais d'ici. Portée appareil : droit de modifier ; marque / modèle :
+ * droit de supprimer (il touche d'autres clients).
+ * @param {{ scope?: string, from_site?: boolean, equipment_model_id?: string|null }|null|undefined} doc
+ * @param {{ peutModifier?: boolean, peutSupprimer?: boolean }} [droits]
+ * @returns {boolean}
+ */
+export function peutRetirerDocument(doc, { peutModifier, peutSupprimer } = {}) {
+  if (doc?.from_site === true || doc?.equipment_model_id) return false;
+  return porteeDocument(doc) === 'appareil' ? peutModifier === true : peutSupprimer === true;
+}
+
+/**
+ * Phrase de confirmation du retrait, qui dit qui sera touché.
+ * @param {{ scope?: string, label?: string, brand?: string, model?: string }|null|undefined} doc
+ * @returns {string}
+ */
+export function messageRetraitDocument(doc) {
+  const nom = `« ${doc?.label || 'ce document'} »`;
+  const portee = porteeDocument(doc);
+  if (portee === 'appareil') return `${nom} sera retiré de cet appareil.`;
+  if (portee === 'marque') return `${nom} sera retiré pour tous les équipements de la marque ${doc?.brand ?? ''}.`;
+  return `${nom} sera retiré pour tous les équipements ${doc?.brand ?? ''} ${doc?.model ?? ''} de l'entreprise.`;
+}
