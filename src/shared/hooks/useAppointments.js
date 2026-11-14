@@ -167,12 +167,9 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     return ids;
   }, [filters.memberProfileKeys, teamList]);
 
-  // Convertir en events FullCalendar. Les jours d'installation sont désormais des
-  // appointments `installation` natifs (Bloc B stage 4) → plus de merge chantier-slots.
-  const events = useMemo(() => {
-    if (!appointments) return [];
-
-    // Enrichir chaque appointment avec ses technician_ids
+  // RDV enrichis de leurs technician_ids, NON filtrés par personne : base des
+  // events du calendrier et du CA programmé (usePlanningCa).
+  const enriched = useMemo(() => {
     const techMap = new Map();
     if (techLinks) {
       techLinks.forEach((t) => {
@@ -180,11 +177,16 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
         techMap.get(t.appointment_id).push(t.technician_id);
       });
     }
-
-    const enriched = (appointments || []).map((a) => ({
+    return (appointments || []).map((a) => ({
       ...a,
       technician_ids: techMap.get(a.id) || [],
     }));
+  }, [appointments, techLinks]);
+
+  // Convertir en events FullCalendar. Les jours d'installation sont désormais des
+  // appointments `installation` natifs (Bloc B stage 4) → plus de merge chantier-slots.
+  const events = useMemo(() => {
+    if (!appointments) return [];
 
     const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`;
     const aujourdhui = new Date().toLocaleDateString('fr-CA'); // YYYY-MM-DD, fuseau local
@@ -218,7 +220,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
         });
         return blocs;
       });
-  }, [appointments, techLinks, chantierOrders, quotedLeadIds, filters.kinds, filters.showTolerance, selectedRecordIds, colorMaps, reglages]);
+  }, [appointments, enriched, chantierOrders, quotedLeadIds, filters.kinds, filters.showTolerance, selectedRecordIds, colorMaps, reglages]);
 
   // Mutation : créer un RDV
   const createMutation = useMutation({
@@ -326,8 +328,8 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
   );
 
   return {
-    // Données
-    appointments: appointments || [],
+    // Données (RDV de la plage, avec technician_ids, non filtrés par personne)
+    appointments: enriched,
     events,
     isLoading,
     error,

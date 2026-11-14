@@ -1,6 +1,7 @@
 /**
  * JourneeEtatChips.jsx — puces d'état de journée sous l'en-tête d'un jour du Planning
  * ============================================================================
+ * Réservées à l'admin d'organisation et au team leader (Planning.jsx).
  * Une puce par technicien planifié par la machine : Vide · Ouverte · Pleine ·
  * Figée · À arbitrer, avec le secteur (déduit des RDV ou étiqueté) — et « À la
  * main » pour un technicien hors tournées (feuille de route seule). Source
@@ -13,6 +14,7 @@
 
 import { Lock, AlertTriangle } from 'lucide-react';
 import { LIBELLES_ETAT } from '@/lib/tournee/etat.js';
+import { formatCa } from '@/lib/planningCa';
 
 const STYLES = {
   conges: 'bg-slate-100 text-slate-600 border-slate-300',
@@ -58,32 +60,41 @@ function titre(item) {
 }
 
 /**
- * @param {{ date: string, etats: Map<string, object>, onOpen?: (item: object) => void }} props
- *   `date` ISO `YYYY-MM-DD` ; `etats` = Map de useEtatsJournees.
+ * Une ligne par technicien (Eric, 2026-11-14 : « pour que ce soit lisible ») :
+ * état à gauche, part du CA HT programmé de sa journée à droite.
+ *
+ * @param {{ date: string, etats: Map<string, object>, onOpen?: (item: object) => void, caParTechnicien?: Map<string, number>|null }} props
+ *   `date` ISO `YYYY-MM-DD` ; `etats` = Map de useEtatsJournees ;
+ *   `caParTechnicien` = `parTechnicienJour` de planningCa (clé `${date}|${technicienId}`),
+ *   null tant que le chiffre est inconnu — rien n'est alors affiché.
  */
-export function JourneeEtatChips({ date, etats, onOpen }) {
+export function JourneeEtatChips({ date, etats, onOpen, caParTechnicien = null }) {
   const items = [...etats.values()]
     .filter((i) => i.date === date)
     .sort((a, b) => String(a.technicienNom || '').localeCompare(String(b.technicienNom || ''), 'fr'));
   if (items.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-1 mt-1">
-      {items.map((item) => (
-        <button
-          key={item.technicienId}
-          type="button"
-          onClick={() => onOpen?.(item)}
-          title={titre(item)}
-          className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-normal leading-tight ${STYLES[item.enConges ? 'conges' : item.etat]}`}
-        >
-          <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: item.couleur || '#94A3B8' }} />
-          <span className="max-w-[5rem] truncate">{String(item.technicienNom || '').split(' ')[0]}</span>
-          {!item.enConges && item.etat === 'figee' && <Lock className="h-3 w-3" />}
-          {!item.enConges && item.etat === 'a_arbitrer' && <AlertTriangle className="h-3 w-3" />}
-          <span>{libelle(item)}</span>
-          {item.etiquette && item.etat !== 'vide' && !item.enConges && <span className="opacity-70">· {item.etiquette}</span>}
-        </button>
-      ))}
+    <div className="mt-1 flex w-full flex-col gap-0.5">
+      {items.map((item) => {
+        const ca = caParTechnicien?.get(`${item.date}|${item.technicienId}`) || 0;
+        return (
+          <button
+            key={item.technicienId}
+            type="button"
+            onClick={() => onOpen?.(item)}
+            title={ca > 0 ? `${titre(item)}\nCA HT programmé : ${formatCa(ca)}` : titre(item)}
+            className={`flex w-full items-center gap-1 rounded border px-1.5 py-0.5 text-left text-[10px] font-normal leading-tight ${STYLES[item.enConges ? 'conges' : item.etat]}`}
+          >
+            <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.couleur || '#94A3B8' }} />
+            <span className="max-w-[6rem] shrink-0 truncate font-medium">{String(item.technicienNom || '').split(' ')[0]}</span>
+            {!item.enConges && item.etat === 'figee' && <Lock className="h-3 w-3 shrink-0" />}
+            {!item.enConges && item.etat === 'a_arbitrer' && <AlertTriangle className="h-3 w-3 shrink-0" />}
+            <span className="shrink-0">{libelle(item)}</span>
+            {item.etiquette && item.etat !== 'vide' && !item.enConges && <span className="min-w-0 truncate opacity-70">· {item.etiquette}</span>}
+            {ca > 0 && <span className="ml-auto shrink-0 pl-1 font-semibold tabular-nums">{formatCa(ca)}</span>}
+          </button>
+        );
+      })}
     </div>
   );
 }

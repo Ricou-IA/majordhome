@@ -396,6 +396,14 @@ html[data-device-class="tablet"] .fc .fc-list-day-cushion {
   @apply bg-secondary-50 text-secondary-600 font-semibold text-xs uppercase;
 }
 
+/* En-tête de jour avec charge par technicien (Planning.jsx, .mdh-day-head) : le
+   contenu occupe toute la largeur de la colonne — une ligne par technicien, le
+   chiffre du jour calé à droite. Sans cette règle le coussin FullCalendar est
+   un inline-block centré, réduit à la largeur de son contenu. */
+.fc .fc-col-header-cell-cushion:has(.mdh-day-head) {
+  display: block;
+}
+
 /* =============================================================================
    UTILITIES
    ============================================================================= */

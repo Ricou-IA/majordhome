@@ -111,6 +111,9 @@ export const appointmentKeys = {
   // Appros des chantiers des RDV d'installation affichés (pose provisoire hachurée)
   chantierOrders: (orgId, chantierIds) => [...appointmentKeys.all(orgId), 'chantier-orders', chantierIds],
   quotedLeads: (orgId, leadIds) => [...appointmentKeys.all(orgId), 'quoted-leads', leadIds],
+  // CA HT programmé : journées et montants des affaires affichées (usePlanningCa).
+  // Sous `all` : toute écriture d'un RDV recalcule la répartition par journée.
+  caAffaires: (orgId, chantierIds, interventionIds) => [...appointmentKeys.all(orgId), 'ca-affaires', chantierIds, interventionIds],
   audit: (orgId, id) => [...appointmentKeys.all(orgId), 'audit', id],
 };
 

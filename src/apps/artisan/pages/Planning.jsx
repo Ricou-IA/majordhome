@@ -36,6 +36,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
 import { useEtatsJournees } from '@hooks/useTournees';
+import { usePlanningCa } from '@hooks/usePlanningCa';
+import { formatCa } from '@/lib/planningCa';
 import { useClientEquipmentLabels } from '@hooks/useClients';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useDeviceClass } from '@hooks/useDeviceClass';
@@ -427,6 +429,9 @@ export default function Planning() {
   const orgId = organization?.id;
   const calendarRef = useRef(null);
   const canCreateAppointment = can('planning', 'create');
+  // Charge par technicien (puces d'état) et CA programmé : pilotage, pas terrain
+  // (Eric, 2026-11-14) — admin d'organisation et team leader, jamais le technicien.
+  const voitCharge = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
   // Sur appareil tenu en main (tablette, téléphone) : la journée, pas la semaine.
   // Téléphone / tablette : la journée en liste (cf. VUES_MOBILE).
   const { isMobileDevice } = useDeviceClass();
@@ -505,6 +510,7 @@ export default function Planning() {
 
   // Hooks données
   const {
+    appointments,
     events,
     isLoading,
     error,
@@ -594,17 +600,50 @@ export default function Planning() {
     return map;
   }, [etatsJournees, recordIdsFiltres, members, events]);
 
+  // CA HT programmé (devis validés des installations au prorata des journées
+  // posées + contrats d'entretien) : total du jour et part par technicien.
+  // `null` tant que le chiffre est inconnu — on n'affiche alors rien, jamais 0.
+  const { ca: caPlanning, error: caError } = usePlanningCa({
+    orgId, appointments, technicienIds: recordIdsFiltres, enabled: voitCharge,
+  });
+
   const dayHeaderContent = useCallback((arg) => {
+    // Charge par technicien et chiffre : admin d'organisation et team leader seulement.
+    if (!voitCharge || arg.view.type === 'dayGridMonth') return <span>{arg.text}</span>;
     const date = arg.date.toLocaleDateString('fr-CA');
+    const total = caPlanning?.parJour.get(date) || 0;
+    const sansMontant = caPlanning?.sansMontantParJour.get(date) || 0;
     return (
-      <div className="flex flex-col items-start">
-        <span>{arg.text}</span>
-        {arg.view.type !== 'dayGridMonth' && (
-          <JourneeEtatChips date={date} etats={etatsAffiches} onOpen={ouvrirJournee} />
-        )}
+      <div className="mdh-day-head flex w-full flex-col items-start">
+        <div className="flex w-full items-baseline justify-between gap-2">
+          <span>{arg.text}</span>
+          {caError && (
+            <span className="font-normal normal-case text-secondary-400" title={`CA HT programmé indisponible (${caError.message || 'échec du chargement'})`}>
+              CA indisponible
+            </span>
+          )}
+          {!caError && (total > 0 || sansMontant > 0) && (
+            <span
+              className="whitespace-nowrap tabular-nums text-secondary-900"
+              title={[
+                'CA HT programmé : devis validés des installations (au prorata des journées posées) + contrats d’entretien. SAV non compté.',
+                recordIdsFiltres ? 'Part des personnes affichées.' : null,
+                sansMontant > 0 ? `${sansMontant} affaire${sansMontant > 1 ? 's' : ''} sans montant, comptée${sansMontant > 1 ? 's' : ''} à 0.` : null,
+              ].filter(Boolean).join('\n')}
+            >
+              {formatCa(total)} HT{sansMontant > 0 ? ' *' : ''}
+            </span>
+          )}
+        </div>
+        <JourneeEtatChips
+          date={date}
+          etats={etatsAffiches}
+          onOpen={ouvrirJournee}
+          caParTechnicien={caPlanning?.parTechnicienJour || null}
+        />
       </div>
     );
-  }, [etatsAffiches, ouvrirJournee]);
+  }, [voitCharge, etatsAffiches, ouvrirJournee, caPlanning, caError, recordIdsFiltres]);
 
   // ==========================================================================
   // IMPRESSION — UNE personne (1 chip équipe) : planning hebdo en vue Semaine,
