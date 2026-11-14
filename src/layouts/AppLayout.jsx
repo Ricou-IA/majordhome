@@ -8,6 +8,7 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { moduleActif, crmActif, peutOuvrirParametres } from '@/lib/modules';
 import { vocabulaire } from '@/lib/maintenance/vocabulaire';
 import TaskCreateModal from '@apps/artisan/components/tasks/TaskCreateModal';
+import { AppUpdateWatcher } from '@components/AppUpdateWatcher';
 import {
   Plus,
   LayoutDashboard,
@@ -386,6 +387,9 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Nouvelle version déployée : bouton « Mettre à jour », rechargement au changement de page */}
+      <AppUpdateWatcher />
 
       {/* Global task create modal */}
       {showTaskCreate && (
