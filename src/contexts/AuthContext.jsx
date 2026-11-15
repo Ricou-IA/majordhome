@@ -22,16 +22,13 @@ export function AuthProvider({ children }) {
   // Refs de contrôle
   const signInActiveRef = useRef(false);       // Éviter que SIGNED_IN double-charge pendant signIn()
   const signOutTimerRef = useRef(null);        // Debounce SIGNED_OUT (protection alt-tab)
-  const chargementsEnCoursRef = useRef(new Map()); // userId → nombre de loadUserData en vol
+  const chargementsEnVolRef = useRef(new Map()); // userId → promesse du loadUserData en vol
 
   // ===========================================================================
   // CHARGEMENT DES DONNÉES UTILISATEUR
   // ===========================================================================
 
-  const loadUserData = useCallback(async (userId) => {
-    if (!userId) return;
-
-    chargementsEnCoursRef.current.set(userId, (chargementsEnCoursRef.current.get(userId) || 0) + 1);
+  const chargerDonnees = useCallback(async (userId) => {
     try {
       const [profileResult, orgResult] = await Promise.all([
         authService.getProfile(userId),
@@ -82,12 +79,21 @@ export function AuthProvider({ children }) {
     } catch (error) {
       logger.error('[AuthContext] loadUserData error:', error);
       return { isClient: false };
-    } finally {
-      const restants = (chargementsEnCoursRef.current.get(userId) || 1) - 1;
-      if (restants > 0) chargementsEnCoursRef.current.set(userId, restants);
-      else chargementsEnCoursRef.current.delete(userId);
     }
   }, []);
+
+  // Chargement suivi : la promesse en vol est gardée par utilisateur, pour que
+  // l'ouverture ne charge pas deux fois (initAuth et l'évènement SIGNED_IN
+  // arrivent à quelques millisecondes d'écart, dans un ordre qui varie).
+  const loadUserData = useCallback((userId) => {
+    if (!userId) return Promise.resolve();
+    const promesse = chargerDonnees(userId);
+    chargementsEnVolRef.current.set(userId, promesse);
+    promesse.finally(() => {
+      if (chargementsEnVolRef.current.get(userId) === promesse) chargementsEnVolRef.current.delete(userId);
+    });
+    return promesse;
+  }, [chargerDonnees]);
 
   const resetState = useCallback(() => {
     setUser(null);
@@ -116,7 +122,8 @@ export function AuthProvider({ children }) {
 
         if (mounted && session?.user) {
           setUser(session.user);
-          await loadUserData(session.user.id);
+          // SIGNED_IN a pu lancer le chargement juste avant : on attend le sien.
+          await (chargementsEnVolRef.current.get(session.user.id) || loadUserData(session.user.id));
         } else if (mounted) {
           // Pas de session locale — tenter getUser (PKCE redirect, etc.)
           const { data: { user: verifiedUser } } = await supabase.auth.getUser();
@@ -157,7 +164,7 @@ export function AuthProvider({ children }) {
     // les charge déjà : à l'ouverture, SIGNED_IN arrive pendant le chargement
     // d'initAuth et doublait chaque requête (profil, adhésion, profil maison).
     const reloadIfNeeded = (userId) => {
-      if (chargementsEnCoursRef.current.has(userId)) return;
+      if (chargementsEnVolRef.current.has(userId)) return;
       setProfile(prev => {
         setOrganization(prevOrg => {
           if (!prev || !prevOrg) {
