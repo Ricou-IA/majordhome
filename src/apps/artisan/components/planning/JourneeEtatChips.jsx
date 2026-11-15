@@ -3,9 +3,10 @@
  * ============================================================================
  * Réservées à l'admin d'organisation et au team leader (Planning.jsx).
  * Une puce par technicien planifié par la machine : Vide · Ouverte · Pleine ·
- * Figée · À arbitrer, avec le secteur (déduit des RDV ou étiqueté) — « À la
- * main » pour un technicien hors tournées, et une ligne sans état pour une
- * journée que le moteur ne juge pas (jour passé) : feuille de route seule. Source
+ * Figée · À arbitrer, avec la zone de travail (grand secteur déduit des RDV ou
+ * étiqueté, sinon la ville du jour) — et une ligne sans libellé pour une journée
+ * que le moteur ne juge pas (technicien hors tournées, jour passé) : feuille de
+ * route seule. Source
  * unique de l'état : src/lib/tournee/etat.js, via useEtatsJournees.
  * Répond à « je ne sais pas quand une journée est complète et si le cron l'a
  * organisée » (Eric, 2026-09-29). Le clic ouvre la journée dans le panneau de
@@ -24,11 +25,18 @@ const STYLES = {
   pleine: 'bg-amber-50 text-amber-700 border-amber-200',
   figee: 'bg-violet-50 text-violet-700 border-violet-200',
   a_arbitrer: 'bg-red-50 text-red-700 border-red-200',
-  // Technicien hors tournées : la machine ne juge pas sa journée (Planning.jsx).
-  manuelle: 'bg-sky-50 text-sky-700 border-sky-200',
-  // Journée que le moteur ne juge pas (jour passé, non travaillé) : la personne et son chiffre.
+  // Journée que la machine ne juge pas — technicien hors tournées (`manuelle`),
+  // jour passé ou non travaillé (`sans_etat`) : la personne, sa zone et son chiffre,
+  // sans libellé (« À la main » n'apprenait rien, Eric 2026-11-15).
+  manuelle: 'bg-white text-secondary-600 border-secondary-200',
   sans_etat: 'bg-white text-secondary-600 border-secondary-200',
 };
+
+/** Journée sans verdict du moteur : pas de libellé d'état, la feuille de route au clic. */
+const sansVerdict = (item) => item.etat === 'manuelle' || item.etat === 'sans_etat';
+
+/** Zone de travail affichée : grand secteur (entretiens), sinon ville(s) du jour. */
+const zone = (item) => item.etiquette || item.lieu || '';
 
 function formatFige(iso) {
   const d = new Date(iso);
@@ -39,22 +47,25 @@ function formatFige(iso) {
 /** Libellé affiché : « Congés » quand la journée ne porte que des congés, sinon l'état du moteur. */
 function libelle(item) {
   if (item.enConges) return 'Congés';
-  if (item.etat === 'sans_etat') return '';
-  return item.etat === 'manuelle' ? 'À la main' : LIBELLES_ETAT[item.etat];
+  return sansVerdict(item) ? '' : LIBELLES_ETAT[item.etat];
 }
 
 /** Aide au survol : ce que la puce ne dit pas (secteur, figeage, reste utile estimé). */
 function titre(item) {
-  if (item.etat === 'sans_etat' && !item.enConges) {
-    return [item.technicienNom, `Journée non évaluée par les tournées (jour passé ou non travaillé) · ${item.nbRdvs} RDV`, 'Clic : feuille de route'].join('\n');
+  if (sansVerdict(item) && !item.enConges) {
+    return [
+      item.technicienNom,
+      item.etat === 'manuelle'
+        ? `Planifiée à la main (hors tournées) · ${item.nbRdvs} RDV`
+        : `Journée non évaluée par les tournées (jour passé ou non travaillé) · ${item.nbRdvs} RDV`,
+      zone(item) ? `Zone : ${zone(item)}` : null,
+      'Clic : feuille de route',
+    ].filter(Boolean).join('\n');
   }
   const parts = [`${item.technicienNom} — ${libelle(item)}`];
   if (item.enConges) return parts.join('\n');
-  if (item.etat === 'manuelle') {
-    parts.push(`Planifiée à la main (hors tournées) · ${item.nbRdvs} RDV`, 'Clic : feuille de route');
-    return parts.join('\n');
-  }
   if (item.etiquette) parts.push(`Secteur ${item.etiquette}${item.origine === 'deduite' ? ' (déduit des RDV posés)' : ''}`);
+  else if (item.lieu) parts.push(`Zone : ${item.lieu}`);
   if (item.figeeAt) {
     parts.push(`Figée le ${formatFige(item.figeeAt)} par ${item.figeePar === 'cron' ? 'le cron' : 'un membre de l’équipe'}`);
   } else if (item.etat === 'figee') {
@@ -97,7 +108,9 @@ export function JourneeEtatChips({ date, etats, onOpen, caParTechnicien = null }
             {!item.enConges && item.etat === 'figee' && <Lock className="h-3 w-3 shrink-0" />}
             {!item.enConges && item.etat === 'a_arbitrer' && <AlertTriangle className="h-3 w-3 shrink-0" />}
             {libelle(item) && <span className="shrink-0">{libelle(item)}</span>}
-            {item.etiquette && item.etat !== 'vide' && !item.enConges && <span className="min-w-0 truncate opacity-70">· {item.etiquette}</span>}
+            {zone(item) && item.etat !== 'vide' && !item.enConges && (
+              <span className="min-w-0 truncate opacity-70">{libelle(item) ? '· ' : ''}{zone(item)}</span>
+            )}
             {ca > 0 && <span className="ml-auto shrink-0 pl-1 font-semibold tabular-nums">{formatCa(ca)}</span>}
           </button>
         );

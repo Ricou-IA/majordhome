@@ -38,6 +38,8 @@ import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
 import { useEtatsJournees } from '@hooks/useTournees';
 import { usePlanningCa } from '@hooks/usePlanningCa';
 import { formatCa, cumulPeriode } from '@/lib/planningCa';
+import { villesDeJournee } from '@/lib/planningEvents';
+import { deduireSecteur } from '@/lib/tournee/etat.js';
 import { useClientEquipmentLabels } from '@hooks/useClients';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useDeviceClass } from '@hooks/useDeviceClass';
@@ -168,7 +170,7 @@ function CalendarToolbar({
         <h2 className="text-base sm:text-lg font-semibold text-gray-900 sm:min-w-[200px] first-letter:uppercase">
           {title}
         </h2>
-        {caCumul != null && (
+        {caCumul > 0 && (
           <span
             className="px-2 py-1 text-sm font-semibold tabular-nums bg-secondary-100 text-secondary-900 rounded-md shrink-0"
             title={`CA HT programmé sur la période affichée, ${caCumulPartiel ? 'part des personnes affichées (filtre équipe actif)' : 'tous techniciens confondus'}.\nDevis validés des installations (au prorata des journées posées) + contrats d’entretien. SAV non compté.`}
@@ -590,25 +592,34 @@ export default function Planning() {
     const membreParId = new Map((members || []).map((m) => [m.id, m]));
     if (membreParId.size === 0) return map;
     const aujourdhui = new Date().toLocaleDateString('fr-CA');
-    const parJournee = new Map();
+    // RDV de chaque personne × jour (un RDV à plusieurs blocs n'est compté qu'une fois).
+    const rdvsParCle = new Map();
     for (const e of events) {
       const a = e.extendedProps;
       if (!a?.scheduled_date || a.band) continue;
       for (const techId of a.technician_ids || []) {
-        const m = membreParId.get(techId);
-        if (!m || (recordIdsFiltres && !recordIdsFiltres.has(techId))) continue;
+        if (recordIdsFiltres && !recordIdsFiltres.has(techId)) continue;
         const cle = `${a.scheduled_date}|${techId}`;
-        if (map.has(cle)) continue;
-        const horsTournees = m.role === 'technician' && m.include_in_routing !== true;
-        // Jour à venir d'une personne que le moteur planifie : on attend son verdict
-        // (pas de ligne « sans état » qui clignoterait pendant le chargement).
-        if (!horsTournees && a.scheduled_date >= aujourdhui && etatsLoading) continue;
-        if (!parJournee.has(cle)) parJournee.set(cle, { date: a.scheduled_date, member: m, horsTournees, rdvs: new Map() });
-        parJournee.get(cle).rdvs.set(a.id, a.appointment_type);
+        if (!rdvsParCle.has(cle)) rdvsParCle.set(cle, new Map());
+        rdvsParCle.get(cle).set(a.id, a);
       }
     }
-    for (const [cle, { date, member, horsTournees, rdvs }] of parJournee) {
-      const enConges = [...rdvs.values()].every((t) => t === 'leave');
+    for (const [cle, parId] of rdvsParCle) {
+      const rdvs = [...parId.values()];
+      const existant = map.get(cle);
+      if (existant) {
+        // Journée du moteur sans grand secteur (jour d'installation) : la ville de travail.
+        if (!existant.etiquette) map.set(cle, { ...existant, lieu: villesDeJournee(rdvs) });
+        continue;
+      }
+      const [date, techId] = cle.split('|');
+      const member = membreParId.get(techId);
+      if (!member) continue;
+      const horsTournees = member.role === 'technician' && member.include_in_routing !== true;
+      // Jour à venir d'une personne que le moteur planifie : on attend son verdict
+      // (pas de ligne « sans état » qui clignoterait pendant le chargement).
+      if (!horsTournees && date >= aujourdhui && etatsLoading) continue;
+      const enConges = rdvs.every((r) => r.appointment_type === 'leave');
       // Ligne « sans état » = quelqu'un qui a travaillé ce jour-là ; un jour férié
       // n'aligne pas toute l'équipe en « Congés ».
       if (!horsTournees && enConges) continue;
@@ -618,8 +629,11 @@ export default function Planning() {
         technicienNom: String(member.display_name || '').trim(),
         couleur: member.calendar_color,
         etat: horsTournees ? 'manuelle' : 'sans_etat',
-        nbRdvs: rdvs.size,
+        nbRdvs: rdvs.length,
         enConges,
+        // Zone de travail : grand secteur des entretiens du jour, sinon la ville.
+        etiquette: deduireSecteur(rdvs),
+        lieu: villesDeJournee(rdvs),
       });
     }
     return map;
@@ -629,7 +643,14 @@ export default function Planning() {
   // posées + contrats d'entretien) : total du jour et part par technicien.
   // `null` tant que le chiffre est inconnu — on n'affiche alors rien, jamais 0.
   const { ca: caPlanning, error: caError } = usePlanningCa({
-    orgId, appointments, technicienIds: recordIdsFiltres, enabled: voitCharge,
+    orgId,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    appointments,
+    technicienIds: recordIdsFiltres,
+    // `periode` connue = le calendrier a annoncé sa plage : on ne chiffre pas la
+    // plage par défaut (± 1 mois) chargée avant lui.
+    enabled: voitCharge && !!periode,
   });
 
   // Cumul de la période affichée (semaine, jour ou mois — pas la grille, qui

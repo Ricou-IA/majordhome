@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   appointmentKind, buildPersonColorMaps, resolveAppointmentColor,
   buildTeamList, matchesKindFilter, matchesMemberFilter, expandAppointmentBlocks,
-  resolveCommercialMemberId, INVOICED_EVENT_COLOR, FALLBACK_PERSON_COLOR, dureeImposee, VT_DURATION_MINUTES,
+  resolveCommercialMemberId, INVOICED_EVENT_COLOR, FALLBACK_PERSON_COLOR, dureeImposee, VT_DURATION_MINUTES, villesDeJournee,
 } from '../src/lib/planningEvents.js';
 
 // Fixtures inspirées des vraies données Mayer (Philippe = tech + commercial).
@@ -172,4 +172,14 @@ test('dureeImposee: les autres types restent à étirement libre (entretien = ba
   assert.equal(dureeImposee('installation'), null);
   assert.equal(dureeImposee('other'), null);
   assert.equal(dureeImposee(undefined), null);
+});
+
+test('villesDeJournee : première ville dans l’ordre des RDV, les autres comptées', () => {
+  const rdv = (city, start, extra = {}) => ({ appointment_type: 'installation', status: 'scheduled', city, scheduled_start: start, ...extra });
+  assert.equal(villesDeJournee([rdv('Gaillac', '08:00:00')]), 'Gaillac');
+  assert.equal(villesDeJournee([rdv('Albi', '14:00:00'), rdv('Gaillac', '08:00:00'), rdv('GAILLAC', '10:00:00')]), 'Gaillac +1');
+  assert.equal(villesDeJournee([rdv('Albi', '08:00:00'), rdv('Castres', '10:00:00'), rdv('Revel', '14:00:00')]), 'Albi +2');
+  // Congés, RDV annulés et RDV sans ville ne comptent pas.
+  assert.equal(villesDeJournee([rdv('Albi', '08:00:00', { status: 'cancelled' }), rdv('', '09:00:00'), rdv('Revel', '10:00:00', { appointment_type: 'leave' })]), null);
+  assert.equal(villesDeJournee(null), null);
 });

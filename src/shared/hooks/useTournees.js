@@ -270,6 +270,21 @@ function joursJusqua(endDate) {
 }
 
 /**
+ * Horizon à charger pour afficher une plage : par PALIERS (45, 90, 120 jours),
+ * jamais le nombre exact de jours. La clé de cache en dépend — au jour près,
+ * chaque changement de semaine rechargeait tout l'horizon (7 requêtes en
+ * cascade, 1,2 à 1,8 s avant l'apparition des puces, mesuré le 2026-11-15).
+ * Le palier 45 est celui du tableau de bord des entretiens : même cache.
+ * @param {string} endDate  borne exclusive de la plage affichée
+ * @returns {number}
+ */
+function horizonPourPlage(endDate) {
+  const n = joursJusqua(endDate);
+  if (n <= 45) return 45;
+  return n <= 90 ? 90 : 120;
+}
+
+/**
  * État de chaque journée (technicien × date) d'une plage — spec 2026-09-29 § 3.1.
  * Verdict du moteur à vol d'oiseau (`estime: true`, comme `useJourneesAArbitrer`)
  * + étiquette de secteur + trace de figeage lues en base. Les journées passées ne
@@ -285,7 +300,7 @@ function joursJusqua(endDate) {
  */
 export function useEtatsJournees({ coreOrgId, startDate, endDate }) {
   const { settings } = useOrgSettings();
-  const joursApres = joursJusqua(endDate);
+  const joursApres = horizonPourPlage(endDate);
   const { data: horizon, isLoading: hLoading, error: hError } = useJourneesHorizon(coreOrgId, joursApres);
   const { data: etiquettes, isLoading: eLoading, error: eError } = useQuery({
     queryKey: tourneeKeys.journeesSecteur(coreOrgId, startDate, endDate),

@@ -221,3 +221,26 @@ export function fenetreDe(appt, { flexDefaut = 30, demiJournee } = {}) {
   const borne = (m) => Math.max(0, Math.min(23 * 60 + 59, m));
   return { debutMinutes: borne(t.min), finMinutes: borne(t.max + (appt.duration_minutes || 60)), flex: t.flex };
 }
+
+/**
+ * Ville(s) de travail d'une journée, pour une ligne de technicien du Planning
+ * quand la journée n'a pas de grand secteur (jour d'installation : le secteur
+ * ne se déduit que des entretiens). Dans l'ordre des RDV ; plusieurs villes →
+ * la première et le nombre des autres (« Gaillac +2 »). Congés et RDV annulés
+ * ne comptent pas.
+ * @param {Array<{ appointment_type?: string, status?: string, city?: string|null, scheduled_start?: string|null }>|null|undefined} rdvs
+ * @returns {string|null}
+ */
+export function villesDeJournee(rdvs) {
+  const poses = (rdvs || [])
+    .filter((r) => r.appointment_type !== 'leave' && r.status !== 'cancelled' && r.status !== 'no_show'
+      && String(r.city || '').trim())
+    .sort((a, b) => String(a.scheduled_start || '').localeCompare(String(b.scheduled_start || '')));
+  const villes = [];
+  for (const r of poses) {
+    const ville = String(r.city).trim();
+    if (!villes.some((v) => v.toLowerCase() === ville.toLowerCase())) villes.push(ville);
+  }
+  if (villes.length === 0) return null;
+  return villes.length === 1 ? villes[0] : `${villes[0]} +${villes.length - 1}`;
+}
