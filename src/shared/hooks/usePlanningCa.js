@@ -16,8 +16,7 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { planningCaService } from '@services/planningCa.service';
-import { appointmentKeys } from '@hooks/cacheKeys';
+import { planningQueries } from '@hooks/planningQueries';
 import { caProgramme, indexerJours } from '@/lib/planningCa';
 
 /**
@@ -32,14 +31,8 @@ import { caProgramme, indexerJours } from '@/lib/planningCa';
  */
 export function usePlanningCa({ orgId, startDate, endDate, appointments, technicienIds = null, enabled = true }) {
   const { data, isLoading, error } = useQuery({
-    queryKey: appointmentKeys.caAffaires(orgId, startDate, endDate),
-    queryFn: async () => {
-      const { data: affaires, error: err } = await planningCaService.getAffaires({ coreOrgId: orgId, startDate, endDate });
-      if (err) throw err;
-      return affaires;
-    },
+    ...planningQueries.caAffaires(orgId, startDate, endDate),
     enabled: !!orgId && !!startDate && !!endDate && enabled,
-    staleTime: 15_000,
   });
 
   const ca = useMemo(() => {

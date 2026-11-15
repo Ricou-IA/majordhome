@@ -10,6 +10,7 @@
  *   - vignette d'un RDV ....... components/planning/PlanningEventContent.jsx (règles : lib/planningVignette.js)
  *   - vue et plage affichées .. hooks/usePlanningVue.js (règles : lib/planningGestes.js)
  *   - gestes sur le calendrier  hooks/usePlanningGestes.js (règles : lib/planningGestes.js)
+ *   - semaines voisines ....... hooks/usePlanningPrechargement.js (requêtes : hooks/planningQueries.js)
  *   - fenêtre de RDV .......... hooks/usePlanningFenetreRdv.js + components/planning/EventModal.jsx
  *   - charge et CA du jour .... hooks/usePlanningCharge.js + components/planning/PlanningDayHeader.jsx
  *                               (règles : lib/planningCharge.js, lib/planningCa.js)
@@ -34,6 +35,7 @@ import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
 import { usePlanningVue } from '@hooks/usePlanningVue';
 import { usePlanningGestes } from '@hooks/usePlanningGestes';
 import { usePlanningFenetreRdv } from '@hooks/usePlanningFenetreRdv';
+import { usePlanningPrechargement } from '@hooks/usePlanningPrechargement';
 import { usePlanningCharge } from '@hooks/usePlanningCharge';
 import { usePlanningJournee } from '@hooks/usePlanningJournee';
 import { usePlanningImpression } from '@hooks/usePlanningImpression';
@@ -78,6 +80,7 @@ export default function Planning() {
     appointments,
     events,
     isLoading,
+    isLoadingTechnicians,
     error,
     filters,
     setFilters,
@@ -97,6 +100,18 @@ export default function Planning() {
   });
 
   const { members } = useTeamMembers(orgId);
+
+  // Semaines (ou jours) voisins chargés d'avance : « précédent » / « suivant » sans attente.
+  usePlanningPrechargement({
+    orgId,
+    vue: currentView,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    appointmentType: filters.appointmentType,
+    status: filters.status,
+    voitCharge,
+    pret: !isLoading && !error,
+  });
 
   // Fenêtre de RDV (création sur un créneau, édition d'un RDV) et gestes du
   // calendrier : clic dans le vide, clic sur un RDV, RDV glissé ou étiré.
@@ -123,9 +138,11 @@ export default function Planning() {
     members,
     teamList,
     memberProfileKeys: filters.memberProfileKeys,
-    // RDV en cours de chargement, ou restreints par un filtre de type ou de statut :
-    // la charge est partielle, on ne dit pas qu'une journée est vide.
-    rdvsPartiels: isLoading || !!(filters.appointmentType || filters.status),
+    // RDV restreints par un filtre de type ou de statut : la charge est partielle, on
+    // ne dit pas qu'une journée est vide. RDV ou techniciens en cours de chargement :
+    // chaque technicien garde sa ligne, sans état ni chiffre, le temps de la réponse.
+    rdvsPartiels: !!(filters.appointmentType || filters.status),
+    rdvsEnChargement: isLoading || isLoadingTechnicians,
     voitCharge,
   });
 

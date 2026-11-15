@@ -25,6 +25,7 @@ import { tourneesService } from '@services/tournees.service';
 import { autoRdvService } from '@services/autoRdv.service';
 import { contractsService } from '@services/contracts.service';
 import { tourneeKeys } from '@hooks/cacheKeys';
+import { planningQueries } from '@hooks/planningQueries';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { supabase } from '@/lib/supabaseClient';
 import { construireReglages } from '@/lib/tournee/reglages.js';
@@ -303,14 +304,8 @@ export function useEtatsJournees({ coreOrgId, startDate, endDate }) {
   const joursApres = horizonPourPlage(endDate);
   const { data: horizon, isLoading: hLoading, error: hError } = useJourneesHorizon(coreOrgId, joursApres);
   const { data: etiquettes, isLoading: eLoading, error: eError } = useQuery({
-    queryKey: tourneeKeys.journeesSecteur(coreOrgId, startDate, endDate),
-    queryFn: async () => {
-      const { data, error } = await tourneesService.getJourneesSecteur({ coreOrgId, from: startDate, to: endDate });
-      if (error) throw error;
-      return data;
-    },
+    ...planningQueries.journeesSecteur(coreOrgId, startDate, endDate),
     enabled: !!coreOrgId && !!startDate && !!endDate,
-    staleTime: 60 * 1000,
   });
   const etats = useMemo(() => {
     const map = new Map();

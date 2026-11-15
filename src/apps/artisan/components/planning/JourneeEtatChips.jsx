@@ -30,6 +30,8 @@ const STYLES = {
   // sans libellé (« À la main » n'apprenait rien, Eric 2026-11-15).
   manuelle: 'bg-white text-secondary-600 border-secondary-200',
   sans_etat: 'bg-white text-secondary-600 border-secondary-200',
+  // Réponse en cours (RDV, techniciens ou verdict du moteur) : le nom seul, la place est tenue.
+  attente: 'bg-white text-secondary-400 border-secondary-100',
 };
 
 /** Journée sans verdict du moteur : pas de libellé d'état, la feuille de route au clic. */
@@ -51,6 +53,7 @@ function libelle(item) {
 
 /** Aide au survol : ce que la puce ne dit pas (secteur, figeage, reste utile estimé). */
 function titre(item) {
+  if (item.etat === 'attente') return `${item.technicienNom}\nChargement de la journée…`;
   if (sansVerdict(item)) {
     return [
       item.technicienNom,
@@ -103,6 +106,7 @@ export function JourneeEtatChips({ date, etats, onOpen, caParTechnicien = null }
             key={item.technicienId}
             type="button"
             onClick={() => onOpen?.(item)}
+            disabled={item.etat === 'attente'}
             title={ca > 0 ? `${titre(item)}\nCA HT programmé : ${formatCa(ca)}` : titre(item)}
             className={`flex w-full items-center gap-1 rounded border px-1.5 py-0.5 text-left text-[10px] font-normal leading-tight ${STYLES[item.etat]}`}
           >

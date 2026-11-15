@@ -68,3 +68,32 @@ test('horaireDeBloc : RDV glissé ou étiré', () => {
   // Tôt le matin : la date reste celle du jour (toISOString reculait d'un jour avant 1 h).
   assert.equal(horaireDeBloc({ start: le(18, 0, 30), end: le(18, 1, 30) }).scheduled_date, '2026-11-18');
 });
+
+test('plagesVoisines : semaine précédente et suivante, mêmes bornes que le calendrier', async () => {
+  const { plagesVoisines } = await import('../src/lib/planningGestes.js');
+  // Bornes relevées sur l'application : la semaine du 16 novembre se charge du 16 au 21 (samedi exclu).
+  assert.deepEqual(plagesVoisines({ vue: 'timeGridWeek', startDate: '2026-11-16', endDate: '2026-11-21' }), [
+    { startDate: '2026-11-09', endDate: '2026-11-14' },
+    { startDate: '2026-11-23', endDate: '2026-11-28' },
+  ]);
+  // Changement de mois et d'année.
+  assert.deepEqual(plagesVoisines({ vue: 'listWeek', startDate: '2026-12-28', endDate: '2027-01-02' }), [
+    { startDate: '2026-12-21', endDate: '2026-12-26' },
+    { startDate: '2027-01-04', endDate: '2027-01-09' },
+  ]);
+});
+
+test('plagesVoisines : vue Jour = jour ouvré voisin ; vue Mois et plage inconnue = rien', async () => {
+  const { plagesVoisines } = await import('../src/lib/planningGestes.js');
+  // Vendredi 20 → jeudi 19 et lundi 23 ; lundi 16 → vendredi 13 et mardi 17.
+  assert.deepEqual(plagesVoisines({ vue: 'timeGridDay', startDate: '2026-11-20', endDate: '2026-11-21' }), [
+    { startDate: '2026-11-19', endDate: '2026-11-20' },
+    { startDate: '2026-11-23', endDate: '2026-11-24' },
+  ]);
+  assert.deepEqual(plagesVoisines({ vue: 'listDay', startDate: '2026-11-16', endDate: '2026-11-17' }), [
+    { startDate: '2026-11-13', endDate: '2026-11-14' },
+    { startDate: '2026-11-17', endDate: '2026-11-18' },
+  ]);
+  assert.deepEqual(plagesVoisines({ vue: 'dayGridMonth', startDate: '2026-10-26', endDate: '2026-12-07' }), []);
+  assert.deepEqual(plagesVoisines({ vue: 'timeGridWeek', startDate: null, endDate: null }), []);
+});

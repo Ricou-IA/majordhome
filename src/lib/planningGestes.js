@@ -104,3 +104,47 @@ export function horaireDeBloc({ start, end = null }) {
     duration_minutes: Math.round((fin - start) / 60000),
   };
 }
+
+const VUES_SEMAINE = ['timeGridWeek', 'listWeek'];
+const VUES_JOUR = ['timeGridDay', 'listDay'];
+
+/** `YYYY-MM-DD` décalé de `jours` (date locale, sans dérive UTC). */
+function decaler(iso, jours) {
+  const [a, m, j] = String(iso).split('-').map(Number);
+  return dateLocale(new Date(a, m - 1, j + jours));
+}
+
+/** Jour ouvré voisin (le calendrier masque samedi et dimanche). */
+function jourOuvreVoisin(iso, sens) {
+  let d = decaler(iso, sens);
+  for (let i = 0; i < 2; i += 1) {
+    const [a, m, j] = d.split('-').map(Number);
+    const jour = new Date(a, m - 1, j).getDay();
+    if (jour !== 0 && jour !== 6) break;
+    d = decaler(d, sens);
+  }
+  return d;
+}
+
+/**
+ * Plages que le calendrier annoncera si l'on clique « précédent » ou « suivant » :
+ * elles servent à charger d'avance les RDV voisins, pour un changement de semaine
+ * sans attente. Mêmes bornes que `plageDeVue` (semaine = lundi → samedi exclu, les
+ * week-ends étant masqués ; jour = le jour ouvré voisin). Vue Mois : rien — la grille
+ * déborde sur les mois voisins et ses bornes ne se déduisent pas d'un simple décalage.
+ * @param {{ vue?: string, startDate?: string|null, endDate?: string|null }} p
+ * @returns {Array<{ startDate: string, endDate: string }>}  précédente puis suivante
+ */
+export function plagesVoisines({ vue, startDate, endDate } = {}) {
+  if (!startDate || !endDate) return [];
+  if (VUES_SEMAINE.includes(vue)) {
+    return [-7, 7].map((n) => ({ startDate: decaler(startDate, n), endDate: decaler(endDate, n) }));
+  }
+  if (VUES_JOUR.includes(vue)) {
+    return [-1, 1].map((sens) => {
+      const jour = jourOuvreVoisin(startDate, sens);
+      return { startDate: jour, endDate: decaler(jour, 1) };
+    });
+  }
+  return [];
+}

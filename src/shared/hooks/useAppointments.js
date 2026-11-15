@@ -22,6 +22,7 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { construireReglages } from '@/lib/tournee/reglages.js';
 import { poseProvisoire } from '@/lib/installOrder';
 import { useLeadCommercials } from '@hooks/useLeads';
+import { planningQueries, dependancesDesRdv } from '@hooks/planningQueries';
 import {
   buildPersonColorMaps, buildTeamList, expandAppointmentBlocks, estAdaptable, fenetreDe,
   matchesKindFilter, matchesMemberFilter,
@@ -71,85 +72,29 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     error,
     refetch,
   } = useQuery({
-    queryKey: appointmentKeys.list(orgId, { startDate, endDate }, { appointmentType: filters.appointmentType, status: filters.status }),
-    queryFn: () =>
-      appointmentsService.getAppointments({
-        coreOrgId: orgId,
-        startDate,
-        endDate,
-        appointmentType: filters.appointmentType,
-        status: filters.status,
-      }),
+    ...planningQueries.list(orgId, startDate, endDate, { appointmentType: filters.appointmentType, status: filters.status }),
     enabled: !!orgId && !!startDate && !!endDate,
-    staleTime: 15_000,
     select: (result) => result?.data || [],
   });
 
-  // Récupérer les liens technicien ↔ RDV (pour filtrage multi-membres)
-  const appointmentIds = useMemo(() => (appointments || []).map(a => a.id), [appointments]);
+  // Requêtes qui dépendent des RDV chargés, mergées en mémoire (la vue appointments
+  // reste un miroir simple) : liens technicien ↔ RDV, appros des chantiers des
+  // installations (pose provisoire hachurée, installOrder.poseProvisoire), leads des
+  // visites techniques dont le devis est fait (liseré noir). Définitions :
+  // planningQueries — les mêmes que le préchargement des semaines voisines.
+  const { appointmentIds, chantierIds, vtLeadIds } = useMemo(() => dependancesDesRdv(appointments), [appointments]);
 
-  const { data: techLinks } = useQuery({
-    queryKey: appointmentKeys.technicians(orgId, appointmentIds),
-    queryFn: async () => {
-      if (appointmentIds.length === 0) return [];
-      const { data } = await supabase
-        .from('majordhome_appointment_technicians')
-        .select('appointment_id, technician_id')
-        .in('appointment_id', appointmentIds);
-      return data || [];
-    },
+  const { data: techLinks, isLoading: isLoadingTechnicians } = useQuery({
+    ...planningQueries.technicians(orgId, appointmentIds),
     enabled: appointmentIds.length > 0,
-    staleTime: 15_000,
   });
-
-  // Appros des chantiers des RDV d'installation (2ᵉ requête mergée en mémoire, comme les
-  // techniciens — la vue appointments reste un miroir simple). Sert à hachurer une pose
-  // provisoire : appros non reçues (installOrder.poseProvisoire).
-  const chantierIds = useMemo(
-    () => Array.from(new Set((appointments || [])
-      .filter((a) => a.appointment_type === 'installation' && a.chantier_id)
-      .map((a) => a.chantier_id))).sort(),
-    [appointments]
-  );
   const { data: chantierOrders } = useQuery({
-    queryKey: appointmentKeys.chantierOrders(orgId, chantierIds),
-    queryFn: async () => {
-      if (chantierIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from('majordhome_chantiers')
-        .select('id, chantier_status, equipment_order_status, materials_order_status')
-        .eq('org_id', orgId)
-        .in('id', chantierIds);
-      if (error) throw error;
-      return data || [];
-    },
+    ...planningQueries.chantierOrders(orgId, chantierIds),
     enabled: !!orgId && chantierIds.length > 0,
-    staleTime: 15_000,
   });
-
-  // Leads des visites techniques ayant un devis Pennylane rattaché (2ᵉ requête mergée en
-  // mémoire, même pattern) : le bloc VT est encadré de noir dès que le devis est fait.
-  const vtLeadIds = useMemo(
-    () => Array.from(new Set((appointments || [])
-      .filter((a) => a.appointment_type === 'rdv_technical' && a.lead_id)
-      .map((a) => a.lead_id))).sort(),
-    [appointments]
-  );
   const { data: quotedLeadIds } = useQuery({
-    queryKey: appointmentKeys.quotedLeads(orgId, vtLeadIds),
-    queryFn: async () => {
-      if (vtLeadIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from('majordhome_lead_pennylane_quotes')
-        .select('lead_id')
-        .eq('org_id', orgId)
-        .is('ejected_at', null)
-        .in('lead_id', vtLeadIds);
-      if (error) throw error;
-      return Array.from(new Set((data || []).map((r) => r.lead_id)));
-    },
+    ...planningQueries.quotedLeads(orgId, vtLeadIds),
     enabled: !!orgId && vtLeadIds.length > 0,
-    staleTime: 15_000,
   });
 
   // Membres + commerciaux (caches partagés avec Planning) → maps couleur + teamList unifié.
@@ -332,6 +277,9 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     appointments: enriched,
     events,
     isLoading,
+    // Liens technicien ↔ RDV en cours de chargement : `technician_ids` est encore vide,
+    // personne ne peut être dit « sans intervention » (lignes de charge du Planning).
+    isLoadingTechnicians,
     error,
 
     // Filtres

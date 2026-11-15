@@ -73,6 +73,9 @@ export function joursDeLaPlage(debut, finExclue) {
  *   RDV de la plage
  * @param {boolean} [p.rdvsPartiels]  vrai quand ces RDV sont restreints par un filtre de type ou de statut :
  *   on ne peut alors pas dire qu'une journée est vide — ni ligne « Vide » déduite, ni « 0 € »
+ * @param {boolean} [p.rdvsEnChargement]  vrai tant que les RDV de la plage OU leurs techniciens ne sont pas chargés :
+ *   chaque technicien au travail garde une ligne « en attente » (son nom seul), pour que l'en-tête ne change pas de
+ *   hauteur quand la réponse arrive — et jamais un « Vide · 0 € » affiché le temps d'une requête
  * @param {string|null} [p.debut]      plage affichée, `YYYY-MM-DD`
  * @param {string|null} [p.finExclue]
  * @param {Set<string>|null} [p.filtreIds]  personnes affichées (filtre équipe) ; null = toute l'équipe
@@ -81,6 +84,7 @@ export function joursDeLaPlage(debut, finExclue) {
  */
 export function lignesDeCharge({
   etatsMoteur = new Map(), moteurEnChargement = false, membres = [], rdvs = [], rdvsPartiels = false,
+  rdvsEnChargement = false,
   debut = null, finExclue = null, filtreIds = null, aujourdhui = new Date().toLocaleDateString('fr-CA'),
 } = {}) {
   const lignes = new Map();
@@ -115,7 +119,7 @@ export function lignesDeCharge({
     // le moteur le sait avant que les RDV de la plage soient chargés.)
     const aucune = interventions.length === 0;
     if (enConges || (moteur?.enConges && aucune)) continue;
-    const sansIntervention = aucune && !rdvsPartiels;
+    const sansIntervention = aucune && !rdvsPartiels && !rdvsEnChargement;
 
     if (moteur) {
       lignes.set(cle, {
@@ -141,10 +145,16 @@ export function lignesDeCharge({
       sansIntervention,
     };
 
+    // Ligne « en attente » : la place du technicien est tenue (son nom, sans état ni
+    // chiffre) tant qu'une réponse manque — verdict du moteur, RDV ou leurs techniciens.
+    const auTravail = membre.role === 'technician' && !!memberWorkingHoursForDate(membre, date);
+    const tenirLaPlace = () => {
+      if (auTravail) lignes.set(cle, { ...base, sansIntervention: false, etat: 'attente', nbRdvs: 0, etiquette: null, lieu: null });
+    };
+
     if (!aucune) {
-      // Jour à venir d'une personne que le moteur planifie : on attend son verdict
-      // (pas de ligne provisoire qui clignoterait pendant le chargement).
-      if (moteurAttendu && moteurEnChargement) continue;
+      // Jour à venir d'une personne que le moteur planifie : on attend son verdict.
+      if (moteurAttendu && moteurEnChargement) { tenirLaPlace(); continue; }
       lignes.set(cle, {
         ...base,
         etat: horsTournees ? 'manuelle' : 'sans_etat',
@@ -159,8 +169,8 @@ export function lignesDeCharge({
     // Aucune intervention : ligne « Vide » pour un technicien qui travaille ce
     // jour-là. Le moteur dit lui-même « Vide » pour les jours à venir des
     // techniciens qu'il planifie ; ici, les jours passés et les techniciens hors tournées.
-    if (rdvsPartiels || membre.role !== 'technician' || moteurAttendu) continue;
-    if (!memberWorkingHoursForDate(membre, date)) continue;
+    if (rdvsEnChargement || (moteurAttendu && moteurEnChargement)) { tenirLaPlace(); continue; }
+    if (rdvsPartiels || moteurAttendu || !auTravail) continue;
     lignes.set(cle, { ...base, etat: 'vide', horsMoteur: true, nbRdvs: 0, etiquette: null, lieu: null });
   }
   return lignes;

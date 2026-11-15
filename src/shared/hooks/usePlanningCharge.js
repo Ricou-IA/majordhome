@@ -31,10 +31,11 @@ const AUCUNE_LIGNE = new Map();
  * @param {Array<{ profileKey: string, recordIds: string[] }>} p.teamList
  * @param {string[]} [p.memberProfileKeys]  filtre équipe du calendrier
  * @param {boolean} [p.rdvsPartiels]  vrai si `appointments` est restreint par un filtre de type ou de statut
+ * @param {boolean} [p.rdvsEnChargement]  vrai tant que les RDV ou leurs techniciens ne sont pas chargés
  * @param {boolean} p.voitCharge  faux ⇒ ni lignes ni chiffre (pilotage réservé à l'admin et au team leader)
  */
 export function usePlanningCharge({
-  orgId, startDate, endDate, periode, appointments, members, teamList, memberProfileKeys, rdvsPartiels = false, voitCharge,
+  orgId, startDate, endDate, periode, appointments, members, teamList, memberProfileKeys, rdvsPartiels = false, rdvsEnChargement = false, voitCharge,
 }) {
   // Ids (team_members / commercials) des personnes filtrées ; null = toute l'équipe.
   const recordIdsFiltres = useMemo(() => {
@@ -58,11 +59,12 @@ export function usePlanningCharge({
       membres: members,
       rdvs: appointments,
       rdvsPartiels,
+      rdvsEnChargement,
       debut: startDate,
       finExclue: endDate,
       filtreIds: recordIdsFiltres,
     });
-  }, [voitCharge, etatsJournees, etatsLoading, members, appointments, rdvsPartiels, startDate, endDate, recordIdsFiltres]);
+  }, [voitCharge, etatsJournees, etatsLoading, members, appointments, rdvsPartiels, rdvsEnChargement, startDate, endDate, recordIdsFiltres]);
 
   // CA HT programmé : total du jour et part par technicien. `null` tant que le
   // chiffre est inconnu — on n'affiche alors rien, jamais 0.

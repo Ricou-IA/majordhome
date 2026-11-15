@@ -107,10 +107,10 @@ test('lignesDeCharge : jours à venir = verdict du moteur, congés masqués', ()
   assert.equal(lignes.get('2026-11-17|moh').etat, 'vide');
 });
 
-test('lignesDeCharge : moteur en chargement, pas de ligne provisoire pour ses techniciens', () => {
+test('lignesDeCharge : moteur en chargement, jamais de verdict provisoire pour ses techniciens', () => {
   const futur = { ...base, debut: '2026-11-16', finExclue: '2026-11-17', moteurEnChargement: true };
   const lignes = lignesDeCharge({ ...futur, rdvs: [rdv('2026-11-16', 'maintenance', ['ant'])] });
-  assert.equal(lignes.has('2026-11-16|ant'), false);
+  assert.equal(lignes.get('2026-11-16|ant').etat, 'attente');
   // Le moteur ne juge jamais le technicien hors tournées : sa ligne n'attend pas.
   assert.equal(lignes.get('2026-11-16|moh').etat, 'vide');
 });
@@ -157,4 +157,26 @@ test('sortJourneeDemandee : attendre, erreur, ou journée absente de l’horizon
   // Lien direct vers une date que la plage affichée ne couvre pas encore.
   assert.equal(sortJourneeDemandee({ ...connu, finPlage: '2026-11-16' }), 'attendre');
   assert.equal(sortJourneeDemandee(connu), 'absente');
+});
+
+test('lignesDeCharge : RDV ou techniciens en chargement, la place de chaque technicien est tenue', () => {
+  // Semaine passée, RDV chargés mais pas encore leurs techniciens : personne n'est dit « Vide ».
+  const lignes = lignesDeCharge({ ...base, rdvsEnChargement: true, rdvs: [rdv('2026-11-10', 'installation', [])] });
+  const moh = lignes.get('2026-11-10|moh');
+  assert.equal(moh.etat, 'attente');
+  assert.equal(moh.sansIntervention, false);
+  assert.equal(lignes.get('2026-11-10|ant').etat, 'attente');
+  // Même nombre de lignes qu'une fois chargé (10) : l'en-tête ne change pas de hauteur.
+  assert.equal(lignes.size, 10);
+  assert.equal([...lignes.keys()].some((k) => k.endsWith('|eri')), false);
+});
+
+test('lignesDeCharge : moteur en chargement, ses techniciens gardent leur ligne en attente', () => {
+  const futur = { ...base, debut: '2026-11-16', finExclue: '2026-11-18', moteurEnChargement: true };
+  const lignes = lignesDeCharge({ ...futur, rdvs: [rdv('2026-11-16', 'maintenance', ['ant'])] });
+  assert.equal(lignes.get('2026-11-16|ant').etat, 'attente');
+  assert.equal(lignes.get('2026-11-17|ant').etat, 'attente');
+  // Moteur chargé sans journée pour lui (jour non travaillé selon le moteur) : pas de ligne.
+  const charge = lignesDeCharge({ ...futur, moteurEnChargement: false, rdvs: [] });
+  assert.equal(charge.has('2026-11-17|ant'), false);
 });
