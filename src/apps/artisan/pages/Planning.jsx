@@ -128,7 +128,7 @@ export default function Planning() {
   // planningCa.js). `orgId` du Planning = org CORE, attendue par le moteur de tournées.
   const {
     recordIdsFiltres, etatsJournees, journeesHorizon, etatsLoading, etatsError,
-    lignes: lignesCharge, ca: caPlanning, caError, caCumul,
+    lignes: lignesCharge, lignesReservees, ca: caPlanning, caError, caCumul,
   } = usePlanningCharge({
     orgId,
     startDate: dateRange.startDate,
@@ -174,13 +174,14 @@ export default function Planning() {
         texte={arg.text}
         date={arg.date.toLocaleDateString('fr-CA')}
         lignes={lignesCharge}
+        reserve={lignesReservees}
         ca={caPlanning}
         caError={caError}
         filtreEquipe={!!recordIdsFiltres}
         onOpen={ouvrirJournee}
       />
     );
-  }, [voitCharge, lignesCharge, ouvrirJournee, caPlanning, caError, recordIdsFiltres]);
+  }, [voitCharge, lignesCharge, lignesReservees, ouvrirJournee, caPlanning, caError, recordIdsFiltres]);
 
   // Impression pour UNE personne : feuille de route en vue Jour, planning de la
   // semaine en vue Semaine (usePlanningImpression).

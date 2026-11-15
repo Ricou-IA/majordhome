@@ -86,16 +86,19 @@ function titre(item) {
  * sans intervention affiche « 0 € » : c'est l'indicateur d'un planning à
  * remplir — seulement quand le chiffre est connu, jamais un 0 par défaut.
  *
- * @param {{ date: string, etats: Map<string, object>, onOpen?: (item: object) => void, caParTechnicien?: Map<string, number>|null }} props
+ * @param {{ date: string, etats: Map<string, object>, reserve?: number, onOpen?: (item: object) => void, caParTechnicien?: Map<string, number>|null }} props
  *   `date` ISO `YYYY-MM-DD` ; `etats` = Map de useEtatsJournees ;
  *   `caParTechnicien` = `parTechnicienJour` de planningCa (clé `${date}|${technicienId}`),
  *   null tant que le chiffre est inconnu — rien n'est alors affiché.
+ *   `reserve` = nombre de lignes dont la hauteur est tenue même si ce jour en a moins (lignes
+ *   invisibles) : l'en-tête ne se vide pas le temps que les lignes d'une nouvelle semaine arrivent.
  */
-export function JourneeEtatChips({ date, etats, onOpen, caParTechnicien = null }) {
+export function JourneeEtatChips({ date, etats, reserve = 0, onOpen, caParTechnicien = null }) {
   const items = [...etats.values()]
     .filter((i) => i.date === date)
     .sort((a, b) => String(a.technicienNom || '').localeCompare(String(b.technicienNom || ''), 'fr'));
-  if (items.length === 0) return null;
+  const vides = Math.max(0, reserve - items.length);
+  if (items.length === 0 && vides === 0) return null;
   return (
     <div className="mt-1 flex w-full flex-col gap-0.5">
       {items.map((item) => {
@@ -122,6 +125,10 @@ export function JourneeEtatChips({ date, etats, onOpen, caParTechnicien = null }
           </button>
         );
       })}
+      {Array.from({ length: vides }, (_, i) => (
+        // Même gabarit qu'une ligne, invisible : seule sa hauteur compte.
+        <div key={`reserve-${i}`} aria-hidden="true" className="invisible rounded border px-1.5 py-0.5 text-[10px] leading-tight">&nbsp;</div>
+      ))}
     </div>
   );
 }

@@ -15,12 +15,13 @@ import { JourneeEtatChips } from './JourneeEtatChips';
  * @param {string} props.texte  libellé du jour (FullCalendar)
  * @param {string} props.date   ISO `YYYY-MM-DD`
  * @param {Map<string, object>} props.lignes  lignes de charge (usePlanningCharge)
+ * @param {number} [props.reserve]  nombre de lignes dont la hauteur est réservée (usePlanningCharge.lignesReservees)
  * @param {object|null} props.ca       CA programmé (caProgramme) ; null = inconnu
  * @param {Error|null} props.caError
  * @param {boolean} props.filtreEquipe  vrai si le chiffre est la part des personnes affichées
  * @param {(item: object) => void} props.onOpen
  */
-export function PlanningDayHeader({ texte, date, lignes, ca, caError, filtreEquipe, onOpen }) {
+export function PlanningDayHeader({ texte, date, lignes, reserve = 0, ca, caError, filtreEquipe, onOpen }) {
   const total = ca?.parJour.get(date) || 0;
   const sansMontant = ca?.sansMontantParJour.get(date) || 0;
   return (
@@ -48,6 +49,7 @@ export function PlanningDayHeader({ texte, date, lignes, ca, caError, filtreEqui
       <JourneeEtatChips
         date={date}
         etats={lignes}
+        reserve={reserve}
         onOpen={onOpen}
         caParTechnicien={ca?.parTechnicienJour || null}
       />

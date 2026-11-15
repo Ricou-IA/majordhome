@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  chargeDuJour, joursDeLaPlage, lignesDeCharge, panneauDeLigne, sortJourneeDemandee,
+  chargeDuJour, joursDeLaPlage, lignesDeCharge, lignesMaxParJour, panneauDeLigne, sortJourneeDemandee,
 } from '../src/lib/planningCharge.js';
 
 const SEMAINE = { monday: { active: true, start: '08:00', end: '17:00' }, tuesday: { active: true, start: '08:00', end: '17:00' },
@@ -179,4 +179,14 @@ test('lignesDeCharge : moteur en chargement, ses techniciens gardent leur ligne 
   // Moteur chargé sans journée pour lui (jour non travaillé selon le moteur) : pas de ligne.
   const charge = lignesDeCharge({ ...futur, moteurEnChargement: false, rdvs: [] });
   assert.equal(charge.has('2026-11-17|ant'), false);
+});
+
+test('lignesMaxParJour : hauteur d’en-tête à réserver', () => {
+  const lignes = new Map([
+    ['2026-11-09|ant', { date: '2026-11-09' }], ['2026-11-09|moh', { date: '2026-11-09' }], ['2026-11-09|lud', { date: '2026-11-09' }],
+    ['2026-11-10|ant', { date: '2026-11-10' }],
+  ]);
+  assert.equal(lignesMaxParJour(lignes), 3);
+  assert.equal(lignesMaxParJour(new Map()), 0);
+  assert.equal(lignesMaxParJour(null), 0);
 });

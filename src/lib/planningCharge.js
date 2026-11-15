@@ -177,6 +177,20 @@ export function lignesDeCharge({
 }
 
 /**
+ * Plus grand nombre de lignes de charge portées par un même jour. L'en-tête du
+ * calendrier réserve cette hauteur : au changement de semaine, les nouveaux jours
+ * sont dessinés une fraction de seconde avant leurs lignes — sans réserve, l'en-tête
+ * se vide et toute la grille remonte puis redescend (90 px mesurés le 2026-11-15).
+ * @param {Map<string, { date: string }>|null|undefined} lignes
+ * @returns {number}
+ */
+export function lignesMaxParJour(lignes) {
+  const parJour = new Map();
+  for (const ligne of lignes?.values() || []) parJour.set(ligne.date, (parJour.get(ligne.date) || 0) + 1);
+  return Math.max(0, ...parJour.values());
+}
+
+/**
  * Panneau qu'ouvre le clic sur une ligne de charge : la feuille de route seule pour
  * une journée d'interventions que le moteur ne juge pas (technicien hors tournées,
  * jour passé), le panneau de remplissage sinon.
