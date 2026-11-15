@@ -16,6 +16,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
+import { normaliserSecteur } from '@/lib/tournee/secteurs';
 import { googleCalendarService } from '@services/googleCalendar.service';
 import { leadsService } from '@services/leads.service';
 import { releaseOrphanEntretienCard } from '@services/entretiens.service';import { logger } from '@lib/logger';
@@ -482,7 +483,8 @@ export const appointmentsService = {
           org_id: orgId,
           ...appointmentData,
           created_by: createdBy,
-          grand_secteur: grandSecteur,
+          // Une seule écriture par secteur, quel que soit l'appelant (« ALBI » = « Albi »).
+          grand_secteur: grandSecteur ? normaliserSecteur(grandSecteur) : null,
         })
         .select()
         .single();

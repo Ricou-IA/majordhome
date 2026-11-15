@@ -13,6 +13,19 @@ test('normaliserSecteur : casse et espaces', () => {
   assert.equal(normaliserSecteur(null), '');
 });
 
+// Écritures relevées en base le 2026-11-15 : la migration 20261115_2 applique la même
+// règle en SQL, vérifiée valeur par valeur contre ces résultats.
+test('normaliserSecteur : une seule écriture pour les secteurs réels', () => {
+  const paires = [
+    ['ALBI', 'Albi'], ['Albi', 'Albi'], ['GRAULHET', 'Graulhet'], ['Lavaur', 'Lavaur'], ['LAVAUR', 'Lavaur'],
+    ["L'UNION", "L'Union"], ['CORDES SUR CIEL', 'Cordes Sur Ciel'], ['LABASTIDE ROUAIROUX', 'Labastide Rouairoux'],
+    ['MONCLAR DE QUERCY', 'Monclar De Quercy'], ['VILLEMUR SUR TARN', 'Villemur Sur Tarn'], ['NEGREPELISSE', 'Negrepelisse'],
+  ];
+  for (const [brut, attendu] of paires) assert.equal(normaliserSecteur(brut), attendu);
+  // Déjà à la bonne écriture : inchangé (la règle se rejoue sans effet).
+  for (const [, attendu] of paires) assert.equal(normaliserSecteur(attendu), attendu);
+});
+
 const contrat = (id, clientId, cp, city, lat, lng, status = null) => ({
   id, client_id: clientId, client_postal_code: cp, client_city: city, client_latitude: lat, client_longitude: lng, current_year_visit_status: status,
 });

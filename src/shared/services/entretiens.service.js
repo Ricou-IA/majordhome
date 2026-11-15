@@ -22,6 +22,7 @@ import { logger } from '@/lib/logger';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.service';
 import { clusterSectorsByProximity } from '@/lib/sectorClustering';
+import { normaliserSecteur } from '@/lib/tournee/secteurs';
 import { fetchCityPopulations } from '@/lib/communePopulation';
 import { statutVisiteAnnee, compterVisitesAnnee } from '@/lib/entretienVisitStatus';
 
@@ -599,9 +600,13 @@ export const entretiensService = {
         orgId,
       );
       const groups = clusterSectorsByProximity(sortedSectors, { radiusKm: 15, cityPopulation });
+      // Une seule écriture par secteur : le nom vient d'une ville saisie sur une fiche
+      // client (« ALBI » ou « Albi » selon la fiche). Même règle que le moteur côté
+      // serveur (secteursDepuisContrats) — c'est ce nom qui est figé sur les RDV.
       const cpToGroup = new Map();
       groups.forEach((g, idx) => {
-        for (const cp of g.codePostals) cpToGroup.set(cp, { id: g.id, name: g.name, order: idx });
+        const name = g.name === 'Non localisé' ? g.name : normaliserSecteur(g.name);
+        for (const cp of g.codePostals) cpToGroup.set(cp, { id: g.id, name, order: idx });
       });
       for (const sector of sortedSectors) {
         const g = cpToGroup.get(sector.codePostal) || {
