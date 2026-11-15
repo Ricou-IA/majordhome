@@ -112,42 +112,14 @@ export async function chargerJournees({
   if (mErr) return { data: [], techniciens: [], error: mErr };
   if (rErr) return { data: [], techniciens: [], error: rErr };
 
-  // Compétences cochées (type × rôle). Un membre sans ligne = rien coché =
-  // jamais proposé : on ne devine pas, la grille Settings → Équipe fait foi.
+  // Deuxième vague — tout ce qui ne dépend que des techniciens et des RDV part EN
+  // MÊME TEMPS : compétences, exceptions du jour, coordonnées (clients, leads),
+  // barème des entretiens, liens technicien ↔ RDV. En cascade, l'horizon coûtait
+  // neuf allers-retours avant l'état des journées (≈ 1,5 s à l'ouverture du
+  // Planning, mesuré le 2026-11-15) ; il en reste quatre. Les erreurs sont lues
+  // dans l'ordre d'avant : la première rencontrée est celle qui remonte.
   const membreIds = (membres || []).map((m) => m.id);
-  const { data: skills, error: sErr } = membreIds.length
-    ? await client.from('majordhome_team_member_skills')
-        .select('team_member_id, equipment_type_id, role').in('team_member_id', membreIds)
-    : { data: [], error: null };
-  if (sErr) return { data: [], techniciens: [], error: sErr };
-  const competencesPar = new Map(membreIds.map((id) => [id, competencesVides()]));
-  for (const s of skills || []) {
-    if (!SKILL_ROLES.includes(s.role)) continue;
-    competencesPar.get(s.team_member_id)?.[s.role].push(s.equipment_type_id);
-  }
-
-  // Exceptions du jour (« Départ / Retour : Agence ») posées depuis la feuille de
-  // route. Aucune ligne = la journée suit le réglage du technicien.
-  const { data: exceptions, error: exErr } = membreIds.length
-    ? await client.from('majordhome_team_member_day_endpoints')
-        .select('team_member_id, date, depart, retour')
-        .eq('org_id', orgId).gte('date', iso(debut)).lte('date', iso(fin))
-    : { data: [], error: null };
-  if (exErr) return { data: [], techniciens: [], error: exErr };
-  const exceptionPar = new Map((exceptions || []).map((e) => [`${e.team_member_id}|${e.date}`, e]));
-
-  // Amendement 1 — les RDV existants DOIVENT porter leurs coordonnées :
-  // sans elles, `arretsExistants` (proposerPourJournee) est TOUJOURS vide
-  // et les candidats sont classés par distance au DÉPÔT au lieu de
-  // distance à la TOURNÉE — le défaut central que ce module corrige.
   const clientIds = [...new Set((rdvs || []).map((r) => r.client_id).filter(Boolean))];
-  const { data: clientsCoord, error: ccErr } = clientIds.length
-    ? await client.from('majordhome_clients')
-        .select('id, latitude, longitude').eq('org_id', coreOrgId).in('id', clientIds)
-    : { data: [], error: null };
-  if (ccErr) return { data: [], techniciens: [], error: ccErr };
-  const coordByClientId = new Map((clientsCoord || []).map((c) => [c.id, c]));
-
   // Tous les RDV n'ont pas de client : une installation est rattachee a un
   // LEAD (10 RDV sur 30 jours en prod, dont l'installation HACK du 04/09).
   // On tente donc aussi le lead. Note : en pratique ces leads ne sont pas
@@ -155,11 +127,62 @@ export async function chargerJournees({
   // au moment ou le depot est connu.
   const leadIds = [...new Set((rdvs || [])
     .filter((r) => !r.client_id && r.lead_id).map((r) => r.lead_id))];
-  const { data: leadsCoord, error: lcErr } = leadIds.length
-    ? await client.from('majordhome_leads')
-        .select('id, latitude, longitude').eq('org_id', coreOrgId).in('id', leadIds)
-    : { data: [], error: null };
+  const rdvIds = (rdvs || []).map((r) => r.id);
+  const vide = { data: [], error: null };
+  const [
+    { data: skills, error: sErr },
+    { data: exceptions, error: exErr },
+    { data: clientsCoord, error: ccErr },
+    { data: leadsCoord, error: lcErr },
+    { data: baremes, error: bErr },
+    { data: liens, error: liensErr },
+  ] = await Promise.all([
+    // Compétences cochées (type × rôle). Un membre sans ligne = rien coché =
+    // jamais proposé : on ne devine pas, la grille Settings → Équipe fait foi.
+    membreIds.length
+      ? client.from('majordhome_team_member_skills')
+          .select('team_member_id, equipment_type_id, role').in('team_member_id', membreIds)
+      : vide,
+    // Exceptions du jour (« Départ / Retour : Agence ») posées depuis la feuille de
+    // route. Aucune ligne = la journée suit le réglage du technicien.
+    membreIds.length
+      ? client.from('majordhome_team_member_day_endpoints')
+          .select('team_member_id, date, depart, retour')
+          .eq('org_id', orgId).gte('date', iso(debut)).lte('date', iso(fin))
+      : vide,
+    // Amendement 1 — les RDV existants DOIVENT porter leurs coordonnées :
+    // sans elles, `arretsExistants` (proposerPourJournee) est TOUJOURS vide
+    // et les candidats sont classés par distance au DÉPÔT au lieu de
+    // distance à la TOURNÉE — le défaut central que ce module corrige.
+    clientIds.length
+      ? client.from('majordhome_clients')
+          .select('id, latitude, longitude').eq('org_id', coreOrgId).in('id', clientIds)
+      : vide,
+    leadIds.length
+      ? client.from('majordhome_leads')
+          .select('id, latitude, longitude').eq('org_id', coreOrgId).in('id', leadIds)
+      : vide,
+    // R1 — le temps de travail d'un Entretien est celui du barème, pas du bloc.
+    chargerDureesBareme({ client, coreOrgId, rdvs: rdvs || [], reglages }),
+    rdvIds.length
+      ? client.from('majordhome_appointment_technicians')
+          .select('appointment_id, technician_id').in('appointment_id', rdvIds)
+      : vide,
+  ]);
+  if (sErr) return { data: [], techniciens: [], error: sErr };
+  if (exErr) return { data: [], techniciens: [], error: exErr };
+  if (ccErr) return { data: [], techniciens: [], error: ccErr };
   if (lcErr) return { data: [], techniciens: [], error: lcErr };
+  if (bErr) return { data: [], techniciens: [], error: bErr };
+  if (liensErr) return { data: [], techniciens: [], error: liensErr };
+
+  const competencesPar = new Map(membreIds.map((id) => [id, competencesVides()]));
+  for (const s of skills || []) {
+    if (!SKILL_ROLES.includes(s.role)) continue;
+    competencesPar.get(s.team_member_id)?.[s.role].push(s.equipment_type_id);
+  }
+  const exceptionPar = new Map((exceptions || []).map((e) => [`${e.team_member_id}|${e.date}`, e]));
+  const coordByClientId = new Map((clientsCoord || []).map((c) => [c.id, c]));
   const coordByLeadId = new Map((leadsCoord || []).map((l) => [l.id, l]));
   // Un RDV sans coordonnee (ni client ni lead geocode) garde lat/lng null ici :
   // le fallback siege est applique dans proposerPourJournee, seul endroit ou le
@@ -168,9 +191,6 @@ export async function chargerJournees({
   // Un RDV sans coordonnée reste compté dans chargeMinutes (le technicien y
   // passe du temps) mais sera exclu de arretsExistants côté proposerPourJournee
   // (r.lat/r.lng null) : il ne peut pas participer au séquencement géographique.
-  // R1 — le temps de travail d'un Entretien est celui du barème, pas du bloc.
-  const { data: baremes, error: bErr } = await chargerDureesBareme({ client, coreOrgId, rdvs: rdvs || [], reglages });
-  if (bErr) return { data: [], techniciens: [], error: bErr };
   const rdvsAvecCoords = (rdvs || []).map((r) => {
     const co = (r.client_id ? coordByClientId.get(r.client_id) : null)
       || (r.lead_id ? coordByLeadId.get(r.lead_id) : null);
@@ -183,12 +203,6 @@ export async function chargerJournees({
     };
   });
 
-  const ids = rdvsAvecCoords.map((r) => r.id);
-  const { data: liens, error: liensErr } = ids.length
-    ? await client.from('majordhome_appointment_technicians')
-        .select('appointment_id, technician_id').in('appointment_id', ids)
-    : { data: [], error: null };
-  if (liensErr) return { data: [], techniciens: [], error: liensErr };
   const techsParRdv = new Map();
   for (const l of liens || []) {
     if (!techsParRdv.has(l.appointment_id)) techsParRdv.set(l.appointment_id, []);
@@ -256,18 +270,19 @@ async function chargerDureesBareme({ client, coreOrgId, rdvs, reglages = null })
   const entretiens = (rdvs || []).filter((r) => r.appointment_type === 'maintenance' && r.intervention_id);
   if (entretiens.length === 0) return { data, error: null };
   const interventionIds = [...new Set(entretiens.map((r) => r.intervention_id))];
-  const { data: interventions, error: iErr } = await client
-    .from('majordhome_interventions').select('id, contract_id').in('id', interventionIds);
-  if (iErr) return { data, error: iErr };
-  const contratParIntervention = new Map((interventions || []).filter((i) => i.contract_id).map((i) => [i.id, i.contract_id]));
-  const contractIds = [...new Set([...contratParIntervention.values()])];
-  if (contractIds.length === 0) return { data, error: null };
-  const [{ data: liens, error: lErr }, { data: types, error: tErr }] = await Promise.all([
-    client.from('majordhome_contract_equipments').select('contract_id, equipment_id').in('contract_id', contractIds),
+  // Les types (référentiel de l'org) ne dépendent de rien : ils partent avec les interventions.
+  const [{ data: interventions, error: iErr }, { data: types, error: tErr }] = await Promise.all([
+    client.from('majordhome_interventions').select('id, contract_id').in('id', interventionIds),
     client.from('majordhome_pricing_equipment_types')
       .select('id, code, category_id, duration_base_minutes, duration_per_extra_unit_minutes, included_units')
       .eq('org_id', coreOrgId),
   ]);
+  if (iErr) return { data, error: iErr };
+  const contratParIntervention = new Map((interventions || []).filter((i) => i.contract_id).map((i) => [i.id, i.contract_id]));
+  const contractIds = [...new Set([...contratParIntervention.values()])];
+  if (contractIds.length === 0) return { data, error: null };
+  const { data: liens, error: lErr } = await client
+    .from('majordhome_contract_equipments').select('contract_id, equipment_id').in('contract_id', contractIds);
   if (lErr) return { data, error: lErr };
   if (tErr) return { data, error: tErr };
   const equipIds = [...new Set((liens || []).map((l) => l.equipment_id))];
