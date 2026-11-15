@@ -5,7 +5,22 @@ import {
   buildTeamList, matchesKindFilter, matchesMemberFilter, expandAppointmentBlocks,
   optionsEntonnoir, purgerFiltres,
   resolveCommercialMemberId, INVOICED_EVENT_COLOR, FALLBACK_PERSON_COLOR, dureeImposee, VT_DURATION_MINUTES, villesDeJournee,
+  chargeDuJour,
 } from '../src/lib/planningEvents.js';
+
+test('chargeDuJour : seules les interventions comptent dans la charge', () => {
+  const rdv = (type) => ({ appointment_type: type });
+  // Un RDV « Autre » ou commercial n'ouvre pas de ligne (Eric, jeudi 12 novembre).
+  assert.deepEqual(chargeDuJour([rdv('other')]), { interventions: [], enConges: false });
+  assert.deepEqual(chargeDuJour([rdv('rdv_technical'), rdv('rdv_closing')]), { interventions: [], enConges: false });
+  const mixte = chargeDuJour([rdv('other'), rdv('installation'), rdv('service'), rdv('maintenance')]);
+  assert.deepEqual(mixte.interventions.map((r) => r.appointment_type), ['installation', 'service', 'maintenance']);
+  // Congé : dit seulement s'il n'y a aucune intervention ce jour-là.
+  assert.equal(chargeDuJour([rdv('leave')]).enConges, true);
+  assert.equal(chargeDuJour([rdv('leave'), rdv('other')]).enConges, true);
+  assert.equal(chargeDuJour([rdv('leave'), rdv('service')]).enConges, false);
+  assert.deepEqual(chargeDuJour(null), { interventions: [], enConges: false });
+});
 
 // Fixtures inspirées des vraies données Mayer (Philippe = tech + commercial).
 const members = [

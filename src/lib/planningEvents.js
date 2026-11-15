@@ -46,6 +46,22 @@ export function appointmentKind(appointmentType) {
 }
 
 /**
+ * Ce qui compte dans la charge d'une personne un jour donné : ses interventions
+ * (installation, entretien, SAV). Un RDV « Autre » ou commercial n'ouvre pas de
+ * ligne de charge (Eric, 2026-11-15) ; sans intervention, un congé reste dit.
+ * @param {Array<{ appointment_type?: string }>|null} [rdvs]
+ * @returns {{ interventions: Array<object>, enConges: boolean }}
+ */
+export function chargeDuJour(rdvs) {
+  const liste = rdvs || [];
+  const interventions = liste.filter((r) => appointmentKind(r?.appointment_type) === 'intervention');
+  return {
+    interventions,
+    enConges: interventions.length === 0 && liste.some((r) => r?.appointment_type === 'leave'),
+  };
+}
+
+/**
  * Maps de résolution couleur.
  * @param {Object} p
  * @param {Array}  p.members     team_members [{ id, user_id, calendar_color }]

@@ -37,7 +37,7 @@ import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
 import { useEtatsJournees } from '@hooks/useTournees';
 import { usePlanningCa } from '@hooks/usePlanningCa';
 import { formatCa, cumulPeriode } from '@/lib/planningCa';
-import { villesDeJournee, optionsEntonnoir, purgerFiltres } from '@/lib/planningEvents';
+import { villesDeJournee, optionsEntonnoir, purgerFiltres, chargeDuJour } from '@/lib/planningEvents';
 import { deduireSecteur } from '@/lib/tournee/etat.js';
 import { useClientEquipmentLabels } from '@hooks/useClients';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -575,11 +575,13 @@ export default function Planning() {
       }
     }
     for (const [cle, parId] of rdvsParCle) {
-      const rdvs = [...parId.values()];
+      // La charge ne lit que les interventions : un RDV « Autre » ou commercial
+      // n'ouvre pas de ligne et ne dit pas où la personne travaille.
+      const { interventions, enConges } = chargeDuJour([...parId.values()]);
       const existant = map.get(cle);
       if (existant) {
         // Journée du moteur sans grand secteur (jour d'installation) : la ville de travail.
-        if (!existant.etiquette) map.set(cle, { ...existant, lieu: villesDeJournee(rdvs) });
+        if (!existant.etiquette) map.set(cle, { ...existant, lieu: villesDeJournee(interventions) });
         continue;
       }
       const [date, techId] = cle.split('|');
@@ -589,21 +591,20 @@ export default function Planning() {
       // Jour à venir d'une personne que le moteur planifie : on attend son verdict
       // (pas de ligne « sans état » qui clignoterait pendant le chargement).
       if (!horsTournees && date >= aujourdhui && etatsLoading) continue;
-      const enConges = rdvs.every((r) => r.appointment_type === 'leave');
-      // Ligne « sans état » = quelqu'un qui a travaillé ce jour-là ; un jour férié
-      // n'aligne pas toute l'équipe en « Congés ».
-      if (!horsTournees && enConges) continue;
+      // Ligne = quelqu'un qui est intervenu ce jour-là. Le congé n'est dit que pour
+      // un technicien hors tournées ; un jour férié n'aligne pas toute l'équipe.
+      if (interventions.length === 0 && !(horsTournees && enConges)) continue;
       map.set(cle, {
         date,
         technicienId: member.id,
         technicienNom: String(member.display_name || '').trim(),
         couleur: member.calendar_color,
         etat: horsTournees ? 'manuelle' : 'sans_etat',
-        nbRdvs: rdvs.length,
+        nbRdvs: interventions.length,
         enConges,
         // Zone de travail : grand secteur des entretiens du jour, sinon la ville.
-        etiquette: deduireSecteur(rdvs),
-        lieu: villesDeJournee(rdvs),
+        etiquette: deduireSecteur(interventions),
+        lieu: villesDeJournee(interventions),
       });
     }
     return map;
