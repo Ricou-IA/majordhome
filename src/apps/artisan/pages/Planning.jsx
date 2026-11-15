@@ -5,13 +5,16 @@
  * Vues : semaine, jour, mois. Drag & drop + resize.
  *
  * La page assemble ; chaque sujet a son fichier :
- *   - barre du haut ........ components/planning/CalendarToolbar.jsx
- *   - filtres en entonnoir . components/planning/CalendarFilters.jsx (règles : lib/planningEvents.js)
- *   - vignette d'un RDV .... components/planning/PlanningEventContent.jsx (règles : lib/planningVignette.js)
- *   - charge et CA du jour . hooks/usePlanningCharge.js + components/planning/PlanningDayHeader.jsx
- *                            (règles : lib/planningCharge.js, lib/planningCa.js)
- *   - journée d'un technicien hooks/usePlanningJournee.js (règles : lib/planningCharge.js)
- *   - impression .......... hooks/usePlanningImpression.js (règles : lib/planningPrintModel.js)
+ *   - barre du haut ........... components/planning/CalendarToolbar.jsx
+ *   - filtres en entonnoir .... components/planning/CalendarFilters.jsx (règles : lib/planningEvents.js)
+ *   - vignette d'un RDV ....... components/planning/PlanningEventContent.jsx (règles : lib/planningVignette.js)
+ *   - vue et plage affichées .. hooks/usePlanningVue.js (règles : lib/planningGestes.js)
+ *   - gestes sur le calendrier  hooks/usePlanningGestes.js (règles : lib/planningGestes.js)
+ *   - fenêtre de RDV .......... hooks/usePlanningFenetreRdv.js + components/planning/EventModal.jsx
+ *   - charge et CA du jour .... hooks/usePlanningCharge.js + components/planning/PlanningDayHeader.jsx
+ *                               (règles : lib/planningCharge.js, lib/planningCa.js)
+ *   - journée d'un technicien . hooks/usePlanningJournee.js (règles : lib/planningCharge.js)
+ *   - impression .............. hooks/usePlanningImpression.js (règles : lib/planningPrintModel.js)
  * Une nouvelle règle va dans le module pur concerné, avec son test — pas ici.
  *
  * @version 2.0.0 - Sprint 2 : FullCalendar + CRUD RDV
@@ -19,7 +22,6 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { toast } from 'sonner';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -29,11 +31,14 @@ import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
+import { usePlanningVue } from '@hooks/usePlanningVue';
+import { usePlanningGestes } from '@hooks/usePlanningGestes';
+import { usePlanningFenetreRdv } from '@hooks/usePlanningFenetreRdv';
 import { usePlanningCharge } from '@hooks/usePlanningCharge';
 import { usePlanningJournee } from '@hooks/usePlanningJournee';
 import { usePlanningImpression } from '@hooks/usePlanningImpression';
 import { useDeviceClass } from '@hooks/useDeviceClass';
-import { isoWeekNumber } from '@/lib/planningPrintModel';
+import { creneauParDefaut } from '@/lib/planningGestes';
 import { FeuilleDeRoutePanel } from '@/apps/artisan/components/planning/FeuilleDeRoutePanel';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { CalendarToolbar } from '@/apps/artisan/components/planning/CalendarToolbar';
@@ -42,28 +47,6 @@ import { PlanningClientSearchInput, PlanningClientAppointments } from '@/apps/ar
 import { PlanningEventContent } from '@/apps/artisan/components/planning/PlanningEventContent';
 import { PlanningDayHeader } from '@/apps/artisan/components/planning/PlanningDayHeader';
 import { RemplirJourneePanel } from '@/apps/artisan/components/tournees/RemplirJourneePanel';
-import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
-import { supabase } from '@/lib/supabaseClient';
-import { formatDateForInput } from '@/lib/utils';
-import { logger } from '@lib/logger';
-
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-/**
- * Calcule les bornes de date selon la vue FullCalendar
- */
-function getDateRange(dateInfo) {
-  return {
-    startDate: dateInfo.startStr?.split('T')[0] || dateInfo.start?.toISOString().split('T')[0],
-    endDate: dateInfo.endStr?.split('T')[0] || dateInfo.end?.toISOString().split('T')[0],
-  };
-}
-
-// ============================================================================
-// COMPOSANT PRINCIPAL
-// ============================================================================
 
 export default function Planning() {
   const { organization, user, effectiveRole } = useAuth();
@@ -74,31 +57,23 @@ export default function Planning() {
   // Charge par technicien (puces d'état) et CA programmé : pilotage, pas terrain
   // (Eric, 2026-11-14) — admin d'organisation et team leader, jamais le technicien.
   const voitCharge = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
-  // Sur appareil tenu en main (tablette, téléphone) : la journée, pas la semaine.
-  // Téléphone / tablette : la journée en liste (cf. VUES_MOBILE).
+  // Sur appareil tenu en main (tablette, téléphone) : la journée en liste, pas la
+  // semaine en grille (cf. VUES_MOBILE de CalendarToolbar).
   const { isMobileDevice } = useDeviceClass();
   const vueInitiale = isMobileDevice ? 'listDay' : 'timeGridWeek';
 
-  // État local
-  const [currentView, setCurrentView] = useState(vueInitiale);
-  const [calendarTitle, setCalendarTitle] = useState('');
-  const [calendarWeek, setCalendarWeek] = useState(null);
-  // Plage affichée, inconnue tant que le calendrier ne l'a pas annoncée (datesSet,
-  // dès son montage) : rien ne se charge avant. L'ancien défaut (± 1 mois « pour
-  // précharger ») lançait trois mois de RDV, leurs techniciens et leurs chantiers
-  // sous une clé de cache que la semaine affichée ne réutilisait jamais.
-  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
-  // Période que le titre annonce (≠ dateRange en vue Mois : la grille déborde) — cumul du CA.
-  const [periode, setPeriode] = useState(null);
-  const [modalState, setModalState] = useState({ open: false, mode: 'create', appointment: null, defaultDate: null, defaultTime: null });
-  const [selectedChantier, setSelectedChantier] = useState(null);
-  const [loadingChantier, setLoadingChantier] = useState(false);
+  // Ce que le calendrier affiche : vue, titre, semaine, plage chargée, période du titre.
+  const {
+    vue: currentView, titre: calendarTitle, semaine: calendarWeek, plage: dateRange, periode,
+    surDates, changerDeVue, allerAuJour,
+  } = usePlanningVue({ calendarRef, vueInitiale });
+
   // Client recherché depuis la barre d'outils (ses RDV s'affichent sous les filtres)
   const [searchedClient, setSearchedClient] = useState(null);
   // RDV du client recherché (surlignés dans le calendrier) — null = pas de recherche
   const [searchHitIds, setSearchHitIds] = useState(null);
 
-  // Hooks données
+  // Données : RDV de la plage, blocs du calendrier, filtres, équipe, écritures.
   const {
     appointments,
     events,
@@ -122,6 +97,16 @@ export default function Planning() {
   });
 
   const { members } = useTeamMembers(orgId);
+
+  // Fenêtre de RDV (création sur un créneau, édition d'un RDV) et gestes du
+  // calendrier : clic dans le vide, clic sur un RDV, RDV glissé ou étiré.
+  const {
+    fenetre, ouvrirCreation, ouvrirEdition, fermer: fermerFenetre, enregistrer, supprimer, annuler,
+  } = usePlanningFenetreRdv({ createAppointment, updateAppointment, deleteAppointment, cancelAppointment });
+  const { surSelection, surClic, surDeplacement, surEtirement } = usePlanningGestes({
+    calendarRef, moveAppointment, ouvrirCreation, ouvrirEdition,
+  });
+  const nouveauRdv = useCallback(() => ouvrirCreation(creneauParDefaut()), [ouvrirCreation]);
 
   // Charge de la plage visible : état de chaque journée de technicien, lignes sous
   // l'en-tête du jour, CA HT programmé (règles : src/lib/planningCharge.js et
@@ -191,194 +176,12 @@ export default function Planning() {
     events,
   });
 
-  // ==========================================================================
-  // HANDLERS FULLCALENDAR
-  // ==========================================================================
-
-  // Quand la vue ou les dates changent
-  const handleDatesSet = useCallback((dateInfo) => {
-    setCalendarTitle(dateInfo.view.title);
-    setCurrentView(dateInfo.view.type);
-    setDateRange(getDateRange(dateInfo));
-    setPeriode({
-      debut: dateInfo.view.currentStart.toLocaleDateString('fr-CA'),
-      finExclue: dateInfo.view.currentEnd.toLocaleDateString('fr-CA'),
-    });
-    // Numéro de semaine ISO — pertinent uniquement sur les vues à 1 semaine
-    const viewType = dateInfo.view.type;
-    setCalendarWeek(
-      ['timeGridWeek', 'timeGridDay', 'listWeek', 'listDay'].includes(viewType)
-        ? isoWeekNumber(dateInfo.start)
-        : null
-    );
-  }, []);
-
-  // Recherche client : clic sur un RDV → le calendrier va à sa date
-  const handlePickSearchedAppointment = useCallback((appt) => {
-    calendarRef.current?.getApi().gotoDate(appt.scheduled_date);
-  }, []);
-
+  // Recherche client : clic sur un de ses RDV → le calendrier va à sa date ; ses RDV sont surlignés.
+  const handlePickSearchedAppointment = useCallback((appt) => allerAuJour(appt.scheduled_date), [allerAuJour]);
   const eventClassNames = useCallback(
     (arg) => (searchHitIds?.has(arg.event.extendedProps.id) ? ['mdh-search-hit'] : []),
     [searchHitIds]
   );
-
-  // Changer de vue
-  const handleViewChange = useCallback((viewName) => {
-    calendarRef.current?.getApi().changeView(viewName);
-    setCurrentView(viewName);
-  }, []);
-
-  // Clic sur un créneau vide → créer un RDV
-  const handleDateSelect = useCallback((selectInfo) => {
-    const startDate = selectInfo.start;
-    setModalState({
-      open: true,
-      mode: 'create',
-      appointment: null,
-      // Date LOCALE : toISOString() passe en UTC et recule d'un jour une sélection
-      // « journée entière » (minuit local = veille 22h UTC).
-      defaultDate: formatDateForInput(startDate),
-      defaultTime: selectInfo.allDay ? '09:00' : `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`,
-    });
-    calendarRef.current?.getApi().unselect();
-  }, []);
-
-  // Clic sur un événement → éditer (RDV) OU ouvrir chantier (slot chantier Phase 0)
-  const handleEventClick = useCallback(async (clickInfo) => {
-    const props = clickInfo.event.extendedProps;
-
-    // Slot chantier : fetch + ouvrir ChantierModal
-    if (props.appointment_kind === 'chantier_slot') {
-      if (!props.parent_lead_id) {
-        toast.error('Chantier introuvable');
-        return;
-      }
-      setLoadingChantier(true);
-      try {
-        const { data, error } = await supabase
-          .from('majordhome_chantiers')
-          .select('*')
-          .eq('id', props.parent_lead_id)
-          .single();
-        if (error || !data) {
-          toast.error('Impossible de charger le chantier');
-          return;
-        }
-        setSelectedChantier(data);
-      } finally {
-        setLoadingChantier(false);
-      }
-      return;
-    }
-
-    // RDV classique : EventModal existante
-    setModalState({
-      open: true,
-      mode: 'edit',
-      appointment: props,
-      defaultDate: null,
-      defaultTime: null,
-    });
-  }, []);
-
-  // Drag & drop d'un événement
-  const handleEventDrop = useCallback(async (dropInfo) => {
-    const { event } = dropInfo;
-    const appointmentId = event.extendedProps.id || event.id;
-
-    try {
-      const start = event.start;
-      const end = event.end || new Date(start.getTime() + 60 * 60000);
-      const pad = (n) => String(n).padStart(2, '0');
-
-      await moveAppointment(appointmentId, {
-        scheduled_date: start.toISOString().split('T')[0],
-        scheduled_start: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
-        scheduled_end: `${pad(end.getHours())}:${pad(end.getMinutes())}`,
-        duration_minutes: Math.round((end - start) / 60000),
-      });
-      toast.success('RDV déplacé');
-    } catch (err) {
-      logger.error('[Planning] moveAppointment error:', err);
-      dropInfo.revert();
-      toast.error('Erreur lors du déplacement');
-    }
-  }, [moveAppointment]);
-
-  // Resize d'un événement
-  const handleEventResize = useCallback(async (resizeInfo) => {
-    const { event } = resizeInfo;
-    const appointmentId = event.extendedProps.id || event.id;
-
-    try {
-      const start = event.start;
-      const end = event.end;
-      const pad = (n) => String(n).padStart(2, '0');
-
-      await moveAppointment(appointmentId, {
-        scheduled_date: start.toISOString().split('T')[0],
-        scheduled_start: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
-        scheduled_end: `${pad(end.getHours())}:${pad(end.getMinutes())}`,
-        duration_minutes: Math.round((end - start) / 60000),
-      });
-    } catch (err) {
-      logger.error('[Planning] resize error:', err);
-      resizeInfo.revert();
-      toast.error('Erreur lors du redimensionnement');
-    }
-  }, [moveAppointment]);
-
-  // ==========================================================================
-  // HANDLERS MODAL
-  // ==========================================================================
-
-  const handleModalClose = useCallback(() => {
-    setModalState({ open: false, mode: 'create', appointment: null, defaultDate: null, defaultTime: null });
-  }, []);
-
-  const handleModalSave = useCallback(async (formData) => {
-    const isCreate = modalState.mode === 'create';
-    try {
-      if (isCreate) {
-        await createAppointment(formData);
-        toast.success('RDV créé avec succès');
-      } else {
-        await updateAppointment(modalState.appointment.id, formData);
-        toast.success('RDV modifié avec succès');
-      }
-      handleModalClose();
-      return true;
-    } catch (err) {
-      logger.error('[Planning] save appointment error:', err);
-      toast.error(isCreate ? 'Erreur lors de la création du RDV' : 'Erreur lors de la modification du RDV');
-      return false;
-    }
-  }, [modalState, createAppointment, updateAppointment, handleModalClose]);
-
-  const handleModalDelete = useCallback(async () => {
-    if (!modalState.appointment?.id) return;
-    try {
-      await deleteAppointment(modalState.appointment.id);
-      toast.success('RDV supprimé');
-      handleModalClose();
-    } catch (err) {
-      logger.error('[Planning] deleteAppointment error:', err);
-      toast.error('Erreur lors de la suppression');
-    }
-  }, [modalState, deleteAppointment, handleModalClose]);
-
-  const handleModalCancel = useCallback(async (reason) => {
-    if (!modalState.appointment?.id) return;
-    try {
-      await cancelAppointment(modalState.appointment.id, reason);
-      toast.success('RDV annulé');
-      handleModalClose();
-    } catch (err) {
-      logger.error('[Planning] cancelAppointment error:', err);
-      toast.error('Erreur lors de l\'annulation');
-    }
-  }, [modalState, cancelAppointment, handleModalClose]);
 
   // ==========================================================================
   // RENDU
@@ -410,12 +213,12 @@ export default function Planning() {
         <CalendarToolbar
           calendarRef={calendarRef}
           currentView={currentView}
-          onViewChange={handleViewChange}
+          onViewChange={changerDeVue}
           title={calendarTitle}
           weekNumber={calendarWeek}
           caCumul={caCumul}
           caCumulPartiel={!!recordIdsFiltres}
-          onAddEvent={canCreateAppointment ? () => setModalState({ open: true, mode: 'create', appointment: null, defaultDate: new Date().toISOString().split('T')[0], defaultTime: '09:00' }) : null}
+          onAddEvent={canCreateAppointment ? nouveauRdv : null}
           onRefresh={refresh}
           isLoading={isLoading}
           onPrint={handlePrint}
@@ -478,11 +281,11 @@ export default function Planning() {
             dayMaxEvents={true}
             nowIndicator={true}
             // Callbacks
-            datesSet={handleDatesSet}
-            select={handleDateSelect}
-            eventClick={handleEventClick}
-            eventDrop={handleEventDrop}
-            eventResize={handleEventResize}
+            datesSet={surDates}
+            select={surSelection}
+            eventClick={surClic}
+            eventDrop={surDeplacement}
+            eventResize={surEtirement}
             // Style
             eventDisplay="block"
             // RDV concurrents (2 techniciens) côte à côte sans se recouvrir
@@ -507,24 +310,24 @@ export default function Planning() {
         </div>
       </div>
 
-      {/* Modale événement */}
+      {/* Fenêtre de RDV */}
       <EventModal
-        isOpen={modalState.open}
-        mode={modalState.mode}
-        appointment={modalState.appointment}
-        defaultDate={modalState.defaultDate}
-        defaultTime={modalState.defaultTime}
+        isOpen={fenetre.open}
+        mode={fenetre.mode}
+        appointment={fenetre.appointment}
+        defaultDate={fenetre.defaultDate}
+        defaultTime={fenetre.defaultTime}
         members={members}
         orgId={orgId}
         userId={user?.id}
-        onClose={handleModalClose}
-        onSave={handleModalSave}
-        onDelete={handleModalDelete}
-        onCancel={handleModalCancel}
+        onClose={fermerFenetre}
+        onSave={enregistrer}
+        onDelete={supprimer}
+        onCancel={annuler}
         isSaving={isCreating || isUpdating}
       />
 
-      {/* Remplir / figer une journée de technicien — clic sur sa puce d'état.
+      {/* Remplir / figer une journée de technicien — clic sur sa ligne de charge.
           Seule porte de programmation au fil de l'eau (spec auto-RDV § 5). */}
       {journeeSelectionnee && (
         <RemplirJourneePanel
@@ -534,40 +337,9 @@ export default function Planning() {
         />
       )}
 
-      {/* Feuille de route d'un technicien hors tournées — clic sur sa puce « À la main » */}
+      {/* Feuille de route seule — journée que le moteur ne juge pas (hors tournées, jour passé) */}
       {feuilleOuverte && (
         <FeuilleDeRoutePanel journee={feuilleOuverte} onClose={fermerFeuille} />
-      )}
-
-      {/* Modale Chantier — clic sur slot chantier (Phase 0) */}
-      {selectedChantier && (
-        <ChantierModal
-          chantier={selectedChantier}
-          onClose={() => setSelectedChantier(null)}
-          onUpdated={() => {
-            refresh();
-            if (selectedChantier?.id) {
-              supabase
-                .from('majordhome_chantiers')
-                .select('*')
-                .eq('id', selectedChantier.id)
-                .single()
-                .then(({ data }) => data && setSelectedChantier(data));
-            }
-          }}
-          effectiveRole={effectiveRole}
-          canEditAll={can('chantiers', 'update')}
-        />
-      )}
-
-      {/* Loader pendant fetch du chantier */}
-      {loadingChantier && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 pointer-events-none">
-          <div className="bg-white rounded-lg shadow-xl px-6 py-4 flex items-center gap-3">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-            <span className="text-sm text-gray-700">Chargement du chantier…</span>
-          </div>
-        </div>
       )}
     </div>
   );
