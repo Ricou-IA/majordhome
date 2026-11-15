@@ -393,6 +393,11 @@ html[data-device-class="tablet"] .fc .fc-list-day-cushion {
 .fc .fc-timegrid-event {
   padding: 1px 4px;
 }
+/* Liseré noir du devis fait : 5 px pris dans le bloc — le texte commence après lui.
+   Ces 8 px de hauteur en moins sont comptés par le gabarit (MARGE_LISERE). */
+.fc .fc-timegrid-event.mdh-quoted {
+  padding: 5px 7px;
+}
 
 .fc .fc-timegrid-slot {
   @apply border-secondary-100;

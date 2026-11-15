@@ -12,7 +12,7 @@
  */
 
 import { estTypeAdaptable } from '@/lib/souplesse';
-import { modeleVignette, HAUTEUR_CRENEAU, HAUTEUR_CRENEAU_TELEPHONE } from '@/lib/planningVignette';
+import { modeleVignette, HAUTEUR_CRENEAU, HAUTEUR_CRENEAU_TELEPHONE, MARGE_LISERE } from '@/lib/planningVignette';
 import { useDeviceClass } from '@hooks/useDeviceClass';
 import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKindIcons';
 
@@ -48,6 +48,8 @@ export function PlanningEventContent({ eventInfo }) {
     fin: event.end,
     vue: view.type,
     hauteurCreneau: isPhone ? HAUTEUR_CRENEAU_TELEPHONE : HAUTEUR_CRENEAU,
+    // Devis fait : le liseré noir prend de la hauteur, le gabarit en tient compte.
+    margeSupplementaire: rdv.devisFait ? MARGE_LISERE : 0,
   });
   const enListe = view.type.startsWith('list');
   // Interligne serré dans la grille (c'est lui qui fait tenir 3 lignes dans une heure) ;

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   lignesDisponibles, heureCourte, creneauCourt, gabaritVignette, modeleVignette,
-  HAUTEUR_CRENEAU_TELEPHONE,
+  HAUTEUR_CRENEAU_TELEPHONE, MARGE_LISERE,
 } from '../src/lib/planningVignette.js';
 
 const le = (h, m = 0) => new Date(2026, 10, 16, h, m);
@@ -70,6 +70,17 @@ test('modeleVignette : visite d’une heure = créneau, type court, ville à dé
   assert.equal(m.gabarit, 'trois');
   assert.equal(m.heure, '11h–12h');
   assert.equal(m.type, 'VT R1');
+  assert.equal(m.zone, 'Albi');
+});
+
+test('modeleVignette : devis fait (liseré noir) = une ligne de moins, tout reste visible', () => {
+  assert.equal(lignesDisponibles(60, undefined, MARGE_LISERE), 2);
+  assert.equal(lignesDisponibles(30, undefined, MARGE_LISERE), 1);
+  const m = modeleVignette({ rdv: vt, debut: le(11), fin: le(12), margeSupplementaire: MARGE_LISERE });
+  assert.equal(m.gabarit, 'deux');
+  assert.equal(m.heure, '11h–12h');
+  assert.equal(m.type, 'VT R1');
+  assert.equal(m.nom, 'ORSINI Justine');
   assert.equal(m.zone, 'Albi');
 });
 

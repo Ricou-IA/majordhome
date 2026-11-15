@@ -25,16 +25,20 @@ const HAUTEUR_LIGNE = 13;
 // Écart entre deux blocs + marges intérieures + bordure pointillée d'un RDV adaptable.
 const MARGES_BLOC = 8;
 const DUREE_PAR_DEFAUT = 60;
+// Liseré noir d'une visite dont le devis est fait : il prend 8 px de hauteur dans le
+// bloc (`.fc .fc-timegrid-event.mdh-quoted`), donc une ligne de moins en une heure.
+export const MARGE_LISERE = 8;
 
 /**
  * Nombre de lignes de texte qui tiennent dans le bloc d'un RDV de la grille horaire.
  * @param {number} dureeMinutes
  * @param {number} [hauteurCreneau]  hauteur d'un créneau de 30 min, en pixels
+ * @param {number} [margeSupplementaire]  hauteur prise par un cadre intérieur (liseré), en pixels
  * @returns {number} au moins 1
  */
-export function lignesDisponibles(dureeMinutes, hauteurCreneau = HAUTEUR_CRENEAU) {
+export function lignesDisponibles(dureeMinutes, hauteurCreneau = HAUTEUR_CRENEAU, margeSupplementaire = 0) {
   const duree = dureeMinutes > 0 ? dureeMinutes : DUREE_PAR_DEFAUT;
-  const hauteur = (duree / DUREE_CRENEAU_MINUTES) * hauteurCreneau - MARGES_BLOC;
+  const hauteur = (duree / DUREE_CRENEAU_MINUTES) * hauteurCreneau - MARGES_BLOC - margeSupplementaire;
   return Math.max(1, Math.floor(hauteur / HAUTEUR_LIGNE));
 }
 
@@ -63,15 +67,15 @@ export function creneauCourt(debut, fin) {
 
 /**
  * Gabarit selon la vue et la place disponible.
- * @param {{ vue?: string, dureeMinutes?: number, hauteurCreneau?: number }} p
+ * @param {{ vue?: string, dureeMinutes?: number, hauteurCreneau?: number, margeSupplementaire?: number }} p
  * @returns {{ gabarit: 'ligne'|'deux'|'trois'|'plein', lignesNom: number }}
  */
-export function gabaritVignette({ vue = 'timeGridWeek', dureeMinutes, hauteurCreneau } = {}) {
+export function gabaritVignette({ vue = 'timeGridWeek', dureeMinutes, hauteurCreneau, margeSupplementaire = 0 } = {}) {
   // Vues liste (téléphone, tablette) : une ligne de tableau par RDV, l'heure a sa colonne.
   if (vue.startsWith('list')) return { gabarit: 'deux', lignesNom: 1 };
   // Vue Mois : une ligne par RDV.
   if (vue.startsWith('dayGrid')) return { gabarit: 'ligne', lignesNom: 1 };
-  const lignes = lignesDisponibles(dureeMinutes, hauteurCreneau);
+  const lignes = lignesDisponibles(dureeMinutes, hauteurCreneau, margeSupplementaire);
   if (lignes <= 1) return { gabarit: 'ligne', lignesNom: 1 };
   if (lignes === 2) return { gabarit: 'deux', lignesNom: 1 };
   if (lignes <= 4) return { gabarit: 'trois', lignesNom: lignes - 2 };
@@ -87,11 +91,12 @@ export function gabaritVignette({ vue = 'timeGridWeek', dureeMinutes, hauteurCre
  * @param {Date|null} [p.fin]
  * @param {string} [p.vue]              type de vue FullCalendar
  * @param {number} [p.hauteurCreneau]
+ * @param {number} [p.margeSupplementaire]  cf. lignesDisponibles (MARGE_LISERE pour un devis fait)
  * @returns {{ gabarit: string, lignesNom: number, heure: string, type: string, nom: string, zone: string, infobulle: string }}
  */
-export function modeleVignette({ rdv, debut = null, fin = null, vue = 'timeGridWeek', hauteurCreneau } = {}) {
+export function modeleVignette({ rdv, debut = null, fin = null, vue = 'timeGridWeek', hauteurCreneau, margeSupplementaire = 0 } = {}) {
   const dureeMinutes = debut && fin ? Math.round((fin.getTime() - debut.getTime()) / 60000) : null;
-  const { gabarit, lignesNom } = gabaritVignette({ vue, dureeMinutes, hauteurCreneau });
+  const { gabarit, lignesNom } = gabaritVignette({ vue, dureeMinutes, hauteurCreneau, margeSupplementaire });
 
   const typeComplet = rdv?.typeConfig?.label || '';
   const typeCourt = rdv?.typeConfig?.shortLabel || typeComplet;
