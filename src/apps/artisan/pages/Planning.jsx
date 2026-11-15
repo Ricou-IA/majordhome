@@ -38,7 +38,7 @@ import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
 import { useEtatsJournees } from '@hooks/useTournees';
 import { usePlanningCa } from '@hooks/usePlanningCa';
 import { formatCa, cumulPeriode } from '@/lib/planningCa';
-import { villesDeJournee } from '@/lib/planningEvents';
+import { villesDeJournee, optionsEntonnoir, purgerFiltres } from '@/lib/planningEvents';
 import { deduireSecteur } from '@/lib/tournee/etat.js';
 import { useClientEquipmentLabels } from '@hooks/useClients';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -50,7 +50,7 @@ import { FeuilleDeRoutePanel } from '@/apps/artisan/components/planning/FeuilleD
 import { useFeuilleDeRoute } from '@hooks/useFeuilleDeRoute';
 import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
-import { PlanningClientSearch } from '@/apps/artisan/components/planning/PlanningClientSearch';
+import { PlanningClientSearchInput, PlanningClientAppointments } from '@/apps/artisan/components/planning/PlanningClientSearch';
 import { JourneeEtatChips } from '@/apps/artisan/components/planning/JourneeEtatChips';
 import { RemplirJourneePanel } from '@/apps/artisan/components/tournees/RemplirJourneePanel';
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
@@ -114,6 +114,7 @@ function CalendarToolbar({
   printLabel,
   isPrinting,
   isMobileDevice,
+  search,
 }) {
   const goToday = () => calendarRef.current?.getApi().today();
   const goPrev = () => calendarRef.current?.getApi().prev();
@@ -170,6 +171,9 @@ function CalendarToolbar({
         )}
       </div>
 
+      {/* Recherche d'un client — sur la ligne de la navigation, entre les dates et les actions */}
+      {search && <div className="sm:flex-1 sm:min-w-[14rem] sm:max-w-md">{search}</div>}
+
       {/* Actions */}
       <div className="flex items-center gap-2 flex-wrap">
         {/* Sélecteur de vue */}
@@ -224,45 +228,43 @@ function CalendarToolbar({
   );
 }
 
-/**
- * Bouton toggle de bucket (Intervention / Commercial)
- */
-function KindToggle({ active, onClick, icon: Icon, label }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
-        active
-          ? 'bg-blue-50 border-blue-200 text-blue-700'
-          : 'bg-white border-gray-300 text-gray-400 hover:bg-gray-50'
-      }`}
-    >
-      <Icon className="w-4 h-4" />
-      {label}
-    </button>
-  );
+// Premier étage de l'entonnoir des filtres : la nature des RDV affichés.
+const NATURES = [
+  { value: 'tout', label: 'Tout', kinds: { intervention: true, commercial: true } },
+  { value: 'intervention', label: 'Intervention', icon: Wrench, kinds: { intervention: true, commercial: false } },
+  { value: 'commercial', label: 'Commercial', icon: Briefcase, kinds: { intervention: false, commercial: true } },
+];
+
+/** Flèche entre deux étages de l'entonnoir (bureau seulement). */
+function EtageSuivant() {
+  return <ChevronRight className="hidden sm:block w-4 h-4 text-gray-300 shrink-0" aria-hidden="true" />;
 }
 
 /**
- * Filtres : toggles bucket (Intervention/Commercial) + chips équipe (par personne) + type
+ * Filtres en entonnoir : nature (tout / intervention / commercial) → personnes
+ * qui peuvent la porter → types de RDV possibles pour ce choix. Chaque étage ne
+ * propose que ce que l'étage du dessus laisse possible (règles : optionsEntonnoir
+ * / purgerFiltres de planningEvents.js). Les tolérances ne filtrent rien : c'est
+ * une option d'affichage, rangée à part.
  */
 function CalendarFilters({ filters, setFilters, teamList }) {
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
 
   const kinds = filters.kinds || { intervention: true, commercial: true };
+  const nature = kinds.intervention && kinds.commercial ? 'tout' : kinds.intervention ? 'intervention' : 'commercial';
+  const { personnes, types } = optionsEntonnoir(filters, teamList, APPOINTMENT_TYPES);
   const selectedKeys = filters.memberProfileKeys || [];
   const selectedType = APPOINTMENT_TYPES.find(t => t.value === filters.appointmentType);
-  const hasFilters =
-    selectedKeys.length > 0 || filters.appointmentType || !kinds.intervention || !kinds.commercial;
+  const hasFilters = selectedKeys.length > 0 || filters.appointmentType || nature !== 'tout';
 
-  const toggleKind = (kind) =>
-    setFilters(f => ({ ...f, kinds: { ...f.kinds, [kind]: !f.kinds[kind] } }));
+  // Tout changement d'étage retire des étages du dessous ce qui n'est plus possible.
+  const appliquer = (patch) =>
+    setFilters(f => purgerFiltres({ ...f, ...(typeof patch === 'function' ? patch(f) : patch) }, teamList, APPOINTMENT_TYPES));
 
   const toggleMember = (profileKey) =>
-    setFilters(f => {
+    appliquer(f => {
       const cur = f.memberProfileKeys || [];
-      const next = cur.includes(profileKey) ? cur.filter(k => k !== profileKey) : [...cur, profileKey];
-      return { ...f, memberProfileKeys: next };
+      return { memberProfileKeys: cur.includes(profileKey) ? cur.filter(k => k !== profileKey) : [...cur, profileKey] };
     });
 
   const resetAll = () =>
@@ -278,26 +280,28 @@ function CalendarFilters({ filters, setFilters, teamList }) {
   // une lecture de bureau.
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {/* Toggles bucket */}
-      <div className="flex items-center gap-1.5">
-        <KindToggle active={kinds.intervention} onClick={() => toggleKind('intervention')} icon={Wrench} label="Intervention" />
-        <KindToggle active={kinds.commercial} onClick={() => toggleKind('commercial')} icon={Briefcase} label="Commercial" />
-        {/* Bandes de tolérance des RDV adaptables (souplesse) — sur demande */}
-        <span className="hidden sm:inline-flex">
-          <KindToggle
-            active={!!filters.showTolerance}
-            onClick={() => setFilters(f => ({ ...f, showTolerance: !f.showTolerance }))}
-            icon={MoveHorizontal}
-            label="Tolérances"
-          />
-        </span>
+      {/* Étage 1 — nature */}
+      <div className="flex items-center bg-gray-100 rounded-lg p-0.5" role="group" aria-label="Nature des rendez-vous">
+        {NATURES.map(({ value, label, icon: Icon, kinds: k }) => (
+          <button
+            key={value}
+            onClick={() => appliquer({ kinds: k })}
+            aria-pressed={nature === value}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              nature === value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {Icon && <Icon className="w-4 h-4" />}
+            {label}
+          </button>
+        ))}
       </div>
 
-      <span className="hidden sm:block w-px h-6 bg-gray-200" />
+      <EtageSuivant />
 
-      {/* Chips équipe (1 par personne) */}
+      {/* Étage 2 — personnes qui peuvent porter cette nature de RDV */}
       <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar w-full sm:w-auto sm:flex-wrap -mx-1 px-1 py-0.5">
-        {teamList.map(h => {
+        {personnes.map(h => {
           const isSel = selectedKeys.includes(h.profileKey);
           return (
             <button
@@ -318,9 +322,9 @@ function CalendarFilters({ filters, setFilters, teamList }) {
         })}
       </div>
 
-      <span className="hidden sm:block w-px h-6 bg-gray-200" />
+      <EtageSuivant />
 
-      {/* Filtre type */}
+      {/* Étage 3 — types possibles pour la nature et les personnes choisies */}
       <div className="relative">
         <button
           onClick={() => setShowTypeDropdown(!showTypeDropdown)}
@@ -344,7 +348,7 @@ function CalendarFilters({ filters, setFilters, teamList }) {
               >
                 Tous les types
               </button>
-              {APPOINTMENT_TYPES.map(type => (
+              {types.map(type => (
                 <button
                   key={type.value}
                   onClick={() => { setFilters(f => ({ ...f, appointmentType: type.value })); setShowTypeDropdown(false); }}
@@ -368,6 +372,24 @@ function CalendarFilters({ filters, setFilters, teamList }) {
           className="text-sm text-blue-600 hover:text-blue-800 font-medium"
         >
           Effacer
+        </button>
+      )}
+
+      {/* Option d'affichage, pas un filtre : plage dans laquelle un entretien ou un
+          SAV dont l'heure n'est pas encore donnée au client peut glisser. */}
+      {kinds.intervention && (
+        <button
+          onClick={() => setFilters(f => ({ ...f, showTolerance: !f.showTolerance }))}
+          aria-pressed={!!filters.showTolerance}
+          title="Afficher, derrière chaque entretien ou SAV dont l’heure n’est pas encore donnée au client, la plage dans laquelle il peut encore être déplacé"
+          className={`hidden sm:inline-flex sm:ml-auto items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+            filters.showTolerance
+              ? 'bg-blue-50 border-blue-200 text-blue-700'
+              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          <MoveHorizontal className="w-4 h-4" />
+          Tolérances
         </button>
       )}
     </div>
@@ -454,6 +476,8 @@ export default function Planning() {
   const [selectedChantier, setSelectedChantier] = useState(null);
   const [loadingChantier, setLoadingChantier] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  // Client recherché depuis la barre d'outils (ses RDV s'affichent sous les filtres)
+  const [searchedClient, setSearchedClient] = useState(null);
   // RDV du client recherché (surlignés dans le calendrier) — null = pas de recherche
   const [searchHitIds, setSearchHitIds] = useState(null);
 
@@ -953,10 +977,7 @@ export default function Planning() {
   if (error) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
-          <p className="text-gray-500">Gérez vos rendez-vous et interventions</p>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Erreur de chargement</h3>
@@ -972,11 +993,7 @@ export default function Planning() {
 
   return (
     <div className="space-y-4">
-      {/* Header — le sous-titre ne dit rien que la page ne montre : masqué sur téléphone */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
-        <p className="hidden sm:block text-gray-500">Gérez vos rendez-vous et interventions</p>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
 
       {/* Toolbar */}
       <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 space-y-3">
@@ -996,17 +1013,20 @@ export default function Planning() {
           printLabel={printLabel}
           isPrinting={isPrinting}
           isMobileDevice={isMobileDevice}
+          search={<PlanningClientSearchInput orgId={orgId} onPick={setSearchedClient} />}
         />
         <CalendarFilters
           filters={filters}
           setFilters={setFilters}
           teamList={teamList}
         />
-        <PlanningClientSearch
+        <PlanningClientAppointments
           orgId={orgId}
+          client={searchedClient}
           teamList={teamList}
           onPickAppointment={handlePickSearchedAppointment}
           onResultsChange={setSearchHitIds}
+          onClose={() => setSearchedClient(null)}
         />
       </div>
 

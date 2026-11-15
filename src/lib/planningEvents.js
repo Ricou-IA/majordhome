@@ -148,6 +148,9 @@ export function resolveCommercialMemberId({ assignedCommercialId, technicianIds 
  * Liste équipe unifiée par humain (profile_key) : dédoublonne les personnes
  * présentes en tech ET commercial. recordIds = ids à matcher sur les RDV.
  * Couleur = celle du team_member (source unique) ; fallback sinon.
+ * `kinds` = natures de RDV que la personne peut porter, même règle que la fenêtre
+ * de RDV (rôle planning `technician` → interventions ; `commercial` / `admin`, ou
+ * présence parmi les commerciaux → RDV commerciaux ; rôle absent → les deux).
  */
 export function buildTeamList({ members = [], commercials = [] } = {}) {
   const byProfile = new Map();
@@ -156,6 +159,7 @@ export function buildTeamList({ members = [], commercials = [] } = {}) {
       byProfile.set(key, {
         profileKey: key, displayName: name || 'Membre', color: FALLBACK_PERSON_COLOR,
         recordIds: [], isTech: false, isCommercial: false,
+        kinds: { intervention: false, commercial: false },
       });
     }
     return byProfile.get(key);
@@ -165,6 +169,8 @@ export function buildTeamList({ members = [], commercials = [] } = {}) {
     const h = ensure(m.user_id, m.display_name);
     h.recordIds.push(m.id);
     h.isTech = true;
+    if (!m.role || m.role === 'technician') h.kinds.intervention = true;
+    if (!m.role || m.role === 'commercial' || m.role === 'admin') h.kinds.commercial = true;
     if (m.calendar_color) h.color = m.calendar_color;
     if (m.display_name) h.displayName = m.display_name;
   }
@@ -173,6 +179,7 @@ export function buildTeamList({ members = [], commercials = [] } = {}) {
     const h = ensure(c.profile_id, c.full_name);
     h.recordIds.push(c.id);
     h.isCommercial = true;
+    h.kinds.commercial = true;
   }
   return Array.from(byProfile.values())
     .sort((a, b) => a.displayName.localeCompare(b.displayName, 'fr'));
@@ -184,6 +191,58 @@ export function matchesKindFilter(appt, kinds) {
   if (k === 'other') return true;
   if (k === 'commercial') return !!kinds?.commercial;
   return !!kinds?.intervention;
+}
+
+// ----------------------------------------------------------------------------
+// Entonnoir des filtres : nature → personnes → type
+// ----------------------------------------------------------------------------
+const NATURES = ['intervention', 'commercial'];
+
+/**
+ * Ce que chaque étage de l'entonnoir peut proposer, compte tenu des étages du
+ * dessus : la nature retient les personnes qui peuvent la porter, la nature et
+ * les personnes choisies retiennent les types. Un type hors nature (congés,
+ * autre) est toujours proposé : il vaut pour toute l'équipe.
+ * @param {{ kinds?: {intervention?: boolean, commercial?: boolean}, memberProfileKeys?: string[] }} filters
+ * @param {Array<{ profileKey: string, kinds?: {intervention?: boolean, commercial?: boolean} }>} teamList
+ * @param {Array<{ value: string }>} types
+ * @returns {{ personnes: Array, types: Array }}
+ */
+export function optionsEntonnoir(filters, teamList = [], types = []) {
+  const natures = NATURES.filter((k) => filters?.kinds?.[k]);
+  const personnes = teamList.filter((h) => natures.some((k) => h.kinds?.[k]));
+  const choisies = personnes.filter((h) => (filters?.memberProfileKeys || []).includes(h.profileKey));
+  const naturesPossibles = choisies.length
+    ? natures.filter((k) => choisies.some((h) => h.kinds?.[k]))
+    : natures;
+  return {
+    personnes,
+    types: types.filter((t) => {
+      const k = appointmentKind(t.value);
+      return k === 'other' || naturesPossibles.includes(k);
+    }),
+  };
+}
+
+/**
+ * Filtres remis en cohérence après un changement d'étage : une personne ou un
+ * type que l'étage du dessus ne propose plus est retiré de la sélection. Équipe
+ * pas encore chargée ⇒ les personnes choisies sont conservées (on ne sait pas).
+ * @param {{ kinds?: object, memberProfileKeys?: string[], appointmentType?: string|null }} filters
+ * @param {Array} teamList
+ * @param {Array<{ value: string }>} types
+ * @returns {object} filtres (mêmes clés, sélection nettoyée)
+ */
+export function purgerFiltres(filters, teamList = [], types = []) {
+  const offertes = new Set(optionsEntonnoir(filters, teamList, types).personnes.map((h) => h.profileKey));
+  const memberProfileKeys = teamList.length
+    ? (filters.memberProfileKeys || []).filter((k) => offertes.has(k))
+    : (filters.memberProfileKeys || []);
+  const typesOfferts = optionsEntonnoir({ ...filters, memberProfileKeys }, teamList, types).types;
+  const appointmentType = typesOfferts.some((t) => t.value === filters.appointmentType)
+    ? filters.appointmentType
+    : null;
+  return { ...filters, memberProfileKeys, appointmentType };
 }
 
 /** RDV visible selon les humains sélectionnés (Set de recordIds). null/vide = tout. */

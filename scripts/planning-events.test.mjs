@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   appointmentKind, buildPersonColorMaps, resolveAppointmentColor,
   buildTeamList, matchesKindFilter, matchesMemberFilter, expandAppointmentBlocks,
+  optionsEntonnoir, purgerFiltres,
   resolveCommercialMemberId, INVOICED_EVENT_COLOR, FALLBACK_PERSON_COLOR, dureeImposee, VT_DURATION_MINUTES, villesDeJournee,
 } from '../src/lib/planningEvents.js';
 
@@ -64,6 +65,69 @@ test('matchesKindFilter: "Autre" toujours visible, buckets respectés', () => {
   assert.equal(matchesKindFilter({ appointment_type: 'rdv_technical' }, { intervention: true, commercial: false }), false);
   assert.equal(matchesKindFilter({ appointment_type: 'rdv_technical' }, { intervention: true, commercial: true }), true);
   assert.equal(matchesKindFilter({ appointment_type: 'maintenance' }, { intervention: true, commercial: false }), true);
+});
+
+// Entonnoir des filtres : rôles réels de l'équipe (technicien / commercial / admin).
+const equipe = buildTeamList({
+  members: [
+    { id: 'tm-antoine', user_id: 'p-antoine', display_name: 'Antoine', role: 'technician' },
+    { id: 'tm-eric', user_id: 'p-eric', display_name: 'Eric', role: 'admin' },
+    { id: 'tm-phil', user_id: 'p-phil', display_name: 'Philippe', role: 'commercial' },
+  ],
+  commercials: [{ id: 'co-phil', profile_id: 'p-phil', full_name: 'Philippe' }],
+});
+const typesRdv = ['rdv_agency', 'rdv_technical', 'rdv_closing', 'installation', 'maintenance', 'service', 'leave', 'other']
+  .map((value) => ({ value }));
+const TOUT = { intervention: true, commercial: true };
+const noms = (liste) => liste.map((h) => h.displayName);
+const valeurs = (liste) => liste.map((t) => t.value);
+
+test('buildTeamList: natures portées selon le rôle planning, rôle absent = les deux', () => {
+  const parNom = Object.fromEntries(equipe.map((h) => [h.displayName, h.kinds]));
+  assert.deepEqual(parNom.Antoine, { intervention: true, commercial: false });
+  assert.deepEqual(parNom.Eric, { intervention: false, commercial: true });
+  assert.deepEqual(parNom.Philippe, { intervention: false, commercial: true });
+  const sansRole = buildTeamList({ members, commercials: [] });
+  assert.ok(sansRole.every((h) => h.kinds.intervention && h.kinds.commercial));
+});
+
+test('optionsEntonnoir: la nature retient les personnes et les types', () => {
+  const tout = optionsEntonnoir({ kinds: TOUT }, equipe, typesRdv);
+  assert.deepEqual(noms(tout.personnes), ['Antoine', 'Eric', 'Philippe']);
+  assert.equal(tout.types.length, typesRdv.length);
+
+  const inter = optionsEntonnoir({ kinds: { intervention: true, commercial: false } }, equipe, typesRdv);
+  assert.deepEqual(noms(inter.personnes), ['Antoine']);
+  assert.deepEqual(valeurs(inter.types), ['installation', 'maintenance', 'service', 'leave', 'other']);
+
+  const com = optionsEntonnoir({ kinds: { intervention: false, commercial: true } }, equipe, typesRdv);
+  assert.deepEqual(noms(com.personnes), ['Eric', 'Philippe']);
+  assert.deepEqual(valeurs(com.types), ['rdv_agency', 'rdv_technical', 'rdv_closing', 'leave', 'other']);
+});
+
+test('optionsEntonnoir: les personnes choisies retiennent les types (Eric ≠ installation)', () => {
+  const eric = optionsEntonnoir({ kinds: TOUT, memberProfileKeys: ['p-eric'] }, equipe, typesRdv);
+  assert.deepEqual(valeurs(eric.types), ['rdv_agency', 'rdv_technical', 'rdv_closing', 'leave', 'other']);
+  const mixte = optionsEntonnoir({ kinds: TOUT, memberProfileKeys: ['p-eric', 'p-antoine'] }, equipe, typesRdv);
+  assert.equal(mixte.types.length, typesRdv.length);
+});
+
+test('purgerFiltres: retire ce que l’étage du dessus ne propose plus', () => {
+  const avant = { kinds: { intervention: true, commercial: false }, memberProfileKeys: ['p-eric', 'p-antoine'], appointmentType: 'rdv_technical', status: null };
+  const apres = purgerFiltres(avant, equipe, typesRdv);
+  assert.deepEqual(apres.memberProfileKeys, ['p-antoine']);
+  assert.equal(apres.appointmentType, null);
+  assert.equal(apres.status, null);
+
+  // Type conservé s'il reste possible ; congés toujours possibles.
+  const garde = purgerFiltres({ kinds: TOUT, memberProfileKeys: ['p-eric'], appointmentType: 'leave' }, equipe, typesRdv);
+  assert.equal(garde.appointmentType, 'leave');
+  const perdu = purgerFiltres({ kinds: TOUT, memberProfileKeys: ['p-eric'], appointmentType: 'installation' }, equipe, typesRdv);
+  assert.equal(perdu.appointmentType, null);
+
+  // Équipe pas encore chargée : on ne retire personne.
+  const attente = purgerFiltres({ kinds: TOUT, memberProfileKeys: ['p-eric'], appointmentType: null }, [], typesRdv);
+  assert.deepEqual(attente.memberProfileKeys, ['p-eric']);
 });
 
 test('matchesMemberFilter: match via commercial OU technicien, vide = tout', () => {
