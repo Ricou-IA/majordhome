@@ -415,6 +415,15 @@ html[data-device-class="tablet"] .fc .fc-list-day-cushion {
   display: block;
 }
 
+/* Hauteur réservée aux lignes de charge (Planning.jsx pose --mdh-head-h, calculée par
+   hauteurEnTeteReservee de src/lib/planningCharge.js). Au changement de semaine, le
+   calendrier dessine les cellules une fraction de seconde avant leur contenu : sans
+   cette réserve, l'en-tête tombait de 107 à 17 px et la grille sautait. Sur une
+   cellule de tableau, `height` vaut hauteur minimale. */
+.fc-wrapper .fc-col-header-cell.fc-day {
+  height: var(--mdh-head-h, auto);
+}
+
 /* =============================================================================
    UTILITIES
    ============================================================================= */

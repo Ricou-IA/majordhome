@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  chargeDuJour, joursDeLaPlage, lignesDeCharge, lignesMaxParJour, panneauDeLigne, sortJourneeDemandee,
+  chargeDuJour, joursDeLaPlage, lignesDeCharge, lignesMaxParJour, hauteurEnTeteReservee, panneauDeLigne, sortJourneeDemandee,
 } from '../src/lib/planningCharge.js';
 
 const SEMAINE = { monday: { active: true, start: '08:00', end: '17:00' }, tuesday: { active: true, start: '08:00', end: '17:00' },
@@ -189,4 +189,10 @@ test('lignesMaxParJour : hauteur d’en-tête à réserver', () => {
   assert.equal(lignesMaxParJour(lignes), 3);
   assert.equal(lignesMaxParJour(new Map()), 0);
   assert.equal(lignesMaxParJour(null), 0);
+  // 3 lignes : 24 + 3 × 20,86 − 2 = 84,58 → 84 px (arrondi par défaut, jamais plus haut que le réel).
+  assert.equal(hauteurEnTeteReservee(lignes), 84);
+  // 4 lignes : 105 px, pour 106 px mesurés en ligne.
+  lignes.set('2026-11-09|luc', { date: '2026-11-09' });
+  assert.equal(hauteurEnTeteReservee(lignes), 105);
+  assert.equal(hauteurEnTeteReservee(new Map()), null);
 });

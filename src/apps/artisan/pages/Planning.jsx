@@ -128,7 +128,7 @@ export default function Planning() {
   // planningCa.js). `orgId` du Planning = org CORE, attendue par le moteur de tournées.
   const {
     recordIdsFiltres, etatsJournees, journeesHorizon, etatsLoading, etatsError,
-    lignes: lignesCharge, lignesReservees, ca: caPlanning, caError, caCumul,
+    lignes: lignesCharge, hauteurEnTete, ca: caPlanning, caError, caCumul,
   } = usePlanningCharge({
     orgId,
     startDate: dateRange.startDate,
@@ -174,14 +174,13 @@ export default function Planning() {
         texte={arg.text}
         date={arg.date.toLocaleDateString('fr-CA')}
         lignes={lignesCharge}
-        reserve={lignesReservees}
         ca={caPlanning}
         caError={caError}
         filtreEquipe={!!recordIdsFiltres}
         onOpen={ouvrirJournee}
       />
     );
-  }, [voitCharge, lignesCharge, lignesReservees, ouvrirJournee, caPlanning, caError, recordIdsFiltres]);
+  }, [voitCharge, lignesCharge, ouvrirJournee, caPlanning, caError, recordIdsFiltres]);
 
   // Impression pour UNE personne : feuille de route en vue Jour, planning de la
   // semaine en vue Semaine (usePlanningImpression).
@@ -270,7 +269,12 @@ export default function Planning() {
           </div>
         )}
 
-        <div className="fc-wrapper">
+        {/* Hauteur d'en-tête réservée (lignes de charge) : la grille ne saute pas au changement
+            de semaine. Jamais en vue Mois, qui n'a pas de lignes. */}
+        <div
+          className="fc-wrapper"
+          style={hauteurEnTete && currentView !== 'dayGridMonth' ? { '--mdh-head-h': `${hauteurEnTete}px` } : undefined}
+        >
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}

@@ -15,7 +15,7 @@
 import { useMemo } from 'react';
 import { useEtatsJournees } from '@hooks/useTournees';
 import { usePlanningCa } from '@hooks/usePlanningCa';
-import { lignesDeCharge, lignesMaxParJour } from '@/lib/planningCharge';
+import { lignesDeCharge, hauteurEnTeteReservee } from '@/lib/planningCharge';
 import { cumulPeriode } from '@/lib/planningCa';
 
 const AUCUNE_LIGNE = new Map();
@@ -66,8 +66,8 @@ export function usePlanningCharge({
     });
   }, [voitCharge, etatsJournees, etatsLoading, members, appointments, rdvsPartiels, rdvsEnChargement, startDate, endDate, recordIdsFiltres]);
 
-  // Hauteur d'en-tête à réserver (cf. lignesMaxParJour).
-  const lignesReservees = useMemo(() => lignesMaxParJour(lignes), [lignes]);
+  // Hauteur d'en-tête à réserver, en pixels (cf. hauteurEnTeteReservee).
+  const hauteurEnTete = useMemo(() => hauteurEnTeteReservee(lignes), [lignes]);
 
   // CA HT programmé : total du jour et part par technicien. `null` tant que le
   // chiffre est inconnu — on n'affiche alors rien, jamais 0.
@@ -89,6 +89,6 @@ export function usePlanningCharge({
   }, [voitCharge, caError, ca, periode]);
 
   return {
-    recordIdsFiltres, etatsJournees, journeesHorizon, etatsLoading, etatsError, lignes, lignesReservees, ca, caError, caCumul,
+    recordIdsFiltres, etatsJournees, journeesHorizon, etatsLoading, etatsError, lignes, hauteurEnTete, ca, caError, caCumul,
   };
 }

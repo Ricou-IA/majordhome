@@ -177,10 +177,7 @@ export function lignesDeCharge({
 }
 
 /**
- * Plus grand nombre de lignes de charge portées par un même jour. L'en-tête du
- * calendrier réserve cette hauteur : au changement de semaine, les nouveaux jours
- * sont dessinés une fraction de seconde avant leurs lignes — sans réserve, l'en-tête
- * se vide et toute la grille remonte puis redescend (90 px mesurés le 2026-11-15).
+ * Plus grand nombre de lignes de charge portées par un même jour.
  * @param {Map<string, { date: string }>|null|undefined} lignes
  * @returns {number}
  */
@@ -188,6 +185,27 @@ export function lignesMaxParJour(lignes) {
   const parJour = new Map();
   for (const ligne of lignes?.values() || []) parJour.set(ligne.date, (parJour.get(ligne.date) || 0) + 1);
   return Math.max(0, ...parJour.values());
+}
+
+// Gabarit d'un en-tête de jour, en pixels (mesuré en ligne le 2026-11-15). À tenir
+// aligné avec PlanningDayHeader / JourneeEtatChips : ligne du jour 16 px + marges de la
+// cellule 4 px + marge du bloc de lignes 4 px, puis 18,86 px par ligne et 2 px entre deux.
+const HAUTEUR_JOUR = 24;
+const HAUTEUR_LIGNE = 20.86;
+const ECART_LIGNES = 2;
+
+/**
+ * Hauteur à réserver pour les cellules d'en-tête du calendrier. Au changement de
+ * semaine, le calendrier dessine les nouveaux jours une fraction de seconde avant
+ * d'y poser leur contenu : sans réserve, l'en-tête se vide et toute la grille
+ * remonte puis redescend (90 px mesurés). Arrondie par défaut — jamais plus haute
+ * que le contenu réel.
+ * @param {Map<string, { date: string }>|null|undefined} lignes
+ * @returns {number|null}  pixels ; null = rien à réserver
+ */
+export function hauteurEnTeteReservee(lignes) {
+  const n = lignesMaxParJour(lignes);
+  return n > 0 ? Math.floor(HAUTEUR_JOUR + n * HAUTEUR_LIGNE - ECART_LIGNES) : null;
 }
 
 /**
