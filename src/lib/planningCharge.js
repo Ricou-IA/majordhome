@@ -165,3 +165,37 @@ export function lignesDeCharge({
   }
   return lignes;
 }
+
+/**
+ * Panneau qu'ouvre le clic sur une ligne de charge : la feuille de route seule pour
+ * une journée d'interventions que le moteur ne juge pas (technicien hors tournées,
+ * jour passé), le panneau de remplissage sinon.
+ * @param {{ etat?: string }|null|undefined} ligne
+ * @returns {'feuille'|'journee'}
+ */
+export function panneauDeLigne(ligne) {
+  return ligne?.etat === 'manuelle' || ligne?.etat === 'sans_etat' ? 'feuille' : 'journee';
+}
+
+/**
+ * Sort d'une journée demandée au panneau de remplissage (clic sur une ligne, ou
+ * lien direct `/planning?journee=&tech=`) quand elle n'est pas dans l'horizon du moteur.
+ *   - `attendre` : les tournées chargent encore, ou la plage affichée ne couvre pas la date ;
+ *   - `erreur`   : le chargement des tournées a échoué ;
+ *   - `absente`  : le moteur ne planifie pas cette journée (jour passé, non travaillé, hors tournées).
+ * @param {object} p
+ * @param {{ date: string }|null} p.demandee
+ * @param {object|null} p.trouvee        la journée dans l'horizon, si elle y est
+ * @param {Error|null} [p.erreur]
+ * @param {boolean} [p.enChargement]
+ * @param {boolean} [p.horizonConnu]
+ * @param {string|null} [p.finPlage]     borne exclusive de la plage affichée
+ * @returns {'aucune'|'ouverte'|'attendre'|'erreur'|'absente'}
+ */
+export function sortJourneeDemandee({ demandee, trouvee, erreur = null, enChargement = false, horizonConnu = false, finPlage = null }) {
+  if (!demandee) return 'aucune';
+  if (trouvee) return 'ouverte';
+  if (erreur) return 'erreur';
+  if (enChargement || !horizonConnu || !finPlage || demandee.date >= finPlage) return 'attendre';
+  return 'absente';
+}

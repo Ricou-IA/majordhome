@@ -10,14 +10,15 @@
  *   - vignette d'un RDV .... components/planning/PlanningEventContent.jsx (règles : lib/planningVignette.js)
  *   - charge et CA du jour . hooks/usePlanningCharge.js + components/planning/PlanningDayHeader.jsx
  *                            (règles : lib/planningCharge.js, lib/planningCa.js)
+ *   - journée d'un technicien hooks/usePlanningJournee.js (règles : lib/planningCharge.js)
+ *   - impression .......... hooks/usePlanningImpression.js (règles : lib/planningPrintModel.js)
  * Une nouvelle règle va dans le module pur concerné, avec son test — pas ici.
  *
  * @version 2.0.0 - Sprint 2 : FullCalendar + CRUD RDV
  * ============================================================================
  */
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -29,14 +30,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
 import { usePlanningCharge } from '@hooks/usePlanningCharge';
-import { useClientEquipmentLabels } from '@hooks/useClients';
-import { useOrgSettings } from '@hooks/useOrgSettings';
+import { usePlanningJournee } from '@hooks/usePlanningJournee';
+import { usePlanningImpression } from '@hooks/usePlanningImpression';
 import { useDeviceClass } from '@hooks/useDeviceClass';
 import { isoWeekNumber } from '@/lib/planningPrintModel';
-import { telechargerPlanningHebdo } from '@/apps/artisan/components/planning/planningPrintExport';
-import { telechargerFeuilleDeRoute } from '@/apps/artisan/components/planning/feuilleDeRouteExport';
 import { FeuilleDeRoutePanel } from '@/apps/artisan/components/planning/FeuilleDeRoutePanel';
-import { useFeuilleDeRoute } from '@hooks/useFeuilleDeRoute';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { CalendarToolbar } from '@/apps/artisan/components/planning/CalendarToolbar';
 import { CalendarFilters } from '@/apps/artisan/components/planning/CalendarFilters';
@@ -95,7 +93,6 @@ export default function Planning() {
   const [modalState, setModalState] = useState({ open: false, mode: 'create', appointment: null, defaultDate: null, defaultTime: null });
   const [selectedChantier, setSelectedChantier] = useState(null);
   const [loadingChantier, setLoadingChantier] = useState(false);
-  const [isPrinting, setIsPrinting] = useState(false);
   // Client recherché depuis la barre d'outils (ses RDV s'affichent sous les filtres)
   const [searchedClient, setSearchedClient] = useState(null);
   // RDV du client recherché (surlignés dans le calendrier) — null = pas de recherche
@@ -125,8 +122,6 @@ export default function Planning() {
   });
 
   const { members } = useTeamMembers(orgId);
-  const { labelsByClientId } = useClientEquipmentLabels();
-  const { settings: orgSettings } = useOrgSettings();
 
   // Charge de la plage visible : état de chaque journée de technicien, lignes sous
   // l'en-tête du jour, CA HT programmé (règles : src/lib/planningCharge.js et
@@ -149,58 +144,11 @@ export default function Planning() {
     voitCharge,
   });
 
-  // Journée ouverte dans le panneau de remplissage : clic sur une puce, ou lien
-  // direct depuis le tableau de bord des entretiens (/planning?journee=&tech=,
-  // cf. lienJourneePlanning). On garde la CLÉ, pas l'objet : la journée affichée
-  // est dérivée en direct de l'horizon, pour qu'un nouvel essai après une pose
-  // voie la charge à jour et non l'état capturé au clic.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [journeeOuverte, setJourneeOuverte] = useState(() => {
-    const date = searchParams.get('journee');
-    const technicienId = searchParams.get('tech');
-    return date && technicienId ? { date, technicienId } : null;
-  });
-  const [dateInitiale] = useState(() => searchParams.get('journee') || undefined);
-  // Technicien hors tournées (puce « À la main ») : pas de remplissage, sa feuille de route seule.
-  const [feuilleOuverte, setFeuilleOuverte] = useState(null);
-  const ouvrirJournee = useCallback((item) => {
-    // Journée que le moteur ne juge pas (hors tournées, jour passé) : la feuille de route seule.
-    if (item.etat === 'manuelle' || item.etat === 'sans_etat') {
-      setFeuilleOuverte(item);
-      return;
-    }
-    setJourneeOuverte({ date: item.date, technicienId: item.technicienId });
-  }, []);
-  const fermerJournee = useCallback(() => {
-    setJourneeOuverte(null);
-    // Le lien direct a servi : sans ce nettoyage, un rechargement rouvrirait le panneau.
-    if (searchParams.has('journee') || searchParams.has('tech')) {
-      const next = new URLSearchParams(searchParams);
-      next.delete('journee');
-      next.delete('tech');
-      setSearchParams(next, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
-  const journeeSelectionnee = useMemo(() => {
-    if (!journeeOuverte || !journeesHorizon) return null;
-    return journeesHorizon.find(
-      (j) => j.date === journeeOuverte.date && j.technicienId === journeeOuverte.technicienId,
-    ) || null;
-  }, [journeeOuverte, journeesHorizon]);
-  // Journée demandée mais absente de l'horizon chargé (jour passé, non travaillé,
-  // technicien planifié « à la main ») : on le dit, plutôt qu'un lien qui n'ouvre
-  // rien. Tant que la plage visible ne couvre pas la date, on attend son chargement.
-  useEffect(() => {
-    if (!journeeOuverte || journeeSelectionnee) return;
-    if (etatsError) {
-      toast.error(`Journée indisponible — chargement des tournées en échec (${etatsError.message || 'échec inconnu'})`);
-      fermerJournee();
-      return;
-    }
-    if (etatsLoading || !journeesHorizon || !dateRange.endDate || journeeOuverte.date >= dateRange.endDate) return;
-    toast.info('Cette journée n’est pas planifiée par la machine (jour passé, non travaillé, ou technicien planifié à la main).');
-    fermerJournee();
-  }, [journeeOuverte, journeeSelectionnee, etatsError, etatsLoading, journeesHorizon, dateRange.endDate, fermerJournee]);
+  // Journée d'un technicien ouverte par sa ligne de charge ou par lien direct :
+  // panneau de remplissage, ou feuille de route seule (usePlanningJournee).
+  const {
+    dateInitiale, journeeSelectionnee, feuilleOuverte, ouvrirJournee, fermerJournee, fermerFeuille,
+  } = usePlanningJournee({ journeesHorizon, etatsLoading, etatsError, finPlage: dateRange.endDate });
 
   // Sur appareil tenu en main : ouvrir sur SON planning (profileKey = user.id,
   // clé d'unification de teamList). Appliqué une seule fois, dès que l'équipe
@@ -232,70 +180,16 @@ export default function Planning() {
     );
   }, [voitCharge, lignesCharge, ouvrirJournee, caPlanning, caError, recordIdsFiltres]);
 
-  // ==========================================================================
-  // IMPRESSION — UNE personne (1 chip équipe) : planning hebdo en vue Semaine,
-  // feuille de route (interventions + itinéraire) en vue Jour
-  // ==========================================================================
-
-  const printPerson = filters.memberProfileKeys?.length === 1
-    ? teamList.find((h) => h.profileKey === filters.memberProfileKeys[0])
-    : null;
-  // Les vues liste (appareils mobiles) impriment comme leur équivalent grille.
-  const isDayView = currentView === 'timeGridDay' || currentView === 'listDay';
-  const isWeekView = currentView === 'timeGridWeek' || currentView === 'listWeek';
-  const printHint = !isWeekView && !isDayView
-    ? 'Passez en vue Semaine ou Jour pour imprimer'
-    : !printPerson
-      ? 'Sélectionnez une seule personne dans les filtres équipe'
-      : null;
-  const printLabel = isDayView
-    ? 'Imprimer la feuille de route du jour (PDF)'
-    : 'Imprimer le planning de la semaine (PDF)';
-
-  // Même modèle que le panneau journée : l'impression ne recalcule rien.
-  const feuilleImpression = useFeuilleDeRoute({
+  // Impression pour UNE personne : feuille de route en vue Jour, planning de la
+  // semaine en vue Semaine (usePlanningImpression).
+  const { printHint, printLabel, isPrinting, handlePrint } = usePlanningImpression({
     orgId,
-    date: isDayView && printPerson ? dateRange.startDate : null,
-    memberIds: printPerson?.recordIds || [],
-    person: printPerson,
+    vue: currentView,
+    startDate: dateRange.startDate,
+    memberProfileKeys: filters.memberProfileKeys,
+    teamList,
+    events,
   });
-
-  const handlePrint = useCallback(async () => {
-    if (!printPerson || !dateRange.startDate) return;
-    if (isDayView) {
-      if (!feuilleImpression.feuille || feuilleImpression.isLoading) {
-        toast.info('Feuille de route en cours de calcul, réessayez dans un instant.');
-        return;
-      }
-      setIsPrinting(true);
-      try {
-        await telechargerFeuilleDeRoute({
-          feuille: feuilleImpression.feuille, carteUrl: feuilleImpression.carteUrl, settings: orgSettings,
-        });
-      } catch (err) {
-        toast.error(`Impression impossible : ${err?.message || 'erreur inconnue'}`);
-      } finally {
-        setIsPrinting(false);
-      }
-      return;
-    }
-    setIsPrinting(true);
-    try {
-      // events = blocs calendrier déjà filtrés sur la personne ; le modèle
-      // déduplique par id (RDV multi-tech éclaté en plusieurs blocs).
-      await telechargerPlanningHebdo({
-        appointments: events.map((e) => e.extendedProps),
-        person: printPerson,
-        weekStart: dateRange.startDate,
-        equipmentLabelsByClient: labelsByClientId,
-        settings: orgSettings,
-      });
-    } catch (err) {
-      toast.error(`Impression impossible : ${err?.message || 'erreur inconnue'}`);
-    } finally {
-      setIsPrinting(false);
-    }
-  }, [printPerson, dateRange.startDate, isDayView, feuilleImpression, events, labelsByClientId, orgSettings]);
 
   // ==========================================================================
   // HANDLERS FULLCALENDAR
@@ -642,7 +536,7 @@ export default function Planning() {
 
       {/* Feuille de route d'un technicien hors tournées — clic sur sa puce « À la main » */}
       {feuilleOuverte && (
-        <FeuilleDeRoutePanel journee={feuilleOuverte} onClose={() => setFeuilleOuverte(null)} />
+        <FeuilleDeRoutePanel journee={feuilleOuverte} onClose={fermerFeuille} />
       )}
 
       {/* Modale Chantier — clic sur slot chantier (Phase 0) */}

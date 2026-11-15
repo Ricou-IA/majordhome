@@ -46,6 +46,40 @@ export function isoWeekNumber(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
+/**
+ * Personne dont on imprime le planning : celle du filtre équipe, s'il n'y en a qu'UNE.
+ * @param {string[]|null|undefined} memberProfileKeys  filtre équipe du calendrier
+ * @param {Array<{ profileKey: string }>|null|undefined} teamList
+ * @returns {object|null}
+ */
+export function personneImprimee(memberProfileKeys, teamList) {
+  if ((memberProfileKeys || []).length !== 1) return null;
+  return (teamList || []).find((h) => h.profileKey === memberProfileKeys[0]) || null;
+}
+
+/**
+ * Ce que fait le bouton « Imprimer » du Planning selon la vue et la personne :
+ * la feuille de route en vue Jour, le planning de la semaine en vue Semaine (les
+ * vues liste des appareils mobiles impriment comme leur équivalent en grille).
+ * @param {{ vue?: string, personne?: object|null }} p
+ * @returns {{ mode: 'jour'|'semaine'|null, raison: string|null, libelle: string }}
+ *   `mode` null = impression impossible, `raison` dit pourquoi (info-bulle du bouton)
+ */
+export function consignesImpression({ vue, personne } = {}) {
+  const jour = vue === 'timeGridDay' || vue === 'listDay';
+  const semaine = vue === 'timeGridWeek' || vue === 'listWeek';
+  const raison = !jour && !semaine
+    ? 'Passez en vue Semaine ou Jour pour imprimer'
+    : !personne
+      ? 'Sélectionnez une seule personne dans les filtres équipe'
+      : null;
+  return {
+    mode: raison ? null : (jour ? 'jour' : 'semaine'),
+    raison,
+    libelle: jour ? 'Imprimer la feuille de route du jour (PDF)' : 'Imprimer le planning de la semaine (PDF)',
+  };
+}
+
 /** « 7 au 11 septembre 2026 » / « 28 septembre au 2 octobre 2026 ». */
 export function formatWeekRange(startISO, endISO) {
   const start = parseISODate(startISO);

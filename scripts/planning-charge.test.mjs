@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chargeDuJour, joursDeLaPlage, lignesDeCharge } from '../src/lib/planningCharge.js';
+import {
+  chargeDuJour, joursDeLaPlage, lignesDeCharge, panneauDeLigne, sortJourneeDemandee,
+} from '../src/lib/planningCharge.js';
 
 const SEMAINE = { monday: { active: true, start: '08:00', end: '17:00' }, tuesday: { active: true, start: '08:00', end: '17:00' },
   wednesday: { active: true, start: '08:00', end: '17:00' }, thursday: { active: true, start: '08:00', end: '17:00' },
@@ -132,4 +134,27 @@ test('lignesDeCharge : filtre équipe', () => {
   const lignes = lignesDeCharge({ ...base, filtreIds: new Set(['moh']), rdvs: [rdv('2026-11-10', 'maintenance', ['ant'])] });
   assert.equal([...lignes.keys()].every((k) => k.endsWith('|moh')), true);
   assert.equal(lignes.size, 5);
+});
+
+test('panneauDeLigne : feuille de route pour une journée sans verdict du moteur', () => {
+  assert.equal(panneauDeLigne({ etat: 'manuelle' }), 'feuille');
+  assert.equal(panneauDeLigne({ etat: 'sans_etat' }), 'feuille');
+  for (const etat of ['vide', 'ouverte', 'pleine', 'figee', 'a_arbitrer']) assert.equal(panneauDeLigne({ etat }), 'journee', etat);
+  assert.equal(panneauDeLigne(null), 'journee');
+});
+
+test('sortJourneeDemandee : attendre, erreur, ou journée absente de l’horizon', () => {
+  const demandee = { date: '2026-11-18', technicienId: 'ant' };
+  const connu = { demandee, trouvee: null, horizonConnu: true, finPlage: '2026-11-23' };
+  assert.equal(sortJourneeDemandee({ demandee: null, trouvee: null }), 'aucune');
+  assert.equal(sortJourneeDemandee({ ...connu, trouvee: { date: '2026-11-18' } }), 'ouverte');
+  // Une journée trouvée reste ouverte même si un rechargement échoue ensuite.
+  assert.equal(sortJourneeDemandee({ ...connu, trouvee: {}, erreur: new Error('x') }), 'ouverte');
+  assert.equal(sortJourneeDemandee({ ...connu, erreur: new Error('x') }), 'erreur');
+  assert.equal(sortJourneeDemandee({ ...connu, enChargement: true }), 'attendre');
+  assert.equal(sortJourneeDemandee({ ...connu, horizonConnu: false }), 'attendre');
+  assert.equal(sortJourneeDemandee({ ...connu, finPlage: null }), 'attendre');
+  // Lien direct vers une date que la plage affichée ne couvre pas encore.
+  assert.equal(sortJourneeDemandee({ ...connu, finPlage: '2026-11-16' }), 'attendre');
+  assert.equal(sortJourneeDemandee(connu), 'absente');
 });

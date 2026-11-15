@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isoWeekNumber, formatWeekRange, buildWeeklyPlanningModel, buildPlanningFilename,
+  personneImprimee, consignesImpression,
 } from '../src/lib/planningPrintModel.js';
 import { buildEquipmentLabelsByClient } from '../src/lib/equipmentIcons.js';
 
@@ -116,4 +117,32 @@ test('buildEquipmentLabelsByClient : tous les équipements, même sans icône, l
   assert.deepEqual(map.get('c1'), ['Poêle à granulés', 'Poêle hydro']);
   assert.deepEqual(map.get('c2'), ['chaudiere_gaz']);
   assert.equal(map.size, 2);
+});
+
+test('personneImprimee : une seule personne dans le filtre équipe, sinon personne', () => {
+  const equipe = [{ profileKey: 'p-moh', displayName: 'Mohammed Ben' }, { profileKey: 'p-ant', displayName: 'Antoine Verloo' }];
+  assert.equal(personneImprimee(['p-moh'], equipe).displayName, 'Mohammed Ben');
+  assert.equal(personneImprimee([], equipe), null);
+  assert.equal(personneImprimee(['p-moh', 'p-ant'], equipe), null);
+  assert.equal(personneImprimee(['inconnu'], equipe), null);
+  assert.equal(personneImprimee(null, null), null);
+});
+
+test('consignesImpression : feuille de route en vue Jour, semaine en vue Semaine', () => {
+  const personne = { profileKey: 'p-moh' };
+  assert.equal(consignesImpression({ vue: 'timeGridDay', personne }).mode, 'jour');
+  assert.equal(consignesImpression({ vue: 'listDay', personne }).mode, 'jour');
+  assert.equal(consignesImpression({ vue: 'timeGridWeek', personne }).mode, 'semaine');
+  assert.equal(consignesImpression({ vue: 'listWeek', personne }).mode, 'semaine');
+  assert.equal(consignesImpression({ vue: 'timeGridDay', personne }).raison, null);
+  assert.match(consignesImpression({ vue: 'timeGridDay', personne }).libelle, /feuille de route/);
+  assert.match(consignesImpression({ vue: 'timeGridWeek', personne }).libelle, /semaine/);
+  // Vue Mois : impossible, quelle que soit la personne.
+  const mois = consignesImpression({ vue: 'dayGridMonth', personne });
+  assert.equal(mois.mode, null);
+  assert.match(mois.raison, /vue Semaine ou Jour/);
+  // Personne non choisie (ou plusieurs) : on dit quoi faire.
+  const sans = consignesImpression({ vue: 'timeGridWeek', personne: null });
+  assert.equal(sans.mode, null);
+  assert.match(sans.raison, /une seule personne/);
 });
