@@ -210,8 +210,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
       toast.success(`Statut mis à jour`);
       onUpdated?.();
       onClose();
-    } catch {
-      toast.error('Erreur de transition');
+    } catch (err) {
+      // Recul refusé : une pose à venir retient la carte, le service dit laquelle.
+      toast.error(err?.code === 'pose_a_venir' ? err.message : 'Erreur de transition');
     }
   };
 

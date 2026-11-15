@@ -212,3 +212,29 @@ export function poseProvisoire(chantier) {
   if (STATUTS_TERMINES.has(chantier.chantier_status)) return false;
   return !approsRecues(chantier.equipment_order_status, chantier.materials_order_status);
 }
+
+/** Statuts chantier en amont de « Planification » : y passer, c'est faire reculer la carte. */
+export const STATUTS_AMONT_PLANIFICATION = ['gagne', 'commande_a_faire', 'commande_recue'];
+/** RDV qui ne retiennent plus la carte (mêmes statuts que le reflux d'`appointments.service`). */
+const RDV_INACTIFS = new Set(['cancelled', 'no_show']);
+
+/**
+ * Un chantier ne recule pas en amont de « Planification » tant qu'un jour
+ * d'installation à venir (aujourd'hui compris) est posé : la carte suit le planning
+ * (règle 2026-10-07). Vécu DJAFOUR, 2026-11-02 : le bouton de retour remettait la
+ * carte en « À planifier » avec une pose au planning, et plus rien ne l'en sortait.
+ * Un jour PASSÉ ne retient rien : pose non faite = à replanifier, le recul est voulu.
+ * @param {string} statutCible statut demandé
+ * @param {Array<{scheduled_date?: string|null, status?: string|null}>|null} rdvs RDV d'installation du chantier
+ * @param {string} aujourdhui date locale 'YYYY-MM-DD'
+ * @returns {string|null} motif du refus (à afficher tel quel), ou null si le geste est permis
+ */
+export function refusReculChantier(statutCible, rdvs, aujourdhui) {
+  if (!STATUTS_AMONT_PLANIFICATION.includes(statutCible)) return null;
+  const aVenir = (Array.isArray(rdvs) ? rdvs : [])
+    .filter((r) => r?.scheduled_date && !RDV_INACTIFS.has(r.status) && r.scheduled_date >= aujourdhui)
+    .map((r) => r.scheduled_date)
+    .sort();
+  if (aVenir.length === 0) return null;
+  return `Une installation est posée le ${dateCourte(aVenir[0])} : retirez ce jour du planning avant de faire reculer le chantier.`;
+}

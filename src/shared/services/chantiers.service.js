@@ -12,7 +12,8 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@lib/serviceHelpers';
 import { storageService } from '@services/storage.service';
-import { approsRecues } from '@/lib/installOrder';
+import { approsRecues, refusReculChantier, STATUTS_AMONT_PLANIFICATION } from '@/lib/installOrder';
+import { formatDateForInput } from '@/lib/utils';
 
 // ============================================================================
 // CONSTANTES
@@ -39,6 +40,8 @@ export const ORDER_STATUSES = [
  * d'installation est posé (`syncCardStateOnCreate`) et en ressort quand le dernier
  * est annulé — le bouton « Planification → » depuis « À planifier » déplaçait la
  * carte sans RDV (CHABBERT, GAYRAN, 2026-10-27).
+ * Les retours vers l'amont sont refusés par `updateChantierStatus` tant qu'une pose
+ * à venir est au planning (`refusReculChantier`, DJAFOUR 2026-11-02).
  */
 export const CHANTIER_TRANSITIONS = {
   gagne: ['commande_a_faire'],
@@ -109,6 +112,28 @@ async function patchChantier(orgId, chantierId, patch) {
   return data;
 }
 
+/**
+ * Garde du recul d'un chantier : une pose à venir au planning le retient (règle pure
+ * `refusReculChantier`). Lecture des RDV en échec ⇒ refus aussi : on ne devine pas.
+ * L'erreur porte `code = 'pose_a_venir'` et un message à afficher tel quel.
+ */
+async function verifierRecul(chantierId, newStatus) {
+  if (!STATUTS_AMONT_PLANIFICATION.includes(newStatus)) return;
+  const aujourdhui = formatDateForInput(new Date());
+  const { data, error } = await supabase
+    .from('majordhome_appointments')
+    .select('scheduled_date, status')
+    .eq('chantier_id', chantierId)
+    .eq('appointment_type', 'installation')
+    .gte('scheduled_date', aujourdhui);
+  if (error) throw error;
+  const refus = refusReculChantier(newStatus, data, aujourdhui);
+  if (!refus) return;
+  const err = new Error(refus);
+  err.code = 'pose_a_venir';
+  throw err;
+}
+
 async function rpc(name, params, label) {
   return withErrorHandling(async () => {
     const { data, error } = await supabase.rpc(name, params);
@@ -145,6 +170,7 @@ export const chantiersService = {
     const validStatuses = CHANTIER_STATUSES.map((s) => s.value);
     if (!validStatuses.includes(newStatus)) throw new Error(`[chantiers] Statut invalide: ${newStatus}`);
     return withErrorHandling(async () => {
+      await verifierRecul(chantierId, newStatus);
       const patch = { chantier_status: newStatus };
       if (newStatus === 'planification') patch.planification_date = new Date().toISOString().split('T')[0];
       return patchChantier(orgId, chantierId, patch);

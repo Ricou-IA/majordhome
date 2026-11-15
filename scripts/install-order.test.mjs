@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   chevauche, fusionnerCreneau, basculerJournee, etatCommande, libelleCommande, joursDepuisRdv,
-  approsRecues, poseProvisoire,
+  approsRecues, poseProvisoire, refusReculChantier,
 } from '../src/lib/installOrder.js';
 
 // ── chevauche ─────────────────────────────────────────────────────────────
@@ -255,4 +255,49 @@ test('poseProvisoire : un chantier réceptionné ou facturé n’est jamais prov
   assert.equal(poseProvisoire({ chantier_status: 'realise', equipment_order_status: null, materials_order_status: null }), false);
   assert.equal(poseProvisoire({ chantier_status: 'facture', equipment_order_status: 'commande', materials_order_status: null }), false);
   assert.equal(poseProvisoire(null), false);
+});
+
+// ── refusReculChantier ────────────────────────────────────────────────────
+// DJAFOUR, 2026-11-02 : deux jours passés (23/09) et une pose à venir (01/12), carte
+// remise en « À planifier » par le bouton de retour alors que la pose restait au planning.
+const rdvDjafour = [
+  { scheduled_date: '2026-09-23', status: 'scheduled' },
+  { scheduled_date: '2026-09-23', status: 'scheduled' },
+  { scheduled_date: '2026-12-01', status: 'scheduled' },
+];
+
+test('refusReculChantier : pose à venir ⇒ le chantier ne recule pas, la date est dite', () => {
+  const refus = refusReculChantier('commande_recue', rdvDjafour, '2026-11-02');
+  assert.match(refus, /01\/12/);
+  assert.match(refusReculChantier('commande_a_faire', rdvDjafour, '2026-11-02'), /01\/12/);
+  assert.match(refusReculChantier('gagne', rdvDjafour, '2026-11-02'), /01\/12/);
+});
+
+test('refusReculChantier : une pose du jour même compte comme à venir', () => {
+  assert.match(refusReculChantier('commande_recue', [{ scheduled_date: '2026-12-01', status: 'scheduled' }], '2026-12-01'), /01\/12/);
+});
+
+test('refusReculChantier : la plus proche des poses à venir est citée', () => {
+  const rdvs = [{ scheduled_date: '2026-12-03', status: 'scheduled' }, { scheduled_date: '2026-12-01', status: 'confirmed' }];
+  assert.match(refusReculChantier('commande_recue', rdvs, '2026-11-15'), /01\/12/);
+});
+
+test('refusReculChantier : jours passés seulement ⇒ recul permis (pose non faite, à replanifier)', () => {
+  assert.equal(refusReculChantier('commande_recue', rdvDjafour.slice(0, 2), '2026-11-02'), null);
+});
+
+test('refusReculChantier : un jour annulé ou non honoré ne retient pas la carte', () => {
+  const rdvs = [{ scheduled_date: '2026-12-01', status: 'cancelled' }, { scheduled_date: '2026-12-02', status: 'no_show' }];
+  assert.equal(refusReculChantier('commande_recue', rdvs, '2026-11-02'), null);
+});
+
+test('refusReculChantier : avancer (Réceptionné, Facturé) ou rester en Planification n’est jamais refusé', () => {
+  assert.equal(refusReculChantier('realise', rdvDjafour, '2026-11-02'), null);
+  assert.equal(refusReculChantier('facture', rdvDjafour, '2026-11-02'), null);
+  assert.equal(refusReculChantier('planification', rdvDjafour, '2026-11-02'), null);
+});
+
+test('refusReculChantier : sans RDV, rien n’est refusé', () => {
+  assert.equal(refusReculChantier('commande_recue', [], '2026-11-02'), null);
+  assert.equal(refusReculChantier('commande_recue', null, '2026-11-02'), null);
 });
