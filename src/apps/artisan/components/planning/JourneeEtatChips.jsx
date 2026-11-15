@@ -2,12 +2,13 @@
  * JourneeEtatChips.jsx — puces d'état de journée sous l'en-tête d'un jour du Planning
  * ============================================================================
  * Réservées à l'admin d'organisation et au team leader (Planning.jsx).
- * Une puce par technicien planifié par la machine : Vide · Ouverte · Pleine ·
- * Figée · À arbitrer, avec la zone de travail (grand secteur déduit des RDV ou
- * étiqueté, sinon la ville du jour) — et une ligne sans libellé pour une journée
- * que le moteur ne juge pas (technicien hors tournées, jour passé) : feuille de
- * route seule. Source
- * unique de l'état : src/lib/tournee/etat.js, via useEtatsJournees.
+ * Une ligne par technicien : Vide · Ouverte · Pleine · Figée · À arbitrer, avec
+ * la zone de travail (grand secteur déduit des RDV ou étiqueté, sinon la ville
+ * du jour) — et une ligne sans libellé pour une journée d'interventions que le
+ * moteur ne juge pas (technicien hors tournées, jour passé) : feuille de route
+ * seule. QUI a une ligne (jamais une personne en congés, « Vide » pour un
+ * technicien libre) : src/lib/planningCharge.js. État d'une journée :
+ * src/lib/tournee/etat.js, via useEtatsJournees.
  * Répond à « je ne sais pas quand une journée est complète et si le cron l'a
  * organisée » (Eric, 2026-09-29). Le clic ouvre la journée dans le panneau de
  * remplissage, sur place (RemplirJourneePanel, monté par Planning.jsx).
@@ -19,7 +20,6 @@ import { LIBELLES_ETAT } from '@/lib/tournee/etat.js';
 import { formatCa } from '@/lib/planningCa';
 
 const STYLES = {
-  conges: 'bg-slate-100 text-slate-600 border-slate-300',
   vide: 'bg-secondary-50 text-secondary-500 border-secondary-200',
   ouverte: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   pleine: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -44,15 +44,14 @@ function formatFige(iso) {
   return `${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
-/** Libellé affiché : « Congés » quand la journée ne porte que des congés, sinon l'état du moteur. */
+/** Libellé affiché : l'état de la journée ; rien pour une journée sans verdict du moteur. */
 function libelle(item) {
-  if (item.enConges) return 'Congés';
   return sansVerdict(item) ? '' : LIBELLES_ETAT[item.etat];
 }
 
 /** Aide au survol : ce que la puce ne dit pas (secteur, figeage, reste utile estimé). */
 function titre(item) {
-  if (sansVerdict(item) && !item.enConges) {
+  if (sansVerdict(item)) {
     return [
       item.technicienNom,
       item.etat === 'manuelle'
@@ -63,7 +62,8 @@ function titre(item) {
     ].filter(Boolean).join('\n');
   }
   const parts = [`${item.technicienNom} — ${libelle(item)}`];
-  if (item.enConges) return parts.join('\n');
+  // Technicien libre un jour que le moteur ne juge pas (jour passé, hors tournées).
+  if (item.horsMoteur) return [...parts, 'Aucune intervention ce jour-là'].join('\n');
   if (item.etiquette) parts.push(`Secteur ${item.etiquette}${item.origine === 'deduite' ? ' (déduit des RDV posés)' : ''}`);
   else if (item.lieu) parts.push(`Zone : ${item.lieu}`);
   if (item.figeeAt) {
@@ -79,7 +79,9 @@ function titre(item) {
 
 /**
  * Une ligne par technicien (Eric, 2026-11-14 : « pour que ce soit lisible ») :
- * état à gauche, part du CA HT programmé de sa journée à droite.
+ * état à gauche, part du CA HT programmé de sa journée à droite. Une journée
+ * sans intervention affiche « 0 € » : c'est l'indicateur d'un planning à
+ * remplir — seulement quand le chiffre est connu, jamais un 0 par défaut.
  *
  * @param {{ date: string, etats: Map<string, object>, onOpen?: (item: object) => void, caParTechnicien?: Map<string, number>|null }} props
  *   `date` ISO `YYYY-MM-DD` ; `etats` = Map de useEtatsJournees ;
@@ -95,23 +97,24 @@ export function JourneeEtatChips({ date, etats, onOpen, caParTechnicien = null }
     <div className="mt-1 flex w-full flex-col gap-0.5">
       {items.map((item) => {
         const ca = caParTechnicien?.get(`${item.date}|${item.technicienId}`) || 0;
+        const montant = ca > 0 || (caParTechnicien && item.sansIntervention) ? formatCa(ca) : null;
         return (
           <button
             key={item.technicienId}
             type="button"
             onClick={() => onOpen?.(item)}
             title={ca > 0 ? `${titre(item)}\nCA HT programmé : ${formatCa(ca)}` : titre(item)}
-            className={`flex w-full items-center gap-1 rounded border px-1.5 py-0.5 text-left text-[10px] font-normal leading-tight ${STYLES[item.enConges ? 'conges' : item.etat]}`}
+            className={`flex w-full items-center gap-1 rounded border px-1.5 py-0.5 text-left text-[10px] font-normal leading-tight ${STYLES[item.etat]}`}
           >
             <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.couleur || '#94A3B8' }} />
             <span className="max-w-[6rem] shrink-0 truncate font-medium">{String(item.technicienNom || '').split(' ')[0]}</span>
-            {!item.enConges && item.etat === 'figee' && <Lock className="h-3 w-3 shrink-0" />}
-            {!item.enConges && item.etat === 'a_arbitrer' && <AlertTriangle className="h-3 w-3 shrink-0" />}
+            {item.etat === 'figee' && <Lock className="h-3 w-3 shrink-0" />}
+            {item.etat === 'a_arbitrer' && <AlertTriangle className="h-3 w-3 shrink-0" />}
             {libelle(item) && <span className="shrink-0">{libelle(item)}</span>}
-            {zone(item) && item.etat !== 'vide' && !item.enConges && (
+            {zone(item) && item.etat !== 'vide' && (
               <span className="min-w-0 truncate opacity-70">{libelle(item) ? '· ' : ''}{zone(item)}</span>
             )}
-            {ca > 0 && <span className="ml-auto shrink-0 pl-1 font-semibold tabular-nums">{formatCa(ca)}</span>}
+            {montant && <span className={`ml-auto shrink-0 pl-1 tabular-nums ${ca > 0 ? 'font-semibold' : ''}`}>{montant}</span>}
           </button>
         );
       })}

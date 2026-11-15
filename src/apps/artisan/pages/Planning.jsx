@@ -3,7 +3,14 @@
  * ============================================================================
  * Page planning avec calendrier FullCalendar interactif.
  * Vues : semaine, jour, mois. Drag & drop + resize.
- * Filtres par technicien et type de RDV.
+ *
+ * La page assemble ; chaque sujet a son fichier :
+ *   - barre du haut ........ components/planning/CalendarToolbar.jsx
+ *   - filtres en entonnoir . components/planning/CalendarFilters.jsx (règles : lib/planningEvents.js)
+ *   - vignette d'un RDV .... components/planning/PlanningEventContent.jsx (règles : lib/planningVignette.js)
+ *   - charge et CA du jour . hooks/usePlanningCharge.js + components/planning/PlanningDayHeader.jsx
+ *                            (règles : lib/planningCharge.js, lib/planningCa.js)
+ * Une nouvelle règle va dans le module pur concerné, avec son test — pas ici.
  *
  * @version 2.0.0 - Sprint 2 : FullCalendar + CRUD RDV
  * ============================================================================
@@ -17,28 +24,11 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
-import {
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  Calendar as CalendarIcon,
-  Loader2,
-  AlertCircle,
-  RefreshCw,
-  ChevronDown,
-  Wrench,
-  Briefcase,
-  Printer,
-  MoveHorizontal,
-} from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
-import { useEtatsJournees } from '@hooks/useTournees';
-import { usePlanningCa } from '@hooks/usePlanningCa';
-import { formatCa, cumulPeriode } from '@/lib/planningCa';
-import { villesDeJournee, optionsEntonnoir, purgerFiltres, chargeDuJour } from '@/lib/planningEvents';
-import { deduireSecteur } from '@/lib/tournee/etat.js';
+import { usePlanningCharge } from '@hooks/usePlanningCharge';
 import { useClientEquipmentLabels } from '@hooks/useClients';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useDeviceClass } from '@hooks/useDeviceClass';
@@ -47,11 +37,12 @@ import { telechargerPlanningHebdo } from '@/apps/artisan/components/planning/pla
 import { telechargerFeuilleDeRoute } from '@/apps/artisan/components/planning/feuilleDeRouteExport';
 import { FeuilleDeRoutePanel } from '@/apps/artisan/components/planning/FeuilleDeRoutePanel';
 import { useFeuilleDeRoute } from '@hooks/useFeuilleDeRoute';
-import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
+import { CalendarToolbar } from '@/apps/artisan/components/planning/CalendarToolbar';
+import { CalendarFilters } from '@/apps/artisan/components/planning/CalendarFilters';
 import { PlanningClientSearchInput, PlanningClientAppointments } from '@/apps/artisan/components/planning/PlanningClientSearch';
 import { PlanningEventContent } from '@/apps/artisan/components/planning/PlanningEventContent';
-import { JourneeEtatChips } from '@/apps/artisan/components/planning/JourneeEtatChips';
+import { PlanningDayHeader } from '@/apps/artisan/components/planning/PlanningDayHeader';
 import { RemplirJourneePanel } from '@/apps/artisan/components/tournees/RemplirJourneePanel';
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
 import { supabase } from '@/lib/supabaseClient';
@@ -70,329 +61,6 @@ function getDateRange(dateInfo) {
     startDate: dateInfo.startStr?.split('T')[0] || dateInfo.start?.toISOString().split('T')[0],
     endDate: dateInfo.endStr?.split('T')[0] || dateInfo.end?.toISOString().split('T')[0],
   };
-}
-
-const VUES_BUREAU = [
-  { value: 'timeGridDay', label: 'Jour' },
-  { value: 'timeGridWeek', label: 'Semaine' },
-  { value: 'dayGridMonth', label: 'Mois' },
-];
-
-// Appareil tenu en main (téléphone, tablette) : une grille horaire à 5
-// colonnes, ou plusieurs techniciens côte à côte dans la journée, donnent des
-// blocs illisibles. Jour et Semaine deviennent des LISTES pleine largeur (un
-// RDV par ligne) ; la grille horaire reste accessible (« Heures ») pour poser
-// au doigt. Validé par Eric sur téléphone le 2026-10-24, étendu à la tablette.
-const VUES_MOBILE = [
-  { value: 'listDay', label: 'Jour' },
-  { value: 'listWeek', label: 'Semaine' },
-  { value: 'timeGridDay', label: 'Heures' },
-  { value: 'dayGridMonth', label: 'Mois' },
-];
-
-// ============================================================================
-// SOUS-COMPOSANTS
-// ============================================================================
-
-/**
- * Barre d'outils du calendrier
- */
-function CalendarToolbar({
-  calendarRef,
-  currentView,
-  onViewChange,
-  title,
-  weekNumber,
-  caCumul,
-  caCumulPartiel,
-  onAddEvent,
-  onRefresh,
-  isLoading,
-  onPrint,
-  printHint,
-  printLabel,
-  isPrinting,
-  isMobileDevice,
-  search,
-}) {
-  const goToday = () => calendarRef.current?.getApi().today();
-  const goPrev = () => calendarRef.current?.getApi().prev();
-  const goNext = () => calendarRef.current?.getApi().next();
-
-  const views = isMobileDevice ? VUES_MOBILE : VUES_BUREAU;
-
-  // Sous `sm` (téléphone) : titre sur sa ligne, puis navigation et actions ;
-  // Imprimer disparaît (PDF d'une personne, geste de bureau).
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
-      {/* Navigation dates */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={goToday}
-          className="h-10 sm:h-auto px-3 py-1.5 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          Aujourd&apos;hui
-        </button>
-        <div className="flex items-center">
-          <button
-            onClick={goPrev}
-            aria-label="Période précédente"
-            className="h-10 w-10 sm:h-auto sm:w-auto flex items-center justify-center sm:p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
-            onClick={goNext}
-            aria-label="Période suivante"
-            className="h-10 w-10 sm:h-auto sm:w-auto flex items-center justify-center sm:p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-        {weekNumber != null && (
-          <span
-            className="px-2 py-1 text-sm font-semibold bg-blue-50 text-blue-700 rounded-md shrink-0"
-            title={`Semaine ${weekNumber}`}
-          >
-            S{weekNumber}
-          </span>
-        )}
-        <h2 className="text-base sm:text-lg font-semibold text-gray-900 sm:min-w-[200px] first-letter:uppercase">
-          {title}
-        </h2>
-        {caCumul > 0 && (
-          <span
-            className="px-2 py-1 text-sm font-semibold tabular-nums bg-secondary-100 text-secondary-900 rounded-md shrink-0"
-            title={`CA HT programmé sur la période affichée, ${caCumulPartiel ? 'part des personnes affichées (filtre équipe actif)' : 'tous techniciens confondus'}.\nDevis validés des installations (au prorata des journées posées) + contrats d’entretien. SAV non compté.`}
-          >
-            {formatCa(caCumul)} HT
-          </span>
-        )}
-      </div>
-
-      {/* Recherche d'un client — sur la ligne de la navigation, entre les dates et les actions */}
-      {search && <div className="sm:flex-1 sm:min-w-[14rem] sm:max-w-md">{search}</div>}
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Sélecteur de vue */}
-        <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-          {views.map(v => (
-            <button
-              key={v.value}
-              onClick={() => onViewChange(v.value)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                currentView === v.value
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={onRefresh}
-          disabled={isLoading}
-          className="h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          title="Rafraîchir"
-          aria-label="Rafraîchir le planning"
-        >
-          <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
-        </button>
-
-        <button
-          onClick={onPrint}
-          disabled={!!printHint || isPrinting}
-          className="hidden sm:inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={printHint || printLabel}
-        >
-          {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-          Imprimer
-        </button>
-
-        {onAddEvent && (
-          <button
-            onClick={onAddEvent}
-            className="inline-flex items-center gap-2 h-10 px-3 sm:px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nouveau RDV</span>
-            <span className="sm:hidden">RDV</span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Premier étage de l'entonnoir des filtres : la nature des RDV affichés.
-const NATURES = [
-  { value: 'tout', label: 'Tout', kinds: { intervention: true, commercial: true } },
-  { value: 'intervention', label: 'Intervention', icon: Wrench, kinds: { intervention: true, commercial: false } },
-  { value: 'commercial', label: 'Commercial', icon: Briefcase, kinds: { intervention: false, commercial: true } },
-];
-
-/** Flèche entre deux étages de l'entonnoir (bureau seulement). */
-function EtageSuivant() {
-  return <ChevronRight className="hidden sm:block w-4 h-4 text-gray-300 shrink-0" aria-hidden="true" />;
-}
-
-/**
- * Filtres en entonnoir : nature (tout / intervention / commercial) → personnes
- * qui peuvent la porter → types de RDV possibles pour ce choix. Chaque étage ne
- * propose que ce que l'étage du dessus laisse possible (règles : optionsEntonnoir
- * / purgerFiltres de planningEvents.js). Les tolérances ne filtrent rien : c'est
- * une option d'affichage, rangée à part.
- */
-function CalendarFilters({ filters, setFilters, teamList }) {
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
-
-  const kinds = filters.kinds || { intervention: true, commercial: true };
-  const nature = kinds.intervention && kinds.commercial ? 'tout' : kinds.intervention ? 'intervention' : 'commercial';
-  const { personnes, types } = optionsEntonnoir(filters, teamList, APPOINTMENT_TYPES);
-  const selectedKeys = filters.memberProfileKeys || [];
-  const selectedType = APPOINTMENT_TYPES.find(t => t.value === filters.appointmentType);
-  const hasFilters = selectedKeys.length > 0 || filters.appointmentType || nature !== 'tout';
-
-  // Tout changement d'étage retire des étages du dessous ce qui n'est plus possible.
-  const appliquer = (patch) =>
-    setFilters(f => purgerFiltres({ ...f, ...(typeof patch === 'function' ? patch(f) : patch) }, teamList, APPOINTMENT_TYPES));
-
-  const toggleMember = (profileKey) =>
-    appliquer(f => {
-      const cur = f.memberProfileKeys || [];
-      return { memberProfileKeys: cur.includes(profileKey) ? cur.filter(k => k !== profileKey) : [...cur, profileKey] };
-    });
-
-  const resetAll = () =>
-    setFilters(f => ({
-      ...f,
-      kinds: { intervention: true, commercial: true },
-      memberProfileKeys: [],
-      appointmentType: null,
-    }));
-
-  // Sous `sm` (téléphone) : les chips équipe défilent sur une ligne au lieu
-  // d'empiler six lignes de boutons ; les tolérances (bandes de souplesse) sont
-  // une lecture de bureau.
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {/* Étage 1 — nature */}
-      <div className="flex items-center bg-gray-100 rounded-lg p-0.5" role="group" aria-label="Nature des rendez-vous">
-        {NATURES.map(({ value, label, icon: Icon, kinds: k }) => (
-          <button
-            key={value}
-            onClick={() => appliquer({ kinds: k })}
-            aria-pressed={nature === value}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-              nature === value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            {Icon && <Icon className="w-4 h-4" />}
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <EtageSuivant />
-
-      {/* Étage 2 — personnes qui peuvent porter cette nature de RDV */}
-      <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar w-full sm:w-auto sm:flex-wrap -mx-1 px-1 py-0.5">
-        {personnes.map(h => {
-          const isSel = selectedKeys.includes(h.profileKey);
-          return (
-            <button
-              key={h.profileKey}
-              onClick={() => toggleMember(h.profileKey)}
-              title={h.displayName}
-              aria-pressed={isSel}
-              className={`inline-flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 sm:py-1 rounded-full border text-sm transition-colors ${
-                isSel
-                  ? 'border-gray-400 bg-gray-100 text-gray-900'
-                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: h.color }} />
-              {h.displayName.split(' ')[0]}
-            </button>
-          );
-        })}
-      </div>
-
-      <EtageSuivant />
-
-      {/* Étage 3 — types possibles pour la nature et les personnes choisies */}
-      <div className="relative">
-        <button
-          onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
-            filters.appointmentType
-              ? 'bg-blue-50 border-blue-200 text-blue-700'
-              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          <CalendarIcon className="w-4 h-4" />
-          {selectedType ? selectedType.label : 'Type'}
-          <ChevronDown className={`w-3 h-3 transition-transform ${showTypeDropdown ? 'rotate-180' : ''}`} />
-        </button>
-        {showTypeDropdown && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setShowTypeDropdown(false)} />
-            <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
-              <button
-                onClick={() => { setFilters(f => ({ ...f, appointmentType: null })); setShowTypeDropdown(false); }}
-                className={`w-full flex items-center px-3 py-2 text-sm text-left ${!filters.appointmentType ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
-              >
-                Tous les types
-              </button>
-              {types.map(type => (
-                <button
-                  key={type.value}
-                  onClick={() => { setFilters(f => ({ ...f, appointmentType: type.value })); setShowTypeDropdown(false); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left ${
-                    filters.appointmentType === type.value ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <span className={`w-3 h-3 rounded-full ${type.bgClass}`} />
-                  {type.label}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Reset filtres */}
-      {hasFilters && (
-        <button
-          onClick={resetAll}
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-        >
-          Effacer
-        </button>
-      )}
-
-      {/* Option d'affichage, pas un filtre : plage dans laquelle un entretien ou un
-          SAV dont l'heure n'est pas encore donnée au client peut glisser. */}
-      {kinds.intervention && (
-        <button
-          onClick={() => setFilters(f => ({ ...f, showTolerance: !f.showTolerance }))}
-          aria-pressed={!!filters.showTolerance}
-          title="Afficher, derrière chaque entretien ou SAV dont l’heure n’est pas encore donnée au client, la plage dans laquelle il peut encore être déplacé"
-          className={`hidden sm:inline-flex sm:ml-auto items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
-            filters.showTolerance
-              ? 'bg-blue-50 border-blue-200 text-blue-700'
-              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-          }`}
-        >
-          <MoveHorizontal className="w-4 h-4" />
-          Tolérances
-        </button>
-      )}
-    </div>
-  );
 }
 
 // ============================================================================
@@ -433,12 +101,53 @@ export default function Planning() {
   // RDV du client recherché (surlignés dans le calendrier) — null = pas de recherche
   const [searchHitIds, setSearchHitIds] = useState(null);
 
-  // État de chaque journée de technicien (vide / ouverte / pleine / figée / à
-  // arbitrer) pour la plage visible — puces sous l'en-tête du jour. `orgId` du
-  // Planning = org CORE, c'est bien le coreOrgId attendu par le hook.
+  // Hooks données
   const {
-    etats: etatsJournees, journees: journeesHorizon, isLoading: etatsLoading, error: etatsError,
-  } = useEtatsJournees({ coreOrgId: orgId, startDate: dateRange.startDate, endDate: dateRange.endDate });
+    appointments,
+    events,
+    isLoading,
+    error,
+    filters,
+    setFilters,
+    teamList,
+    createAppointment,
+    updateAppointment,
+    moveAppointment,
+    cancelAppointment,
+    deleteAppointment,
+    isCreating,
+    isUpdating,
+    refresh,
+  } = useAppointments({
+    orgId,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+  });
+
+  const { members } = useTeamMembers(orgId);
+  const { labelsByClientId } = useClientEquipmentLabels();
+  const { settings: orgSettings } = useOrgSettings();
+
+  // Charge de la plage visible : état de chaque journée de technicien, lignes sous
+  // l'en-tête du jour, CA HT programmé (règles : src/lib/planningCharge.js et
+  // planningCa.js). `orgId` du Planning = org CORE, attendue par le moteur de tournées.
+  const {
+    recordIdsFiltres, etatsJournees, journeesHorizon, etatsLoading, etatsError,
+    lignes: lignesCharge, ca: caPlanning, caError, caCumul,
+  } = usePlanningCharge({
+    orgId,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    periode,
+    appointments,
+    members,
+    teamList,
+    memberProfileKeys: filters.memberProfileKeys,
+    // RDV en cours de chargement, ou restreints par un filtre de type ou de statut :
+    // la charge est partielle, on ne dit pas qu'une journée est vide.
+    rdvsPartiels: isLoading || !!(filters.appointmentType || filters.status),
+    voitCharge,
+  });
 
   // Journée ouverte dans le panneau de remplissage : clic sur une puce, ou lien
   // direct depuis le tableau de bord des entretiens (/planning?journee=&tech=,
@@ -493,33 +202,6 @@ export default function Planning() {
     fermerJournee();
   }, [journeeOuverte, journeeSelectionnee, etatsError, etatsLoading, journeesHorizon, dateRange.endDate, fermerJournee]);
 
-  // Hooks données
-  const {
-    appointments,
-    events,
-    isLoading,
-    error,
-    filters,
-    setFilters,
-    teamList,
-    createAppointment,
-    updateAppointment,
-    moveAppointment,
-    cancelAppointment,
-    deleteAppointment,
-    isCreating,
-    isUpdating,
-    refresh,
-  } = useAppointments({
-    orgId,
-    startDate: dateRange.startDate,
-    endDate: dateRange.endDate,
-  });
-
-  const { members } = useTeamMembers(orgId);
-  const { labelsByClientId } = useClientEquipmentLabels();
-  const { settings: orgSettings } = useOrgSettings();
-
   // Sur appareil tenu en main : ouvrir sur SON planning (profileKey = user.id,
   // clé d'unification de teamList). Appliqué une seule fois, dès que l'équipe
   // est connue ; un admin sans ressource planning garde la vue globale, et
@@ -533,141 +215,22 @@ export default function Planning() {
     }
   }, [isMobileDevice, user?.id, teamList, setFilters]);
 
-  // ==========================================================================
-  // PUCES D'EN-TÊTE — état de journée des personnes affichées
-  // ==========================================================================
-
-  // Ids (team_members / commercials) des personnes filtrées ; null = toute l'équipe.
-  const recordIdsFiltres = useMemo(() => {
-    const keys = filters.memberProfileKeys || [];
-    if (keys.length === 0) return null;
-    const set = new Set(keys);
-    return new Set(teamList.filter((h) => set.has(h.profileKey)).flatMap((h) => h.recordIds));
-  }, [filters.memberProfileKeys, teamList]);
-
-  // Puces du moteur restreintes au filtre équipe, + une puce « À la main » par
-  // technicien HORS tournées (`include_in_routing = false`) qui a des RDV ce
-  // jour-là : la machine ne le planifie pas, mais sa journée existe et sa
-  // feuille de route aussi. Sans elle, il n'avait aucune puce (Mohammed, 2026-10-14).
-  // Même filet pour toute personne posée sur un RDV un jour que le moteur ne juge
-  // pas (jour passé — il ne charge qu'à partir d'aujourd'hui —, jour non travaillé) :
-  // une ligne « sans état », sinon la part de CA d'un chantier à plusieurs ne
-  // s'affichait que sur le technicien hors tournées, comme s'il était seul
-  // (semaine passée, Eric 2026-11-14).
-  const etatsAffiches = useMemo(() => {
-    const map = new Map();
-    for (const [cle, item] of etatsJournees) {
-      if (!recordIdsFiltres || recordIdsFiltres.has(item.technicienId)) map.set(cle, item);
-    }
-    const membreParId = new Map((members || []).map((m) => [m.id, m]));
-    if (membreParId.size === 0) return map;
-    const aujourdhui = new Date().toLocaleDateString('fr-CA');
-    // RDV de chaque personne × jour (un RDV à plusieurs blocs n'est compté qu'une fois).
-    const rdvsParCle = new Map();
-    for (const e of events) {
-      const a = e.extendedProps;
-      if (!a?.scheduled_date || a.band) continue;
-      for (const techId of a.technician_ids || []) {
-        if (recordIdsFiltres && !recordIdsFiltres.has(techId)) continue;
-        const cle = `${a.scheduled_date}|${techId}`;
-        if (!rdvsParCle.has(cle)) rdvsParCle.set(cle, new Map());
-        rdvsParCle.get(cle).set(a.id, a);
-      }
-    }
-    for (const [cle, parId] of rdvsParCle) {
-      // La charge ne lit que les interventions : un RDV « Autre » ou commercial
-      // n'ouvre pas de ligne et ne dit pas où la personne travaille.
-      const { interventions, enConges } = chargeDuJour([...parId.values()]);
-      const existant = map.get(cle);
-      if (existant) {
-        // Journée du moteur sans grand secteur (jour d'installation) : la ville de travail.
-        if (!existant.etiquette) map.set(cle, { ...existant, lieu: villesDeJournee(interventions) });
-        continue;
-      }
-      const [date, techId] = cle.split('|');
-      const member = membreParId.get(techId);
-      if (!member) continue;
-      const horsTournees = member.role === 'technician' && member.include_in_routing !== true;
-      // Jour à venir d'une personne que le moteur planifie : on attend son verdict
-      // (pas de ligne « sans état » qui clignoterait pendant le chargement).
-      if (!horsTournees && date >= aujourdhui && etatsLoading) continue;
-      // Ligne = quelqu'un qui est intervenu ce jour-là. Le congé n'est dit que pour
-      // un technicien hors tournées ; un jour férié n'aligne pas toute l'équipe.
-      if (interventions.length === 0 && !(horsTournees && enConges)) continue;
-      map.set(cle, {
-        date,
-        technicienId: member.id,
-        technicienNom: String(member.display_name || '').trim(),
-        couleur: member.calendar_color,
-        etat: horsTournees ? 'manuelle' : 'sans_etat',
-        nbRdvs: interventions.length,
-        enConges,
-        // Zone de travail : grand secteur des entretiens du jour, sinon la ville.
-        etiquette: deduireSecteur(interventions),
-        lieu: villesDeJournee(interventions),
-      });
-    }
-    return map;
-  }, [etatsJournees, etatsLoading, recordIdsFiltres, members, events]);
-
-  // CA HT programmé (devis validés des installations au prorata des journées
-  // posées + contrats d'entretien) : total du jour et part par technicien.
-  // `null` tant que le chiffre est inconnu — on n'affiche alors rien, jamais 0.
-  const { ca: caPlanning, error: caError } = usePlanningCa({
-    orgId,
-    startDate: dateRange.startDate,
-    endDate: dateRange.endDate,
-    appointments,
-    technicienIds: recordIdsFiltres,
-    // `periode` connue = le calendrier a annoncé sa plage : on ne chiffre pas la
-    // plage par défaut (± 1 mois) chargée avant lui.
-    enabled: voitCharge && !!periode,
-  });
-
-  // Cumul de la période affichée (semaine, jour ou mois — pas la grille, qui
-  // déborde sur les mois voisins), à côté du titre de la barre d'outils.
-  const caCumul = useMemo(() => {
-    if (!voitCharge || caError || !caPlanning || !periode) return null;
-    return cumulPeriode(caPlanning.parJour, periode.debut, periode.finExclue);
-  }, [voitCharge, caError, caPlanning, periode]);
-
+  // En-tête d'un jour : charge par technicien et chiffre, pour l'admin d'organisation
+  // et le team leader seulement (jamais en vue Mois).
   const dayHeaderContent = useCallback((arg) => {
-    // Charge par technicien et chiffre : admin d'organisation et team leader seulement.
     if (!voitCharge || arg.view.type === 'dayGridMonth') return <span>{arg.text}</span>;
-    const date = arg.date.toLocaleDateString('fr-CA');
-    const total = caPlanning?.parJour.get(date) || 0;
-    const sansMontant = caPlanning?.sansMontantParJour.get(date) || 0;
     return (
-      <div className="mdh-day-head flex w-full flex-col items-start">
-        <div className="flex w-full items-baseline justify-between gap-2">
-          <span>{arg.text}</span>
-          {caError && (
-            <span className="font-normal normal-case text-secondary-400" title={`CA HT programmé indisponible (${caError.message || 'échec du chargement'})`}>
-              CA indisponible
-            </span>
-          )}
-          {!caError && (total > 0 || sansMontant > 0) && (
-            <span
-              className="whitespace-nowrap tabular-nums text-secondary-900"
-              title={[
-                'CA HT programmé : devis validés des installations (au prorata des journées posées) + contrats d’entretien. SAV non compté.',
-                recordIdsFiltres ? 'Part des personnes affichées.' : null,
-                sansMontant > 0 ? `${sansMontant} affaire${sansMontant > 1 ? 's' : ''} sans montant, comptée${sansMontant > 1 ? 's' : ''} à 0.` : null,
-              ].filter(Boolean).join('\n')}
-            >
-              {formatCa(total)} HT{sansMontant > 0 ? ' *' : ''}
-            </span>
-          )}
-        </div>
-        <JourneeEtatChips
-          date={date}
-          etats={etatsAffiches}
-          onOpen={ouvrirJournee}
-          caParTechnicien={caPlanning?.parTechnicienJour || null}
-        />
-      </div>
+      <PlanningDayHeader
+        texte={arg.text}
+        date={arg.date.toLocaleDateString('fr-CA')}
+        lignes={lignesCharge}
+        ca={caPlanning}
+        caError={caError}
+        filtreEquipe={!!recordIdsFiltres}
+        onOpen={ouvrirJournee}
+      />
     );
-  }, [voitCharge, etatsAffiches, ouvrirJournee, caPlanning, caError, recordIdsFiltres]);
+  }, [voitCharge, lignesCharge, ouvrirJournee, caPlanning, caError, recordIdsFiltres]);
 
   // ==========================================================================
   // IMPRESSION — UNE personne (1 chip équipe) : planning hebdo en vue Semaine,
