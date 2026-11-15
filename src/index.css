@@ -388,6 +388,12 @@ html[data-device-class="tablet"] .fc .fc-list-day-cushion {
   @apply rounded-md border-0 px-2 py-1 text-xs font-medium cursor-pointer;
 }
 
+/* Grille horaire : marges réduites — un RDV de 30 min doit laisser passer une ligne
+   de texte entière, un RDV d'une heure trois (gabarits de planningVignette.js). */
+.fc .fc-timegrid-event {
+  padding: 1px 4px;
+}
+
 .fc .fc-timegrid-slot {
   @apply border-secondary-100;
 }

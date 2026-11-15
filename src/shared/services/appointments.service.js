@@ -30,17 +30,18 @@ export { COMMERCIAL_TYPES, TECHNICIAN_TYPES, PHONE_REQUIRED_TYPES } from '@/lib/
 // ============================================================================
 
 /**
- * Types de RDV avec couleurs FullCalendar
+ * Types de RDV avec couleurs FullCalendar. `shortLabel` = libellé des vignettes du
+ * calendrier quand la place manque (planningVignette.js) ; absent = le libellé complet.
  */
 export const APPOINTMENT_TYPES = [
-  { value: 'rdv_agency', label: 'RDV Commercial', color: '#F59E0B', bgClass: 'bg-amber-500' },
-  { value: 'rdv_technical', label: 'Visite Technique R1', color: '#3B82F6', bgClass: 'bg-blue-500' },
+  { value: 'rdv_agency', label: 'RDV Commercial', shortLabel: 'RDV Co.', color: '#F59E0B', bgClass: 'bg-amber-500' },
+  { value: 'rdv_technical', label: 'Visite Technique R1', shortLabel: 'VT R1', color: '#3B82F6', bgClass: 'bg-blue-500' },
   // RDV Bouclage R2 : 2ᵉ RDV commercial rattaché à une carte pipeline EXISTANTE
   // (valider options / signer / caler la suite). Ne crée jamais de lead — cf.
   // resolveCardForAppointment + sélection lead-only (EventModal). Couleur = icône
   // modale uniquement (le calendrier colore par intervenant, cf. planningEvents).
-  { value: 'rdv_closing', label: 'RDV Bouclage R2', color: '#6366F1', bgClass: 'bg-indigo-500' },
-  { value: 'installation', label: 'Installation', color: '#8B5CF6', bgClass: 'bg-violet-500' },
+  { value: 'rdv_closing', label: 'RDV Bouclage R2', shortLabel: 'R2', color: '#6366F1', bgClass: 'bg-indigo-500' },
+  { value: 'installation', label: 'Installation', shortLabel: 'Install.', color: '#8B5CF6', bgClass: 'bg-violet-500' },
   { value: 'maintenance', label: 'Entretien', color: '#10B981', bgClass: 'bg-emerald-500' },
   { value: 'service', label: 'SAV', color: '#EF4444', bgClass: 'bg-red-500' },
   // Congés : absence d'une personne, sans client ni carte (2026-09-30). Journée entière

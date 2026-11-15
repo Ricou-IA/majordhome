@@ -9,7 +9,6 @@
  * ============================================================================
  */
 
-import { estTypeAdaptable } from '@/lib/souplesse';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -51,10 +50,10 @@ import { useFeuilleDeRoute } from '@hooks/useFeuilleDeRoute';
 import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { PlanningClientSearchInput, PlanningClientAppointments } from '@/apps/artisan/components/planning/PlanningClientSearch';
+import { PlanningEventContent } from '@/apps/artisan/components/planning/PlanningEventContent';
 import { JourneeEtatChips } from '@/apps/artisan/components/planning/JourneeEtatChips';
 import { RemplirJourneePanel } from '@/apps/artisan/components/tournees/RemplirJourneePanel';
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
-import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKindIcons';
 import { supabase } from '@/lib/supabaseClient';
 import { formatDateForInput } from '@/lib/utils';
 import { logger } from '@lib/logger';
@@ -391,53 +390,6 @@ function CalendarFilters({ filters, setFilters, teamList }) {
           <MoveHorizontal className="w-4 h-4" />
           Tolérances
         </button>
-      )}
-    </div>
-  );
-}
-
-/**
- * Rendu custom d'un événement dans le calendrier.
- * Vrai composant React (pas une simple render function) : EquipmentKindIcons
- * lit le cache useClientEquipmentKinds via hook.
- */
-function PlanningEventContent({ eventInfo }) {
-  const {
-    typeConfig, client_name, client_first_name, status, grand_secteur, client_id, adaptable, hour_confirmed_at,
-    appointment_type, provisoire,
-  } = eventInfo.event.extendedProps;
-  const typeSouple = estTypeAdaptable(appointment_type);
-  const isCancelled = status === 'cancelled';
-  const fullName = [client_name, client_first_name].filter(Boolean).join(' ');
-  // Ligne 1 = type (plus le nom), ligne 2 = nom · grand secteur → le nom n'apparaît
-  // qu'une seule fois (fini le doublon) et le grand secteur est visible d'un coup d'œil.
-  const typeLabel = typeConfig?.label || eventInfo.event.title;
-
-  return (
-    <div className={`px-1 py-0.5 overflow-hidden ${isCancelled ? 'opacity-50 line-through' : ''}`}>
-      <div className="font-medium text-xs truncate flex items-center gap-1">
-        {/* Souplesse : ↔ adaptable (heure provisoire), 🔒 heure communiquée au client */}
-        {adaptable ? (
-          <span className="mr-0.5 opacity-90" title="Adaptable : l’heure peut glisser dans sa tolérance">↔</span>
-        ) : (typeSouple && hour_confirmed_at) ? (
-          <span className="mr-0.5 opacity-90" title="Heure communiquée au client">🔒</span>
-        ) : null}
-        {/* Pose provisoire : appros du chantier non reçues (bloc hachuré) */}
-        {provisoire && (
-          <span className="mr-0.5 opacity-90" title="Pose provisoire : appros du chantier non reçues">⏳</span>
-        )}
-        {/* Vues liste : l'heure a déjà sa colonne */}
-        {eventInfo.timeText && !eventInfo.view.type.startsWith('list') && (
-          <span className="mr-1">{eventInfo.timeText}</span>
-        )}
-        {typeLabel}
-        <EquipmentKindIcons clientId={client_id} size="xs" />
-      </div>
-      {(fullName || grand_secteur) && eventInfo.view.type !== 'dayGridMonth' && (
-        <div className="text-xs truncate opacity-80">
-          {fullName}
-          {grand_secteur && <span className="opacity-90"> · Secteur {grand_secteur}</span>}
-        </div>
       )}
     </div>
   );
