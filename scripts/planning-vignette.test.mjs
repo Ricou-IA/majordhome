@@ -47,11 +47,11 @@ test('gabaritVignette : vues Mois et liste indépendantes de la durée', () => {
 });
 
 const sav = {
-  client_name: 'ARCAMBAL', client_first_name: 'Guy', grand_secteur: 'Gaillac', city: 'Brens',
+  appointment_type: 'service', client_name: 'ARCAMBAL', client_first_name: 'Guy', grand_secteur: 'Gaillac', city: 'Brens',
   typeConfig: { label: 'SAV', shortLabel: 'SAV' },
 };
 const vt = {
-  client_name: 'ORSINI', client_first_name: 'Justine', grand_secteur: null, city: 'Albi',
+  appointment_type: 'rdv_technical', client_name: 'ORSINI', client_first_name: 'Justine', grand_secteur: null, city: 'Albi',
   typeConfig: { label: 'Visite Technique R1', shortLabel: 'VT R1' },
 };
 
@@ -84,6 +84,15 @@ test('modeleVignette : devis fait (liseré noir) = une ligne de moins, tout rest
   assert.equal(m.zone, 'Albi');
 });
 
+test('modeleVignette : icônes d’équipement pour un entretien ou un SAV seulement', () => {
+  const icones = (type) => modeleVignette({ rdv: { ...sav, appointment_type: type }, debut: le(10), fin: le(11) }).icones;
+  assert.equal(icones('maintenance'), true);
+  assert.equal(icones('service'), true);
+  for (const type of ['rdv_technical', 'rdv_agency', 'rdv_closing', 'installation', 'leave', 'other', undefined]) {
+    assert.equal(icones(type), false, String(type));
+  }
+});
+
 test('modeleVignette : cadre plein = type en toutes lettres', () => {
   const pose = { client_name: 'MOROY', client_first_name: 'Richard', grand_secteur: 'Salvagnac', typeConfig: { label: 'Installation', shortLabel: 'Install.' } };
   const m = modeleVignette({ rdv: pose, debut: le(8), fin: le(17) });
@@ -103,6 +112,9 @@ test('modeleVignette : liste sans heure, RDV sans client = son objet', () => {
   // Objet identique au type : pas de doublon.
   const conges = modeleVignette({ rdv: { subject: 'Congés', typeConfig: { label: 'Congés' } }, debut: le(8), fin: le(17) });
   assert.equal(conges.nom, '');
+  // Congés : jamais d'objet, la personne est déjà dite par la couleur.
+  const absence = modeleVignette({ rdv: { appointment_type: 'leave', subject: 'Congés — Antoine', typeConfig: { label: 'Congés' } }, debut: le(8), fin: le(18) });
+  assert.equal(absence.nom, '');
   // Fin inconnue : une heure par défaut, pas de plantage.
   assert.equal(modeleVignette({ rdv: sav, debut: le(10), fin: null }).gabarit, 'trois');
 });

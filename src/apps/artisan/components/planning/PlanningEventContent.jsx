@@ -57,7 +57,8 @@ export function PlanningEventContent({ eventInfo }) {
   const racine = `h-full overflow-hidden text-xs ${enListe ? '' : 'leading-[13px]'} ${
     rdv.status === 'cancelled' ? 'opacity-50 line-through' : ''
   }`;
-  const icones = <EquipmentKindIcons clientId={rdv.client_id} size="xs" />;
+  // Icônes d'équipement : entretien et SAV seulement (règle dans le modèle).
+  const icones = m.icones ? <EquipmentKindIcons clientId={rdv.client_id} size="xs" /> : null;
   const heure = m.heure ? <span className="shrink-0 tabular-nums">{m.heure}</span> : null;
   const zoneALaSuite = m.zone
     ? <span className="font-normal opacity-90">{m.nom ? ' · ' : ''}{m.zone}</span>

@@ -28,6 +28,13 @@ const DUREE_PAR_DEFAUT = 60;
 // Liseré noir d'une visite dont le devis est fait : il prend 8 px de hauteur dans le
 // bloc (`.fc .fc-timegrid-event.mdh-quoted`), donc une ligne de moins en une heure.
 export const MARGE_LISERE = 8;
+// Les icônes d'équipement (bûche, flamme, flocon) disent sur quoi on intervient : elles
+// n'ont de sens que pour un entretien ou un SAV (Eric, 2026-11-15). Ailleurs (visite
+// technique, installation, RDV commercial) elles alourdissent la lecture pour rien.
+const TYPES_AVEC_ICONES = ['maintenance', 'service'];
+// Congés : la personne est déjà dite par la couleur et la colonne, l'objet (« Congés —
+// Antoine ») ne ferait que répéter le type.
+const TYPES_SANS_OBJET = ['leave'];
 
 /**
  * Nombre de lignes de texte qui tiennent dans le bloc d'un RDV de la grille horaire.
@@ -85,14 +92,14 @@ export function gabaritVignette({ vue = 'timeGridWeek', dureeMinutes, hauteurCre
 /**
  * Tout ce que la vignette affiche, déjà mis en forme.
  * @param {object} p
- * @param {{ client_name?: string|null, client_first_name?: string|null, subject?: string|null,
+ * @param {{ appointment_type?: string, client_name?: string|null, client_first_name?: string|null, subject?: string|null,
  *   grand_secteur?: string|null, city?: string|null, typeConfig?: { label?: string, shortLabel?: string } }} p.rdv
  * @param {Date|null} [p.debut]
  * @param {Date|null} [p.fin]
  * @param {string} [p.vue]              type de vue FullCalendar
  * @param {number} [p.hauteurCreneau]
  * @param {number} [p.margeSupplementaire]  cf. lignesDisponibles (MARGE_LISERE pour un devis fait)
- * @returns {{ gabarit: string, lignesNom: number, heure: string, type: string, nom: string, zone: string, infobulle: string }}
+ * @returns {{ gabarit: string, lignesNom: number, heure: string, type: string, nom: string, zone: string, icones: boolean, infobulle: string }}
  */
 export function modeleVignette({ rdv, debut = null, fin = null, vue = 'timeGridWeek', hauteurCreneau, margeSupplementaire = 0 } = {}) {
   const dureeMinutes = debut && fin ? Math.round((fin.getTime() - debut.getTime()) / 60000) : null;
@@ -101,8 +108,8 @@ export function modeleVignette({ rdv, debut = null, fin = null, vue = 'timeGridW
   const typeComplet = rdv?.typeConfig?.label || '';
   const typeCourt = rdv?.typeConfig?.shortLabel || typeComplet;
   const client = [rdv?.client_name, rdv?.client_first_name].filter(Boolean).join(' ').trim();
-  // RDV sans client (réunion, congés) : son objet, s'il dit autre chose que le type.
-  const objet = String(rdv?.subject || '').trim();
+  // RDV sans client (réunion) : son objet, s'il dit autre chose que le type.
+  const objet = TYPES_SANS_OBJET.includes(rdv?.appointment_type) ? '' : String(rdv?.subject || '').trim();
   const nom = client || (objet && objet !== typeComplet ? objet : '');
   const zone = String(rdv?.grand_secteur || rdv?.city || '').trim();
   const creneau = creneauCourt(debut, fin);
@@ -115,6 +122,7 @@ export function modeleVignette({ rdv, debut = null, fin = null, vue = 'timeGridW
     type: gabarit === 'plein' ? typeComplet : typeCourt,
     nom,
     zone,
+    icones: TYPES_AVEC_ICONES.includes(rdv?.appointment_type),
     infobulle: [creneau, typeComplet, nom, zone].filter(Boolean).join(' · '),
   };
 }
