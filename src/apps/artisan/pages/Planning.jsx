@@ -50,6 +50,11 @@ import { PlanningEventContent } from '@/apps/artisan/components/planning/Plannin
 import { PlanningDayHeader } from '@/apps/artisan/components/planning/PlanningDayHeader';
 import { RemplirJourneePanel } from '@/apps/artisan/components/tournees/RemplirJourneePanel';
 
+// Vue Mois : une colonne est un jour de la SEMAINE, pas une date. Avec le format des
+// autres vues (jour + mois), le calendrier y écrivait une date de référence sans
+// rapport avec le mois affiché (« LUN. 5 JANV. » en octobre).
+const OPTIONS_PAR_VUE = { dayGridMonth: { dayHeaderFormat: { weekday: 'short' } } };
+
 export default function Planning() {
   const { organization, user, effectiveRole } = useAuth();
   const { can } = useCanAccess();
@@ -313,6 +318,7 @@ export default function Planning() {
             // RDV concurrents (2 techniciens) côte à côte sans se recouvrir
             slotEventOverlap={false}
             dayHeaderFormat={{ weekday: 'short', day: 'numeric', month: 'short' }}
+            views={OPTIONS_PAR_VUE}
             // Vues liste (téléphone) : « lundi 26 octobre » sur toute la largeur
             listDayFormat={{ weekday: 'long', day: 'numeric', month: 'long' }}
             listDaySideFormat={false}
