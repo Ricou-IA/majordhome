@@ -67,16 +67,6 @@ import { logger } from '@lib/logger';
  * Calcule les bornes de date selon la vue FullCalendar
  */
 function getDateRange(dateInfo) {
-  if (!dateInfo) {
-    // Default : semaine courante étendue à ±1 mois pour prefetch
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
-    return {
-      startDate: start.toISOString().split('T')[0],
-      endDate: end.toISOString().split('T')[0],
-    };
-  }
   return {
     startDate: dateInfo.startStr?.split('T')[0] || dateInfo.start?.toISOString().split('T')[0],
     endDate: dateInfo.endStr?.split('T')[0] || dateInfo.end?.toISOString().split('T')[0],
@@ -453,7 +443,11 @@ export default function Planning() {
   const [currentView, setCurrentView] = useState(vueInitiale);
   const [calendarTitle, setCalendarTitle] = useState('');
   const [calendarWeek, setCalendarWeek] = useState(null);
-  const [dateRange, setDateRange] = useState(() => getDateRange(null));
+  // Plage affichée, inconnue tant que le calendrier ne l'a pas annoncée (datesSet,
+  // dès son montage) : rien ne se charge avant. L'ancien défaut (± 1 mois « pour
+  // précharger ») lançait trois mois de RDV, leurs techniciens et leurs chantiers
+  // sous une clé de cache que la semaine affichée ne réutilisait jamais.
+  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
   // Période que le titre annonce (≠ dateRange en vue Mois : la grille déborde) — cumul du CA.
   const [periode, setPeriode] = useState(null);
   const [modalState, setModalState] = useState({ open: false, mode: 'create', appointment: null, defaultDate: null, defaultTime: null });
@@ -518,7 +512,7 @@ export default function Planning() {
       fermerJournee();
       return;
     }
-    if (etatsLoading || !journeesHorizon || journeeOuverte.date >= dateRange.endDate) return;
+    if (etatsLoading || !journeesHorizon || !dateRange.endDate || journeeOuverte.date >= dateRange.endDate) return;
     toast.info('Cette journée n’est pas planifiée par la machine (jour passé, non travaillé, ou technicien planifié à la main).');
     fermerJournee();
   }, [journeeOuverte, journeeSelectionnee, etatsError, etatsLoading, journeesHorizon, dateRange.endDate, fermerJournee]);

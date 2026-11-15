@@ -122,11 +122,15 @@ export function extractRpcResult(data) {
 // ORG ID MAPPING (core → majordhome)
 // ============================================================================
 
-const orgIdCache = {};
+/** core org id → promesse de l'org majordhome (une seule requête, même pour des appels simultanés). */
+const orgIdPromises = {};
 
 /**
  * Résout core.organizations.id → majordhome.organizations.id
- * Cache en mémoire pour éviter les requêtes répétées.
+ * Cache en mémoire de la PROMESSE : à l'ouverture d'un écran, plusieurs services
+ * la demandent en même temps — un cache de la seule valeur laissait partir une
+ * requête par appelant (5 à l'ouverture du Planning, mesuré le 2026-11-15).
+ * Un échec n'est pas mis en cache : l'appel suivant réessaie.
  *
  * @param {string} coreOrgId - UUID de core.organizations
  * @returns {Promise<string>} UUID de majordhome.organizations
@@ -135,19 +139,23 @@ const orgIdCache = {};
 export async function getMajordhomeOrgId(coreOrgId) {
   if (!coreOrgId) throw new Error('[serviceHelpers] coreOrgId requis');
 
-  if (orgIdCache[coreOrgId]) return orgIdCache[coreOrgId];
+  if (!orgIdPromises[coreOrgId]) {
+    orgIdPromises[coreOrgId] = (async () => {
+      const { data, error } = await supabase
+        .from('majordhome_organizations')
+        .select('id')
+        .eq('core_org_id', coreOrgId)
+        .single();
 
-  const { data, error } = await supabase
-    .from('majordhome_organizations')
-    .select('id')
-    .eq('core_org_id', coreOrgId)
-    .single();
-
-  if (error || !data) {
-    logger.error('[serviceHelpers] Impossible de résoudre org_id:', error);
-    throw new Error('Organisation majordhome introuvable pour cet org_id');
+      if (error || !data) {
+        logger.error('[serviceHelpers] Impossible de résoudre org_id:', error);
+        throw new Error('Organisation majordhome introuvable pour cet org_id');
+      }
+      return data.id;
+    })().catch((err) => {
+      delete orgIdPromises[coreOrgId];
+      throw err;
+    });
   }
-
-  orgIdCache[coreOrgId] = data.id;
-  return data.id;
+  return orgIdPromises[coreOrgId];
 }

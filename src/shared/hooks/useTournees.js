@@ -314,7 +314,8 @@ export function useEtatsJournees({ coreOrgId, startDate, endDate }) {
   });
   const etats = useMemo(() => {
     const map = new Map();
-    if (!horizon || !settings) return map;
+    // Plage inconnue (le calendrier ne l'a pas encore annoncée) : aucun état, pas tout l'horizon.
+    if (!horizon || !settings || !startDate || !endDate) return map;
     const reglages = construireReglages(settings);
     const depot = getOrgHeadquarters(settings);
     const parCle = new Map((etiquettes || []).map((e) => [`${e.date}|${e.team_member_id}`, e]));

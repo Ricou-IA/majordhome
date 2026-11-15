@@ -4,6 +4,7 @@ import { supabase } from '@lib/supabaseClient';
 import { authService } from '@services/auth.service';
 import { computeEffectiveRole } from '@lib/permissions';
 import { logger } from '@lib/logger';
+import { getMajordhomeOrgId } from '@lib/serviceHelpers';
 
 const AuthContext = createContext(null);
 
@@ -21,6 +22,7 @@ export function AuthProvider({ children }) {
   // Refs de contrôle
   const signInActiveRef = useRef(false);       // Éviter que SIGNED_IN double-charge pendant signIn()
   const signOutTimerRef = useRef(null);        // Debounce SIGNED_OUT (protection alt-tab)
+  const chargementsEnCoursRef = useRef(new Map()); // userId → nombre de loadUserData en vol
 
   // ===========================================================================
   // CHARGEMENT DES DONNÉES UTILISATEUR
@@ -29,6 +31,7 @@ export function AuthProvider({ children }) {
   const loadUserData = useCallback(async (userId) => {
     if (!userId) return;
 
+    chargementsEnCoursRef.current.set(userId, (chargementsEnCoursRef.current.get(userId) || 0) + 1);
     try {
       const [profileResult, orgResult] = await Promise.all([
         authService.getProfile(userId),
@@ -60,6 +63,11 @@ export function AuthProvider({ children }) {
       if (userOrg) setOrganization(userOrg);
       if (userMembership) setMembership(userMembership);
 
+      // Org majordhome résolue dès maintenant (en parallèle du profil maison) : le
+      // premier écran n'attend plus cette requête avant de charger ses données.
+      // Sans effet si elle échoue — le service qui en a besoin réessaiera et le dira.
+      if (userOrg?.id) getMajordhomeOrgId(userOrg.id).catch(() => {});
+
       // Profil maison : chargé APRÈS l'org, null si aucun / inactif / erreur.
       // En cas d'erreur l'écran retombe sur le modèle (plus large) — la base, elle,
       // applique toujours le profil via role_can : un geste non permis échouera bruyamment.
@@ -74,6 +82,10 @@ export function AuthProvider({ children }) {
     } catch (error) {
       logger.error('[AuthContext] loadUserData error:', error);
       return { isClient: false };
+    } finally {
+      const restants = (chargementsEnCoursRef.current.get(userId) || 1) - 1;
+      if (restants > 0) chargementsEnCoursRef.current.set(userId, restants);
+      else chargementsEnCoursRef.current.delete(userId);
     }
   }, []);
 
@@ -141,8 +153,11 @@ export function AuthProvider({ children }) {
       });
     };
 
-    // Helper : recharger profile/org SEULEMENT si manquants
+    // Helper : recharger profile/org SEULEMENT si manquants — et si personne ne
+    // les charge déjà : à l'ouverture, SIGNED_IN arrive pendant le chargement
+    // d'initAuth et doublait chaque requête (profil, adhésion, profil maison).
     const reloadIfNeeded = (userId) => {
+      if (chargementsEnCoursRef.current.has(userId)) return;
       setProfile(prev => {
         setOrganization(prevOrg => {
           if (!prev || !prevOrg) {
