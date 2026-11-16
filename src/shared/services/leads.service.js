@@ -489,9 +489,14 @@ export const leadsService = {
       const today = now.split('T')[0];
 
       if (newStatusLabel === 'Contact\u00e9') {
-        updates.last_call_date = extra.callDate || now;
-        updates.call_count = (currentLead?.call_count || 0) + 1;
-        if (extra.callResult) updates.last_call_result = extra.callResult;
+        // Un appel n'est compte que s'il y en a eu un (la modale d'appel fournit toujours
+        // sa date). Un retour en Contacte sans appel (RDV annule, passage en Perdu annule)
+        // ne doit ni gonfler call_count ni redater le dernier contact affiche sur la carte.
+        if (extra.callDate || extra.callResult) {
+          updates.last_call_date = extra.callDate || now;
+          updates.call_count = (currentLead?.call_count || 0) + 1;
+          if (extra.callResult) updates.last_call_result = extra.callResult;
+        }
       } else if (newStatusLabel === 'RDV planifi\u00e9') {
         if (extra.appointmentDate) {
           updates.appointment_date = extra.appointmentDate;

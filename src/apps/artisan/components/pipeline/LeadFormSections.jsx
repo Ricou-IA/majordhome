@@ -15,17 +15,15 @@ import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientC
 import { BanAddressInput } from '@/apps/artisan/components/shared/BanAddressInput';
 import {
   Search, PenLine, Unlink, Link2, X,
-  Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, Euro, ChevronDown, CalendarDays,
+  Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, ChevronDown, CalendarDays,
   ArrowRightLeft, Target, Loader2, Wrench, Undo2,
   FileText, ChevronRight, Plus, Info,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { FormField, SectionTitle, inputClass, selectClass } from '@/apps/artisan/components/FormFields';
 import { formatPhoneNumber, formatPhoneDisplay } from '@/lib/utils';
-import { LOST_REASONS } from './LeadStatusConfig';
 import { FICHE_STATUS_CONFIG, computeVisitStatus } from './FicheTechniqueConfig';
 import { useTechnicalVisit } from '@hooks/useTechnicalVisit';
 // SchedulingPanel déplacé dans LeadModal (overlay mode)
@@ -374,15 +372,6 @@ export const SectionPipeline = ({
   commercials,
   groupedEquipmentTypes,
   projectFamilies = [],
-  isFinal,
-  isWon,
-  // Lost reason
-  pendingLostStatusId,
-  lostReasonInput,
-  setLostReasonInput,
-  handleConfirmLost,
-  setPendingLostStatusId,
-  isChangingStatus,
   canAssign = true,
 }) => (
   <>
@@ -403,44 +392,6 @@ export const SectionPipeline = ({
         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
       </div>
     </FormField>
-
-    {/* Formulaire motif de perte (inline quand passage en Perdu) */}
-    {pendingLostStatusId && (
-      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg space-y-2">
-        <p className="text-sm font-medium text-red-800">
-          Motif de perte (objection) *
-        </p>
-        <select
-          value={lostReasonInput}
-          onChange={(e) => setLostReasonInput(e.target.value)}
-          className={`${inputClass} border-red-300 focus:ring-red-500 focus:border-red-500`}
-          autoFocus
-        >
-          <option value="">— Sélectionner —</option>
-          {LOST_REASONS.map((r) => (
-            <option key={r.value} value={r.value}>{r.label}</option>
-          ))}
-        </select>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            onClick={handleConfirmLost}
-            disabled={isChangingStatus}
-            className="bg-red-600 hover:bg-red-700 min-h-[36px]"
-          >
-            {isChangingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmer Perdu'}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setPendingLostStatusId(null)}
-            className="min-h-[36px]"
-          >
-            Annuler
-          </Button>
-        </div>
-      </div>
-    )}
 
     {/* Assistant de planification rendu en overlay dans LeadModal */}
 
@@ -485,65 +436,21 @@ export const SectionPipeline = ({
       </div>
     </FormField>
 
-    <div className={`grid ${canAssign ? 'grid-cols-2' : 'grid-cols-1'} gap-3 mt-3`}>
-      {canAssign && (
-        <FormField label="Commercial assigné">
-          <div className="relative">
-            <select
-              value={form.assigned_user_id}
-              onChange={(e) => setField('assigned_user_id', e.target.value)}
-              className={selectClass}
-            >
-              <option value="">— Non assigné —</option>
-              {commercials.map((c) => (
-                <option key={c.id} value={c.id}>{c.full_name}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-          </div>
-        </FormField>
-      )}
-
-      <FormField label="Probabilité (%)">
-        <input
-          type="number"
-          min="0"
-          max="100"
-          value={form.probability}
-          onChange={(e) => setField('probability', e.target.value)}
-          className={inputClass}
-        />
-      </FormField>
-    </div>
-
-    <FormField label="Montant HT (€)" className="mt-3">
-      <div className="relative">
-        <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          type="number"
-          min="0"
-          step="100"
-          value={form.order_amount_ht}
-          onChange={(e) => setField('order_amount_ht', e.target.value)}
-          className={`${inputClass} pl-9`}
-          placeholder="0"
-        />
-      </div>
-    </FormField>
-
-    {/* Raison perdue (si statut Perdu) */}
-    {isFinal && !isWon && (
-      <FormField label="Raison de perte" className="mt-3">
-        <select
-          value={form.lost_reason}
-          onChange={(e) => setField('lost_reason', e.target.value)}
-          className={inputClass}
-        >
-          <option value="">— Sélectionner —</option>
-          {LOST_REASONS.map((r) => (
-            <option key={r.value} value={r.value}>{r.label}</option>
-          ))}
-        </select>
+    {canAssign && (
+      <FormField label="Commercial assigné" className="mt-3">
+        <div className="relative">
+          <select
+            value={form.assigned_user_id}
+            onChange={(e) => setField('assigned_user_id', e.target.value)}
+            className={selectClass}
+          >
+            <option value="">— Non assigné —</option>
+            {commercials.map((c) => (
+              <option key={c.id} value={c.id}>{c.full_name}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+        </div>
       </FormField>
     )}
   </>

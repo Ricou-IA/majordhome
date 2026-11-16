@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, UserCircle, Tag, FileText } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, UserCircle, Tag, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeadStatuses, useLeadCommercials, useLeadSources, useLeadMutations } from '@hooks/useLeads';
@@ -22,7 +22,7 @@ import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { MoveToLongTermModal } from './longTerm/MoveToLongTermModal';
-import { ALLOWED_TRANSITIONS, LOST_REASONS } from './LeadStatusConfig';
+import { ALLOWED_TRANSITIONS } from './LeadStatusConfig';
 import { logger } from '@lib/logger';
 
 // ============================================================================
@@ -525,11 +525,6 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
     );
   }, []);
 
-  // Etat pour le prompt "Perdu" depuis le kanban
-  const [pendingLost, setPendingLost] = useState(null); // { leadId, newStatusId, oldStatusId }
-  const [lostReasonSelect, setLostReasonSelect] = useState('');
-  const [lostReasonCustom, setLostReasonCustom] = useState('');
-
   // Etat pour le prompt "Contacte" depuis le kanban
   const [pendingContact, setPendingContact] = useState(null); // { leadId, newStatusId, oldStatusId }
   const [contactLoading, setContactLoading] = useState(false);
@@ -637,13 +632,8 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
         return;
       }
 
-      // Si "Perdu", ouvrir la modale de motif
-      if (newStatusLabel === 'Perdu') {
-        setPendingLost({ leadId, newStatusId, oldStatusId });
-        setLostReasonSelect('');
-        setLostReasonCustom('');
-        return;
-      }
+      // "Perdu" : passage direct (plus de motif à saisir, Eric 2026-11-17) → flux
+      // commun plus bas (mise à jour optimiste + updateLeadStatus).
 
       // Si "Contacte", ouvrir la modale d'appel — sauf régression (ex. RDV planifié →
       // Contacté après annulation de RDV) qui se fait en retour direct (pas de modale).
@@ -691,6 +681,25 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
       try {
         await updateLeadStatus(leadId, newStatusId, userId);
         fetchLeads();
+        // Perdu est terminal (aucune transition de sortie) : un dépôt malencontreux
+        // doit pouvoir s'annuler, sans quoi la carte reste coincée.
+        if (newStatusLabel === 'Perdu') {
+          toast.success('Lead passé en « Perdu »', {
+            duration: 8000,
+            action: {
+              label: 'Annuler',
+              onClick: async () => {
+                try {
+                  await updateLeadStatus(leadId, oldStatusId, userId);
+                  fetchLeads();
+                } catch (err) {
+                  logger.error('[LeadKanban] annulation Perdu:', err);
+                  toast.error('Le passage en « Perdu » n’a pas pu être annulé');
+                }
+              },
+            },
+          });
+        }
       } catch (err) {
         logger.error('[LeadKanban] drag status error:', err);
         toast.error('Erreur lors du deplacement');
@@ -701,37 +710,6 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
     },
     [updateLeadStatus, userId, fetchLeads, columns, kanbanItems, allLeads, onLeadClick, pennylaneActive],
   );
-
-  // Confirmer le passage en Perdu avec motif
-  const handleConfirmLost = useCallback(async () => {
-    const reason = lostReasonSelect === 'Autre' ? lostReasonCustom.trim() : lostReasonSelect;
-    if (!pendingLost || !reason) {
-      toast.error('Veuillez selectionner un motif de perte');
-      return;
-    }
-
-    const { leadId, newStatusId, oldStatusId } = pendingLost;
-
-    // Optimistic update
-    setAllLeads((prev) =>
-      prev.map((l) => (l.id === leadId ? { ...l, status_id: newStatusId } : l)),
-    );
-    setPendingLost(null);
-
-    try {
-      await updateLeadStatus(leadId, newStatusId, userId, {
-        lostReason: reason,
-      });
-      fetchLeads();
-      toast.success('Lead marque comme perdu');
-    } catch (err) {
-      logger.error('[LeadKanban] lost status error:', err);
-      toast.error('Erreur lors du changement de statut');
-      setAllLeads((prev) =>
-        prev.map((l) => (l.id === leadId ? { ...l, status_id: oldStatusId } : l)),
-      );
-    }
-  }, [pendingLost, lostReasonSelect, lostReasonCustom, updateLeadStatus, userId, fetchLeads]);
 
   // Confirmer le passage en Contacte avec donnees d'appel
   const handleConfirmContact = useCallback(async (callData) => {
@@ -824,6 +802,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
         <LeadCard
           lead={item.lead}
           card={item.card}
+          columnKey={item.column_key}
           onClick={onLeadClick}
           commercialsMap={commercialsMap}
           onMoveToLongTerm={handleOpenLongTerm}
@@ -883,73 +862,6 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
         </>
       }
     >
-      {/* Modale motif de perte */}
-      {pendingLost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div
-            className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6"
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setPendingLost(null);
-            }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Motif de perte</h3>
-              <button
-                onClick={() => setPendingLost(null)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <select
-                value={lostReasonSelect}
-                onChange={(e) => setLostReasonSelect(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
-                autoFocus
-              >
-                <option value="">Selectionner un motif...</option>
-                {LOST_REASONS.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-                <option value="Autre">Autre (preciser)</option>
-              </select>
-
-              {lostReasonSelect === 'Autre' && (
-                <input
-                  type="text"
-                  value={lostReasonCustom}
-                  onChange={(e) => setLostReasonCustom(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
-                  placeholder="Precisez le motif..."
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); handleConfirmLost(); }
-                  }}
-                />
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 mt-6">
-              <button
-                onClick={() => setPendingLost(null)}
-                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleConfirmLost}
-                disabled={!lostReasonSelect || (lostReasonSelect === 'Autre' && !lostReasonCustom.trim())}
-                className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Confirmer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modale d'appel pour transition vers Contacte */}
       <CallModal
         isOpen={!!pendingContact}

@@ -2,8 +2,9 @@
  * LeadCard.jsx - Majord'home Artisan
  * ============================================================================
  * Carte lead compacte pour le Kanban pipeline (drag & drop).
- * Affiche nom, statut, source, montant, prochaine action, jours dans le statut,
- * badge devis Pennylane (expand inline).
+ * Affiche nom, source, montant, prochaine action, jours dans le statut,
+ * badge devis Pennylane (expand inline). La date de la bande gauche dépend de
+ * la COLONNE de la carte : règle unique `dateDeCarte` (src/lib/leadCardDate.js).
  *
  * @version 2.0.0 - Mode liste retiré (onglet Leads supprimé) → compact-only
  * ============================================================================
@@ -14,6 +15,7 @@ import { Phone, Calendar, Clock, PhoneCall, FileText, Trophy, XCircle, Hourglass
 import { formatEuroCeil } from '@/lib/utils';
 import { useLinkedPennylaneQuotes, usePrefetchLinkedPennylaneQuotes } from '@hooks/usePennylane';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
+import { dateDeCarte } from '@/lib/leadCardDate';
 import { QuoteSubCard } from './QuoteSubCard';
 
 // Statuts depuis lesquels un lead peut partir en suivi MT-LT : tout le funnel
@@ -46,55 +48,32 @@ function formatShortDate(dateStr) {
   return { day, month };
 }
 
-/**
- * Retourne la date contextuelle et l'icône selon le statut du lead
- */
-function getContextualDate(lead) {
-  const statusLabel = lead.statuses?.label;
-
-  switch (statusLabel) {
-    case 'Nouveau':
-      return {
-        date: lead.created_date || lead.created_at,
-        icon: Calendar,
-        tooltip: 'Date de création',
-      };
-    case 'Contacté':
-      return {
-        date: lead.last_call_date,
-        icon: PhoneCall,
-        tooltip: lead.call_count > 1 ? `${lead.call_count} appels` : '1 appel',
-        extra: null,
-      };
-    case 'RDV planifié':
-      return {
-        date: lead.appointment_date,
-        icon: Calendar,
-        tooltip: 'Date du RDV',
-      };
-    case 'Devis envoyé':
-      return {
-        date: lead.quote_sent_date,
-        icon: FileText,
-        tooltip: 'Date d\'envoi du devis',
-      };
-    case 'Gagné':
-      return {
-        date: lead.won_date,
-        icon: Trophy,
-        tooltip: 'Date de signature',
-      };
-    case 'Perdu':
-      return {
-        date: null,
-        icon: XCircle,
-        tooltip: lead.lost_reason || null,
-        text: lead.lost_reason ? lead.lost_reason.substring(0, 20) : null,
-      };
-    default:
-      return { date: lead.created_date, icon: Calendar };
-  }
+/** Date complète pour l'infobulle (« 3 nov. 2026 ») — l'année ne tient pas dans la bande */
+function formatFullDate(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+// Icône de la bande gauche quand la date de la colonne est inconnue
+const COLUMN_ICONS = {
+  nouveau: Calendar,
+  contacte: PhoneCall,
+  rdv_planifie: Calendar,
+  devis_envoye: FileText,
+  gagne: Trophy,
+  perdu: XCircle,
+};
+
+// Colonne déduite du statut du lead, pour une carte rendue sans colonne explicite
+const STATUS_LABEL_TO_COLUMN_KEY = {
+  'Nouveau': 'nouveau',
+  'Contacté': 'contacte',
+  'RDV planifié': 'rdv_planifie',
+  'Devis envoyé': 'devis_envoye',
+  'Gagné': 'gagne',
+  'Perdu': 'perdu',
+};
 
 /**
  * Couleur du badge "jours dans statut" selon le délai
@@ -137,8 +116,10 @@ function getCommercialColor(index) {
  * @param {Function} props.onMoveToLongTerm - (lead) => void — affiche un bouton MT-LT
  *   sur les cartes du funnel actif (Nouveau → Devis envoyé) si fourni
  * @param {Object} [props.card] - Carte Kanban courante (column_key, devis_count) passée par LeadKanban (Phase 1 pipeline multi-devis)
+ * @param {string} [props.columnKey] - Colonne où la carte est AFFICHÉE (peut différer un instant de `card.column_key`
+ *   pendant un déplacement) ; à défaut, celle de la vue puis celle du statut du lead
  */
-export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card }) {
+export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card, columnKey }) {
   const [expanded, setExpanded] = useState(false);
 
   // Devis Pennylane liés (expand inline dans le kanban)
@@ -204,16 +185,14 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
   // Commercial assigné (initiales)
   const commercial = commercialsMap?.[lead.assigned_user_id];
 
-  const ctx = getContextualDate(lead);
-  // Colonne "RDV planifié" : la puce est pilotée par le RDV réel (vue dérivée).
-  // RDV actif -> date du 1er RDV ; sinon -> marqueur ambre "à replanifier".
-  const requiresRdv = card?.column_key === 'rdv_planifie';
-  const hasActiveRdv = Boolean(card?.has_active_rdv);
-  const showAmber = requiresRdv && !hasActiveRdv;
-  const effectiveDate = (requiresRdv && hasActiveRdv && card?.next_rdv_date) ? card.next_rdv_date : ctx.date;
-  const shortDate = formatShortDate(effectiveDate);
-  const CtxIcon = ctx.icon;
-  const isPerdu = lead.statuses?.label === 'Perdu';
+  // Date de la bande gauche : dépend de la colonne (création, dernier contact, RDV,
+  // 1er devis, gain, perte). Colonne RDV planifié sans RDV actif -> marqueur ambre.
+  const effectiveColumnKey = columnKey || card?.column_key || STATUS_LABEL_TO_COLUMN_KEY[lead.statuses?.label];
+  const ctx = dateDeCarte({ columnKey: effectiveColumnKey, lead, card });
+  const showAmber = ctx.aReplanifier;
+  const shortDate = formatShortDate(ctx.date);
+  const CtxIcon = COLUMN_ICONS[effectiveColumnKey] || Calendar;
+  const dateTitle = shortDate ? `${ctx.libelle} ${formatFullDate(ctx.date)}` : ctx.libelle;
 
   return (
     <div
@@ -230,19 +209,10 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
       <div
         className="flex flex-col items-center justify-center px-2 py-2 rounded-l-lg min-w-[44px] border-r"
         style={{ backgroundColor: `${statusColor}10`, borderColor: `${statusColor}30` }}
-        title={showAmber ? 'À replanifier' : ctx.tooltip}
+        title={dateTitle}
       >
         {showAmber ? (
           <CalendarClock className="h-4 w-4 text-amber-500" />
-        ) : isPerdu ? (
-          <>
-            <XCircle className="h-4 w-4 mb-0.5" style={{ color: statusColor }} />
-            {ctx.text && (
-              <span className="text-[9px] text-gray-500 text-center leading-tight line-clamp-2">
-                {ctx.text}
-              </span>
-            )}
-          </>
         ) : shortDate ? (
           <>
             <span className="text-sm font-bold leading-none" style={{ color: statusColor }}>
@@ -251,9 +221,6 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
             <span className="text-[10px] uppercase leading-tight" style={{ color: statusColor }}>
               {shortDate.month}
             </span>
-            {ctx.extra && (
-              <span className="text-[9px] font-medium text-gray-500 mt-0.5">{ctx.extra}</span>
-            )}
           </>
         ) : (
           <CtxIcon className="h-4 w-4 text-gray-300" />

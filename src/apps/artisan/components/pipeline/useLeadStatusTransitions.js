@@ -2,8 +2,9 @@
  * useLeadStatusTransitions.js — gestes de statut de LeadModal (sorti du composant).
  * Chaque transition enregistre d'abord le formulaire en cours (`persistForm`), puis
  * passe par la modale propre à la cible : appel (Contacté), assistant (RDV planifié),
- * devis MDH ou rattachement Pennylane (Devis envoyé), motif (Perdu), devis canonique
- * Pennylane (Gagné). Garde Pennylane : sur une org PL, Gagné exige un devis rattaché.
+ * devis MDH ou rattachement Pennylane (Devis envoyé), devis canonique Pennylane (Gagné).
+ * Perdu est direct, sans motif (Eric 2026-11-17), avec « Annuler » sur la confirmation :
+ * le statut est terminal. Garde Pennylane : sur une org PL, Gagné exige un devis rattaché.
  */
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -22,8 +23,6 @@ export function useLeadStatusTransitions({
   pennylaneActive, linkedQuotes, persistForm,
   updateLeadStatus, convertLead, sendQuote, onSaved, onClose,
 }) {
-  const [pendingLostStatusId, setPendingLostStatusId] = useState(null);
-  const [lostReasonInput, setLostReasonInput] = useState('');
   const [pendingRdvStatusId, setPendingRdvStatusId] = useState(null);
   const [schedulingLoading, setSchedulingLoading] = useState(false);
   const [pendingContactStatusId, setPendingContactStatusId] = useState(null);
@@ -46,11 +45,7 @@ export function useLeadStatusTransitions({
   const handleStatusChange = async (newStatusId) => {
     if (!isEditing || newStatusId === form.status_id) return;
     const targetStatus = statuses.find((s) => s.id === newStatusId);
-    if (targetStatus?.label === 'Perdu') {
-      setPendingLostStatusId(newStatusId);
-      setLostReasonInput('');
-      return;
-    }
+    const previousStatusId = form.status_id;
     if (targetStatus?.label === 'Contacté') {
       // Forward (Nouveau → Contacté) : modale d'appel pour qualifier le contact.
       // Régression (ex. RDV planifié → Contacté après annulation de RDV) : retour
@@ -103,31 +98,29 @@ export function useLeadStatusTransitions({
       if (result?.clientCreated) {
         const clientName = result.clientCreated.display_name || result.clientCreated.client_number;
         toast.success(`Lead passé en "${targetLabel}" — Fiche client créée : ${clientName}`, { duration: 5000 });
+      } else if (targetLabel === 'Perdu') {
+        // Perdu est terminal : la fiche se ferme, l'annulation reste offerte quelques secondes.
+        toast.success('Lead passé en « Perdu »', {
+          duration: 8000,
+          action: {
+            label: 'Annuler',
+            onClick: async () => {
+              try {
+                await updateLeadStatus(leadId, previousStatusId, userId);
+                onSaved?.();
+              } catch (err) {
+                logger.error('[LeadModal] annulation Perdu:', err);
+                toast.error('Le passage en « Perdu » n’a pas pu être annulé');
+              }
+            },
+          },
+        });
       } else {
         toast.success(`Lead passé en "${targetLabel}"`);
       }
       done();
     } catch (err) {
       logger.error('[LeadModal] Erreur statut:', err);
-      toast.error('Erreur lors du changement de statut');
-    }
-  };
-
-  const handleConfirmLost = async () => {
-    if (!lostReasonInput) {
-      toast.error('Veuillez sélectionner un motif de perte');
-      return;
-    }
-    try {
-      await persistForm();
-      await updateLeadStatus(leadId, pendingLostStatusId, userId, {
-        lostReason: lostReasonInput.trim(),
-      });
-      setPendingLostStatusId(null);
-      toast.success('Lead marqué comme perdu');
-      done();
-    } catch (err) {
-      logger.error('[LeadModal] Erreur passage perdu:', err);
       toast.error('Erreur lors du changement de statut');
     }
   };
@@ -366,14 +359,13 @@ export function useLeadStatusTransitions({
   };
 
   return {
-    pendingLostStatusId, setPendingLostStatusId, lostReasonInput, setLostReasonInput,
     pendingRdvStatusId, setPendingRdvStatusId, schedulingLoading, setSchedulingLoading,
     pendingContactStatusId, setPendingContactStatusId,
     callModalForLog, setCallModalForLog, callLoading,
     followupModalOpen, setFollowupModalOpen, followupLoading,
     pendingQuoteStatusId, setPendingQuoteStatusId, quoteLoading,
     showQuoteCandidates, setShowQuoteCandidates, showMarkWon, setShowMarkWon,
-    handleStatusChange, handleConfirmLost, handleConfirmScheduling, handleVtPosee, handleConfirmContact,
+    handleStatusChange, handleConfirmScheduling, handleVtPosee, handleConfirmContact,
     handleConfirmQuote, handleSendDevis, handleLogCall, handleLogFollowup, handleConvert,
   };
 }

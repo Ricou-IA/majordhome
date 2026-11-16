@@ -200,14 +200,13 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   }, [emailInvalide, updateLead, leadId, buildPayload, syncClientFields]);
 
   const {
-    pendingLostStatusId, setPendingLostStatusId, lostReasonInput, setLostReasonInput,
     pendingRdvStatusId, setPendingRdvStatusId, schedulingLoading, setSchedulingLoading,
     pendingContactStatusId, setPendingContactStatusId,
     callModalForLog, setCallModalForLog, callLoading,
     followupModalOpen, setFollowupModalOpen, followupLoading,
     pendingQuoteStatusId, setPendingQuoteStatusId, quoteLoading,
     showQuoteCandidates, setShowQuoteCandidates, showMarkWon, setShowMarkWon,
-    handleStatusChange, handleConfirmLost, handleConfirmScheduling, handleVtPosee, handleConfirmContact,
+    handleStatusChange, handleConfirmScheduling, handleVtPosee, handleConfirmContact,
     handleConfirmQuote, handleSendDevis, handleLogCall, handleLogFollowup, handleConvert,
   } = useLeadStatusTransitions({
     leadId, isEditing, orgId, userId, form, setForm, statuses, linkedClientId: linkedClient?.id,
@@ -484,14 +483,6 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 commercials={commercials}
                 groupedEquipmentTypes={groupedEquipmentTypes}
                 projectFamilies={projectFamilies}
-                isFinal={isFinal}
-                isWon={isWon}
-                pendingLostStatusId={pendingLostStatusId}
-                lostReasonInput={lostReasonInput}
-                setLostReasonInput={setLostReasonInput}
-                handleConfirmLost={handleConfirmLost}
-                setPendingLostStatusId={setPendingLostStatusId}
-                isChangingStatus={isChangingStatus}
                 pendingRdvStatusId={pendingRdvStatusId}
                 setPendingRdvStatusId={setPendingRdvStatusId}
                 lead={lead}

@@ -1,20 +1,10 @@
 /**
  * LeadStatusConfig.js
  * ============================================================================
- * Configuration pipeline : transitions autorisées, labels, causes de perte
+ * Configuration pipeline : transitions autorisées
  * Extrait de LeadModal.jsx pour réutilisation
  * ============================================================================
  */
-
-// Causes de perte prédéfinies
-export const LOST_REASONS = [
-  { value: 'Prix', label: 'Prix' },
-  { value: 'Ghost', label: 'Ghost' },
-  { value: 'Délai', label: 'Délai' },
-  { value: 'Qualif', label: 'Qualif' },
-  { value: 'Annulé', label: 'Annulé' },
-  { value: 'Tech', label: 'Tech' },
-];
 
 /**
  * Transitions autorisées par statut

@@ -281,6 +281,7 @@ const VIEWS = [
   'public.majordhome_webshop_pickup_points',
   'public.majordhome_leads', // 20261030_1 : project_family_key en fin
   'public.majordhome_audit_log', // 20261116_5 : client_id en fin (CREATE OR REPLACE sur la vue telle qu'en prod)
+  'public.majordhome_kanban_cards', // 20261117_2 : dates des devis en fin (après majordhome.lead_quote_stats, qu'elle lit)
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du
