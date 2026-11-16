@@ -270,6 +270,7 @@ export const certificatKeys = {
   byIntervention: (orgId, interventionId) => [...certificatKeys.all(orgId), 'intervention', interventionId],
   tree: (orgId, interventionId) => [...certificatKeys.all(orgId), 'tree', interventionId],
   attestation: (orgId, interventionId) => [...certificatKeys.all(orgId), 'attestation', interventionId],
+  rdvTechniciens: (orgId, interventionId) => [...certificatKeys.all(orgId), 'rdv-techniciens', interventionId],
 };
 
 // --- Suppliers ---

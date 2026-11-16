@@ -23,7 +23,8 @@ export function useAppointmentEntretien({ isOpen, isEdit, clientId, appointmentT
         // project_id / client_project_id : CertificatsSection en a besoin pour créer les
         // enfants (interventions.project_id NOT NULL). Sans eux, la création échouait en
         // 23502 à chaque ouverture d'un RDV entretien (avalé jusqu'au 2026-09-20).
-        .select('id, workflow_status, intervention_type, includes_entretien, client_id, contract_id, effective_contract_id, project_id, client_project_id')
+        // Champs client / contrat / facturation : lus par le certificat « Conforme » de CertificatsSection.
+        .select('id, workflow_status, intervention_type, includes_entretien, client_id, contract_id, effective_contract_id, project_id, client_project_id, scheduled_date, invoice_id, invoiced_at, contract_number, client_name, client_first_name, client_last_name, client_address, client_postal_code, client_city')
         .eq('client_id', clientId)
         .in('workflow_status', ['planifie', 'a_planifier', 'realise'])
         .order('created_at', { ascending: false })

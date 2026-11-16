@@ -30,6 +30,29 @@ async function fetchAsDataUrl(url) {
 }
 
 /**
+ * Logo et signature du signataire en data URL, pour une lettre à l'en-tête de l'entreprise
+ * (attestation de ramonage, certificat allégé). Jamais bloquant : ce qui manque est renvoyé
+ * dans `warnings`, le document sort sans.
+ * @param {object} company  buildCompanyInfo(settings)
+ * @returns {Promise<{ logoSrc: string|null, signatureSrc: string|null, warnings: string[] }>}
+ */
+export async function chargerVisuelsLettre(company) {
+  const visuels = { logoSrc: null, signatureSrc: null, warnings: [] };
+  if (company.logoUrl) {
+    visuels.logoSrc = await fetchAsDataUrl(company.logoUrl);
+    if (!visuels.logoSrc) visuels.warnings.push('Logo illisible : document édité sans logo.');
+  }
+  if (company.signatorySignaturePath) {
+    const { url } = await storageService.getSignedUrl(SIGNATURE_BUCKET, company.signatorySignaturePath);
+    visuels.signatureSrc = url ? await fetchAsDataUrl(url) : null;
+    if (!visuels.signatureSrc) visuels.warnings.push('Signature illisible : document édité sans signature.');
+  } else {
+    visuels.warnings.push('Aucune signature dans Organisation → Identité : document édité sans signature.');
+  }
+  return visuels;
+}
+
+/**
  * @param {object} p
  * @param {string} p.orgId  org core
  * @param {string} p.interventionId  carte d'entretien (racine ; les certificats des enfants sont inclus)
@@ -67,18 +90,8 @@ export async function genererAttestationsIntervention({ orgId, interventionId, c
   let assets = null;
   const loadAssets = async () => {
     if (assets) return assets;
-    assets = { logoSrc: null, signatureSrc: null };
-    if (company.logoUrl) {
-      assets.logoSrc = await fetchAsDataUrl(company.logoUrl);
-      if (!assets.logoSrc) result.warnings.push('Logo illisible : attestation éditée sans logo.');
-    }
-    if (company.signatorySignaturePath) {
-      const { url } = await storageService.getSignedUrl(SIGNATURE_BUCKET, company.signatorySignaturePath);
-      assets.signatureSrc = url ? await fetchAsDataUrl(url) : null;
-      if (!assets.signatureSrc) result.warnings.push('Signature illisible : attestation éditée sans signature.');
-    } else {
-      result.warnings.push('Aucune signature dans Organisation → Identité : attestation éditée sans signature.');
-    }
+    assets = await chargerVisuelsLettre(company);
+    result.warnings.push(...assets.warnings);
     return assets;
   };
 

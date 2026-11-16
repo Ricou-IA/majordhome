@@ -126,6 +126,110 @@ export const certificatsService = {
   },
 
   /**
+   * Certificat « Conforme » allégé, posé par le bureau (spec 2026-11-16) : upsert sur
+   * `intervention_id` de la ligne construite par `certificatAllegePayload` — remplace un
+   * brouillon conforme, rejoue sans doublon. Les gardes (anomalie, certificat signé) sont
+   * tenues AVANT par `blocageConforme`.
+   * @param {object} payload
+   */
+  async saveAllege(payload) {
+    if (!payload?.intervention_id || !payload?.org_id) {
+      return { data: null, error: { message: 'intervention_id et org_id requis' } };
+    }
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_certificats')
+        .upsert(payload, { onConflict: 'intervention_id' })
+        .select()
+        .single();
+      if (error) {
+        logger.error('[certificats] saveAllege error:', error);
+        return { data: null, error };
+      }
+      return { data, error: null };
+    } catch (err) {
+      logger.error('[certificats] saveAllege error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Retire un certificat allégé (annulation avant facturation). Le filtre `mode = 'allege'` est
+   * la garde : un certificat complet signé par le client ne se supprime jamais par cette voie.
+   * 0 ligne supprimée = refus (RLS, certificat complet, déjà retiré) : une erreur, pas un succès.
+   * @param {string} certificatId
+   * @param {string} orgId  org core
+   */
+  async deleteAllege(certificatId, orgId) {
+    if (!certificatId || !orgId) return { data: null, error: { message: 'certificatId et orgId requis' } };
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_certificats')
+        .delete()
+        .eq('id', certificatId)
+        .eq('org_id', orgId)
+        .eq('mode', 'allege')
+        .select('id, pdf_storage_path');
+      if (error) {
+        logger.error('[certificats] deleteAllege error:', error);
+        return { data: null, error };
+      }
+      if (!data?.length) return { data: null, error: { message: 'certificat allégé introuvable ou déjà retiré' } };
+      return { data: data[0], error: null };
+    } catch (err) {
+      logger.error('[certificats] deleteAllege error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /** Supprime des fichiers du bucket `certificats` (PDF, attestation). @param {string[]} paths */
+  async removeFiles(paths) {
+    const cibles = (paths || []).filter(Boolean);
+    if (cibles.length === 0) return { data: true, error: null };
+    try {
+      const { error } = await supabase.storage.from('certificats').remove(cibles);
+      if (error) {
+        logger.error('[certificats] removeFiles error:', error);
+        return { data: null, error };
+      }
+      return { data: true, error: null };
+    } catch (err) {
+      logger.error('[certificats] removeFiles error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Techniciens posés sur le RDV d'entretien de la carte (le plus récent), pour préremplir
+   * « qui est passé ». `interventions.technician_name` n'est pas tenu à jour par le planning.
+   * @param {string} interventionId  carte d'entretien (racine)
+   * @returns {Promise<{ data: string[]|null, error: object|null }>} ids `team_members`
+   */
+  async listRdvTechnicianIds(interventionId) {
+    if (!interventionId) return { data: [], error: null };
+    try {
+      const { data: rdvs, error: rdvErr } = await supabase
+        .from('majordhome_appointments')
+        .select('id')
+        .eq('intervention_id', interventionId)
+        .neq('status', 'cancelled')
+        .order('scheduled_date', { ascending: false })
+        .limit(1);
+      if (rdvErr) return { data: null, error: rdvErr };
+      if (!rdvs?.[0]) return { data: [], error: null };
+      const { data: techs, error: techErr } = await supabase
+        .from('majordhome_appointment_technicians')
+        .select('technician_id')
+        .eq('appointment_id', rdvs[0].id);
+      if (techErr) return { data: null, error: techErr };
+      return { data: (techs || []).map((t) => t.technician_id).filter(Boolean), error: null };
+    } catch (err) {
+      logger.error('[certificats] listRdvTechnicianIds error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
    * Signe le certificat : enregistre la signature base64 + passe en statut 'signe'.
    */
   async signCertificat(certificatId, signatureBase64, signataireNom) {
@@ -391,7 +495,7 @@ export const certificatsService = {
       const ids = [interventionId, ...(children || []).map((c) => c.id)];
       const { data, error } = await supabase
         .from('majordhome_certificats')
-        .select('id, intervention_id, equipment_id, client_id, reference, equipement_type, equipement_marque, equipement_modele, statut, signed_at, pdf_storage_path, pdf_generated_at, date_intervention, bilan_conformite, donnees_entretien, donnees_ramonage')
+        .select('id, intervention_id, equipment_id, client_id, reference, equipement_type, equipement_marque, equipement_modele, statut, signed_at, pdf_storage_path, pdf_generated_at, date_intervention, bilan_conformite, anomalies_detail, donnees_entretien, donnees_ramonage, technicien_nom, mode')
         .eq('org_id', orgId)
         .in('intervention_id', ids)
         .order('created_at', { ascending: true });

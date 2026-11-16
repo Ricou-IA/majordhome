@@ -22,6 +22,7 @@ import { useIntervention } from '@hooks/useInterventions';
 import { useCertificat } from '@hooks/useCertificats';
 import { certificatsService } from '@services/certificats.service';
 import { CertificatWizard } from '../components/certificat/CertificatWizard';
+import { estAllege } from '@/lib/certificatConformeModel';
 import { EquipmentModelDocuments } from '../components/interventions/EquipmentModelDocuments';
 import { supabase } from '@/lib/supabaseClient';
 import { useState, useEffect } from 'react';
@@ -197,6 +198,29 @@ export default function CertificatEntretien() {
     );
   }
 
+  // ── Certificat allégé posé par le bureau : jamais la saisie complète, qui l'écraserait ──
+  // (spec 2026-11-16). Son document se régénère depuis « Voir certificat » de la fiche d'entretien.
+  if (estAllege(certificat) && !(hasPdf && freshPdfUrl)) {
+    return (
+      <div className="max-w-lg mx-auto mt-12 p-6 bg-sky-50 border border-sky-200 rounded-lg text-center space-y-3">
+        {hasPdf ? (
+          <Loader2 className="w-8 h-8 text-sky-700 animate-spin mx-auto" />
+        ) : (
+          <>
+            <FileText className="w-8 h-8 text-sky-700 mx-auto" />
+            <p className="text-sm text-sky-900">
+              Certificat conforme {certificat.reference}, posé par le bureau : il n&apos;y a pas de saisie détaillée.
+              Son document n&apos;est pas encore généré — ouvrez « Voir certificat » depuis la fiche d&apos;entretien.
+            </p>
+          </>
+        )}
+        <button onClick={() => navigate(-1)} className="text-sm text-blue-600 hover:underline">
+          Retour
+        </button>
+      </div>
+    );
+  }
+
   // ── Certificat signé avec PDF → Afficher le résultat ──
   if (isSigned && hasPdf && freshPdfUrl) {
     return (
@@ -215,10 +239,14 @@ export default function CertificatEntretien() {
         {/* PDF */}
         <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center space-y-4">
           <FileText className="w-16 h-16 text-green-600 mx-auto" />
-          <p className="text-lg font-semibold text-green-800">Certificat signé et généré</p>
+          <p className="text-lg font-semibold text-green-800">
+            {estAllege(certificat) ? 'Certificat conforme généré' : 'Certificat signé et généré'}
+          </p>
           <p className="text-sm text-green-700">
-            Signé par {certificat.signature_client_nom} le{' '}
-            {certificat.signed_at ? new Date(certificat.signed_at).toLocaleDateString('fr-FR') : '—'}
+            {estAllege(certificat)
+              ? `Posé par le bureau, sans saisie détaillée — intervention du ${new Date(certificat.date_intervention).toLocaleDateString('fr-FR')}`
+              : <>Signé par {certificat.signature_client_nom} le{' '}
+                {certificat.signed_at ? new Date(certificat.signed_at).toLocaleDateString('fr-FR') : '—'}</>}
           </p>
           <a
             href={freshPdfUrl}
