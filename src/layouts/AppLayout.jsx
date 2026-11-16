@@ -1,16 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
-import { useOrgMembers } from '@hooks/usePermissions';
-import { useTaskMutations } from '@hooks/useTasks';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { moduleActif, crmActif, peutOuvrirParametres } from '@/lib/modules';
+import { moduleActif, peutOuvrirParametres } from '@/lib/modules';
 import { vocabulaire } from '@/lib/maintenance/vocabulaire';
-import TaskCreateModal from '@apps/artisan/components/tasks/TaskCreateModal';
 import { AppUpdateWatcher } from '@components/AppUpdateWatcher';
 import {
-  Plus,
   LayoutDashboard,
   Calendar,
   Users,
@@ -21,13 +17,11 @@ import {
   Settings,
   LogOut,
   Menu,
-  ChevronDown,
   Building2,
   User,
   Factory,
   Target,
   Grid3x3,
-  ListTodo,
   Mail,
   FileText,
   Megaphone,
@@ -54,7 +48,6 @@ const navigation = [
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,        resource: 'chantiers' },
   { name: 'Contrats',   href: '/contrats',   icon: FileText,        resource: 'entretiens', module: 'entretiens' },
   { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens', module: 'entretiens' },
-  { name: 'Tâches',     href: '/tasks',      icon: ListTodo,        resource: 'tasks' },
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants' },
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale' },
   { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings' },
@@ -91,27 +84,8 @@ export default function AppLayout() {
 
   // État sidebar mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // État dropdown utilisateur
+  // État menu du profil (pied du menu, en bas à droite)
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  // État modal nouvelle tâche (header global)
-  const [showTaskCreate, setShowTaskCreate] = useState(false);
-
-  const orgId = organization?.id;
-  const { members } = useOrgMembers(orgId);
-  const { createTask } = useTaskMutations();
-
-  const taskMembersList = (members || []).map((m) => ({
-    user_id: m.user_id,
-    full_name: m.profile?.full_name || m.full_name || m.display_name || m.email || '—',
-    email: m.profile?.email || m.email,
-  }));
-
-  const handleCreateTask = useCallback(
-    async (data) => {
-      await createTask({ orgId, ...data });
-    },
-    [createTask, orgId]
-  );
 
   // ===========================================================================
   // HANDLERS
@@ -120,6 +94,12 @@ export default function AppLayout() {
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
+  };
+
+  // Ferme le tiroir mobile ET le menu du profil (lien suivi, clic hors du tiroir)
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+    setUserMenuOpen(false);
   };
 
   // ===========================================================================
@@ -202,7 +182,7 @@ export default function AppLayout() {
           <NavLink
             key={item.name}
             to={item.href}
-            onClick={() => setSidebarOpen(false)}
+            onClick={closeSidebar}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
@@ -217,14 +197,16 @@ export default function AppLayout() {
         ))}
       </nav>
 
-      {/* Footer sidebar : admins (settings.view) ou tout rôle qui a au moins une tuile de Paramètres (Fournisseurs & catalogue → articles.edit) */}
-      {peutOuvrirReglages && (
-        <div className="px-4 py-4 border-t border-secondary-800">
+      {/* Pied du menu : Paramètres à gauche — admins (settings.view) ou tout rôle qui a au moins
+          une tuile de Paramètres (Fournisseurs & catalogue → articles.edit) — et profil en bas à
+          droite. Sans accès aux Paramètres, le nom de la personne prend la place du lien. */}
+      <div className="flex items-center gap-2 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-secondary-800">
+        {peutOuvrirReglages ? (
           <NavLink
             to="/settings"
-            onClick={() => setSidebarOpen(false)}
+            onClick={closeSidebar}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              `flex-1 min-w-0 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-primary-600 text-white'
                   : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
@@ -234,8 +216,70 @@ export default function AppLayout() {
             <Settings className="w-5 h-5" />
             Paramètres
           </NavLink>
+        ) : (
+          <p className="flex-1 min-w-0 px-3 text-sm font-medium text-secondary-300 truncate">
+            {getUserDisplayName()}
+          </p>
+        )}
+
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            aria-label={`Menu du profil — ${getUserDisplayName()}`}
+            aria-expanded={userMenuOpen}
+            aria-haspopup="menu"
+            title={getUserDisplayName()}
+            className="h-11 w-11 lg:h-10 lg:w-10 rounded-full bg-primary-600 flex items-center justify-center ring-2 ring-transparent hover:ring-secondary-500 focus-visible:ring-white focus:outline-none transition-shadow"
+          >
+            <span className="text-sm font-medium text-white">
+              {getUserInitials()}
+            </span>
+          </button>
+
+          {userMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setUserMenuOpen(false)}
+              />
+              <div
+                role="menu"
+                className="absolute right-0 bottom-full z-50 mb-2 w-56 bg-white rounded-lg shadow-lg border border-secondary-200 py-1 animate-fade-in"
+              >
+                <div className="px-4 py-3 border-b border-secondary-100">
+                  <p className="text-sm font-medium text-secondary-900 truncate">
+                    {getUserDisplayName()}
+                  </p>
+                  <p className="text-xs text-secondary-500 truncate">
+                    {user?.email}
+                  </p>
+                </div>
+
+                <NavLink
+                  to="/profile"
+                  role="menuitem"
+                  onClick={closeSidebar}
+                  className="flex items-center gap-3 px-4 py-2.5 lg:py-2 text-sm text-secondary-700 hover:bg-secondary-50"
+                >
+                  <User className="w-4 h-4" />
+                  Mon profil
+                </NavLink>
+
+                <div className="border-t border-secondary-100 mt-1 pt-1">
+                  <button
+                    role="menuitem"
+                    onClick={handleSignOut}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 lg:py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Se déconnecter
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 
@@ -249,7 +293,7 @@ export default function AppLayout() {
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeSidebar}
         />
       )}
 
@@ -274,111 +318,20 @@ export default function AppLayout() {
 
       {/* Main Content */}
       <div className="lg:pl-64">
-        {/* Header */}
-        <header className="sticky top-0 z-30 bg-white border-b border-secondary-200">
-          <div className="flex items-center justify-between h-14 lg:h-16 px-3 sm:px-6">
+        {/* Bandeau du haut : téléphone seulement, pour ouvrir le menu. Dès que le menu est
+            affiché en permanence (lg, tablettes comprises), il n'a plus rien à porter — le
+            profil est au pied du menu — et la page gagne sa hauteur. */}
+        <header className="sticky top-0 z-30 bg-white border-b border-secondary-200 lg:hidden">
+          <div className="flex items-center h-14 px-3 sm:px-6">
             {/* Menu burger mobile */}
             <button
               onClick={() => setSidebarOpen(true)}
               aria-label="Ouvrir le menu"
               aria-expanded={sidebarOpen}
-              className="h-11 w-11 -ml-1 flex items-center justify-center rounded-lg text-secondary-600 hover:bg-secondary-100 lg:hidden"
+              className="h-11 w-11 -ml-1 flex items-center justify-center rounded-lg text-secondary-600 hover:bg-secondary-100"
             >
               <Menu className="w-6 h-6" />
             </button>
-
-            {/* Spacer */}
-            <div className="flex-1" />
-
-            {/* Quick task button */}
-            {can('tasks', 'create') && crmActif(orgSettings) && (
-              <button
-                onClick={() => setShowTaskCreate(true)}
-                className="flex items-center justify-center gap-1.5 h-10 w-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 mr-2 sm:mr-3 text-sm font-medium text-white
-                  bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                title="Nouvelle tâche"
-                aria-label="Nouvelle tâche"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Nouvelle tâche</span>
-              </button>
-            )}
-
-            {/* User menu */}
-            <div className="relative">
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                aria-label="Menu utilisateur"
-                aria-expanded={userMenuOpen}
-                aria-haspopup="menu"
-                className="flex items-center gap-3 min-h-[44px] p-2 rounded-lg hover:bg-secondary-100 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
-                  <span className="text-sm font-medium text-white">
-                    {getUserInitials()}
-                  </span>
-                </div>
-                <div className="hidden sm:block text-left">
-                  <p className="text-sm font-medium text-secondary-900">
-                    {getUserDisplayName()}
-                  </p>
-                  <p className="text-xs text-secondary-500">
-                    {user?.email}
-                  </p>
-                </div>
-                <ChevronDown className="w-4 h-4 text-secondary-400 hidden sm:block" />
-              </button>
-
-              {/* Dropdown */}
-              {userMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setUserMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 z-50 mt-2 w-56 bg-white rounded-lg shadow-lg border border-secondary-200 py-1 animate-fade-in">
-                    <div className="px-4 py-3 border-b border-secondary-100">
-                      <p className="text-sm font-medium text-secondary-900">
-                        {getUserDisplayName()}
-                      </p>
-                      <p className="text-xs text-secondary-500 truncate">
-                        {user?.email}
-                      </p>
-                    </div>
-
-                    <NavLink
-                      to="/profile"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-50"
-                    >
-                      <User className="w-4 h-4" />
-                      Mon profil
-                    </NavLink>
-
-                    {peutOuvrirReglages && (
-                      <NavLink
-                        to="/settings"
-                        onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-50"
-                      >
-                        <Settings className="w-4 h-4" />
-                        Paramètres
-                      </NavLink>
-                    )}
-
-                    <div className="border-t border-secondary-100 mt-1 pt-1">
-                      <button
-                        onClick={handleSignOut}
-                        className="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Se déconnecter
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
           </div>
         </header>
 
@@ -390,15 +343,6 @@ export default function AppLayout() {
 
       {/* Nouvelle version déployée : bouton « Mettre à jour », rechargement au changement de page */}
       <AppUpdateWatcher />
-
-      {/* Global task create modal */}
-      {showTaskCreate && (
-        <TaskCreateModal
-          onClose={() => setShowTaskCreate(false)}
-          onCreate={handleCreateTask}
-          members={taskMembersList}
-        />
-      )}
     </div>
   );
 }

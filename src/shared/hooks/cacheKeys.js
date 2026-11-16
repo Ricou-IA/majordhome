@@ -360,16 +360,6 @@ export const gscKeys = {
   metrics: (orgId, range, queries) => [...gscKeys.all(orgId), 'metrics', range, queries],
 };
 
-// --- Tasks ---
-export const taskKeys = {
-  all: (orgId) => ['tasks', orgId],
-  lists: (orgId) => [...taskKeys.all(orgId), 'list'],
-  list: (orgId) => [...taskKeys.lists(orgId)],
-  archived: (orgId) => [...taskKeys.all(orgId), 'archived'],
-  detail: (orgId, id) => [...taskKeys.all(orgId), 'detail', id],
-  notes: (orgId, taskId) => [...taskKeys.all(orgId), 'notes', taskId],
-};
-
 // --- Google Calendar ---
 export const googleCalendarKeys = {
   all: (orgId) => ['google-calendar', orgId],
