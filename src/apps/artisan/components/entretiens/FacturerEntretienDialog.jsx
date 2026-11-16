@@ -216,13 +216,12 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
     }
   };
 
-  // Détail de la remise (dégressivité / exceptionnelle / commerciale) : calculé une seule
+  // Détail de la remise (dégressivité / exceptionnelle) : calculé une seule
   // fois, réutilisé par le tableau lecture seule ET par le bloc sous l'éditeur (mêmes chiffres).
   const discountDetail = effectiveModel?.discount
     ? [
         effectiveModel.discount.degressivitePercent > 0 ? `dégressivité ${effectiveModel.discount.degressivitePercent} %` : null,
         effectiveModel.discount.exceptionalAmount > 0 ? `remise exceptionnelle ${formatEuro(effectiveModel.discount.exceptionalAmount)}` : null,
-        effectiveModel.discount.commercialAmount > 0 ? `remise commerciale ${formatEuro(effectiveModel.discount.commercialAmount)}` : null,
       ].filter(Boolean).join(' + ') || 'montant du contrat'
     : null;
 

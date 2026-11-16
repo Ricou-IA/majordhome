@@ -8,10 +8,12 @@
 // révisées avec Eric le 2026-09-21 soir) :
 //  - 1 LIGNE PAR ÉQUIPEMENT au prix grille de la zone (ou prix forcé par ligne),
 //    calcul strictement identique au contrat signé (`computeContractLines`) ;
-//  - la REMISE s'applique : dégressivité (+ remise commerciale si le montant du
-//    contrat a été forcé à la baisse) = remise relative par ligne d'équipement,
-//    jamais sur les pièces ; le total retombe sur `contract.amount`, source figée
-//    à la signature. Montant forcé à la HAUSSE → lignes majorées au prorata ;
+//  - la REMISE s'applique : dégressivité + remise exceptionnelle du contrat =
+//    remise relative par ligne d'équipement, jamais sur les pièces ; le total
+//    retombe sur `contract.amount`, source figée à la signature ;
+//  - montant du contrat FORCÉ (≠ grille − dégressivité − remise exceptionnelle,
+//    à la baisse comme à la hausse) → c'est le prix : lignes ramenées au prorata
+//    sur ce montant, aucune remise affichée (Eric, 2026-11-16) ;
 //  - TVA par ligne = TVA par défaut de la catégorie du type d'équipement ;
 //    catégorie sans TVA → 20 % + avertissement (jamais silencieux) ;
 //  - les pièces non offertes du certificat s'ajoutent sur la même facture, à
@@ -305,23 +307,24 @@ export function buildEntretienInvoice({
 
   // --- Écart entre la grille (Σ lignes) et le montant contractuel figé ---
   const subtotal = round2(priced.reduce((s, it) => s + Number(it.lineTotal), 0));
+  const exceptional = round2(Number(pricing?.exceptionalDiscount) || 0);
+  // Ce que donne le calcul du contrat : grille − dégressivité − remise exceptionnelle.
+  const calcule = round2(subtotal - (Number(pricing?.discountAmount) || 0) - exceptional);
   let discount = null;
-  let scaleUp = null;
-  if (amount < subtotal - 0.01) {
-    const percent = round4(((subtotal - amount) / subtotal) * 100);
-    const degressivite = Number(pricing?.discountPercent) || 0;
-    const exceptional = round2(Number(pricing?.exceptionalDiscount) || 0);
-    // Écart résiduel = forçage legacy du montant (amount_forced), hors dégressivité et remise exceptionnelle
-    const commercial = round2(subtotal - amount - (Number(pricing?.discountAmount) || 0) - exceptional);
+  let scale = null;
+  if (Math.abs(amount - calcule) > 0.01) {
+    // Montant forcé (à la baisse comme à la hausse) : c'est LE prix. Les lignes sont
+    // ramenées au prorata sur ce montant, sans remise — une remise se saisit ailleurs
+    // (remise exceptionnelle du contrat). Eric, 2026-11-16, facture VADON : un contrat
+    // forcé à 190 € pour 220 € de grille sortait « remise commerciale 13,6364 % ».
+    scale = amount / subtotal;
+  } else if (amount < subtotal - 0.01) {
     discount = {
-      percent,
+      percent: round4(((subtotal - amount) / subtotal) * 100),
       amount: round2(subtotal - amount),
-      degressivitePercent: degressivite,
+      degressivitePercent: Number(pricing?.discountPercent) || 0,
       exceptionalAmount: exceptional > 0.01 ? exceptional : 0,
-      commercialAmount: commercial > 0.01 ? commercial : 0,
     };
-  } else if (amount > subtotal + 0.01) {
-    scaleUp = amount / subtotal;
   }
 
   // --- 1 ligne par équipement ---
@@ -331,8 +334,8 @@ export function buildEntretienInvoice({
   priced.forEach((it, i) => {
     const last = i === priced.length - 1;
     const eq = it.equipment || null;
-    const grossTtc = scaleUp
-      ? (last ? round2(amount - allocatedNet) : round2(Number(it.lineTotal) * scaleUp))
+    const grossTtc = scale
+      ? (last ? round2(amount - allocatedNet) : round2(Number(it.lineTotal) * scale))
       : round2(Number(it.lineTotal));
     const netTtc = discount
       ? (last ? round2(amount - allocatedNet) : round2(grossTtc * (1 - discount.percent / 100)))

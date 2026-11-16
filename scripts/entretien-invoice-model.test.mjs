@@ -162,17 +162,51 @@ test('2 équipements : 1 ligne chacun au prix grille, dégressivité 10 % porté
     [90, 10, 81, 'FR_100'],
     [160, 10, 144, 'FR_200'],
   ]);
-  assert.deepEqual(m.discount, { percent: 10, amount: 25, degressivitePercent: 10, exceptionalAmount: 0, commercialAmount: 0 });
+  assert.deepEqual(m.discount, { percent: 10, amount: 25, degressivitePercent: 10, exceptionalAmount: 0 });
   assert.equal(m.totalTtc, 225);
   assert.equal(m.subject, 'Entretien de vos équipements : Jollymec · Quadro+s/80 · N° 0160067 / Toshiba · Ras-16e2avg-e · N° 32301304');
 });
 
-test('montant forcé à la baisse : la remise relative couvre dégressivité + remise commerciale, la dernière ligne absorbe l’arrondi', () => {
+// Eric, 2026-11-16 : « Si je force c'est le bon prix, la remise je la saisis ailleurs. »
+// Un montant forcé n'est jamais présenté au client comme une remise sur le prix grille.
+test('montant forcé à la baisse : lignes ramenées au prorata sur le montant du contrat, aucune remise affichée', () => {
   const m = buildEntretienInvoice(dalous({ contract: { contract_number: 'CTR-1', amount: 200 }, pricing: pricingFor([EQ_POELE, EQ_PAC]) }));
-  assert.equal(m.discount.percent, 20);
-  assert.equal(m.discount.degressivitePercent, 10);
-  assert.equal(m.discount.commercialAmount, 25);
-  assert.deepEqual(m.lines.map((l) => l.netTtc), [72, 128]);
+  assert.equal(m.discount, null);
+  assert.deepEqual(m.lines.map((l) => [l.grossTtc, l.netTtc, l.discountPercent]), [[72, 72, 0], [128, 128, 0]]);
+  assert.equal(m.totalTtc, 200);
+});
+
+test('VADON : contrat forcé au prix sans supplément de zone ⇒ une ligne au prix du contrat, sans remise', () => {
+  // Grille 90 + 30 de zone = 120 ; contrat forcé à 90.
+  const pricing = pricingFor([EQ_POELE], { zone: { ...ZONE, supplement: 30 } });
+  assert.equal(pricing.total, 120);
+  const m = buildEntretienInvoice(dalous({ contract: { contract_number: 'CTR-00738', amount: 90 }, pricing }));
+  assert.deepEqual(m.errors, []);
+  assert.equal(m.discount, null);
+  assert.equal(m.lines.length, 1);
+  assert.deepEqual([m.lines[0].grossTtc, m.lines[0].netTtc, m.lines[0].discountPercent], [90, 90, 0]);
+  assert.equal(m.lines[0].unitPriceHt, '81.818182');
+  assert.equal(m.totalTtc, 90);
+  const payload = toPennylaneInvoicePayload(m, { customerId: 1, draft: true, externalReference: 'iv-1' });
+  assert.equal('discount' in payload.invoice_lines[0], false);
+});
+
+test('montant forcé entre le calcul et la grille : prorata aussi, pas une « dégressivité » au mauvais taux', () => {
+  // Grille 250, calcul 225 (dégressivité 10 %), contrat forcé à 240.
+  const m = buildEntretienInvoice(dalous({ contract: { contract_number: 'CTR-1', amount: 240 }, pricing: pricingFor([EQ_POELE, EQ_PAC]) }));
+  assert.equal(m.discount, null);
+  assert.deepEqual(m.lines.map((l) => [l.grossTtc, l.netTtc, l.discountPercent]), [[86.4, 86.4, 0], [153.6, 153.6, 0]]);
+  assert.equal(m.totalTtc, 240);
+});
+
+test('montant forcé à la baisse, arrondi : la dernière ligne absorbe le centime', () => {
+  // Grille 90 + 90 + 160 = 340 (dégressivité 10 % → 306), contrat forcé à 200.
+  const m = buildEntretienInvoice(dalous({
+    contract: { contract_number: 'CTR-1', amount: 200 },
+    pricing: pricingFor([EQ_POELE, { ...EQ_POELE, id: 'eq-1b' }, EQ_PAC]),
+  }));
+  assert.equal(m.discount, null);
+  assert.deepEqual(m.lines.map((l) => l.netTtc), [52.94, 52.94, 94.12]);
   assert.equal(m.totalTtc, 200);
 });
 
@@ -189,7 +223,7 @@ test('bi-split : le nombre d’unités se lit dans le libellé de la ligne, comm
   assert.equal(m.lines[0].description, 'Toshiba · Ras-16e2avg-e · N° 32301304');
 });
 
-test('remise exceptionnelle (contrat) : après la dégressivité, distinguée de la remise commerciale legacy, total = montant du contrat', () => {
+test('remise exceptionnelle (contrat) : après la dégressivité, affichée comme remise, total = montant du contrat', () => {
   const pricing = computeContractLines({ equipments: [EQ_POELE, EQ_PAC], rates: RATES, equipmentTypes: TYPES, zone: ZONE, discounts: DISCOUNTS, exceptionalDiscount: 25 });
   assert.equal(pricing.discountAmount, 25);
   assert.equal(pricing.exceptionalDiscount, 25);
@@ -198,7 +232,7 @@ test('remise exceptionnelle (contrat) : après la dégressivité, distinguée de
   assert.equal(m.discount.percent, 20);
   assert.equal(m.discount.degressivitePercent, 10);
   assert.equal(m.discount.exceptionalAmount, 25);
-  assert.equal(m.discount.commercialAmount, 0);
+  assert.equal('commercialAmount' in m.discount, false);
   assert.equal(m.totalTtc, 200);
   // Une remise exceptionnelle supérieure au total ne produit jamais un total négatif
   assert.equal(calculateContractTotal([{ lineTotal: 90 }], [], 500).total, 0);

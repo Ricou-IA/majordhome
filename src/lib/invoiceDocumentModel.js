@@ -218,6 +218,7 @@ function discountLineOf(discount) {
   const causes = [
     discount.degressivitePercent > 0 ? `dégressivité ${fmtPct(discount.degressivitePercent)}` : null,
     discount.exceptionalAmount > 0 ? `remise exceptionnelle ${fmtEur(discount.exceptionalAmount)}` : null,
+    // Plus produit depuis le 2026-11-16 (montant forcé = prix net) : lu pour les factures déjà émises.
     discount.commercialAmount > 0 ? `remise commerciale ${fmtEur(discount.commercialAmount)}` : null,
   ].filter(Boolean).join(' + ') || 'montant du contrat';
   return `Remise ${fmtPct(discount.percent)} appliquée sur les équipements (${causes}) : -${fmtEur(discount.amount)} TTC`;
