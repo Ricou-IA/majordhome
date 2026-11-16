@@ -4,7 +4,7 @@
  * Vue `majordhome_audit_log` (security_invoker → RLS membres de l'org), alimentée
  * par le trigger `majordhome.audit_row_change()` sur `leads`, `appointments`, `chantiers`
  * (migration 20260916_3) et la fiche client — `clients`, `equipments`, `contracts`,
- * `contract_equipments` (20261116_5). Lecture seule : personne n'écrit dans ce journal
+ * `contract_equipments` (20261116_5), `interventions` (20261117_1). Lecture seule : personne n'écrit dans ce journal
  * depuis le front, c'est le principe même du mouchard.
  *
  * `org_id` de la vue = org CORE (normalisé par le trigger, y compris pour les
@@ -20,11 +20,12 @@ const AUDIT_COLUMNS = 'id, org_id, table_name, record_id, lead_id, client_id, ac
 
 /**
  * Tables qui font la Timeline d'une fiche client : la fiche, ses équipements, son contrat
- * (et les équipements qui y entrent ou en sortent), ses RDV. Les leads du client portent
+ * (et les équipements qui y entrent ou en sortent), ses RDV, ses cartes Entretien / SAV
+ * (`interventions`, 20261117_1). Les leads du client portent
  * aussi `client_id` au journal, mais leur histoire se lit sur la fiche lead (elle est
  * rythmée par la synchro Pennylane) : ils ne sont pas repris ici.
  */
-export const CLIENT_TIMELINE_TABLES = ['clients', 'equipments', 'contracts', 'contract_equipments', 'appointments'];
+export const CLIENT_TIMELINE_TABLES = ['clients', 'equipments', 'contracts', 'contract_equipments', 'appointments', 'interventions'];
 
 export const auditService = {
   /**

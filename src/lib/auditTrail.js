@@ -7,8 +7,8 @@
  * Source : lignes de la vue `majordhome_audit_log`, écrites par le trigger
  * `majordhome.audit_row_change()` (migrations 20260916_3 puis 20261116_5). Une ligne =
  * une écriture sur `leads`, `appointments`, `chantiers`, et depuis le 2026-11-16 sur la
- * fiche client (`clients`, `equipments`, `contracts`, `contract_equipments`, rattachées
- * par `client_id`) : QUI (`changed_by` = auth.uid() côté
+ * fiche client (`clients`, `equipments`, `contracts`, `contract_equipments`, puis
+ * `interventions` le 2026-11-17 — rattachées par `client_id`) : QUI (`changed_by` = auth.uid() côté
  * serveur), QUAND (`changed_at`), QUOI (`changed_fields` + `old_values` /
  * `new_values` limités aux champs modifiés), PAR OÙ (`source` = RPC ou vue).
  *
@@ -233,6 +233,54 @@ export const AUDIT_FIELD_LABELS = {
     equipment_id: 'Équipement',
     contract_id: 'Contrat',
   },
+  interventions: {
+    intervention_type: 'Type',
+    workflow_status: 'État',
+    status: 'Statut technique',
+    scheduled_date: 'Date prévue',
+    scheduled_time_start: 'Heure de début',
+    scheduled_time_end: 'Heure de fin',
+    sav_description: 'Description',
+    sav_urgency: 'Urgence',
+    sav_origin: 'Origine',
+    includes_entretien: 'Avec entretien',
+    devis_amount: 'Montant du devis',
+    devis_status: 'Devis',
+    parts_order_status: 'Pièces',
+    invoiced_at: 'Facturé le',
+    invoice_id: 'Facture',
+    is_billable: 'Facturable',
+    planned_team_size: 'Personnes prévues',
+    planned_days: 'Jours prévus',
+    duration_minutes: 'Durée',
+    report_date: 'Date du compte rendu',
+    report_notes: 'Notes',
+    work_performed: 'Travaux effectués',
+    parts_replaced: 'Pièces remplacées',
+    client_comment: 'Commentaire du client',
+    technician_id: 'Technicien',
+    technician_name: 'Technicien',
+    equipment_id: 'Équipement',
+    contract_id: 'Contrat',
+    client_id: 'Client',
+    lead_id: 'Lead lié',
+    parent_id: 'Intervention parente',
+    source_certificat_id: 'Certificat d’origine',
+    signed_at: 'Signé le',
+    signed_by_name: 'Signataire',
+    signature_url: 'Signature',
+    photo_before_url: 'Photo avant',
+    photo_after_url: 'Photo après',
+    photos_extra: 'Photos',
+    slot_date: 'Créneau (date)',
+    slot_start_time: 'Créneau (début)',
+    slot_end_time: 'Créneau (fin)',
+    slot_notes: 'Créneau (notes)',
+    tags: 'Étiquettes',
+    metadata: 'Données techniques',
+    project_id: 'Projet lié',
+    created_by: 'Créé par',
+  },
 };
 
 /**
@@ -281,6 +329,14 @@ const AUDIT_SOURCE_LABELS = {
   resend_apply_webhook_event: 'retour d’envoi email',
   equipment_model_merge: 'fusion de modèles d’appareil',
   equipment_models_close: 'relevé du fabricant',
+  // Cartes Entretien / SAV (20261117_1)
+  majordhome_interventions: 'fiche Entretien / SAV',
+  sync_intervention_from_visit: 'visite d’entretien enregistrée',
+  maintenance_visit_clear: 'visite d’entretien annulée',
+  entretien_card_release_orphan: 'carte d’entretien libérée',
+  contract_activation_promote_cards: 'activation du contrat',
+  assign_pending_contract: 'rattachement du contrat',
+  merge_dedup_pair: 'fusion de doublons',
 };
 
 /** Sujet affiché selon la table auditée. */
@@ -292,10 +348,11 @@ const SUBJECTS = {
   equipments: 'Équipement',
   contracts: 'Contrat',
   contract_equipments: 'Contrat',
+  interventions: 'Intervention',
 };
 
 /** Sujets féminins : « Fiche — Modifiée par… » (le verbe s'accorde). */
-const FEMININE_TABLES = new Set(['clients']);
+const FEMININE_TABLES = new Set(['clients', 'interventions']);
 
 /**
  * Écritures qui se disent mieux autrement que « Créé / Supprimé » : le lien entre un
@@ -317,6 +374,7 @@ const AUDIT_INSERT_HIGHLIGHTS = {
   equipments: ['equipment_type_id', 'brand', 'model', 'installation_year'],
   contracts: ['contract_number', 'status', 'amount', 'start_date'],
   contract_equipments: ['equipment_id'],
+  interventions: ['workflow_status', 'scheduled_date', 'sav_urgency', 'sav_description', 'equipment_id'],
 };
 
 /**
@@ -327,6 +385,7 @@ const AUDIT_DELETE_HIGHLIGHTS = {
   equipments: ['equipment_type_id', 'brand', 'model'],
   contracts: ['contract_number', 'amount'],
   contract_equipments: ['equipment_id'],
+  interventions: ['workflow_status', 'scheduled_date', 'sav_description'],
 };
 
 const ACTION_VERBS = { INSERT: 'Créé', UPDATE: 'Modifié', DELETE: 'Supprimé' };
@@ -336,17 +395,20 @@ const DATE_FIELDS = new Set([
   'appointment_date', 'quote_sent_date', 'won_date', 'next_action_date', 'created_date',
   'converted_date', 'estimated_date', 'planification_date', 'scheduled_date',
   'start_date', 'end_date', 'renewal_date', 'next_maintenance_date', 'install_date',
-  'warranty_end_date', 'contract_start_date',
+  'warranty_end_date', 'contract_start_date', 'report_date', 'slot_date',
 ]);
-const TIME_FIELDS = new Set(['scheduled_start', 'scheduled_end', 'announced_start']);
+const TIME_FIELDS = new Set([
+  'scheduled_start', 'scheduled_end', 'announced_start',
+  'scheduled_time_start', 'scheduled_time_end', 'slot_start_time', 'slot_end_time',
+]);
 const TIMESTAMP_FIELDS = new Set([
   'last_call_date', 'last_followup_date', 'long_term_started_at', 'email_unsubscribed_at',
   'cancelled_at', 'completed_at', 'hour_confirmed_at', 'created_at', 'updated_at',
-  'archived_at', 'signed_at',
+  'archived_at', 'signed_at', 'invoiced_at',
 ]);
 const AMOUNT_FIELDS = new Set([
   'order_amount_ht', 'estimated_revenue', 'estimated_amount', 'final_amount',
-  'amount', 'subtotal', 'exceptional_discount', 'contract_tarif',
+  'amount', 'subtotal', 'exceptional_discount', 'contract_tarif', 'devis_amount',
 ]);
 const PERCENT_FIELDS = new Set(['probability', 'discount_percent']);
 const MINUTE_FIELDS = new Set(['duration_minutes', 'time_flex_minutes']);
@@ -449,12 +511,14 @@ function authorOf(row) {
 /**
  * Transforme une ligne brute de `majordhome_audit_log` en entrée affichable.
  * @param {object} row - ligne de la vue
- * @param {{ resolvers?: Record<string, Map<string, string>> }} [options]
+ * @param {{ resolvers?: Record<string, Map<string, string>>, subjectOf?: (row: object) => (string|null|undefined) }} [options]
+ *   `subjectOf` : sujet affiché quand l'appelant sait mieux que la table (une intervention est un
+ *   « SAV » ou un « Entretien ») ; valeur vide → sujet par défaut de la table.
  * @returns {{ id: string, kind: 'audit', at: string, action: string, table: string, subject: string,
  *   author: string, isHuman: boolean, sourceLabel: string|null, title: string,
  *   changes: Array<{ field: string, label: string, from: string|null, to: string|null }> }}
  */
-export function buildAuditEntry(row, { resolvers = {} } = {}) {
+export function buildAuditEntry(row, { resolvers = {}, subjectOf = null } = {}) {
   const table = row.table_name;
   const { author, isHuman } = authorOf(row);
   const sourceLabel = row.source ? (AUDIT_SOURCE_LABELS[row.source] || row.source) : null;
@@ -496,7 +560,7 @@ export function buildAuditEntry(row, { resolvers = {} } = {}) {
     at: row.changed_at,
     action: row.action,
     table,
-    subject: SUBJECTS[table] || table,
+    subject: subjectOf?.(row) || SUBJECTS[table] || table,
     author,
     isHuman,
     sourceLabel,
@@ -508,6 +572,23 @@ export function buildAuditEntry(row, { resolvers = {} } = {}) {
 // ----------------------------------------------------------------------------
 // Helpers d'intégration
 // ----------------------------------------------------------------------------
+
+/**
+ * Écriture mécanique, sans intérêt dans une Timeline : la création et la purge des lignes
+ * ENFANTS d'un entretien (une par équipement, `parent_id` renseigné). Elles sont posées à la
+ * planification et retirées à la déplanification — trois équipements, trois lignes « créée »
+ * à chaque RDV posé. Le journal les garde (la base enregistre tout) ; l'écran les saute.
+ * Leurs MODIFICATIONS, elles, restent affichées : c'est là qu'on lit qui a rempli un
+ * certificat ou marqué un équipement « néant ».
+ * @param {object} row - ligne de `majordhome_audit_log`
+ * @returns {boolean}
+ */
+export function estEcritureMecanique(row) {
+  if (row?.table_name !== 'interventions') return false;
+  if (row.action === 'INSERT') return !!row.new_values?.parent_id;
+  if (row.action === 'DELETE') return !!row.old_values?.parent_id;
+  return false;
+}
 
 /**
  * Construit un résolveur `Map<id, nom>` depuis une liste de référentiel, quelle
@@ -538,4 +619,25 @@ export function toNameMap(list = [], idKey = 'id') {
 export function mergeTimeline(activities = [], auditEntries = []) {
   const acts = activities.map((a) => ({ ...a, kind: 'activity', at: a.created_at }));
   return [...acts, ...auditEntries].sort((a, b) => new Date(b.at) - new Date(a.at));
+}
+
+/**
+ * Sujet d'une écriture sur `interventions` : « SAV », « Entretien », ou « Certificat » pour une
+ * ligne enfant (un équipement d'un entretien). Une modification ne porte que les champs changés :
+ * le type et le parent se lisent alors sur l'intervention connue de l'appelant (liste du client).
+ * Rien de reconnaissable → null (le sujet par défaut « Intervention » s'applique).
+ * @param {object} row - ligne de `majordhome_audit_log`
+ * @param {{ intervention_type?: string, parent_id?: string|null }|null} [connue] - l'intervention, si elle existe encore
+ * @param {string|null} [equipement] - libellé de l'équipement d'une ligne enfant
+ * @returns {string|null}
+ */
+export function sujetIntervention(row, connue = null, equipement = null) {
+  if (row?.table_name !== 'interventions') return null;
+  const valeurs = row.new_values || row.old_values || {};
+  const parent = connue?.parent_id ?? valeurs.parent_id ?? null;
+  if (parent) return equipement ? `Certificat · ${equipement}` : 'Certificat';
+  const type = connue?.intervention_type ?? valeurs.intervention_type ?? null;
+  if (type === 'sav') return 'SAV';
+  if (type === 'entretien' || type === 'maintenance') return 'Entretien';
+  return null;
 }

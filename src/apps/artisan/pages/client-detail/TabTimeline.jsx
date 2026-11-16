@@ -1,10 +1,14 @@
 /**
  * TabTimeline.jsx — onglet Timeline de la fiche client : le traceur.
  * ============================================================================
- * Montre TOUTES les modifications de la fiche, de ses équipements, de son contrat
- * et de ses RDV : qui, quand, quoi (avant → après), par où. La source est le
- * journal d'audit écrit par trigger en base (`majordhome.audit_log`, migration
- * 20261116_5) — personne ne déclare rien, donc rien n'est oublié.
+ * Montre TOUTES les modifications de la fiche, de ses équipements, de son contrat,
+ * de ses RDV et de ses cartes Entretien / SAV : qui, quand, quoi (avant → après),
+ * par où. La source est le journal d'audit écrit par trigger en base
+ * (`majordhome.audit_log`, migrations 20261116_5 et 20261117_1) — personne ne
+ * déclare rien, donc rien n'est oublié.
+ *
+ * Seule chose sautée : la création et la purge des lignes par équipement d'un
+ * entretien (`estEcritureMecanique`), posées et retirées par la planification.
  *
  * Les anciennes activités déclaratives (`client_activities` : « Client créé »,
  * « Équipement ajouté », documents de l'import) restent affichées : c'est tout ce
@@ -16,18 +20,22 @@
  * ============================================================================
  */
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   MessageSquare, Phone, Mail, FileText, User, Settings, Tag,
   Calendar, Wrench, ChevronRight, Clock, Pin, History,
-  Loader2, AlertCircle, RefreshCw,
+  Loader2, AlertCircle, RefreshCw, ClipboardList,
 } from 'lucide-react';
 import { useClientActivities, useClientAuditTrail, useClientEquipments } from '@hooks/useClients';
 import { useAuditResolvers } from '@hooks/useAuditResolvers';
+import { useProjectInterventions } from '@hooks/useInterventions';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { CLIENT_CATEGORIES, HOUSING_TYPES, LEAD_SOURCES } from '@services/clients.service';
 import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES, MAINTENANCE_MONTHS } from '@services/contracts.service';
-import { buildAuditEntry, mergeTimeline, toNameMap } from '@/lib/auditTrail';
+import { INTERVENTION_TYPES } from '@services/interventions.service';
+import { ENTRETIEN_STATUSES, SAV_STATUSES, DEVIS_STATUSES, PARTS_ORDER_STATUSES } from '@services/sav.service';
+import { SAV_URGENCES } from '@/lib/savUrgency';
+import { buildAuditEntry, mergeTimeline, toNameMap, estEcritureMecanique, sujetIntervention } from '@/lib/auditTrail';
 import { libelleEquipement } from '@/lib/equipmentReferential';
 import { formatDateTimeFR } from '@/lib/utils';
 import { AuditEntry } from '@/apps/artisan/components/shared/AuditEntry';
@@ -60,7 +68,15 @@ const AUDIT_ICONS = {
   contracts: FileText,
   contract_equipments: FileText,
   appointments: Calendar,
+  interventions: ClipboardList,
 };
+
+/** Codes d'une carte Entretien / SAV qui n'ont pas de référentiel exporté ailleurs. */
+const STATUTS_TECHNIQUES = new Map([
+  ['scheduled', 'Planifié'], ['in_progress', 'En cours'], ['completed', 'Terminé'],
+  ['cancelled', 'Annulé'], ['on_hold', 'En attente'], ['no_show', 'Absent'],
+]);
+const ORIGINES_SAV = new Map([['appel_client', 'Appel du client'], ['entretien', 'Suite d’entretien']]);
 
 const Pastille = ({ icon: Icon, className }) => (
   <div className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${className}`}>
@@ -80,33 +96,55 @@ const ActivityItem = ({ activity }) => (
   </div>
 );
 
-export const TabTimeline = ({ clientId }) => {
+export const TabTimeline = ({ clientId, projectId }) => {
   const { activities, isLoading: loadingActivities, error: activitiesError, refresh: refreshActivities } = useClientActivities(clientId);
   const { rows, truncated, isLoading: loadingAudit, error: auditError, refresh: refreshAudit } = useClientAuditTrail(clientId);
   const { equipments } = useClientEquipments(clientId);
+  const { interventions } = useProjectInterventions(projectId);
   const { categories, index: referentiel } = useEquipmentReferential();
   const baseResolvers = useAuditResolvers();
+
+  const libellesEquipements = useMemo(() => new Map(equipments.map((e) => [
+    String(e.id),
+    [libelleEquipement(e, referentiel), [e.brand, e.model].filter(Boolean).join(' ')].filter(Boolean).join(' · '),
+  ])), [equipments, referentiel]);
+
+  // Une modification ne porte que les champs changés : pour dire « SAV », « Entretien » ou
+  // « Certificat · tel équipement », on lit l'intervention dans la liste du client.
+  const interventionsById = useMemo(() => new Map(interventions.map((i) => [i.id, i])), [interventions]);
+  const subjectOf = useCallback((row) => {
+    const connue = interventionsById.get(row.record_id) || null;
+    const equipementId = connue?.equipment_id ?? row.new_values?.equipment_id ?? row.old_values?.equipment_id ?? null;
+    return sujetIntervention(row, connue, equipementId ? libellesEquipements.get(String(equipementId)) || null : null);
+  }, [interventionsById, libellesEquipements]);
 
   // ids → libellés. Une clé `table.champ` prime sur `champ` : « statut » n'a pas le même
   // sens pour un RDV et pour un contrat.
   const resolvers = useMemo(() => ({
     ...baseResolvers,
     category_id: toNameMap(categories),
-    equipment_id: new Map(equipments.map((e) => [
-      String(e.id),
-      [libelleEquipement(e, referentiel), [e.brand, e.model].filter(Boolean).join(' ')].filter(Boolean).join(' · '),
-    ])),
+    equipment_id: libellesEquipements,
     'contracts.status': toNameMap(CONTRACT_STATUSES, 'value'),
     'contracts.frequency': toNameMap(CONTRACT_FREQUENCIES, 'value'),
     'contracts.maintenance_month': toNameMap(MAINTENANCE_MONTHS, 'value'),
     'clients.client_category': toNameMap(CLIENT_CATEGORIES, 'value'),
     'clients.housing_type': toNameMap(HOUSING_TYPES, 'value'),
     'clients.lead_source': toNameMap(LEAD_SOURCES, 'value'),
-  }), [baseResolvers, categories, equipments, referentiel]);
+    'interventions.intervention_type': toNameMap(INTERVENTION_TYPES, 'value'),
+    'interventions.workflow_status': toNameMap([...ENTRETIEN_STATUSES, ...SAV_STATUSES], 'value'),
+    'interventions.status': STATUTS_TECHNIQUES,
+    'interventions.sav_urgency': toNameMap(SAV_URGENCES, 'value'),
+    'interventions.sav_origin': ORIGINES_SAV,
+    'interventions.devis_status': toNameMap(DEVIS_STATUSES, 'value'),
+    'interventions.parts_order_status': toNameMap(PARTS_ORDER_STATUSES, 'value'),
+  }), [baseResolvers, categories, libellesEquipements]);
 
   const timeline = useMemo(
-    () => mergeTimeline(activities, rows.map((row) => buildAuditEntry(row, { resolvers }))),
-    [activities, rows, resolvers],
+    () => mergeTimeline(
+      activities,
+      rows.filter((row) => !estEcritureMecanique(row)).map((row) => buildAuditEntry(row, { resolvers, subjectOf })),
+    ),
+    [activities, rows, resolvers, subjectOf],
   );
 
   if (loadingActivities || loadingAudit) {
@@ -147,7 +185,7 @@ export const TabTimeline = ({ clientId }) => {
             <History className="w-12 h-12 text-secondary-300 mx-auto" />
             <p className="mt-4 text-secondary-700 font-medium">Aucune modification enregistrée</p>
             <p className="mt-1 text-sm text-secondary-500">
-              Chaque changement de la fiche, d&apos;un équipement, du contrat ou d&apos;un RDV apparaîtra ici, avec son auteur.
+              Chaque changement de la fiche, d&apos;un équipement, du contrat, d&apos;un RDV ou d&apos;une carte Entretien / SAV apparaîtra ici, avec son auteur.
             </p>
           </div>
         )
@@ -182,8 +220,9 @@ export const TabTimeline = ({ clientId }) => {
 
       {/* Pas de rétroactif : dire depuis quand le journal existe, sinon un historique court se lit « rien avant ». */}
       <p className="border-t border-secondary-100 pt-3 text-xs text-secondary-400">
-        Les modifications de la fiche, des équipements et du contrat sont enregistrées depuis le 16 novembre 2026 ;
-        celles des RDV depuis le 16 septembre 2026. Ce qui a été modifié avant n&apos;a pas été enregistré.
+        Les modifications de la fiche, des équipements et du contrat sont enregistrées depuis le 16 novembre 2026,
+        celles des cartes Entretien / SAV depuis le 17 novembre 2026, celles des RDV depuis le 16 septembre 2026.
+        Ce qui a été modifié avant n&apos;a pas été enregistré.
       </p>
     </div>
   );

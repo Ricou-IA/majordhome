@@ -302,3 +302,71 @@ test('écriture sans humain sur la fiche : synchro Pennylane, jamais « Utilisat
   assert.equal(e.title, 'Modifiée par Automatisation via synchro Pennylane');
   assert.equal(e.isHuman, false);
 });
+
+// ── Cartes Entretien / SAV (migration 20261117_1) ───────────────────────────
+import { estEcritureMecanique, sujetIntervention } from '../src/lib/auditTrail.js';
+
+const SAV = '24f1cda0-9b19-4aa0-aacc-9ca330a35ad2';
+
+test('carte SAV : état, urgence et devis se lisent en clair, le verbe s’accorde', () => {
+  const resolversClient = {
+    status: new Map([['scheduled', 'Planifié (RDV)']]),
+    'interventions.workflow_status': new Map([['demande', 'Demande'], ['realise', 'Réalisé']]),
+    'interventions.sav_urgency': new Map([['urgent', 'Urgent'], ['normal', 'Normal']]),
+    'interventions.devis_status': new Map([['envoye', 'Envoyé']]),
+  };
+  const row = {
+    id: 30, table_name: 'interventions', record_id: SAV, client_id: CLIENT, action: 'UPDATE',
+    changed_fields: ['devis_amount', 'devis_status', 'invoiced_at', 'sav_urgency', 'workflow_status'],
+    old_values: { devis_amount: null, devis_status: null, invoiced_at: null, sav_urgency: 'urgent', workflow_status: 'demande' },
+    new_values: { devis_amount: 320, devis_status: 'envoye', invoiced_at: '2026-11-17T09:00:00Z', sav_urgency: 'normal', workflow_status: 'realise' },
+    changed_by: PHILIPPE, changed_by_name: 'Philippe Mazel', changed_by_role: 'authenticated',
+    source: 'majordhome_interventions', changed_at: '2026-11-17T09:00:00Z',
+  };
+  const e = buildAuditEntry(row, { resolvers: resolversClient, subjectOf: (r) => sujetIntervention(r, { intervention_type: 'sav', parent_id: null }) });
+  assert.equal(e.subject, 'SAV');
+  assert.equal(e.title, 'Modifiée par Philippe Mazel via fiche Entretien / SAV');
+  const parChamp = Object.fromEntries(e.changes.map((c) => [c.label, [c.from, c.to]]));
+  assert.deepEqual(parChamp['État'], ['Demande', 'Réalisé']);
+  assert.deepEqual(parChamp['Urgence'], ['Urgent', 'Normal']);
+  assert.deepEqual(parChamp['Devis'], ['—', 'Envoyé']);
+  assert.deepEqual(parChamp['Montant du devis'], ['—', '320,00 €']);
+  assert.match(parChamp['Facturé le'][1], /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
+  // Sans sujet fourni : le sujet par défaut de la table.
+  assert.equal(buildAuditEntry(row).subject, 'Intervention');
+});
+
+test('demande SAV créée : ce qui la situe (état, urgence, description), pas la ligne entière', () => {
+  const e = buildAuditEntry({
+    id: 31, table_name: 'interventions', record_id: SAV, client_id: CLIENT, action: 'INSERT',
+    changed_fields: ['intervention_type', 'sav_description', 'sav_urgency', 'workflow_status', 'project_id'],
+    old_values: null,
+    new_values: { intervention_type: 'sav', sav_description: 'Poêle en défaut', sav_urgency: 'urgent', workflow_status: 'demande', project_id: CLIENT },
+    changed_by: PHILIPPE, changed_by_name: 'Philippe Mazel', changed_by_role: 'authenticated',
+    source: 'majordhome_interventions', changed_at: '2026-11-17T08:00:00Z',
+  }, { subjectOf: (r) => sujetIntervention(r) });
+  assert.equal(e.subject, 'SAV');
+  assert.equal(e.title, 'Créée par Philippe Mazel via fiche Entretien / SAV');
+  assert.deepEqual(e.changes.map((c) => c.label), ['État', 'Urgence', 'Description']);
+});
+
+test('lignes par équipement : création et purge sont mécaniques, leurs modifications restent', () => {
+  const enfant = (action, valeurs) => ({ table_name: 'interventions', action, ...valeurs });
+  assert.equal(estEcritureMecanique(enfant('INSERT', { new_values: { parent_id: SAV } })), true);
+  assert.equal(estEcritureMecanique(enfant('DELETE', { old_values: { parent_id: SAV } })), true);
+  assert.equal(estEcritureMecanique(enfant('UPDATE', { new_values: { workflow_status: 'realise' }, old_values: { workflow_status: 'planifie' } })), false);
+  // Une carte (sans parent) n'est jamais masquée, ni une autre table.
+  assert.equal(estEcritureMecanique(enfant('INSERT', { new_values: { intervention_type: 'sav' } })), false);
+  assert.equal(estEcritureMecanique({ table_name: 'equipments', action: 'INSERT', new_values: { parent_id: SAV } }), false);
+});
+
+test('sujet d’une intervention : SAV, Entretien, Certificat d’un équipement, sinon rien', () => {
+  const maj = { table_name: 'interventions', action: 'UPDATE', new_values: { workflow_status: 'realise' }, old_values: { workflow_status: 'planifie' } };
+  assert.equal(sujetIntervention(maj, { intervention_type: 'entretien', parent_id: null }), 'Entretien');
+  assert.equal(sujetIntervention(maj, { intervention_type: 'entretien', parent_id: SAV }, 'Poêle à granulés'), 'Certificat · Poêle à granulés');
+  assert.equal(sujetIntervention(maj, { intervention_type: 'entretien', parent_id: SAV }), 'Certificat');
+  // Intervention supprimée depuis : une modification ne dit plus son type.
+  assert.equal(sujetIntervention(maj, null), null);
+  assert.equal(sujetIntervention({ table_name: 'interventions', action: 'DELETE', old_values: { intervention_type: 'sav' } }), 'SAV');
+  assert.equal(sujetIntervention({ table_name: 'clients', action: 'UPDATE' }), null);
+});

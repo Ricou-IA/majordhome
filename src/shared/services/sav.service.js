@@ -75,7 +75,7 @@ export async function annulerDecalages(appointmentsService, faits) {
 // CONSTANTES — STATUTS & TRANSITIONS
 // ============================================================================
 
-const ENTRETIEN_STATUSES = [
+export const ENTRETIEN_STATUSES = [
   { value: 'demande_contrat', label: 'Demande de contrat', color: '#06B6D4', display_order: 0 },
   { value: 'a_planifier', label: 'À planifier', color: '#3B82F6', display_order: 1 },
   { value: 'planifie',    label: 'Planifié',    color: '#8B5CF6', display_order: 2 },
@@ -83,7 +83,7 @@ const ENTRETIEN_STATUSES = [
   { value: 'facture',     label: 'Facturé',     color: '#6366F1', display_order: 4 },
 ];
 
-const SAV_STATUSES = [
+export const SAV_STATUSES = [
   { value: 'demande',            label: 'Demande',           color: '#EF4444', display_order: 1 },
   { value: 'pieces_commandees',  label: 'Pièces commandées', color: '#F59E0B', display_order: 2 },
   { value: 'devis_envoye',       label: 'Devis envoyé',      color: '#3B82F6', display_order: 3 },

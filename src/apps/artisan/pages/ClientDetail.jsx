@@ -545,7 +545,7 @@ export default function ClientDetail() {
           />
         )}
         {activeTab === 'interventions' && <TabInterventions projectId={client.project_id} clientId={id} />}
-        {activeTab === 'timeline' && <TabTimeline clientId={id} />}
+        {activeTab === 'timeline' && <TabTimeline clientId={id} projectId={client.project_id} />}
         {activeTab === 'mailings' && <TabMailings clientId={id} />}
         {activeTab === 'sms' && <TabSms clientId={id} />}
       </div>
