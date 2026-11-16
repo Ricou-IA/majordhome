@@ -103,9 +103,9 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
 
   // Helper : construire les données PDF (réutilisé par impression + envoi).
   // La présentation tarifaire (lignes + remises) est dérivée du montant facturé via
-  // buildContractPresentation : forçage à la baisse → ligne "Remise commerciale" ;
-  // forçage à la hausse → prix d'articles majorés au prorata (la somme des lignes
-  // retombe toujours sur le total). Transparence client + traçabilité du geste commercial.
+  // buildContractPresentation : montant forcé (à la baisse comme à la hausse) → prix
+  // d'articles ramenés au prorata, aucune remise affichée (le montant forcé est le prix,
+  // Eric 2026-11-16). La somme des lignes retombe toujours sur le total.
   const buildPdfData = useCallback(() => {
     const forcedAmount = contract?.amount_forced ? parseFloat(contract.amount) : null;
     const computedTotal = computedPricing?.total || 0;
@@ -129,7 +129,6 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       subtotal: presentation.subtotal,
       discountPercent: presentation.discountPercent,
       discountAmount: presentation.discountAmount,
-      extraDiscountAmount: presentation.extraDiscountAmount,
       exceptionalDiscountAmount: presentation.exceptionalDiscountAmount,
       total: presentation.total,
       zoneName: activeZone?.label || '-',

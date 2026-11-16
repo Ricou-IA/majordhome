@@ -136,20 +136,20 @@ export function computeContractLines({ equipments = [], rates = [], equipmentTyp
  * le montant RÉELLEMENT facturé, qu'il soit calculé depuis la grille ou forcé par
  * un admin. Garantit toujours que la somme des lignes (± remises) retombe sur le total.
  *
- * Trois cas :
+ * Deux cas :
  *  - billable ≈ computedTotal (calcul grille standard) :
- *      lignes au prix grille + dégressivité éventuelle, pas de remise commerciale.
- *  - billable < computedTotal (forçage à la BAISSE) :
- *      lignes au prix grille + ligne "Remise commerciale" = computedTotal − billable.
- *  - billable > computedTotal (forçage à la HAUSSE) :
- *      les prix d'articles sont MAJORÉS au prorata de leur prix grille pour que la
- *      somme des lignes = montant facturé. Pas de remise négative ni de dégressivité
- *      affichée (absorbées dans les prix de ligne). Un équipement unique forcé à 350 €
- *      voit simplement sa ligne passer à 350 €.
+ *      lignes au prix grille + dégressivité et remise exceptionnelle éventuelles.
+ *  - billable ≠ computedTotal (montant FORCÉ, à la baisse comme à la hausse) :
+ *      le montant forcé est LE prix (Eric, 2026-11-16 : « si je force c'est le bon prix,
+ *      la remise je la saisis ailleurs »). Les prix d'articles sont ramenés au prorata de
+ *      leur prix grille pour que la somme des lignes = montant du contrat ; aucune remise
+ *      affichée (ni dégressivité, ni « remise commerciale », retirée ce jour-là). Un
+ *      équipement unique forcé à 190 € voit simplement sa ligne passer à 190 €.
+ *      Même règle que la facture d'entretien (`buildEntretienInvoice`).
  *
  * @param {{items:Array, subtotal:number, discountPercent:number, discountAmount:number, total:number}|null} computedPricing
  * @param {number} billableTotal - montant facturé (forcé ou calculé)
- * @returns {{equipmentLines:Array, subtotal:number, discountPercent:number, discountAmount:number, extraDiscountAmount:number, total:number}}
+ * @returns {{equipmentLines:Array, subtotal:number, discountPercent:number, discountAmount:number, exceptionalDiscountAmount:number, total:number}}
  */
 export function buildContractPresentation(computedPricing, billableTotal) {
   const items = computedPricing?.items || [];
@@ -162,15 +162,16 @@ export function buildContractPresentation(computedPricing, billableTotal) {
     .map((it, i) => ((parseFloat(it.lineTotal) || 0) > 0 ? i : -1))
     .filter((i) => i >= 0);
 
-  // --- Forçage à la hausse : majorer les lignes pour que leur somme = montant facturé ---
-  if (pricedIndexes.length > 0 && billable > computedTotal + 0.01) {
+  // --- Montant forcé : ramener les lignes au prorata pour que leur somme = montant du contrat ---
+  if (pricedIndexes.length > 0 && billable > 0 && Math.abs(billable - computedTotal) > 0.01) {
     const baseSum = pricedIndexes.reduce((s, i) => s + parseFloat(items[i].lineTotal), 0);
+    const scale = billable / baseSum;
     const remainderIdx = pricedIndexes[pricedIndexes.length - 1]; // absorbe l'arrondi
     let allocated = 0;
     const equipmentLines = items.map((it, i) => {
       if (!pricedIndexes.includes(i)) return it; // ligne "Sur devis" : inchangée
       if (i === remainderIdx) return { ...it, lineTotal: round2(billable - allocated) };
-      const price = round2(billable * (parseFloat(it.lineTotal) / baseSum));
+      const price = round2(parseFloat(it.lineTotal) * scale);
       allocated += price;
       return { ...it, lineTotal: price };
     });
@@ -180,22 +181,17 @@ export function buildContractPresentation(computedPricing, billableTotal) {
       discountPercent: 0,
       discountAmount: 0,
       exceptionalDiscountAmount: 0,
-      extraDiscountAmount: 0,
       total: billable,
     };
   }
 
-  // --- Calcul standard / forçage à la baisse : remise commerciale absorbe l'écart ---
-  // La remise exceptionnelle (saisie sur le contrat) est déjà dans computedTotal : elle
-  // s'affiche à part, la « remise commerciale » ne porte que l'écart legacy (amount_forced).
-  const extraDiscountAmount = billable < computedTotal - 0.01 ? round2(computedTotal - billable) : 0;
+  // --- Calcul standard : lignes au prix grille, dégressivité et remise exceptionnelle à part ---
   return {
     equipmentLines: items,
     subtotal: computedPricing?.subtotal || 0,
     discountPercent: computedPricing?.discountPercent || 0,
     discountAmount: computedPricing?.discountAmount || 0,
     exceptionalDiscountAmount: computedPricing?.exceptionalDiscount || 0,
-    extraDiscountAmount,
     total: billable,
   };
 }

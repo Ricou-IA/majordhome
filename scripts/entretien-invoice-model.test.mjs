@@ -4,14 +4,15 @@
 //
 // Ce que la facture Pennylane d'un entretien DOIT reproduire (Eric, 2026-09-21) :
 // 1 ligne par équipement au prix grille, la remise appliquée (dégressivité, remise
-// commerciale), le total = montant contractuel figé, la TVA de la catégorie, les
+// exceptionnelle ; un montant forcé est le prix, sans remise — Eric 2026-11-16),
+// le total = montant contractuel figé, la TVA de la catégorie, les
 // pièces non offertes sur la même facture sans remise, l'objet « Entretien de votre
 // poêle à bois : Marque · Modèle · N° série ». Cas de référence : DALOUS, facture
 // F-2026-09372 saisie à la main le 2026-09-21 (90 € TTC, 81,82 HT, TVA 10 %).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildEntretienInvoice, toPennylaneInvoicePayload, resolveLedgerAccountId, renderInvoiceTemplate, invoiceTemplatesFromSettings, lineEditsFromModel, applyLineEdits, newFreeLine } from '../src/lib/entretienInvoiceModel.js';
-import { computeContractLines, calculateContractTotal } from '../src/lib/contractPricing.js';
+import { computeContractLines, calculateContractTotal, buildContractPresentation } from '../src/lib/contractPricing.js';
 
 const ZONE = { id: 'z1', name: 'Zone 1', supplement: 0 };
 const CAT_POELE = { id: 'cat-poele', code: 'poele_bois', label: 'Poêle à bois', default_vat_rate: 10 };
@@ -627,4 +628,67 @@ test('charge utile Pennylane : information client → pdf_invoice_free_text, abs
   assert.equal('pdf_invoice_free_text' in sans, false);
   const nul = toPennylaneInvoicePayload(m, { customerId: 1, draft: true, externalReference: 'iv-1' });
   assert.equal('pdf_invoice_free_text' in nul, false);
+});
+
+// ---------------------------------------------------------------------------
+// buildContractPresentation (PDF du contrat + écran de signature)
+// Eric, 2026-11-16 : « si je force c'est le bon prix, la remise je la saisis ailleurs ».
+// ---------------------------------------------------------------------------
+
+test('présentation du contrat : montant = calcul ⇒ lignes au prix grille, dégressivité affichée', () => {
+  const p = buildContractPresentation(pricingFor([EQ_POELE, EQ_PAC]), 225);
+  assert.deepEqual(p.equipmentLines.map((l) => l.lineTotal), [90, 160]);
+  assert.equal(p.subtotal, 250);
+  assert.equal(p.discountPercent, 10);
+  assert.equal(p.discountAmount, 25);
+  assert.equal(p.total, 225);
+  assert.equal('extraDiscountAmount' in p, false);
+});
+
+test('présentation du contrat : remise exceptionnelle affichée quand le montant correspond au calcul', () => {
+  const pricing = computeContractLines({ equipments: [EQ_POELE, EQ_PAC], rates: RATES, equipmentTypes: TYPES, zone: ZONE, discounts: DISCOUNTS, exceptionalDiscount: 10 });
+  const p = buildContractPresentation(pricing, 215);
+  assert.deepEqual(p.equipmentLines.map((l) => l.lineTotal), [90, 160]);
+  assert.equal(p.discountAmount, 25);
+  assert.equal(p.exceptionalDiscountAmount, 10);
+  assert.equal(p.total, 215);
+});
+
+test('présentation du contrat, VADON : forcé au prix sans supplément de zone ⇒ une ligne au prix du contrat, aucune remise', () => {
+  const p = buildContractPresentation(pricingFor([EQ_POELE], { zone: { ...ZONE, supplement: 30 } }), 90);
+  assert.deepEqual(p.equipmentLines.map((l) => l.lineTotal), [90]);
+  assert.equal(p.subtotal, 90);
+  assert.equal(p.discountPercent, 0);
+  assert.equal(p.discountAmount, 0);
+  assert.equal(p.exceptionalDiscountAmount, 0);
+  assert.equal(p.total, 90);
+  assert.equal('extraDiscountAmount' in p, false);
+});
+
+test('présentation du contrat : forcé à la baisse avec dégressivité ⇒ prorata, mêmes lignes que la facture', () => {
+  const pricing = pricingFor([EQ_POELE, EQ_PAC]);
+  const p = buildContractPresentation(pricing, 200);
+  assert.deepEqual(p.equipmentLines.map((l) => l.lineTotal), [72, 128]);
+  assert.equal(p.subtotal, 200);
+  assert.equal(p.discountPercent, 0);
+  assert.equal(p.total, 200);
+  const facture = buildEntretienInvoice(dalous({ contract: { id: 'ct-1', contract_number: 'CTR-1', amount: 200 }, pricing }));
+  assert.deepEqual(facture.lines.map((l) => l.netTtc), p.equipmentLines.map((l) => l.lineTotal));
+});
+
+test('présentation du contrat : forcé à la hausse ⇒ prorata, la dernière ligne absorbe l’arrondi', () => {
+  const p = buildContractPresentation(pricingFor([EQ_POELE, EQ_PAC]), 300);
+  assert.deepEqual(p.equipmentLines.map((l) => l.lineTotal), [108, 192]);
+  assert.equal(p.total, 300);
+  const trois = pricingFor([EQ_POELE, { ...EQ_POELE, id: 'eq-3' }, EQ_PAC]);
+  const q = buildContractPresentation(trois, 200);
+  assert.deepEqual(q.equipmentLines.map((l) => l.lineTotal), [52.94, 52.94, 94.12]);
+  const facture = buildEntretienInvoice(dalous({ contract: { id: 'ct-1', contract_number: 'CTR-1', amount: 200 }, pricing: trois }));
+  assert.deepEqual(facture.lines.map((l) => l.netTtc), [52.94, 52.94, 94.12]);
+});
+
+test('présentation du contrat : une ligne « Sur devis » (0 €) ne reçoit jamais de prix redistribué', () => {
+  const p = buildContractPresentation(pricingFor([EQ_POELE, { id: 'eq-9', equipment_type_id: 'type-inconnu' }], { discounts: [] }), 70);
+  assert.deepEqual(p.equipmentLines.map((l) => l.lineTotal), [70, 0]);
+  assert.equal(p.total, 70);
 });

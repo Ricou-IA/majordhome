@@ -229,8 +229,8 @@ export default function ContractSign() {
   }, [contract?.amount, computedPricing?.total]);
 
   // -- Présentation tarifaire alignée sur le montant signé (billableTotal) :
-  //    forçage à la baisse → ligne "Remise commerciale" qui absorbe l'écart ;
-  //    forçage à la hausse → prix d'articles majorés au prorata (pas de remise négative).
+  //    montant forcé (à la baisse comme à la hausse) → prix d'articles ramenés au prorata,
+  //    aucune remise affichée (le montant forcé est le prix, Eric 2026-11-16).
   //    Dans tous les cas la somme des lignes (± remises) retombe sur le total signé. --
   const presentation = useMemo(
     () => buildContractPresentation(computedPricing, billableTotal),
@@ -266,7 +266,6 @@ export default function ContractSign() {
         subtotal: presentation.subtotal,
         discountPercent: presentation.discountPercent,
         discountAmount: presentation.discountAmount,
-        extraDiscountAmount: presentation.extraDiscountAmount,
         exceptionalDiscountAmount: presentation.exceptionalDiscountAmount,
         total: presentation.total,
         zoneName: activeZone?.label || '-',
@@ -451,7 +450,7 @@ export default function ContractSign() {
               {/* Totaux — le total signé = montant ENREGISTRÉ sur le contrat (billableTotal),
                   pas un recalcul. Sous-total/remises mirrorisent le PDF généré. */}
               <div className="mt-3 space-y-1">
-                {(presentation.discountPercent > 0 || presentation.extraDiscountAmount > 0 || presentation.exceptionalDiscountAmount > 0) && (
+                {(presentation.discountPercent > 0 || presentation.exceptionalDiscountAmount > 0) && (
                   <div className="flex justify-between text-sm px-4">
                     <span className="text-gray-500">Sous-total</span>
                     <span className="tabular-nums">{formatEuro(presentation.subtotal)}</span>
@@ -467,12 +466,6 @@ export default function ContractSign() {
                   <div className="flex justify-between text-sm px-4 text-green-700">
                     <span>Remise exceptionnelle</span>
                     <span className="tabular-nums">-{formatEuro(presentation.exceptionalDiscountAmount)}</span>
-                  </div>
-                )}
-                {presentation.extraDiscountAmount > 0 && (
-                  <div className="flex justify-between text-sm px-4 text-green-700">
-                    <span>Remise commerciale</span>
-                    <span className="tabular-nums">-{formatEuro(presentation.extraDiscountAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between px-4 py-2 bg-orange-50 rounded-lg text-base font-bold text-[#EA580C]">
