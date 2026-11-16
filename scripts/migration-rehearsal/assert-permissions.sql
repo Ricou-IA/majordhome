@@ -5,6 +5,9 @@
 -- pas les ACL des fonctions, seul le REVOKE de 20260930_13 rend (B) « anon sans EXECUTE » vrai.
 -- Sur une photo post-migrations sans les rejouer, (B) échoue à tort — la prod, elle, est
 -- vérifiée par scripts/permissions-coherence.mjs --env.
+-- ⚠️ Figé sur la prod du 2026-09-30 : ne se rejoue plus sur une photo récente. Le module
+-- Tâches (majordhome.tasks, ressource `tasks`), dont se servent (B), (C) et (D), a été
+-- supprimé par 20261116_4 ; le compte de (A) a bougé avec `articles` et `assistant_pieces`.
 --
 -- A. défauts app regénérés (123 lignes, nouvelles ressources)
 -- B. policies : plus aucune écriture « tout membre », tout passe par role_can

@@ -118,7 +118,7 @@ BEGIN
 
   -- RLS activée + au moins une policy (POLICY_TABLES)
   FOR r IN SELECT * FROM (VALUES ('pricing_zones'), ('pricing_equipment_types'), ('team_members'),
-                                 ('leads'), ('contracts'), ('quotes'), ('tasks'), ('role_permissions'), ('app_role_permissions'),
+                                 ('leads'), ('contracts'), ('quotes'), ('role_permissions'), ('app_role_permissions'),
                                  ('webshop_sectors'), ('webshop_sector_postcodes'), ('webshop_shipping_rates'), ('webshop_pickup_points'),
                                  ('suppliers'), ('supplier_products')) AS t(tbl) -- 20261113_3 : RLS lue par la vue des pièces
   LOOP

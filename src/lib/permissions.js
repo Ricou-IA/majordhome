@@ -35,7 +35,6 @@ export const RESOURCES = [
   { key: 'cedants',    label: 'Cédants' },
   { key: 'prospection_commerciale', label: 'Prospection' },
   { key: 'devis',      label: 'Devis' },
-  { key: 'tasks',      label: 'Tâches' },
   { key: 'meta_ads',   label: 'Meta Ads' },
   { key: 'voice_recorder', label: 'Compte-rendu vocal (PWA)' },
   { key: 'pv_calculator', label: 'Calculateur solaire' },

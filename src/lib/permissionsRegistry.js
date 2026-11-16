@@ -78,14 +78,6 @@ export const REGISTRY = {
     create: { sql: 'INSERT', default: d([1, 0, 0]) },
     edit:   { sql: 'UPDATE', default: d([1, 0, 0]) },
   } },
-  tasks: { label: 'Tâches', tables: { tasks: 'org', task_notes: 'parent:tasks' }, actions: {
-    view:     { sql: 'SELECT', default: d([1, 1, 1]) },
-    create:   { sql: 'INSERT', default: d([1, 1, 1]) },
-    edit:     { sql: 'UPDATE', default: d([1, 0, 0]) },
-    edit_own: { sql: 'UPDATE', default: d([0, 1, 0]) },
-    delete:   { sql: 'DELETE', default: d([0, 0, 0]) }, // delta Eric : delete = admin only
-    assign:   { sql: null,     default: d([1, 0, 0]) },
-  } },
   territoire: { label: 'Territoire', tables: {}, actions: {
     view: { sql: 'SELECT', default: d([1, 1, 1]) },
   } },

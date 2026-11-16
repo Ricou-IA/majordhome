@@ -74,12 +74,12 @@ const TABLES = [
   { schema: 'majordhome', table: 'service_requests', columns: ['id', 'intervention_id'], data: false }, // 20261019_2 : garde du retrait d'une carte entretien sans contrat
   { schema: 'majordhome', table: 'maintenance_visits', columns: null, data: false }, // 20260928_1 : garde-fou date de visite (triggers ci-dessous)
   // 20260930_12..15 (droits app-level phases 4-6) : défauts app + surcharges par org AVEC données
-  // (la purge se vérifie sur les vraies lignes), tasks pour ses policies role_can.
+  // (la purge se vérifie sur les vraies lignes). `tasks` (policies role_can) a quitté la liste
+  // avec la suppression du module Tâches (20261116_4).
   { schema: 'majordhome', table: 'app_role_permissions', columns: null },
   { schema: 'majordhome', table: 'role_permissions', columns: null },
   { schema: 'majordhome', table: 'org_roles', columns: null }, // 20261006_1 : profils maison
   { schema: 'majordhome', table: 'member_org_roles', columns: null },
-  { schema: 'majordhome', table: 'tasks', columns: null, data: false },
   { schema: 'majordhome', table: 'journees_secteur', columns: null, data: false }, // 20261004_3 : auto_rdv_poser (journée figée, étiquette déduite)
   { schema: 'majordhome', table: 'pennylane_sync', columns: null }, // 20261011_1 : synchro identité client MDH ⇄ PL (saisies en attente)
   { schema: 'majordhome', table: 'pennylane_customer_lookup', columns: null }, // 20261011_1 : base de diff (identity_baseline_at)
@@ -284,7 +284,7 @@ const VIEWS = [
 const POLICY_TABLES = [
   'pricing_zones', 'pricing_equipment_types', 'team_members',
   // 20260930_13 : bascule des écritures sur role_can
-  'leads', 'contracts', 'quotes', 'tasks',
+  'leads', 'contracts', 'quotes',
   // 20260930_14 : purge des surcharges (lecture org / écriture org_admin)
   'role_permissions', 'app_role_permissions',
   'org_roles', 'member_org_roles', // 20261006_1
