@@ -100,7 +100,7 @@ export function tuilesParametrage() {
  * `accueil` = écran d'entrée du module (accueil d'une org sans CRM). Le socle n'est pas activable.
  */
 export const CATALOGUE = [
-  { key: 'crm', label: 'CRM artisan', description: 'Clients, planning, pipeline commercial, chantiers, tâches, territoire, mailing.', parDefaut: true, accueil: '/' },
+  { key: 'crm', label: 'CRM artisan', description: 'Clients, planning, pipeline commercial, chantiers, territoire, mailing.', parDefaut: true, accueil: '/' },
   { key: 'entretiens', label: 'Entretiens & Contrats', description: "Contrats d'entretien, certificats, tournées, tarification.", parDefaut: true, accueil: '/entretiens' },
   { key: 'communication', label: 'Communication', description: 'SMS et WhatsApp, envoi des factures par e-mail.', parDefaut: false, accueil: null },
   { key: 'solaire', label: 'Solaire', description: 'Simulateur photovoltaïque et dossiers PV.', parDefaut: true, accueil: '/solaire' },
