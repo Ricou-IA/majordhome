@@ -216,3 +216,89 @@ test('un RDV posé sans humain dit QUI l’a posé : agent téléphonique, clien
     old_values: { scheduled_start: '08:30' }, changed_fields: ['scheduled_start'] });
   assert.equal(decale.author, 'Automatisation');
 });
+
+// ── Fiche client (migration 20261116_5) ─────────────────────────────────────
+const CLIENT = '608e1de5-6c90-42fe-b7e0-c009ec9d87ec';
+const EQUIP = '11111111-aaaa-4bbb-8ccc-222222222222';
+
+test('fiche client : le verbe s’accorde, libellés FR, source « fiche client »', () => {
+  const e = buildAuditEntry({
+    id: 20, table_name: 'clients', record_id: CLIENT, client_id: CLIENT, action: 'UPDATE',
+    changed_fields: ['address', 'mail_optin', 'phone'],
+    old_values: { address: 'QUARTIER GUMLE', mail_optin: true, phone: '0678716837' },
+    new_values: { address: '12 route du Gers', mail_optin: false, phone: '0600000000' },
+    changed_by: PHILIPPE, changed_by_name: 'Philippe Mazel', changed_by_role: 'authenticated',
+    source: 'majordhome_clients_all', changed_at: '2026-11-16T10:00:00Z',
+  });
+  assert.equal(e.subject, 'Fiche');
+  assert.equal(e.title, 'Modifiée par Philippe Mazel via fiche client');
+  assert.deepEqual(e.changes.map((c) => [c.label, c.from, c.to]), [
+    ['Adresse', 'QUARTIER GUMLE', '12 route du Gers'],
+    ['Accepte les emails', 'Oui', 'Non'],
+    ['Téléphone', '0678716837', '0600000000'],
+  ]);
+});
+
+test('contrat : « statut » se lit avec les statuts de contrat, pas ceux des RDV ; montants et dates formatés', () => {
+  const resolversClient = {
+    status: new Map([['cancelled', 'Annulé'], ['pending', 'En attente de confirmation']]), // statuts de RDV
+    'contracts.status': new Map([['active', 'Actif'], ['cancelled', 'Clos'], ['pending', 'En attente']]),
+    'contracts.maintenance_month': new Map([['11', 'Novembre']]),
+  };
+  const e = buildAuditEntry({
+    id: 21, table_name: 'contracts', record_id: EQUIP, client_id: CLIENT, action: 'UPDATE',
+    changed_fields: ['amount', 'end_date', 'maintenance_month', 'status'],
+    old_values: { amount: 190, end_date: null, maintenance_month: null, status: 'active' },
+    new_values: { amount: 210.5, end_date: '2026-12-31', maintenance_month: 11, status: 'cancelled' },
+    changed_by: PHILIPPE, changed_by_name: 'Philippe Mazel', changed_by_role: 'authenticated',
+    source: 'majordhome_contracts_write', changed_at: '2026-11-16T10:05:00Z',
+  }, { resolvers: resolversClient });
+  assert.equal(e.title, 'Modifié par Philippe Mazel via fiche contrat');
+  assert.deepEqual(e.changes.map((c) => [c.label, c.from, c.to]), [
+    ['Montant', '190,00 €', '210,50 €'],
+    ['Date de fin', '—', '31/12/2026'],
+    ['Mois d’entretien', '—', 'Novembre'],
+    ['Statut', 'Actif', 'Clos'],
+  ]);
+  // Sans clé `table.champ`, le résolveur générique reste utilisé (RDV).
+  assert.equal(formatAuditValue('appointments', 'status', 'cancelled', resolversClient), 'Annulé');
+});
+
+test('équipement qui entre au contrat ou en sort : dit comme tel, avec l’équipement nommé', () => {
+  const resolversClient = { equipment_id: new Map([[EQUIP, 'Poêle à granulés · INVICTA Antaya']]) };
+  const lien = (action, valeurs) => buildAuditEntry({
+    id: 22, table_name: 'contract_equipments', record_id: EQUIP, client_id: CLIENT, action,
+    changed_fields: ['contract_id', 'equipment_id'], ...valeurs,
+    changed_by: PHILIPPE, changed_by_name: 'Philippe Mazel', changed_by_role: 'authenticated',
+    source: 'majordhome_contract_equipments', changed_at: '2026-11-16T10:10:00Z',
+  }, { resolvers: resolversClient });
+  const ajout = lien('INSERT', { old_values: null, new_values: { contract_id: CLIENT, equipment_id: EQUIP } });
+  assert.equal(ajout.subject, 'Contrat');
+  assert.equal(ajout.title, 'Équipement ajouté au contrat par Philippe Mazel via équipements du contrat');
+  assert.deepEqual(ajout.changes, [{ field: 'equipment_id', label: 'Équipement', from: null, to: 'Poêle à granulés · INVICTA Antaya' }]);
+  const retrait = lien('DELETE', { old_values: { contract_id: CLIENT, equipment_id: EQUIP }, new_values: null });
+  assert.equal(retrait.title, 'Équipement retiré du contrat par Philippe Mazel via équipements du contrat');
+  assert.equal(retrait.changes[0].to, 'Poêle à granulés · INVICTA Antaya');
+});
+
+test('équipement supprimé : on sait lequel (la ligne n’existe plus)', () => {
+  const e = buildAuditEntry({
+    id: 23, table_name: 'equipments', record_id: EQUIP, client_id: CLIENT, action: 'DELETE',
+    changed_fields: ['brand', 'model'], old_values: { brand: 'INVICTA', model: 'Antaya', serial_number: 'X1' }, new_values: null,
+    changed_by: PHILIPPE, changed_by_name: 'Philippe Mazel', changed_by_role: 'authenticated',
+    source: 'majordhome_equipments', changed_at: '2026-11-16T10:15:00Z',
+  });
+  assert.equal(e.title, 'Supprimé par Philippe Mazel via fiche équipement');
+  assert.deepEqual(e.changes.map((c) => [c.label, c.to]), [['Marque', 'INVICTA'], ['Modèle', 'Antaya']]);
+});
+
+test('écriture sans humain sur la fiche : synchro Pennylane, jamais « Utilisateur inconnu »', () => {
+  const e = buildAuditEntry({
+    id: 24, table_name: 'clients', record_id: CLIENT, client_id: CLIENT, action: 'UPDATE',
+    changed_fields: ['email'], old_values: { email: 'a@example.invalid' }, new_values: { email: 'b@example.invalid' },
+    changed_by: null, changed_by_name: null, changed_by_role: 'service_role',
+    source: 'pennylane_sync_update_client_fields', changed_at: '2026-11-16T10:20:00Z',
+  });
+  assert.equal(e.title, 'Modifiée par Automatisation via synchro Pennylane');
+  assert.equal(e.isHuman, false);
+});

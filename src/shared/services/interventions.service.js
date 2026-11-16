@@ -175,92 +175,63 @@ export const interventionsService = {
 
       if (error) throw error;
 
-      // Enrich child interventions with equipment category
       const withEquipment = data || [];
-      const equipmentIds = withEquipment
-        .filter((i) => i.equipment_id && i.parent_id)
-        .map((i) => i.equipment_id);
 
+      // Équipement concerné (enfants = un certificat par équipement ; un SAV peut aussi en porter un).
+      // Une erreur d'enrichissement fait échouer la lecture : l'onglet dit « illisible » plutôt que
+      // d'afficher des lignes amputées sans le dire.
+      const equipmentIds = [...new Set(withEquipment.filter((i) => i.equipment_id).map((i) => i.equipment_id))];
       if (equipmentIds.length > 0) {
-        const { data: equipments } = await supabase
+        const { data: equipments, error: eqError } = await supabase
           .from('majordhome_equipments')
-          .select('id, category_id, brand, model')
+          .select('id, category_id, equipment_type_id, brand, model')
           .in('id', equipmentIds);
+        if (eqError) throw eqError;
 
-        if (equipments) {
-          const eqMap = Object.fromEntries(equipments.map((e) => [e.id, e]));
-          for (const item of withEquipment) {
-            if (item.equipment_id && eqMap[item.equipment_id]) {
-              item.equipment_category_id = eqMap[item.equipment_id].category_id;
-              item.equipment_brand = eqMap[item.equipment_id].brand;
-              item.equipment_model = eqMap[item.equipment_id].model;
-            }
-          }
+        const eqMap = Object.fromEntries((equipments || []).map((e) => [e.id, e]));
+        for (const item of withEquipment) {
+          const eq = item.equipment_id ? eqMap[item.equipment_id] : null;
+          if (!eq) continue;
+          item.equipment_category_id = eq.category_id;
+          item.equipment_type_id = eq.equipment_type_id;
+          item.equipment_brand = eq.brand;
+          item.equipment_model = eq.model;
         }
       }
 
+      // Planning : RDV rattachés à chaque intervention + leurs techniciens. `technician_name`
+      // n'est renseigné sur aucune intervention (mesuré 2026-11-16) : qui est passé, et quand,
+      // se lit ici. 2ᵉ requête mergée en mémoire (la vue des RDV reste un miroir simple).
+      const interventionIds = withEquipment.map((i) => i.id);
+      const rdvsByIntervention = new Map();
+      if (interventionIds.length > 0) {
+        const { data: rdvs, error: rdvError } = await supabase
+          .from('majordhome_appointments')
+          .select('id, intervention_id, scheduled_date, scheduled_start, status, appointment_type')
+          .in('intervention_id', interventionIds);
+        if (rdvError) throw rdvError;
+
+        const techsByRdv = new Map();
+        if (rdvs?.length) {
+          const { data: techLinks, error: techError } = await supabase
+            .from('majordhome_appointment_technicians')
+            .select('appointment_id, technician_id')
+            .in('appointment_id', rdvs.map((r) => r.id));
+          if (techError) throw techError;
+          for (const t of techLinks || []) {
+            if (!techsByRdv.has(t.appointment_id)) techsByRdv.set(t.appointment_id, []);
+            techsByRdv.get(t.appointment_id).push(t.technician_id);
+          }
+        }
+        for (const r of rdvs || []) {
+          if (!rdvsByIntervention.has(r.intervention_id)) rdvsByIntervention.set(r.intervention_id, []);
+          rdvsByIntervention.get(r.intervention_id).push({ ...r, technician_ids: techsByRdv.get(r.id) || [] });
+        }
+      }
+      for (const item of withEquipment) item.rdvs = rdvsByIntervention.get(item.id) || [];
+
       return withEquipment;
     }, 'interventions.getInterventionsByProject');
-  },
-
-  // ==========================================================================
-  // CRÉATION
-  // ==========================================================================
-
-  /**
-   * Crée une nouvelle intervention
-   * @param {Object} params
-   * @param {string} params.projectId - UUID du projet (NOT NULL)
-   * @param {string} params.interventionType - Type (maintenance, repair, etc.)
-   * @param {string} params.scheduledDate - Date planifiée (YYYY-MM-DD)
-   * @param {string} [params.reportNotes] - Notes / motif
-   * @param {string} [params.status='scheduled'] - Statut initial
-   * @param {string} [params.equipmentId] - UUID équipement (optionnel)
-   * @param {string} [params.technicianId] - UUID technicien
-   * @param {string} [params.technicianName] - Nom technicien
-   * @param {string} [params.workPerformed] - Travaux effectués
-   * @param {string} [params.createdBy] - UUID utilisateur créateur
-   * @returns {{ data, error }}
-   */
-  async createIntervention({
-    projectId,
-    interventionType,
-    scheduledDate,
-    reportNotes = null,
-    status = 'scheduled',
-    equipmentId = null,
-    technicianId = null,
-    technicianName = null,
-    workPerformed = null,
-    createdBy = null,
-  }) {
-    if (!projectId) throw new Error('[interventions] projectId requis');
-    if (!interventionType) throw new Error('[interventions] interventionType requis');
-    if (!scheduledDate) throw new Error('[interventions] scheduledDate requis');
-
-    return withErrorHandling(async () => {
-      const insertData = {
-        project_id: projectId,
-        intervention_type: interventionType,
-        scheduled_date: scheduledDate,
-        status,
-        report_notes: reportNotes || null,
-        equipment_id: equipmentId || null,
-        technician_id: technicianId || null,
-        technician_name: technicianName || null,
-        work_performed: workPerformed || null,
-        created_by: createdBy || null,
-      };
-
-      const { data, error } = await supabase
-        .from('majordhome_interventions')
-        .insert(insertData)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    }, 'interventions.createIntervention');
   },
 
   // ==========================================================================

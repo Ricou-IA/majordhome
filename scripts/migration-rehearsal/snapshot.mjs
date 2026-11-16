@@ -46,6 +46,9 @@ const TABLES = [
   { schema: 'majordhome', table: 'commercials', columns: null }, // 20261005_1 : commercial_set_for_user (liste « Commercial assigné »)
   // auth_user_id : cité par les policies portail client (client_portal_select_own_*) des tables contracts/equipments/interventions
   { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived', 'address_complement', 'company_name', 'client_category', 'dpe_number'] }, // dpe_number : 20261112_2 (client_dpe_record tient le numéro de la fiche) // client_category : 20261021_1 (find_or_create_client crée la fiche) // address_complement / company_name : 20261011_1 (push identité PL) // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
+  // 20261116_5 : lue par le trigger tr_equipments_check_model_org à CHAQUE écriture d'un équipement (PL/pgSQL
+  // planifie toute la condition, même sans modèle) — sans elle, aucun INSERT d'équipement ne se répète
+  { schema: 'majordhome', table: 'equipment_models', columns: null, data: false },
   { schema: 'majordhome', table: 'equipments', columns: null },
   // contracts / interventions / leads : toutes les colonnes (DDL seul), les vues
   // majordhome_entretien_sav / majordhome_chantiers (20260922_1) en citent des dizaines.
@@ -146,6 +149,7 @@ const FUNCTIONS = [
   'majordhome.fn_leads_status_changed()',
   'majordhome.reset_lead_geocode_on_address_change()',
   'majordhome.update_updated_at()',
+  'majordhome.lead_rename_sync_appointments()', // trigger leads posé par 20261116_2, en prod depuis le 2026-11-16
   // 20260922_3 : REVOKE PUBLIC/anon/authenticated — l'ACL de départ (anon/authenticated/service_role
   // = EXECUTE) est reproduite par les privilèges par défaut de bootstrap-pre.sql, comme en prod.
   'public.exec_sql(text)',
@@ -276,6 +280,7 @@ const VIEWS = [
   'public.majordhome_webshop_shipping_rates',
   'public.majordhome_webshop_pickup_points',
   'public.majordhome_leads', // 20261030_1 : project_family_key en fin
+  'public.majordhome_audit_log', // 20261116_5 : client_id en fin (CREATE OR REPLACE sur la vue telle qu'en prod)
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du
@@ -297,6 +302,9 @@ const POLICY_TABLES = [
   'webshop_products', 'webshop_categories', // 20261014_1
   // 20261018_1 : écritures directes retirées (policy FOR ALL membres → SELECT membres)
   'webshop_sectors', 'webshop_sector_postcodes', 'webshop_shipping_rates', 'webshop_pickup_points',
+  // 20261116_5 : le journal d'audit n'est lisible que par les membres de l'org — une ligne dont l'org est
+  // dérivée de la fiche client (equipments, contract_equipments) doit rester invisible d'une autre org
+  'audit_log',
 ];
 
 function lireEnv(fichier) {

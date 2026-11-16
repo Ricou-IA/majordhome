@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Phone, MapPin, Home, FileText, ExternalLink, Link2, X, Search, Loader2, UserCheck, Users, Plus } from 'lucide-react';
+import { User, Phone, MapPin, Home, FileText, ExternalLink, Link2, X, Search, Loader2, UserCheck, Users, Plus, Navigation } from 'lucide-react';
+import { LienWaze } from '@/apps/artisan/components/shared/LienWaze';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
@@ -371,10 +372,25 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onIn
 
       {/* Adresse */}
       <section>
-        <h3 className="text-sm font-semibold text-secondary-900 mb-4 flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-secondary-500" />
-          Adresse
-        </h3>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-secondary-500" />
+            Adresse
+          </h3>
+          {/* Vise l'adresse ENREGISTRÉE (coordonnées de la fiche si elle est géocodée), pas une saisie en cours :
+              les champs restent des champs, le lien vit à côté. Cible de 44 px pour le doigt. */}
+          <LienWaze
+            address={savedAddress?.address}
+            postalCode={savedAddress?.postalCode}
+            city={savedAddress?.city}
+            lat={savedLocation?.lat}
+            lng={savedLocation?.lng}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary-50 px-3 py-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-100"
+          >
+            <Navigation className="w-4 h-4" aria-hidden="true" />
+            Y aller avec Waze
+          </LienWaze>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4">
           <FormField label="Adresse">

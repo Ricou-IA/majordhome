@@ -16,7 +16,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { interventionsService } from '@services/interventions.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
-import { interventionKeys, clientKeys } from '@hooks/cacheKeys';
+import { interventionKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 import { logger } from '@lib/logger';
 
@@ -57,38 +57,6 @@ export function useProjectInterventions(projectId) {
     isLoading,
     error,
     refresh: refetch,
-  };
-}
-
-// ============================================================================
-// HOOK - useCreateIntervention (mutation création)
-// ============================================================================
-
-/**
- * Hook pour créer une intervention
- *
- * @returns {Object} { createIntervention, isCreating }
- */
-export function useCreateIntervention() {
-  const queryClient = useQueryClient();
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-
-  const mutation = useMutation({
-    mutationFn: (params) => unwrapResult(interventionsService.createIntervention(params)),
-    onSuccess: (_created, variables) => {
-      // Invalider la liste interventions du projet
-      queryClient.invalidateQueries({
-        queryKey: interventionKeys.byProject(orgId, variables.projectId),
-      });
-      // Invalider le détail client (il charge aussi les interventions)
-      queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
-    },
-  });
-
-  return {
-    createIntervention: mutation.mutateAsync,
-    isCreating: mutation.isPending,
   };
 }
 

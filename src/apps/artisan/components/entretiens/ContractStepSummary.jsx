@@ -19,7 +19,9 @@ export function Step3Contract({
   newClientData,
   clientMode,
   contractData,
-  calculator,
+  lines = [],
+  pricing,
+  zoneCode = null,
   onContractDataChange,
 }) {
   const clientName =
@@ -50,29 +52,30 @@ export function Step3Contract({
         </div>
       </div>
 
-      {/* Résumé tarification */}
-      {calculator.hasItems && (
+      {/* Résumé tarification (équipements déjà recensés retenus + ajoutés) */}
+      {lines.length > 0 && pricing && (
         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-blue-800 flex items-center gap-1.5">
               <Wrench className="w-4 h-4" />
-              {calculator.items.length} équipement{calculator.items.length > 1 ? 's' : ''} · {calculator.activeZone?.code}
+              {lines.length} équipement{lines.length > 1 ? 's' : ''}{zoneCode ? ` · ${zoneCode}` : ''}
             </span>
             <span className="text-lg font-bold text-blue-700 tabular-nums">
-              {calculator.pricing.total.toFixed(2)} €
+              {pricing.total.toFixed(2)} €
             </span>
           </div>
           <div className="space-y-1">
-            {calculator.items.map((item, idx) => (
-              <p key={idx} className="text-xs text-blue-700">
-                • {item.equipType?.label || item.equipmentTypeCode}
-                {item.quantity > 1 && ` (×${item.quantity})`}
-                {' — '}{item.lineTotal?.toFixed(0)}€
+            {lines.map((line) => (
+              <p key={line.key} className="text-xs text-blue-700">
+                • {line.label}
+                {line.quantity > 1 && ` (×${line.quantity})`}
+                {line.recensed && ' · déjà recensé'}
+                {' — '}{(line.lineTotal || 0).toFixed(0)}€
               </p>
             ))}
-            {calculator.pricing.discountPercent > 0 && (
+            {pricing.discountPercent > 0 && (
               <p className="text-xs text-green-700">
-                • Remise -{calculator.pricing.discountPercent}% : -{calculator.pricing.discountAmount.toFixed(0)}€
+                • Remise -{pricing.discountPercent}% : -{pricing.discountAmount.toFixed(0)}€
               </p>
             )}
           </div>

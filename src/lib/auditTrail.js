@@ -5,8 +5,10 @@
  * `node --test scripts/audit-trail.test.mjs`.
  *
  * Source : lignes de la vue `majordhome_audit_log`, écrites par le trigger
- * `majordhome.audit_row_change()` (migration 20260916_3). Une ligne = une
- * écriture sur `leads` ou `appointments` : QUI (`changed_by` = auth.uid() côté
+ * `majordhome.audit_row_change()` (migrations 20260916_3 puis 20261116_5). Une ligne =
+ * une écriture sur `leads`, `appointments`, `chantiers`, et depuis le 2026-11-16 sur la
+ * fiche client (`clients`, `equipments`, `contracts`, `contract_equipments`, rattachées
+ * par `client_id`) : QUI (`changed_by` = auth.uid() côté
  * serveur), QUAND (`changed_at`), QUOI (`changed_fields` + `old_values` /
  * `new_values` limités aux champs modifiés), PAR OÙ (`source` = RPC ou vue).
  *
@@ -132,6 +134,105 @@ export const AUDIT_FIELD_LABELS = {
     label: 'Libellé du chantier',
     chantier_id: 'Chantier lié',
   },
+  clients: {
+    first_name: 'Prénom',
+    last_name: 'Nom',
+    display_name: 'Nom affiché',
+    company_name: 'Société',
+    client_category: 'Catégorie',
+    client_number: 'Numéro client',
+    email: 'Email',
+    phone: 'Téléphone',
+    phone_secondary: 'Téléphone secondaire',
+    address: 'Adresse',
+    address_complement: 'Complément d’adresse',
+    postal_code: 'Code postal',
+    city: 'Ville',
+    country: 'Pays',
+    access_instructions: 'Instructions d’accès',
+    housing_type: 'Type de logement',
+    surface: 'Surface',
+    floor_count: 'Nombre d’étages',
+    construction_year: 'Année de construction',
+    dpe_number: 'Numéro de DPE',
+    dpe_rating: 'Étiquette DPE',
+    lead_source: 'Source',
+    tags: 'Étiquettes',
+    is_reliable: 'Client fiable',
+    notes: 'Notes',
+    internal_notes: 'Notes internes',
+    is_archived: 'Archivé',
+    archived_at: 'Archivé le',
+    siren: 'SIREN',
+    owner_client_id: 'Propriétaire lié',
+    mail_optin: 'Accepte les emails',
+    sms_optin: 'Accepte les SMS',
+    email_unsubscribed_at: 'Désabonnement email',
+    email_unsubscribe_reason: 'Raison du désabonnement',
+    parrain_id: 'Parrain',
+    parrainage_code: 'Code de parrainage',
+    auth_user_id: 'Compte du portail client',
+    pennylane_account_number: 'Code comptable Pennylane',
+    is_web_draft: 'Brouillon du site',
+    import_source: 'Origine de l’import',
+    project_id: 'Projet lié',
+    created_by: 'Créé par',
+  },
+  equipments: {
+    equipment_type_id: 'Type d’équipement',
+    category_id: 'Catégorie',
+    brand: 'Marque',
+    model: 'Modèle',
+    serial_number: 'Numéro de série',
+    installation_year: 'Année d’installation',
+    install_date: 'Date d’installation',
+    installation_type: 'Type de pose',
+    warranty_end_date: 'Fin de garantie',
+    maintenance_frequency_months: 'Fréquence d’entretien (mois)',
+    unit_count: 'Nombre d’unités',
+    status: 'État',
+    notes: 'Notes',
+    supplier_product_id: 'Article du catalogue',
+    equipment_model_id: 'Modèle fabricant',
+    nameplate_photo_path: 'Photo de la plaque',
+    metadata: 'Données de saisie',
+    contract_status: 'Statut de contrat (ancien champ)',
+    contract_type: 'Type de contrat (ancien champ)',
+    contract_tarif: 'Tarif de contrat (ancien champ)',
+    contract_start_date: 'Début de contrat (ancien champ)',
+    project_id: 'Projet lié',
+    created_by: 'Créé par',
+  },
+  contracts: {
+    contract_number: 'Numéro de contrat',
+    status: 'Statut',
+    workflow_status: 'Étape de la proposition',
+    frequency: 'Fréquence',
+    start_date: 'Date de début',
+    end_date: 'Date de fin',
+    renewal_date: 'Date de renouvellement',
+    next_maintenance_date: 'Prochain entretien',
+    maintenance_month: 'Mois d’entretien',
+    estimated_time: 'Temps estimé',
+    amount: 'Montant',
+    subtotal: 'Sous-total',
+    discount_percent: 'Remise',
+    exceptional_discount: 'Remise exceptionnelle',
+    amount_forced: 'Montant forcé',
+    zone_id: 'Zone tarifaire',
+    source: 'Origine',
+    notes: 'Notes',
+    contract_pdf_path: 'PDF du contrat',
+    signed_at: 'Signé le',
+    signature_client_nom: 'Signataire',
+    cancellation_reason: 'Motif de clôture',
+    cancelled_at: 'Clos le',
+    client_id: 'Client',
+  },
+  contract_equipments: {
+    equipment_id: 'Équipement',
+    contract_id: 'Contrat',
+  },
 };
 
 /**
@@ -162,10 +263,48 @@ const AUDIT_SOURCE_LABELS = {
   chantier_delete: 'suppression de chantier',
   chantier_ensure_for_lead: 'gain sans devis',
   majordhome_chantiers_write: 'fiche chantier',
+  // Fiche client (20261116_5)
+  majordhome_clients: 'fiche client',
+  majordhome_clients_all: 'fiche client',
+  majordhome_equipments: 'fiche équipement',
+  majordhome_contracts: 'fiche contrat',
+  majordhome_contracts_write: 'fiche contrat',
+  majordhome_contract_equipments: 'équipements du contrat',
+  client_set_location: 'adresse vérifiée',
+  client_dpe_record: 'rattachement du DPE',
+  client_hard_delete: 'suppression définitive',
+  pennylane_sync_update_client_fields: 'synchro Pennylane',
+  find_or_create_client: 'création automatique',
+  process_web_entretien: 'site web',
+  link_client_auth: 'portail client',
+  mailing_apply_unsubscribe: 'désabonnement email',
+  resend_apply_webhook_event: 'retour d’envoi email',
+  equipment_model_merge: 'fusion de modèles d’appareil',
+  equipment_models_close: 'relevé du fabricant',
 };
 
 /** Sujet affiché selon la table auditée. */
-const SUBJECTS = { leads: 'Lead', appointments: 'RDV', chantiers: 'Chantier' };
+const SUBJECTS = {
+  leads: 'Lead',
+  appointments: 'RDV',
+  chantiers: 'Chantier',
+  clients: 'Fiche',
+  equipments: 'Équipement',
+  contracts: 'Contrat',
+  contract_equipments: 'Contrat',
+};
+
+/** Sujets féminins : « Fiche — Modifiée par… » (le verbe s'accorde). */
+const FEMININE_TABLES = new Set(['clients']);
+
+/**
+ * Écritures qui se disent mieux autrement que « Créé / Supprimé » : le lien entre un
+ * contrat et un équipement n'est pas un objet qu'on crée, c'est un équipement qui entre
+ * au contrat ou qui en sort.
+ */
+const ACTION_TITLES = {
+  contract_equipments: { INSERT: 'Équipement ajouté au contrat', DELETE: 'Équipement retiré du contrat' },
+};
 
 /**
  * À la création, seuls ces champs sont détaillés (la ligne entière noierait
@@ -174,6 +313,20 @@ const SUBJECTS = { leads: 'Lead', appointments: 'RDV', chantiers: 'Chantier' };
 const AUDIT_INSERT_HIGHLIGHTS = {
   leads: ['status_id', 'source_id', 'assigned_user_id', 'appointment_date', 'client_id'],
   appointments: ['appointment_type', 'scheduled_date', 'scheduled_start', 'assigned_commercial_id', 'status'],
+  clients: ['last_name', 'first_name', 'company_name', 'city', 'lead_source'],
+  equipments: ['equipment_type_id', 'brand', 'model', 'installation_year'],
+  contracts: ['contract_number', 'status', 'amount', 'start_date'],
+  contract_equipments: ['equipment_id'],
+};
+
+/**
+ * À la suppression, ce qui permet de savoir CE qui a disparu (la ligne n'existe plus :
+ * sans ces champs, « Supprimé par X » ne dit pas quoi).
+ */
+const AUDIT_DELETE_HIGHLIGHTS = {
+  equipments: ['equipment_type_id', 'brand', 'model'],
+  contracts: ['contract_number', 'amount'],
+  contract_equipments: ['equipment_id'],
 };
 
 const ACTION_VERBS = { INSERT: 'Créé', UPDATE: 'Modifié', DELETE: 'Supprimé' };
@@ -182,14 +335,20 @@ const ACTION_VERBS = { INSERT: 'Créé', UPDATE: 'Modifié', DELETE: 'Supprimé'
 const DATE_FIELDS = new Set([
   'appointment_date', 'quote_sent_date', 'won_date', 'next_action_date', 'created_date',
   'converted_date', 'estimated_date', 'planification_date', 'scheduled_date',
+  'start_date', 'end_date', 'renewal_date', 'next_maintenance_date', 'install_date',
+  'warranty_end_date', 'contract_start_date',
 ]);
 const TIME_FIELDS = new Set(['scheduled_start', 'scheduled_end', 'announced_start']);
 const TIMESTAMP_FIELDS = new Set([
   'last_call_date', 'last_followup_date', 'long_term_started_at', 'email_unsubscribed_at',
   'cancelled_at', 'completed_at', 'hour_confirmed_at', 'created_at', 'updated_at',
+  'archived_at', 'signed_at',
 ]);
-const AMOUNT_FIELDS = new Set(['order_amount_ht', 'estimated_revenue', 'estimated_amount', 'final_amount']);
-const PERCENT_FIELDS = new Set(['probability']);
+const AMOUNT_FIELDS = new Set([
+  'order_amount_ht', 'estimated_revenue', 'estimated_amount', 'final_amount',
+  'amount', 'subtotal', 'exceptional_discount', 'contract_tarif',
+]);
+const PERCENT_FIELDS = new Set(['probability', 'discount_percent']);
 const MINUTE_FIELDS = new Set(['duration_minutes', 'time_flex_minutes']);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -234,14 +393,15 @@ function truncate(text, max) {
  * @param {string} table - 'leads' | 'appointments'
  * @param {string} field - nom de colonne
  * @param {*} value - valeur jsonb brute
- * @param {Record<string, Map<string, string>>} [resolvers] - `{ [field]: Map<id, libellé> }`
+ * @param {Record<string, Map<string, string>>} [resolvers] - `{ [field]: Map<id, libellé> }` ;
+ *   une clé `table.champ` prime sur `champ` (`status` n'a pas le même sens pour un RDV et un contrat)
  * @returns {string}
  */
 export function formatAuditValue(table, field, value, resolvers = {}) {
   if (value === null || value === undefined || value === '') return EMPTY;
   if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
 
-  const resolved = resolvers[field]?.get(String(value));
+  const resolved = (resolvers[`${table}.${field}`] || resolvers[field])?.get(String(value));
   if (resolved) return resolved;
 
   if (DATE_FIELDS.has(field)) return formatDateFR(value);
@@ -298,7 +458,8 @@ export function buildAuditEntry(row, { resolvers = {} } = {}) {
   const table = row.table_name;
   const { author, isHuman } = authorOf(row);
   const sourceLabel = row.source ? (AUDIT_SOURCE_LABELS[row.source] || row.source) : null;
-  const verb = ACTION_VERBS[row.action] || 'Modifié';
+  const verb = ACTION_TITLES[table]?.[row.action]
+    || `${ACTION_VERBS[row.action] || 'Modifié'}${FEMININE_TABLES.has(table) ? 'e' : ''}`;
   const title = `${verb} par ${author}${sourceLabel ? ` via ${sourceLabel}` : ''}`;
 
   let changes = [];
@@ -317,6 +478,15 @@ export function buildAuditEntry(row, { resolvers = {} } = {}) {
         label: auditFieldLabel(table, field),
         from: null,
         to: formatAuditValue(table, field, row.new_values[field], resolvers),
+      }));
+  } else if (row.action === 'DELETE') {
+    changes = (AUDIT_DELETE_HIGHLIGHTS[table] || [])
+      .filter((field) => row.old_values?.[field] !== null && row.old_values?.[field] !== undefined)
+      .map((field) => ({
+        field,
+        label: auditFieldLabel(table, field),
+        from: null,
+        to: formatAuditValue(table, field, row.old_values[field], resolvers),
       }));
   }
 

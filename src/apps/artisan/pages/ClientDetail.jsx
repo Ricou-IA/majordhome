@@ -14,8 +14,9 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, User, FileText, Wrench, History, Mail, MessageSquare,
   Save, Loader2, AlertCircle, Lock, Unlock, Clock,
-  Archive, ArchiveRestore, Receipt, CalendarPlus, Trash2, LifeBuoy,
+  Archive, ArchiveRestore, Receipt, CalendarPlus, Trash2, LifeBuoy, Navigation,
 } from 'lucide-react';
+import { LienWaze } from '../components/shared/LienWaze';
 import { CreateSAVModal } from '../components/entretiens/CreateSAVModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -387,7 +388,19 @@ export default function ClientDetail() {
               {client.client_number && !client.pennylane_account_number && (
                 <span className="text-xs font-mono text-secondary-400 mr-2">{client.client_number}</span>
               )}
-              {[client.city, client.postal_code].filter(Boolean).join(' ')}
+              {/* Ville de l'en-tête : un appui lance Waze vers l'adresse de la fiche, depuis n'importe quel onglet */}
+              <LienWaze
+                address={client.address}
+                postalCode={client.postal_code}
+                city={client.city}
+                lat={client.latitude}
+                lng={client.longitude}
+                className="inline-flex items-center gap-1 text-primary-600 hover:underline"
+                sinon={[client.city, client.postal_code].filter(Boolean).join(' ')}
+              >
+                <Navigation className="w-3.5 h-3.5" aria-hidden="true" />
+                {[client.city, client.postal_code].filter(Boolean).join(' ') || 'Itinéraire'}
+              </LienWaze>
               {client.email && ` • ${client.email}`}
               {client.updated_at && (
                 <span className="ml-2 inline-flex items-center gap-1 text-xs text-secondary-400">
@@ -532,7 +545,7 @@ export default function ClientDetail() {
           />
         )}
         {activeTab === 'interventions' && <TabInterventions projectId={client.project_id} clientId={id} />}
-        {activeTab === 'timeline' && <TabTimeline clientId={id} orgId={organization?.id} userId={user?.id} />}
+        {activeTab === 'timeline' && <TabTimeline clientId={id} />}
         {activeTab === 'mailings' && <TabMailings clientId={id} />}
         {activeTab === 'sms' && <TabSms clientId={id} />}
       </div>

@@ -14,6 +14,7 @@ import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsService } from '@services/clients.service';
 import { equipmentsService } from '@services/equipments.service';
+import { auditService } from '@services/audit.service';
 import { buildKindsByClient, buildEquipmentLabelsByClient } from '@/lib/equipmentIcons';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { buildClientDuplicateProbe } from '@/lib/clientDuplicateMatch';
@@ -361,7 +362,6 @@ export function usePricingEquipmentTypes() {
 // ============================================================================
 
 export function useClientActivities(clientId) {
-  const queryClient = useQueryClient();
   const { organization } = useAuth();
   const orgId = organization?.id;
 
@@ -381,21 +381,39 @@ export function useClientActivities(clientId) {
     staleTime: 15_000, // 15s - timeline change souvent
   });
 
-  const addNoteMutation = useMutation({
-    mutationFn: (noteData) => unwrapResult(clientsService.addClientNote({ clientId, ...noteData })),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: clientKeys.activities(orgId, clientId) });
-    },
-  });
-
   return {
     activities: activities || [],
     isLoading,
     error,
-    addNote: addNoteMutation.mutateAsync,
-    isAddingNote: addNoteMutation.isPending,
     refresh: refetch,
   };
+}
+
+// ============================================================================
+// HOOK - useClientAuditTrail (mouchard : écritures sur la fiche client)
+// ============================================================================
+
+/**
+ * Lignes brutes du journal d'audit d'une fiche client : la fiche, ses équipements, son
+ * contrat, ses RDV (vue `majordhome_audit_log`, rattachement par `client_id`).
+ * Mise en forme côté appelant via `buildAuditEntry` (src/lib/auditTrail.js).
+ * Toute écriture sous `clientKeys.all` (fiche, équipement, contrat) relance la lecture.
+ */
+export function useClientAuditTrail(clientId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: clientKeys.audit(orgId, clientId),
+    queryFn: async () => {
+      const { data: result, error: err } = await auditService.getForClient(orgId, clientId);
+      if (err) throw err;
+      return result;
+    },
+    enabled: !!orgId && !!clientId,
+    staleTime: 0,
+  });
+
+  return { rows: data?.rows || [], truncated: !!data?.truncated, isLoading, error, refresh: refetch };
 }
 
 // ============================================================================

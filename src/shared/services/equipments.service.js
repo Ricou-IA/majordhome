@@ -75,7 +75,7 @@ export const equipmentsService = {
       // Récupérer le project_id
       const { data: client, error: clientError } = await supabase
         .from('majordhome_clients')
-        .select('project_id, org_id')
+        .select('project_id')
         .eq('id', clientId)
         .single();
 
@@ -113,20 +113,8 @@ export const equipmentsService = {
 
       if (error) throw error;
 
-      // Ajouter activité timeline
-      await supabase
-        .from('majordhome_client_activities')
-        .insert({
-          client_id: clientId,
-          org_id: client.org_id,
-          activity_type: 'equipment_added',
-          title: 'Équipement ajouté',
-          description: `${equipmentData.brand || ''} ${equipmentData.model || ''}`.trim() || 'Équipement',
-          reference_type: 'equipment',
-          reference_id: data.id,
-          is_system: true,
-        });
-
+      // L'ajout est tracé par le journal d'audit (trigger trg_audit_equipments, 20261116_5) :
+      // plus d'activité déclarative « Équipement ajouté », qui s'afficherait en double.
       return data;
     }, 'equipments.addEquipment');
   },

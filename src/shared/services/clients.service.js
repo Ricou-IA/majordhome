@@ -393,19 +393,8 @@ export const clientsService = {
 
       if (clientError) throw clientError;
 
-      // 3. Créer l'activité de création
-      await supabase
-        .from('majordhome_client_activities')
-        .insert({
-          client_id: client.id,
-          org_id: orgId,
-          activity_type: 'client_created',
-          title: 'Client créé',
-          description: `Fiche client créée depuis l'application`,
-          is_system: true,
-          created_by: createdBy,
-        });
-
+      // La création est tracée par le journal d'audit (trigger trg_audit_clients, 20261116_5) :
+      // plus d'activité déclarative « Client créé », qui s'afficherait en double dans la Timeline.
       return client;
     }, 'clients.createClient');
   },
@@ -705,42 +694,6 @@ export const clientsService = {
       if (error) throw error;
       return data;
     }, 'clients.getClientActivities');
-  },
-
-  /**
-   * Ajoute une note/commentaire à la timeline
-   */
-  async addClientNote({
-    clientId,
-    orgId,
-    title,
-    description = null,
-    activityType = 'note',
-    isPinned = false,
-    createdBy = null,
-  } = {}) {
-    return withErrorHandling(async () => {
-      if (!clientId || !orgId) throw new Error('[clientsService] clientId et orgId requis');
-      if (!title) throw new Error('[clientsService] title est requis');
-
-      const { data, error } = await supabase
-        .from('majordhome_client_activities')
-        .insert({
-          client_id: clientId,
-          org_id: orgId,
-          activity_type: activityType,
-          title,
-          description,
-          is_system: false,
-          is_pinned: isPinned,
-          created_by: createdBy,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    }, 'clients.addClientNote');
   },
 
   // ==========================================================================

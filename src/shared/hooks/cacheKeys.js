@@ -45,6 +45,7 @@ export const clientKeys = {
   stats: (orgId) => [...clientKeys.all(orgId), 'stats'],
   search: (orgId, query) => [...clientKeys.all(orgId), 'search', query],
   activities: (orgId, clientId) => [...clientKeys.all(orgId), 'activities', clientId],
+  audit: (orgId, clientId) => [...clientKeys.all(orgId), 'audit', clientId],
   equipments: (orgId, clientId) => [...clientKeys.all(orgId), 'equipments', clientId],
   equipmentKinds: (orgId) => [...clientKeys.all(orgId), 'equipment-kinds'],
   brands: (orgId) => [...clientKeys.all(orgId), 'brands'],

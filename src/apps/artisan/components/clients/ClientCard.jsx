@@ -26,6 +26,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { EquipmentKindIcons } from '../shared/EquipmentKindIcons';
+import { LienWaze } from '../shared/LienWaze';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -98,6 +99,8 @@ export function ClientCard({
     address,
     postal_code,
     city,
+    latitude,
+    longitude,
     phone,
     email,
     has_active_contract,
@@ -179,21 +182,35 @@ export function ClientCard({
         </div>
       </div>
 
-      {/* Ligne 2 : Adresse (rue + CP/ville sur 2 lignes) */}
+      {/* Ligne 2 : Adresse (rue + CP/ville sur 2 lignes) — un appui lance Waze.
+          La zone est élargie (-my-1 py-1) pour rester visable au doigt. */}
       <div className="mb-2">
-        <div className="flex items-start gap-2 text-sm">
+        <LienWaze
+          address={address}
+          postalCode={postal_code}
+          city={city}
+          lat={latitude}
+          lng={longitude}
+          className="group/adresse flex items-start gap-2 text-sm -mx-1 px-1 -my-1 py-1 rounded hover:bg-blue-50"
+          sinon={(
+            <div className="flex items-start gap-2 text-sm">
+              <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+              <p className="text-gray-400">-</p>
+            </div>
+          )}
+        >
           <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
           <div className="min-w-0">
             {streetAddress ? (
-              <p className="text-gray-600 truncate">{streetAddress}</p>
+              <p className="text-blue-600 truncate group-hover/adresse:underline">{streetAddress}</p>
             ) : (
               <p className="text-gray-400">-</p>
             )}
             {cityLine && (
-              <p className="text-gray-500 truncate">{cityLine}</p>
+              <p className="text-blue-600/80 truncate group-hover/adresse:underline">{cityLine}</p>
             )}
           </div>
-        </div>
+        </LienWaze>
       </div>
 
       {/* Ligne 3 : Téléphone */}

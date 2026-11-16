@@ -1,143 +1,224 @@
+/**
+ * TabInterventions.jsx — onglet Interventions de la fiche client.
+ * ============================================================================
+ * Ici on RECENSE, on ne crée pas (Eric 2026-11-16) : un entretien naît du contrat,
+ * un SAV du bouton « Nouveau SAV » de la fiche, une installation d'un chantier.
+ * Chaque ligne dit ce que la base sait : quand (RDV posé, date prévue, sinon date
+ * de la demande), qui (techniciens du RDV), quoi (description du SAV, équipement,
+ * compte rendu), où ça en est (état de la carte, urgence, devis, facturation),
+ * et ouvre la fiche Entretien / SAV du kanban.
+ *
+ * Les faits affichés viennent de `src/lib/interventionLigne.js` (pur, testé).
+ * ============================================================================
+ */
+
 import { useState, useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
-import { Loader2, Plus, Wrench, HardHat, Ban } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  Loader2, Wrench, HardHat, Ban, CalendarDays, Users, AlertCircle, RefreshCw, ChevronRight, Receipt, Package,
+} from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { AttestationLink } from '@/apps/artisan/components/certificat/AttestationLink';
+import { SAVUrgencyBadge } from '@/apps/artisan/components/entretiens/SAVUrgency';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProjectInterventions, useCreateIntervention } from '@hooks/useInterventions';
-import { INTERVENTION_TYPES } from '@services/interventions.service';
-import { getStatusConfig } from '@services/sav.service';
-import { chantiersService, getChantierStatusConfig } from '@services/chantiers.service';
-import { formatDateFR } from '@/lib/utils';
+import { useProjectInterventions, interventionKeys } from '@hooks/useInterventions';
+import { useTeamMembers } from '@hooks/useAppointments';
+import { useCanAccess } from '@hooks/usePermissions';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
-import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
+import { INTERVENTION_TYPES } from '@services/interventions.service';
+import { getStatusConfig, DEVIS_STATUSES, PARTS_ORDER_STATUSES } from '@services/sav.service';
+import { chantiersService, getChantierStatusConfig } from '@services/chantiers.service';
+import { formatDateFR, formatDateShortFR, formatEuro } from '@/lib/utils';
+import { decrireIntervention, ordonnerInterventions } from '@/lib/interventionLigne';
 import { logger } from '@lib/logger';
+import { FicheInterventionCarte } from './FicheInterventionCarte';
 
-const InterventionCard = ({ intervention, hasChildren = false }) => {
-  const typeConfig = INTERVENTION_TYPES.find(t => t.value === intervention.intervention_type) || INTERVENTION_TYPES[INTERVENTION_TYPES.length - 1];
-  const isChild = !!intervention.parent_id;
-  const isNeant = isChild && intervention.status === 'cancelled' && intervention.workflow_status === 'realise';
-  const isParentWithChildren = !isChild && hasChildren;
+const STATUTS_TECHNIQUES = {
+  completed: { label: 'Terminé', className: 'bg-green-100 text-green-700' },
+  scheduled: { label: 'Planifié', className: 'bg-blue-100 text-blue-700' },
+  cancelled: { label: 'Annulé', className: 'bg-secondary-100 text-secondary-700' },
+  in_progress: { label: 'En cours', className: 'bg-amber-100 text-amber-700' },
+  on_hold: { label: 'En attente', className: 'bg-orange-100 text-orange-700' },
+  no_show: { label: 'Absent', className: 'bg-red-100 text-red-700' },
+};
 
-  const statusConfig = {
-    completed: { label: 'Terminé', className: 'bg-green-100 text-green-700' },
-    scheduled: { label: 'Planifié', className: 'bg-blue-100 text-blue-700' },
-    cancelled: { label: 'Annulé', className: 'bg-secondary-100 text-secondary-700' },
-    in_progress: { label: 'En cours', className: 'bg-amber-100 text-amber-700' },
-    on_hold: { label: 'En attente', className: 'bg-orange-100 text-orange-700' },
-    no_show: { label: 'Absent', className: 'bg-red-100 text-red-700' },
-  };
+/** Date locale du jour, 'YYYY-MM-DD' (jamais toISOString : il recule d'un jour après minuit). */
+function aujourdhuiLocal() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
+/** « RDV le 20 nov. 2026 à 09:30 », « Passage le … », « Réalisé le … », « Prévu le … », « Demande du … ». */
+function libelleMoment(moment, type) {
+  if (!moment.date) return null;
+  const date = formatDateShortFR(moment.date);
+  const heure = moment.heure ? ` à ${moment.heure}` : '';
+  switch (moment.kind) {
+    case 'rdv_a_venir': return `RDV le ${date}${heure}`;
+    case 'rdv_passe': return `Passage le ${date}${heure}`;
+    case 'realise': return `Réalisé le ${date}`;
+    case 'prevu': return `Prévu le ${date}`;
+    default: return type === 'sav' ? `Demande du ${date}` : `Créée le ${date}`;
+  }
+}
+
+/** Équipement d'une ligne : « Poêle à granulés · INVICTA Antaya » (libellés du référentiel de l'org). */
+function useLibelleEquipement(intervention) {
+  const { index: referentiel } = useEquipmentReferential();
+  if (!intervention.equipment_id) return { label: null, detail: null };
+  const label = (intervention.equipment_type_id && referentiel.labelType(intervention.equipment_type_id))
+    || (intervention.equipment_category_id ? referentiel.labelCategorie(intervention.equipment_category_id) : null);
+  const detail = [intervention.equipment_brand, intervention.equipment_model].filter(Boolean).join(' ') || null;
+  return { label, detail };
+}
+
+/** Enfant d'un entretien : un équipement, son certificat. */
+const ChildCard = ({ intervention }) => {
+  const isNeant = intervention.status === 'cancelled' && intervention.workflow_status === 'realise';
   const statusInfo = isNeant
     ? { label: 'Néant', className: 'bg-gray-100 text-gray-500' }
-    : (statusConfig[intervention.status] || statusConfig.scheduled);
-
-  // Carte kanban (entretien / SAV) sans enfants : le badge workflow fait foi.
-  // `status` reste 'scheduled' de la création à la clôture ('completed') → afficher
-  // « Planifié » sur une carte « À planifier » était faux ; on ne garde le badge
-  // technique que s'il porte une information propre (annulé, absent, en attente…).
-  const hasWorkflowBadge = !isChild && !hasChildren
-    && ['entretien', 'sav'].includes(intervention.intervention_type)
-    && !!intervention.workflow_status;
-  const showTechnicalStatus = !hasWorkflowBadge
-    || !['scheduled', 'completed'].includes(intervention.status);
-
-  // Le certificat s'affiche uniquement sur les enfants (pas le parent qui a des enfants)
+    : (STATUTS_TECHNIQUES[intervention.status] || STATUTS_TECHNIQUES.scheduled);
   const hasEntretien = intervention.intervention_type === 'entretien'
     || (intervention.intervention_type === 'sav' && intervention.includes_entretien);
-  const showCertificat = isChild && hasEntretien && !isNeant
-    && ['planifie', 'realise'].includes(intervention.workflow_status);
+  const showCertificat = hasEntretien && !isNeant && ['planifie', 'realise'].includes(intervention.workflow_status);
   const isRealise = intervention.workflow_status === 'realise';
-
-  // Libellé de catégorie de l'équipement (interventions enfants), depuis le référentiel de l'org
-  const { index: referentiel } = useEquipmentReferential();
-  const equipmentLabel = isChild && intervention.equipment_category_id
-    ? referentiel.labelCategorie(intervention.equipment_category_id)
-    : null;
-  const equipmentDetail = isChild
-    ? [intervention.equipment_brand, intervention.equipment_model].filter(Boolean).join(' ')
-    : null;
-
-  // Parent avec enfants : affichage compact (les détails sont dans les enfants)
-  if (isParentWithChildren) {
-    const wfConfig = getStatusConfig(intervention.intervention_type, intervention.workflow_status);
-    return (
-      <div className="px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-xs px-2 py-0.5 rounded-full ${typeConfig.bgClass}`}>{typeConfig.label}</span>
-            {wfConfig && (
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ backgroundColor: wfConfig.color }}>
-                {wfConfig.label}
-              </span>
-            )}
-            <span className="text-xs text-gray-500">{formatDateFR(intervention.scheduled_date || intervention.created_at)}</span>
-          </div>
-          {intervention.report_notes && (
-            <span className="text-xs text-gray-400 italic truncate max-w-[200px]">{intervention.report_notes}</span>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const { label, detail } = useLibelleEquipement(intervention);
 
   return (
-    <div className={`p-4 bg-white rounded-lg border transition-colors ${
-      isChild
-        ? 'ml-6 border-l-2 border-l-blue-300 border-gray-200 hover:border-gray-300'
-        : 'border-secondary-200 hover:border-secondary-300'
-    } ${isNeant ? 'opacity-60' : ''}`}>
+    <div className={`ml-6 p-3 bg-white rounded-lg border border-l-2 border-l-blue-300 border-gray-200 ${isNeant ? 'opacity-60' : ''}`}>
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {isChild ? (
-              <>
-                {equipmentLabel && (
-                  <span className="text-sm font-medium text-gray-900">{equipmentLabel}</span>
-                )}
-                {equipmentDetail && (
-                  <span className="text-xs text-gray-500">{equipmentDetail}</span>
-                )}
-              </>
-            ) : (
-              <span className={`text-xs px-2 py-0.5 rounded-full ${typeConfig.bgClass}`}>{typeConfig.label}</span>
-            )}
-            {showTechnicalStatus && (
-              <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.className}`}>{statusInfo.label}</span>
-            )}
-            {isNeant && <Ban className="w-3 h-3 text-gray-400" />}
-            {/* Badge workflow pour interventions sans enfants */}
-            {hasWorkflowBadge && (() => {
-                const wfConfig = getStatusConfig(intervention.intervention_type, intervention.workflow_status);
-                return wfConfig ? (
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ backgroundColor: wfConfig.color }}>
-                    {wfConfig.label}
-                  </span>
-                ) : null;
-              })()}
-          </div>
-          {!isChild && (
-            <p className="text-sm text-secondary-500 mt-1">
-              {formatDateFR(intervention.scheduled_date)}
-              {intervention.technician_name && ` • ${intervention.technician_name}`}
-            </p>
-          )}
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <span className="text-sm font-medium text-gray-900">{label || 'Équipement'}</span>
+          {detail && <span className="text-xs text-gray-500">{detail}</span>}
+          <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.className}`}>{statusInfo.label}</span>
+          {isNeant && <Ban className="w-3 h-3 text-gray-400" />}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {intervention.duration_minutes && <span className="text-xs text-secondary-500">{intervention.duration_minutes} min</span>}
           {showCertificat && (
-            <CertificatLink
-              interventionId={intervention.id}
-              isRealise={isRealise}
-              label={isRealise ? 'Certificat' : 'Remplir'}
-            />
+            <CertificatLink interventionId={intervention.id} isRealise={isRealise} label={isRealise ? 'Certificat' : 'Remplir'} />
           )}
           {showCertificat && isRealise && <AttestationLink interventionId={intervention.id} label="Attestation" />}
         </div>
       </div>
       {intervention.work_performed && <p className="text-sm text-secondary-600 mt-2 line-clamp-2">{intervention.work_performed}</p>}
-      {intervention.report_notes && !isParentWithChildren && <p className="text-sm text-secondary-500 mt-1 line-clamp-2 italic">{intervention.report_notes}</p>}
+      {intervention.report_notes && <p className="text-sm text-secondary-500 mt-1 line-clamp-2 italic">{intervention.report_notes}</p>}
     </div>
+  );
+};
+
+/** Intervention (carte Entretien / SAV, ou ligne d'historique importée). */
+const InterventionCard = ({ intervention, aujourdhui, nomsTechniciens, onOpen }) => {
+  const type = intervention.intervention_type;
+  const typeConfig = INTERVENTION_TYPES.find((t) => t.value === type) || INTERVENTION_TYPES[INTERVENTION_TYPES.length - 1];
+  const estCarte = ['entretien', 'sav'].includes(type) && !!intervention.workflow_status;
+  const wfConfig = estCarte ? getStatusConfig(type, intervention.workflow_status) : null;
+  // `status` reste 'scheduled' de la création à la clôture : sur une carte, l'état du kanban fait
+  // foi ; on ne garde le statut technique que s'il dit autre chose (annulé, absent, en attente…).
+  const statutTechnique = (!estCarte || !['scheduled', 'completed'].includes(intervention.status))
+    ? STATUTS_TECHNIQUES[intervention.status] || null
+    : null;
+
+  const faits = decrireIntervention(intervention, { aujourdhui, nomsTechniciens });
+  const moment = libelleMoment(faits.moment, type);
+  const { label: equipLabel, detail: equipDetail } = useLibelleEquipement(intervention);
+  const devisStatut = DEVIS_STATUSES.find((s) => s.value === intervention.devis_status)?.label || null;
+  const piecesStatut = PARTS_ORDER_STATUSES.find((s) => s.value === intervention.parts_order_status)?.label || null;
+  const facture = !!intervention.invoiced_at && intervention.workflow_status !== 'facture';
+
+  const contenu = (
+    <>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-xs px-2 py-0.5 rounded-full ${typeConfig.bgClass}`}>{typeConfig.label}</span>
+          {wfConfig && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ backgroundColor: wfConfig.color }}>
+              {wfConfig.label}
+            </span>
+          )}
+          {statutTechnique && (
+            <span className={`text-xs px-2 py-0.5 rounded-full ${statutTechnique.className}`}>{statutTechnique.label}</span>
+          )}
+          <SAVUrgencyBadge item={intervention} taille="fiche" />
+          {type === 'sav' && intervention.sav_origin === 'entretien' && (
+            <span className="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700">Suite d&apos;entretien</span>
+          )}
+          {type === 'sav' && intervention.includes_entretien && (
+            <span className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700">Avec entretien</span>
+          )}
+          {facture && (
+            <span className="text-xs px-2 py-0.5 rounded bg-violet-50 text-violet-700">
+              Facturé le {formatDateShortFR(intervention.invoiced_at)}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-secondary-700">
+          {moment && (
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays className="w-4 h-4 text-secondary-400" aria-hidden="true" />
+              {moment}
+              {faits.joursDeRdv > 1 && <span className="text-secondary-400">({faits.joursDeRdv} jours posés)</span>}
+            </span>
+          )}
+          {faits.techniciens.length > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-secondary-400" aria-hidden="true" />
+              {faits.techniciens.join(', ')}
+            </span>
+          )}
+          {faits.demandeLe && (
+            <span className="text-xs text-secondary-400">
+              {type === 'sav' ? 'Demande du' : 'Créée le'} {formatDateShortFR(faits.demandeLe)}
+            </span>
+          )}
+        </div>
+
+        {faits.objet && <p className="text-sm text-secondary-900 line-clamp-3">{faits.objet}</p>}
+
+        {(equipLabel || equipDetail) && (
+          <p className="inline-flex items-center gap-1.5 text-sm text-secondary-600">
+            <Wrench className="w-4 h-4 text-secondary-400" aria-hidden="true" />
+            {[equipLabel, equipDetail].filter(Boolean).join(' · ')}
+          </p>
+        )}
+
+        {(intervention.devis_amount != null || devisStatut || piecesStatut) && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-secondary-600">
+            {(intervention.devis_amount != null || devisStatut) && (
+              <span className="inline-flex items-center gap-1.5">
+                <Receipt className="w-4 h-4 text-secondary-400" aria-hidden="true" />
+                Devis{intervention.devis_amount != null ? ` ${formatEuro(intervention.devis_amount)}` : ''}{devisStatut ? ` · ${devisStatut}` : ''}
+              </span>
+            )}
+            {piecesStatut && (
+              <span className="inline-flex items-center gap-1.5">
+                <Package className="w-4 h-4 text-secondary-400" aria-hidden="true" />
+                Pièces : {piecesStatut}
+              </span>
+            )}
+          </div>
+        )}
+
+        {faits.compteRendu && <p className="text-sm text-secondary-600 line-clamp-2">{faits.compteRendu}</p>}
+        {faits.notes && <p className="text-sm text-secondary-500 line-clamp-2 italic">{faits.notes}</p>}
+      </div>
+
+      {onOpen && <ChevronRight className="w-5 h-5 shrink-0 self-center text-secondary-300" aria-hidden="true" />}
+    </>
+  );
+
+  const classes = 'flex w-full items-start gap-3 p-4 bg-white rounded-lg border border-secondary-200 text-left';
+  if (!onOpen) return <div className={classes}>{contenu}</div>;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(intervention)}
+      title="Ouvrir la fiche"
+      className={`${classes} transition-colors hover:border-primary-300 hover:bg-primary-50/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500`}
+    >
+      {contenu}
+    </button>
   );
 };
 
@@ -213,71 +294,26 @@ const ChantierSummary = ({ clientId }) => {
 };
 
 export const TabInterventions = ({ projectId, clientId }) => {
-  const { user } = useAuth();
-  const { interventions, isLoading } = useProjectInterventions(projectId);
-  const { createIntervention, isCreating } = useCreateIntervention();
-  // Tri parent/enfants : parents d'abord, enfants indentés juste après
-  const sortedInterventions = useMemo(() => {
-    const parents = interventions.filter((i) => !i.parent_id);
-    const childrenByParent = {};
-    const parentIds = new Set(parents.map((p) => p.id));
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const queryClient = useQueryClient();
+  const { can } = useCanAccess();
+  const { interventions, isLoading, error, refresh } = useProjectInterventions(projectId);
+  const { members } = useTeamMembers(orgId);
+  const [ouverte, setOuverte] = useState(null); // id de l'intervention dont la fiche est ouverte
 
-    for (const i of interventions) {
-      if (i.parent_id) {
-        if (!childrenByParent[i.parent_id]) childrenByParent[i.parent_id] = [];
-        childrenByParent[i.parent_id].push(i);
-      }
-    }
-
-    const sorted = [];
-    for (const p of parents) {
-      sorted.push({ ...p, _hasChildren: !!childrenByParent[p.id]?.length });
-      if (childrenByParent[p.id]) {
-        sorted.push(...childrenByParent[p.id]);
-      }
-    }
-    // Orphelins (enfants dont le parent n'est pas dans la liste)
-    for (const i of interventions) {
-      if (i.parent_id && !parentIds.has(i.parent_id)) {
-        sorted.push(i);
-      }
-    }
-    return sorted;
-  }, [interventions]);
-
-  const parentCount = useMemo(
-    () => interventions.filter((i) => !i.parent_id).length,
-    [interventions],
+  const aujourdhui = aujourdhuiLocal();
+  const nomsTechniciens = useMemo(
+    () => new Map(members.map((m) => [String(m.id), m.display_name || [m.first_name, m.last_name].filter(Boolean).join(' ')])),
+    [members],
   );
+  const lignes = useMemo(() => ordonnerInterventions(interventions, aujourdhui), [interventions, aujourdhui]);
+  const parentCount = useMemo(() => interventions.filter((i) => !i.parent_id).length, [interventions]);
 
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    interventionType: 'maintenance',
-    scheduledDate: new Date().toISOString().split('T')[0],
-    reportNotes: '',
-  });
-
-  const handleCreate = async () => {
-    if (!formData.scheduledDate) {
-      toast.error('La date est requise');
-      return;
-    }
-    try {
-      await createIntervention({
-        projectId,
-        interventionType: formData.interventionType,
-        scheduledDate: formData.scheduledDate,
-        reportNotes: formData.reportNotes || null,
-        createdBy: user?.id || null,
-      });
-      toast.success('Intervention créée');
-      setShowForm(false);
-      setFormData({ interventionType: 'maintenance', scheduledDate: new Date().toISOString().split('T')[0], reportNotes: '' });
-    } catch (err) {
-      logger.error('[TabInterventions] create error:', err);
-      toast.error(err?.message || "Erreur lors de la création");
-    }
-  };
+  // La fiche Entretien / SAV ne s'ouvre que pour une carte du kanban, et pour qui a le droit de la voir.
+  const peutVoirCartes = can('entretiens', 'view') || can('sav', 'view');
+  const peutOuvrir = (i) => peutVoirCartes && !i.parent_id && !!i.workflow_status
+    && ['entretien', 'sav'].includes(i.intervention_type);
 
   if (isLoading) {
     return (
@@ -292,83 +328,55 @@ export const TabInterventions = ({ projectId, clientId }) => {
       {/* Section chantier (lecture seule) */}
       <ChantierSummary clientId={clientId} />
 
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-secondary-500">
-          {parentCount > 0 ? `${parentCount} intervention${parentCount !== 1 ? 's' : ''}` : ''}
-        </p>
-        {!showForm && (
+      {error ? (
+        // Lecture refusée ou en échec : le dire. Une liste vide ici se lirait « ce client n'a jamais rien eu ».
+        <div className="flex items-start justify-between gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="flex items-start gap-2 text-sm text-red-800">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            Les interventions de ce client n&apos;ont pas pu être lues.
+          </p>
           <button
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
+            type="button"
+            onClick={() => refresh()}
+            className="inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-800 bg-white border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            Nouvelle intervention
+            <RefreshCw className="w-3.5 h-3.5" />
+            Réessayer
           </button>
-        )}
-      </div>
-
-      {showForm && (
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-          <h4 className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-primary-600" />
-            Nouvelle intervention
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <FormField label="Type" required>
-              <SelectInput
-                value={formData.interventionType}
-                onChange={(v) => setFormData(prev => ({ ...prev, interventionType: v || 'maintenance' }))}
-                options={INTERVENTION_TYPES.map(t => ({ value: t.value, label: t.label }))}
-              />
-            </FormField>
-            <FormField label="Date" required>
-              <TextInput
-                type="date"
-                value={formData.scheduledDate}
-                onChange={(v) => setFormData(prev => ({ ...prev, scheduledDate: v }))}
-              />
-            </FormField>
-          </div>
-          <FormField label="Motif / Notes">
-            <TextArea
-              value={formData.reportNotes}
-              onChange={(v) => setFormData(prev => ({ ...prev, reportNotes: v }))}
-              placeholder="Motif de l'intervention..."
-              rows={2}
-            />
-          </FormField>
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              onClick={handleCreate}
-              disabled={isCreating}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
-            >
-              {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Créer
-            </button>
-            <button
-              onClick={() => setShowForm(false)}
-              disabled={isCreating}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors"
-            >
-              Annuler
-            </button>
-          </div>
         </div>
-      )}
-
-      {interventions.length === 0 && !showForm ? (
+      ) : interventions.length === 0 ? (
         <div className="text-center py-12">
           <Wrench className="w-12 h-12 text-secondary-300 mx-auto" />
           <p className="mt-4 text-secondary-700 font-medium">Aucune intervention</p>
-          <p className="mt-1 text-sm text-secondary-500">Cliquez sur &quot;Nouvelle intervention&quot; pour en créer une.</p>
+          <p className="mt-1 text-sm text-secondary-500">Les entretiens et les demandes SAV de ce client apparaîtront ici.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {sortedInterventions.map((i) => (
-            <InterventionCard key={i.id} intervention={i} hasChildren={i._hasChildren} />
-          ))}
-        </div>
+        <>
+          <p className="text-sm text-secondary-500">
+            {parentCount} intervention{parentCount !== 1 ? 's' : ''}
+          </p>
+          <div className="space-y-3">
+            {lignes.map((i) => (i.parent_id ? (
+              <ChildCard key={i.id} intervention={i} />
+            ) : (
+              <InterventionCard
+                key={i.id}
+                intervention={i}
+                aujourdhui={aujourdhui}
+                nomsTechniciens={nomsTechniciens}
+                onOpen={peutOuvrir(i) ? (item) => setOuverte(item.id) : null}
+              />
+            )))}
+          </div>
+        </>
+      )}
+
+      {ouverte && (
+        <FicheInterventionCarte
+          interventionId={ouverte}
+          onClose={() => setOuverte(null)}
+          onUpdated={() => queryClient.invalidateQueries({ queryKey: interventionKeys.byProject(orgId, projectId) })}
+        />
       )}
     </div>
   );

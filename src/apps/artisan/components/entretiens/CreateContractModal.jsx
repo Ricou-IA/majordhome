@@ -4,26 +4,24 @@
  * Modale centrée pour la création d'un contrat d'entretien.
  * 3 étapes :
  *   1. Sélection/Création client (ContractStepClient)
- *   2. Sélection famille d'équipements + calcul tarif temps réel (ContractStepEquipment)
+ *   2. Équipements du contrat + calcul tarif temps réel (ContractStepEquipment) :
+ *      ceux DÉJÀ RECENSÉS chez le client sont proposés d'emblée (cochés) et seront
+ *      RATTACHÉS au contrat ; les types cochés en plus créent de nouveaux équipements.
  *   3. Détails du contrat (dates, notes) + résumé tarifaire (ContractStepSummary)
  *
  * Orchestrateur : logique métier + state. Le JSX des étapes est dans :
  *   - ContractStepClient.jsx
  *   - ContractStepEquipment.jsx
  *   - ContractStepSummary.jsx
+ *   - ContractModalFooter.jsx (boutons du pied)
+ * Lignes et écriture des équipements : useContractCreationLines.js
  *
  * @version 3.0.0 - Refactoring extraction sous-composants
  * ============================================================================
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import {
-  X,
-  ArrowLeft,
-  ArrowRight,
-  FileText,
-  Loader2,
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
@@ -31,11 +29,11 @@ import { contractKeys, clientKeys, entretienSavKeys } from '@/shared/hooks/cache
 import { useClientSearch, useDuplicateCheck } from '@hooks/useClients';
 import { useCreateContractWithClient } from '@hooks/useContracts';
 import { usePricingData, usePricingCalculator } from '@hooks/usePricing';
-import { pricingService } from '@services/pricing.service';
-import { contractsService } from '@services/contracts.service';
+import { useContractCreationLines, saveContractCreationEquipments } from './useContractCreationLines';
 import { Step1Client } from './ContractStepClient';
 import { Step2Equipment } from './ContractStepEquipment';
 import { Step3Contract } from './ContractStepSummary';
+import { ContractModalFooter } from './ContractModalFooter';
 import { logger } from '@lib/logger';
 import { emailsValides } from '@/lib/emailUtils';
 
@@ -132,6 +130,21 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
 
   const calculator = usePricingCalculator(pricingData, clientAddress);
 
+  // Équipements déjà recensés chez le client (cochés d'office, rattachés à la création) + types
+  // ajoutés ici : lignes et total du contrat. Cf. useContractCreationLines.
+  const existingClientId = clientMode === 'search' ? selectedClient?.id || null : null;
+  const {
+    recensedLines,
+    recensedEquipments,
+    lines: contractLines,
+    pricing: contractPricing,
+    isLoading: loadingRecensed,
+    error: recensedError,
+    retry: refreshRecensed,
+    toggle: handleToggleRecensed,
+    resetSelection: resetRecensedSelection,
+  } = useContractCreationLines({ clientId: existingClientId, pricingData, calculator });
+
   // ========== Refs ==========
   const searchInputRef = useRef(null);
   const equipmentPreSelectedRef = useRef(false);
@@ -156,6 +169,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
       setSearchQuery('');
       clearSearch();
       calculator.reset();
+      resetRecensedSelection();
       equipmentPreSelectedRef.current = false;
       if (!preSelectedClient) {
         setTimeout(() => searchInputRef.current?.focus(), 100);
@@ -164,19 +178,25 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Auto-add équipement pré-sélectionné (ex: depuis chantier)
+  // Auto-add équipement pré-sélectionné (ex: depuis chantier).
+  // On attend la liste des équipements recensés : si le client a déjà un équipement de ce type
+  // (posé par le chantier, recensé à la main), c'est LUI qui entre au contrat — ajouter le type
+  // en plus créerait un doublon et compterait deux fois le prix.
   useEffect(() => {
     if (
       isOpen &&
       preSelectedEquipmentTypeId &&
       pricingData.equipmentTypes?.length > 0 &&
-      !equipmentPreSelectedRef.current
+      !equipmentPreSelectedRef.current &&
+      !loadingRecensed &&
+      !recensedError
     ) {
-      calculator.addItem(preSelectedEquipmentTypeId);
+      const dejaRecense = recensedEquipments.some((eq) => eq.equipment_type_id === preSelectedEquipmentTypeId);
+      if (!dejaRecense) calculator.addItem(preSelectedEquipmentTypeId);
       equipmentPreSelectedRef.current = true;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, preSelectedEquipmentTypeId, pricingData.equipmentTypes]);
+  }, [isOpen, preSelectedEquipmentTypeId, pricingData.equipmentTypes, loadingRecensed, recensedError, recensedEquipments]);
 
   // ========== Handlers ==========
 
@@ -189,13 +209,15 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
   const handleSelectClient = useCallback((client) => {
     setSelectedClient(client);
     setClientMode('search');
-  }, []);
+    resetRecensedSelection(); // autre client, autres équipements : tout repart coché
+  }, [resetRecensedSelection]);
 
   const handleChooseDuplicate = useCallback((client) => {
     setSelectedClient(client);
     setClientMode('search');
     setDuplicateAcknowledged(false);
-  }, []);
+    resetRecensedSelection();
+  }, [resetRecensedSelection]);
 
   const handleSwitchToCreate = useCallback(() => {
     setClientMode('create');
@@ -231,7 +253,9 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
     return false;
   })();
 
-  const canGoToStep2 = calculator.hasItems;
+  // Liste des équipements recensés inconnue (chargement ou échec) ⇒ on n'avance pas : créer le
+  // contrat sans elle, c'est recréer en double des équipements qui existent peut-être déjà.
+  const canGoToStep2 = contractLines.length > 0 && !loadingRecensed && !recensedError;
 
   // ========== Submit ==========
 
@@ -245,9 +269,9 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
         status: contractDefaults?.status || 'active',
         workflowStatus: contractDefaults?.workflowStatus || null,
         source: contractDefaults?.source || 'manual',
-        amount: calculator.pricing.total || null,
-        subtotal: calculator.pricing.subtotal || null,
-        discountPercent: calculator.pricing.discountPercent || null,
+        amount: contractPricing.total || null,
+        subtotal: contractPricing.subtotal || null,
+        discountPercent: contractPricing.discountPercent || null,
         zoneId: calculator.activeZone?.id || null,
         startDate: contractData.startDate || null,
         maintenanceMonth: contractData.maintenanceMonth || null,
@@ -280,21 +304,22 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
     const contractId = result?.contract?.id;
     const resolvedClientId = result?.client || result?.contract?.client_id;
 
-    if (contractId && calculator.hasItems) {
-      const itemsToSave = calculator.getItemsForSave();
-      const saveResult = await pricingService.saveContractPricingItems(contractId, itemsToSave);
-      if (saveResult.error) {
-        logger.warn('[CreateContractModal] Erreur sauvegarde pricing items:', saveResult.error);
-      }
-
-      // Créer les équipements réels + liens contract_equipments
-      if (resolvedClientId) {
-        const eqResult = await contractsService.createEquipmentsFromPricingItems(
-          contractId, resolvedClientId, itemsToSave
+    // Équipements du contrat : types ajoutés → créés ; déjà recensés → rattachés. Un rattachement
+    // refusé se dit : le contrat existe et son montant compte ces équipements.
+    if (contractId) {
+      const { linkFailures } = await saveContractCreationEquipments({
+        contractId,
+        clientId: resolvedClientId,
+        newItems: calculator.getItemsForSave(),
+        recensedLines: recensedLines.filter((line) => line.included),
+        zoneId: calculator.activeZone?.id || null,
+      });
+      if (linkFailures > 0) {
+        toast.warning(
+          linkFailures > 1
+            ? `Contrat créé, mais ${linkFailures} équipements déjà recensés n'ont pas pu être rattachés : à ajouter depuis l'onglet Équipements.`
+            : "Contrat créé, mais un équipement déjà recensé n'a pas pu être rattaché : à ajouter depuis l'onglet Équipements.",
         );
-        if (eqResult.error) {
-          logger.warn('[CreateContractModal] Erreur création équipements:', eqResult.error);
-        }
       }
     }
 
@@ -312,7 +337,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
     toast.success(isPending ? 'Proposition créée — visible dans Pipeline Contrats' : 'Contrat créé avec succès');
     onClose();
     onSuccess?.();
-  }, [isCreating, orgId, userId, calculator, contractData, clientMode, selectedClient, newClientData, createContractWithClient, contractDefaults, onClose, onSuccess, queryClient]);
+  }, [isCreating, orgId, userId, calculator, contractPricing, recensedLines, contractData, clientMode, selectedClient, newClientData, createContractWithClient, contractDefaults, onClose, onSuccess, queryClient]);
 
   // ========== Render ==========
 
@@ -381,6 +406,15 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
                 pricingData={pricingData}
                 calculator={calculator}
                 clientAddress={clientAddress}
+                lines={contractLines}
+                pricing={contractPricing}
+                recensed={{
+                  lines: recensedLines,
+                  isLoading: loadingRecensed,
+                  error: recensedError,
+                  onToggle: handleToggleRecensed,
+                  onRetry: refreshRecensed,
+                }}
               />
             )}
 
@@ -390,99 +424,27 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
                 newClientData={newClientData}
                 clientMode={clientMode}
                 contractData={contractData}
-                calculator={calculator}
+                lines={contractLines}
+                pricing={contractPricing}
+                zoneCode={calculator.activeZone?.code || null}
                 onContractDataChange={handleContractDataChange}
               />
             )}
           </div>
 
           {/* ===== FOOTER ===== */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
-            {step === 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  disabled={!canGoToStep1}
-                  className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg
-                    hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Suivant
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </>
-            )}
-
-            {step === 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => preSelectedClient ? onClose() : setStep(0)}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  {preSelectedClient ? 'Annuler' : 'Retour'}
-                </button>
-                <div className="flex items-center gap-3">
-                  {calculator.hasItems && (
-                    <span className="text-sm font-semibold text-gray-900">
-                      {calculator.pricing.total.toFixed(2)} €
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    disabled={!canGoToStep2}
-                    className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg
-                      hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Suivant
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </>
-            )}
-
-            {step === 2 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  disabled={isCreating}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Retour
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={isCreating}
-                  className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg
-                    hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isCreating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Création...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-4 h-4" />
-                      {contractDefaults?.status === 'pending' ? 'Créer la proposition' : 'Créer le contrat'}
-                    </>
-                  )}
-                </button>
-              </>
-            )}
-          </div>
+          <ContractModalFooter
+            step={step}
+            hasPreSelectedClient={!!preSelectedClient}
+            canGoToStep1={!!canGoToStep1}
+            canGoToStep2={canGoToStep2}
+            total={contractLines.length > 0 ? contractPricing.total : null}
+            isCreating={isCreating}
+            isProposal={contractDefaults?.status === 'pending'}
+            onStep={setStep}
+            onClose={onClose}
+            onSubmit={handleSubmit}
+          />
         </div>
       </div>
     </>
