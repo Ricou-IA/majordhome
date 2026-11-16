@@ -255,7 +255,9 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
 
   // Liste des équipements recensés inconnue (chargement ou échec) ⇒ on n'avance pas : créer le
   // contrat sans elle, c'est recréer en double des équipements qui existent peut-être déjà.
-  const canGoToStep2 = contractLines.length > 0 && !loadingRecensed && !recensedError;
+  // Idem pour la grille tarifaire : sans elle un équipement recensé se chiffrerait à 0 €.
+  const canGoToStep2 = contractLines.length > 0 && !loadingRecensed && !recensedError
+    && !pricingData.isLoading && !pricingData.error;
 
   // ========== Submit ==========
 
