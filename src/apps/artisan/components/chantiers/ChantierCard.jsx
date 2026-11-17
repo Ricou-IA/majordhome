@@ -1,197 +1,156 @@
 /**
  * ChantierCard.jsx - Majord'home Artisan
  * ============================================================================
- * Carte chantier pour le Kanban chantiers.
- * Affiche : nom client, CP, équipement, montant, date estimative, commercial.
+ * Carte chantier pour le Kanban chantiers. Hauteur FIXE : chaque ligne est
+ * toujours rendue (vide s'il n'y a rien à dire), les cartes sont donc identiques
+ * d'une colonne à l'autre.
  *
- * @version 1.1.0 - Sprint 6 Chantiers
+ *   bande de gauche : ce que la colonne date (règles : src/lib/chantierCardDate.js)
+ *   ligne 1 : nom + montant
+ *   ligne 2 : objet du chantier (type d'équipement · libellé)
+ *   lignes 3-4 : adresse complète (voie, puis code postal et ville)
+ *   ligne 5 : commandes (Éq. / Mat.) + repères de devis
+ *
+ * @version 2.0.0 - carte à hauteur fixe, bande selon la colonne (2026-11-17)
  * ============================================================================
  */
 
-import { MapPin, Calendar, CalendarClock } from 'lucide-react';
+import { MapPin, Calendar, CalendarClock, CalendarPlus, Package } from 'lucide-react';
 import { formatEuroCeil } from '@/lib/utils';
-import { getChantierStatusConfig, getChantierAmount, getChantierCardDate } from '@services/chantiers.service';
+import { getChantierStatusConfig, getChantierAmount } from '@services/chantiers.service';
 import { poseProvisoire } from '@/lib/installOrder';
+import { bandeDeCarteChantier, adresseDeCarte, objetDeCarte } from '@/lib/chantierCardDate';
 
-/** Puce de date hachurée (pose provisoire : appros non reçues), même motif que le planning. */
-const PROVISIONAL_CHIP_STYLE = {
-  backgroundColor: '#F59E0B14',
-  borderColor: '#F59E0B40',
+const AMBRE = { backgroundColor: '#F59E0B14', borderColor: '#F59E0B40' };
+/** Bande hachurée (pose provisoire : appros non reçues), même motif que le planning. */
+const HACHURE = {
+  ...AMBRE,
   backgroundImage: 'repeating-linear-gradient(45deg, rgba(245, 158, 11, 0.18) 0 4px, transparent 4px 8px)',
 };
 
-function formatShortDate(dateStr) {
-  if (!dateStr) return null;
+/** Icône de la bande quand la colonne ne porte pas de date. */
+const ICONES = {
+  commande: Package,
+  a_planifier: CalendarPlus,
+  a_replanifier: CalendarClock,
+  inconnue: Calendar,
+};
+
+function jourEtMois(dateStr) {
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return null;
-  const day = d.getDate();
-  const month = d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
-  return { day, month };
+  if (Number.isNaN(d.getTime())) return null;
+  return { jour: d.getDate(), mois: d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '') };
 }
 
-function formatDateSlash(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return null;
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yy = String(d.getFullYear()).slice(-2);
-  return `${dd}/${mm}/${yy}`;
-}
-
-const COMMERCIAL_COLORS = [
-  'bg-indigo-100 text-indigo-700 ring-indigo-300',
-  'bg-teal-100 text-teal-700 ring-teal-300',
-  'bg-rose-100 text-rose-700 ring-rose-300',
-  'bg-amber-100 text-amber-700 ring-amber-300',
-];
-
-function getCommercialColor(index) {
-  return COMMERCIAL_COLORS[index % COMMERCIAL_COLORS.length];
-}
-
-export function ChantierCard({ chantier, onClick, commercialsMap }) {
+export function ChantierCard({ chantier, onClick }) {
   if (!chantier) return null;
 
   const name = `${chantier.last_name || ''} ${chantier.first_name || ''}`.trim() || 'Sans nom';
   const amount = getChantierAmount(chantier);
   const statusConfig = getChantierStatusConfig(chantier.chantier_status);
-  // Puce gauche : RDV installation si présent (vue dérivée), sinon date de signature.
-  // Marqueur ambre « à replanifier » réactivé en Bloc B stage 4 (flux de planif installation
-  // depuis ChantierModal) : chantier en planification sans RDV d'installation actif.
-  const hasActiveRdv = Boolean(chantier.has_active_rdv);
-  // Réceptionné / Facturé : date de réalisation figée au passage en Réceptionné
-  // (chantiers.realized_date = dernier jour d'installation posé au planning, 20261001_2).
-  const isDone = ['realise', 'facture'].includes(chantier.chantier_status);
-  const chipDate = formatShortDate(getChantierCardDate(chantier));
-  const needsReplan = chantier.chantier_status === 'planification' && !hasActiveRdv;
-  // Pose provisoire : RDV posé avant réception des appros → puce hachurée ambre. La carte
-  // est en Planification comme toute pose datée (règle 2026-10-07, cf. installOrder.poseProvisoire).
-  const provisoire = hasActiveRdv && poseProvisoire(chantier);
-  const commercial = commercialsMap?.[chantier.assigned_user_id];
+  const bande = bandeDeCarteChantier(chantier);
+  const date = bande.date ? jourEtMois(bande.date) : null;
+  const { voie, commune } = adresseDeCarte(chantier);
+  const objet = objetDeCarte(chantier);
 
-  let chipStyle = { backgroundColor: `${statusConfig.color}10`, borderColor: `${statusConfig.color}30` };
-  let chipTitle = (isDone && chantier.realized_date)
-    ? 'Date de réalisation (figée au planning)'
-    : hasActiveRdv ? 'Date RDV installation' : 'Date signature';
-  let chipColor = statusConfig.color;
-  if (needsReplan) {
-    chipStyle = { backgroundColor: '#F59E0B14', borderColor: '#F59E0B40' };
-    chipTitle = 'Installation à replanifier';
+  // Pose provisoire : RDV posé avant réception des appros → bande hachurée ambre,
+  // seulement là où la bande porte la date de pose (colonne Planifié).
+  const provisoire = chantier.chantier_status === 'planification' && bande.repere === 'date' && poseProvisoire(chantier);
+  const aReplanifier = bande.repere === 'a_replanifier';
+
+  let bandeStyle = { backgroundColor: `${statusConfig.color}10`, borderColor: `${statusConfig.color}30` };
+  let bandeCouleur = statusConfig.color;
+  let bandeTitre = bande.libelle;
+  if (aReplanifier) {
+    bandeStyle = AMBRE;
+    bandeCouleur = '#D97706';
   } else if (provisoire) {
-    chipStyle = PROVISIONAL_CHIP_STYLE;
-    chipTitle = 'Pose provisoire : appros non reçues';
-    chipColor = '#B45309';
+    bandeStyle = HACHURE;
+    bandeCouleur = '#B45309';
+    bandeTitre = 'Pose provisoire : commandes non reçues';
+  } else if (bande.repere === 'inconnue') {
+    bandeCouleur = '#D1D5DB';
   }
+  const Icone = ICONES[bande.repere] || Calendar;
+
+  const plusieursDevis = Number(chantier.quotes_count) >= 2;
+  const sansDevisValide = Number(chantier.validated_quotes_count) === 0;
 
   return (
     <button
       type="button"
       onClick={() => onClick?.(chantier)}
-      className="w-full text-left bg-white rounded-lg border hover:shadow-md transition-shadow
-                 focus:outline-none focus:ring-2 focus:ring-blue-500 flex min-h-[72px]"
+      className="w-full h-[124px] text-left bg-white rounded-lg border hover:shadow-md transition-shadow
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 flex overflow-hidden"
     >
-      {/* Bande date à gauche */}
+      {/* Bande de gauche : date de la colonne, ou icône quand elle n'en a pas */}
       <div
-        className="flex flex-col items-center justify-center px-2 py-2 rounded-l-lg min-w-[44px] border-r"
-        style={chipStyle}
-        title={chipTitle}
+        className="flex flex-col items-center justify-center px-2 w-[44px] shrink-0 border-r"
+        style={bandeStyle}
+        title={bandeTitre}
       >
-        {needsReplan ? (
-          <CalendarClock className="h-4 w-4 text-amber-500" />
-        ) : chipDate ? (
+        {date ? (
           <>
-            <span className="text-sm font-bold leading-none" style={{ color: chipColor }}>
-              {chipDate.day}
-            </span>
-            <span className="text-[10px] uppercase leading-tight" style={{ color: chipColor }}>
-              {chipDate.month}
-            </span>
+            <span className="text-sm font-bold leading-none" style={{ color: bandeCouleur }}>{date.jour}</span>
+            <span className="text-[10px] uppercase leading-tight" style={{ color: bandeCouleur }}>{date.mois}</span>
           </>
         ) : (
-          <Calendar className="h-4 w-4 text-gray-300" />
+          <Icone className="h-4 w-4" style={{ color: bandeCouleur }} aria-label={bandeTitre} />
         )}
       </div>
 
-      {/* Contenu carte */}
-      <div className="flex-1 min-w-0 p-2.5">
-        {/* Ligne 1 : Nom + Montant */}
+      <div className="flex-1 min-w-0 p-2.5 flex flex-col">
+        {/* Ligne 1 : nom + montant */}
         <div className="flex items-start justify-between gap-2">
-          <p className="font-medium text-sm text-gray-900 truncate">{name}</p>
-          <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
+          <p className="font-medium text-sm leading-5 text-gray-900 truncate">{name}</p>
+          <span className={`text-xs leading-5 font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
             {formatEuroCeil(amount)}
           </span>
         </div>
 
-        {(chantier.label || Number(chantier.quotes_count) >= 2 || Number(chantier.validated_quotes_count) === 0) && (
-          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-            {chantier.label && <p className="text-xs text-gray-500 truncate">{chantier.label}</p>}
-            {Number(chantier.quotes_count) >= 2 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold shrink-0" title="Devis groupés sur ce chantier">
-                {chantier.quotes_count} devis
-              </span>
-            )}
-            {Number(chantier.validated_quotes_count) === 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold shrink-0" title="Aucun devis validé sur ce chantier">
-                sans devis validé
-              </span>
-            )}
+        {/* Ligne 2 : objet du chantier */}
+        <p className="h-4 mt-0.5 text-xs leading-4 text-gray-500 truncate" title={objet || undefined}>{objet}</p>
+
+        {/* Lignes 3-4 : adresse complète */}
+        <div className="mt-1.5 flex items-start gap-1 min-w-0" title={[voie, commune].filter(Boolean).join(', ') || undefined}>
+          <MapPin className={`h-3 w-3 mt-0.5 shrink-0 ${voie || commune ? 'text-gray-400' : 'text-gray-200'}`} />
+          <div className="min-w-0 flex-1 text-xs leading-4 text-gray-600">
+            <p className="h-4 truncate">{voie || (commune ? '' : 'Adresse non renseignée')}</p>
+            <p className="h-4 truncate">{commune}</p>
           </div>
-        )}
+        </div>
 
-        {/* Ligne 2 : CP + Commandes + Commercial */}
-        <div className="flex items-center gap-1.5 mt-1.5">
-          {chantier.postal_code && (
-            <span className="text-xs text-gray-500 flex items-center gap-0.5 shrink-0">
-              <MapPin className="h-3 w-3" />
-              {chantier.postal_code}
+        {/* Ligne 5 : commandes + repères de devis */}
+        <div className="mt-auto flex items-center gap-1.5 min-w-0">
+          <OrderIndicator label="Éq." nom="Équipement" status={chantier.equipment_order_status} />
+          <OrderIndicator label="Mat." nom="Matériaux" status={chantier.materials_order_status} />
+          <span className="flex-1" />
+          {plusieursDevis && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold shrink-0" title="Devis groupés sur ce chantier">
+              {chantier.quotes_count} devis
             </span>
           )}
-          <OrderIndicator label="Éq." status={chantier.equipment_order_status} />
-          <OrderIndicator label="Mat." status={chantier.materials_order_status} />
-          {commercial && (
-            <span
-              className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ring-1 ml-auto shrink-0 ${getCommercialColor(commercial.colorIndex)}`}
-              title={commercial.name}
-            >
-              {commercial.initials}
+          {sansDevisValide && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold truncate" title="Aucun devis validé sur ce chantier">
+              sans devis validé
             </span>
           )}
         </div>
-
-        {/* Ligne 3 : Type équipement — toujours rendue (hauteur réservée) pour
-            uniformiser la taille des cartes même sans type d'équipement */}
-        <div className="mt-1.5 h-[22px]">
-          {chantier.equipment_type_label && (
-            <span className="inline-block text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium truncate max-w-full">
-              {chantier.equipment_type_label}
-            </span>
-          )}
-        </div>
-
-        {/* Ligne 4 : date de passage en planification (la date estimative a disparu :
-            c'est le RDV d'installation, provisoire ou non, qui porte la date) */}
-        {chantier.planification_date && (
-          <p className="text-[10px] text-gray-400 mt-1">
-            Planif. : {formatDateSlash(chantier.planification_date)}
-          </p>
-        )}
       </div>
     </button>
   );
 }
 
-function OrderIndicator({ label, status }) {
-  const config = {
-    recu: 'bg-emerald-500 text-white',
-    commande: 'bg-blue-500 text-white',
-    na: 'bg-gray-200 text-gray-400',
-  };
-  const fallback = 'bg-gray-50 text-gray-300 border border-gray-200';
-  const css = config[status] || fallback;
+const ORDER_STYLES = {
+  recu: { css: 'bg-emerald-500 text-white', etat: 'reçu' },
+  commande: { css: 'bg-blue-500 text-white', etat: 'commandé' },
+  na: { css: 'bg-gray-200 text-gray-400', etat: 'rien à recevoir' },
+};
 
+function OrderIndicator({ label, nom, status }) {
+  const style = ORDER_STYLES[status] || { css: 'bg-gray-50 text-gray-300 border border-gray-200', etat: 'non renseigné' };
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${css}`}>
+    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${style.css}`} title={`${nom} : ${style.etat}`}>
       {label}
     </span>
   );

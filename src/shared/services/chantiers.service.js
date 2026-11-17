@@ -19,13 +19,14 @@ import { formatDateForInput } from '@/lib/utils';
 // CONSTANTES
 // ============================================================================
 
+// `hint` : ce que l'étape veut dire, affiché sous le titre de la colonne (Eric 2026-11-17).
 export const CHANTIER_STATUSES = [
-  { value: 'gagne', label: 'Gagné', color: '#10B981', display_order: 1 },
-  { value: 'commande_a_faire', label: 'Commande à faire', color: '#F59E0B', display_order: 2 },
-  { value: 'commande_recue', label: 'À planifier', color: '#3B82F6', display_order: 3 },
-  { value: 'planification', label: 'Planification', color: '#8B5CF6', display_order: 4 },
-  { value: 'realise', label: 'Réceptionné', color: '#6B7280', display_order: 5 },
-  { value: 'facture', label: 'Facturé', color: '#0D9488', display_order: 6 },
+  { value: 'gagne', label: 'Gagné', hint: 'Devis signé', color: '#10B981', display_order: 1 },
+  { value: 'commande_a_faire', label: 'Commande à faire', hint: 'Acompte versé, à commander', color: '#F59E0B', display_order: 2 },
+  { value: 'commande_recue', label: 'À planifier', hint: 'Commandes reçues, pose à dater', color: '#3B82F6', display_order: 3 },
+  { value: 'planification', label: 'Planifié', hint: 'Pose au planning', color: '#8B5CF6', display_order: 4 },
+  { value: 'realise', label: 'Réceptionné', hint: 'Pose terminée et réceptionnée', color: '#6B7280', display_order: 5 },
+  { value: 'facture', label: 'Facturé', hint: 'Facture émise', color: '#0D9488', display_order: 6 },
 ];
 
 export const ORDER_STATUSES = [
@@ -36,7 +37,7 @@ export const ORDER_STATUSES = [
 
 /**
  * Transitions autorisées entre statuts chantier (boutons du pied de la fiche).
- * « Planification » n'est pas un geste manuel : la carte y entre quand un RDV
+ * « Planifié » n'est pas un geste manuel : la carte y entre quand un RDV
  * d'installation est posé (`syncCardStateOnCreate`) et en ressort quand le dernier
  * est annulé — le bouton « Planification → » depuis « À planifier » déplaçait la
  * carte sans RDV (CHABBERT, GAYRAN, 2026-10-27).
@@ -68,18 +69,6 @@ export function getChantierStatusConfig(status) {
  * pour « aucun devis rattaché » : seul validated_quotes_count les distingue,
  * d'où le branchement explicite plutôt qu'une cascade ||.
  */
-/**
- * Date portée par la carte kanban (puce gauche + tri des colonnes), ISO 'YYYY-MM-DD' ou null :
- * Réceptionné / Facturé → date de réalisation figée (`realized_date`, 20261001_2) ;
- * sinon RDV d'installation actif à venir ; sinon date de signature.
- */
-export function getChantierCardDate(chantier) {
-  if (!chantier) return null;
-  if (['realise', 'facture'].includes(chantier.chantier_status) && chantier.realized_date) return chantier.realized_date;
-  if (chantier.has_active_rdv && chantier.next_rdv_date) return chantier.next_rdv_date;
-  return chantier.won_date || null;
-}
-
 export function getChantierAmount(chantier) {
   if (!chantier) return 0;
   if (Number(chantier.validated_quotes_count) > 0) {
@@ -180,7 +169,7 @@ export const chantiersService = {
   /**
    * Appros (équipement / matériaux) + transition automatique du chantier.
    * Appros closes (`approsRecues`, N/A = réponse qualifiée) depuis « Commande à
-   * faire » → « À planifier », ou directement « Planification » si un RDV
+   * faire » → « À planifier », ou directement « Planifié » si un RDV
    * d'installation existe (`hasActiveRdv`, filet : depuis le 2026-10-07 le RDV
    * seul y place déjà la carte via `syncCardStateOnCreate`).
    * Retour : `{ data, error, autoTransitioned, newChantierStatus }`.

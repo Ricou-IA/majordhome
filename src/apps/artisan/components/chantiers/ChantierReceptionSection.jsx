@@ -143,7 +143,7 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
 
       if (res?.autoTransitioned) {
         const libelles = {
-          planification: 'Appros reçues : pose confirmée, chantier déplacé en « Planification »',
+          planification: 'Appros reçues : pose confirmée, chantier déplacé en « Planifié »',
           commande_recue: 'Chantier déplacé en « À planifier »',
           commande_a_faire: 'Chantier repassé en « Commande à faire »',
         };
