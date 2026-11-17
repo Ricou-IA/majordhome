@@ -14,6 +14,8 @@ import { withErrorHandling } from '@lib/serviceHelpers';
 import { storageService } from '@services/storage.service';
 import { approsRecues, refusReculChantier, STATUTS_AMONT_PLANIFICATION } from '@/lib/installOrder';
 import { formatDateForInput } from '@/lib/utils';
+import { fetchAllPages } from '@/lib/postgrestUtils';
+import { CAMPAGNE_AVIS_POSE } from '@/lib/chantierApresVente';
 
 // ============================================================================
 // CONSTANTES
@@ -153,6 +155,28 @@ export const chantiersService = {
       if (error) throw error;
       return data || [];
     }, 'chantiers.getChantiersByClientId');
+  },
+
+  /**
+   * Listes de l'après-vente : contrats (par client) et demandes d'avis après pose déjà
+   * parties. Lues en entier, page par page : un filtre sur les clients des chantiers
+   * grossirait avec le board, et une liste tronquée rouvrirait l'envoi du SMS.
+   * @returns {Promise<{ data: { contrats: Object[], avis: Object[] } | null, error: Error | null }>}
+   */
+  async getApresVente(orgId) {
+    return withErrorHandling(async () => {
+      if (!orgId) throw new Error('[chantiers] orgId requis');
+      const [contrats, avis] = await Promise.all([
+        fetchAllPages((from, to) => supabase
+          .from('majordhome_contracts').select('id, client_id, status')
+          .eq('org_id', orgId).order('id').range(from, to)),
+        fetchAllPages((from, to) => supabase
+          .from('majordhome_sms_logs').select('id, client_id')
+          .eq('org_id', orgId).eq('campaign_name', CAMPAGNE_AVIS_POSE).neq('status', 'failed')
+          .order('id').range(from, to)),
+      ]);
+      return { contrats, avis };
+    }, 'chantiers.getApresVente');
   },
 
   async updateChantierStatus(orgId, chantierId, newStatus) {

@@ -144,6 +144,7 @@ export const chantierKeys = {
   lists: (orgId) => [...chantierKeys.all(orgId), 'list'],
   list: (orgId) => [...chantierKeys.lists(orgId)],
   byClient: (orgId, clientId) => [...chantierKeys.all(orgId), 'client', clientId],
+  apresVente: (orgId) => [...chantierKeys.all(orgId), 'apres-vente'],
 };
 
 // --- Prospects ---

@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Loader2, ArrowLeft, ArrowRight, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, Car, Layers, Trash2 } from 'lucide-react';
+import { X, Loader2, ArrowLeft, ArrowRight, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, Car, Layers, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuroCeil } from '@/lib/utils';
@@ -32,11 +32,10 @@ import { useTeamMembers, useChantierAppointments } from '@hooks/useAppointments'
 import { appointmentsService } from '@services/appointments.service';
 import { appointmentKeys } from '@hooks/cacheKeys';
 import { useQueryClient } from '@tanstack/react-query';
-import { contractsService } from '@services/contracts.service';
-import { supabase } from '@/lib/supabaseClient';
 import { FormField, TextInput, TextArea } from '@apps/artisan/components/FormFields';
 import { poseProvisoire } from '@/lib/installOrder';
-import { CreateContractModal } from '../entretiens/CreateContractModal';
+import { enApresVente } from '@/lib/chantierApresVente';
+import { ChantierApresVenteSection } from './ChantierApresVenteSection';
 import { ChantierReceptionSection } from './ChantierReceptionSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';
 import { GroupChantiersDialog } from './GroupChantiersDialog';
@@ -74,11 +73,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
   // PV de réception
   const [pvPath] = useState(chantier?.pv_reception_path || null);
-
-  // Proposition contrat d'entretien
-  const [showContractModal, setShowContractModal] = useState(false);
-  const [clientForContract, setClientForContract] = useState(null);
-  const [loadingContract, setLoadingContract] = useState(false);
 
   // Grouper / supprimer ce chantier
   const [showGroup, setShowGroup] = useState(false);
@@ -250,38 +244,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     refreshInstallAppointments();
     queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
     onUpdated?.();
-  };
-
-  const handleProposeContract = async () => {
-    if (!chantier.client_id) {
-      toast.error('Aucun client lié à ce chantier');
-      return;
-    }
-    setLoadingContract(true);
-    try {
-      // Vérifier si le client a déjà un contrat (UNIQUE constraint sur client_id)
-      const { data: existing } = await contractsService.getContractByClientId(chantier.client_id);
-      if (existing) {
-        toast.error('Ce client possède déjà un contrat');
-        return;
-      }
-      // Charger les données client (adresse, etc.) pour le pré-remplissage
-      const { data: client, error: clientErr } = await supabase
-        .from('majordhome_clients')
-        .select('id, display_name, first_name, last_name, address, postal_code, city, has_active_contract, project_id')
-        .eq('id', chantier.client_id)
-        .single();
-      if (clientErr || !client) {
-        toast.error('Impossible de charger les données client');
-        return;
-      }
-      setClientForContract(client);
-      setShowContractModal(true);
-    } catch {
-      toast.error('Erreur lors de la vérification');
-    } finally {
-      setLoadingContract(false);
-    }
   };
 
   return (
@@ -460,32 +422,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
             </div>
           )}
 
-          {/* Proposition contrat d'entretien — visible au statut réceptionné */}
-          {chantier.chantier_status === 'realise' && !isTechnicien && canEditChantier && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
-                <ScrollText className="w-4 h-4" />
-                Contrat d&apos;entretien
-              </h3>
-              <button
-                type="button"
-                onClick={handleProposeContract}
-                disabled={loadingContract}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50"
-              >
-                {loadingContract ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Vérification...
-                  </>
-                ) : (
-                  <>
-                    <ScrollText className="w-4 h-4" />
-                    Proposer un contrat d&apos;entretien
-                  </>
-                )}
-              </button>
-            </div>
+          {/* Après-vente (avis, contrat, facturation) — chantier réceptionné, hors technicien */}
+          {enApresVente(chantier) && !isTechnicien && (
+            <ChantierApresVenteSection chantier={chantier} onUpdated={onUpdated} peutAgir={canEditChantier} />
           )}
 
           {/* Notes */}
@@ -590,21 +529,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
         })()}
       </div>
     </div>
-
-    {/* Modale création contrat (couche z-index supérieure) */}
-    {showContractModal && (
-      <CreateContractModal
-        isOpen={showContractModal}
-        onClose={() => setShowContractModal(false)}
-        onSuccess={() => {
-          setShowContractModal(false);
-          onUpdated?.();
-        }}
-        preSelectedClient={clientForContract}
-        preSelectedEquipmentTypeId={chantier.equipment_type_id || null}
-        contractDefaults={{ status: 'pending', workflowStatus: 'nouveau', source: 'chantier' }}
-      />
-    )}
 
     {showGroup && <GroupChantiersDialog chantier={chantier} onClose={() => setShowGroup(false)} onGrouped={onUpdated} />}
     <ConfirmDialog

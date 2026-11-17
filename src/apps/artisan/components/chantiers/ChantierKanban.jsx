@@ -10,11 +10,15 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
-import { useChantiers } from '@hooks/useChantiers';
+import { useChantiers, useChantiersApresVente, useDemanderAvisPose } from '@hooks/useChantiers';
 import { CHANTIER_STATUSES, getChantierAmount } from '@services/chantiers.service';
 import { comparerCartesChantier } from '@/lib/chantierCardDate';
+import {
+  enApresVente, reperesApresVente, blocageAvis, messageAvisEnvoye, messageAvisRefuse,
+} from '@/lib/chantierApresVente';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { ChantierCard } from './ChantierCard';
 import { ChantierModal } from './ChantierModal';
@@ -31,6 +35,9 @@ export function ChantierKanban() {
   const { can, effectiveRole } = useCanAccess();
 
   const { chantiers, isLoading, refresh } = useChantiers(orgId);
+  // Après-vente des chantiers réceptionnés : contrats et avis déjà demandés (undefined = pas encore connus).
+  const listesApresVente = useChantiersApresVente(orgId);
+  const { demanderAvis, envoiEnCoursPour } = useDemanderAvisPose();
 
   const [selectedChantier, setSelectedChantier] = useState(null);
   // La modale lit le chantier dans la liste FRAÎCHE, pas dans l'instantané du clic :
@@ -80,9 +87,30 @@ export function ChantierKanban() {
     [],
   );
 
-  const renderCard = useCallback((chantier) => (
-    <ChantierCard chantier={chantier} onClick={setSelectedChantier} />
-  ), []);
+  // Demande d'avis par SMS depuis la carte, comme sur les entretiens. Le technicien ne l'envoie pas.
+  const peutDemanderAvis = effectiveRole !== 'technicien';
+  const handleDemanderAvis = useCallback(async (chantier) => {
+    try {
+      toast.success(messageAvisEnvoye(await demanderAvis(chantier)));
+    } catch (err) {
+      const { texte, info } = messageAvisRefuse(err);
+      if (info) toast.info(texte); else toast.error(texte);
+    }
+  }, [demanderAvis]);
+
+  const renderCard = useCallback((chantier) => {
+    const apresVente = enApresVente(chantier);
+    return (
+      <ChantierCard
+        chantier={chantier}
+        onClick={setSelectedChantier}
+        reperes={apresVente ? reperesApresVente(chantier, listesApresVente) : null}
+        avisBlocage={apresVente ? blocageAvis(chantier, listesApresVente.avis) : null}
+        onDemanderAvis={apresVente && peutDemanderAvis ? handleDemanderAvis : undefined}
+        avisEnCours={envoiEnCoursPour === chantier.id}
+      />
+    );
+  }, [listesApresVente, peutDemanderAvis, handleDemanderAvis, envoiEnCoursPour]);
 
   // Sous le titre de chaque colonne : ce que l'étape veut dire.
   const headerExtra = useCallback(

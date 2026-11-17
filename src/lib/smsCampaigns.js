@@ -42,6 +42,27 @@ export const SMS_CAMPAIGNS = [
     },
   },
   {
+    // Émetteur : carte et fiche d'un chantier réceptionné (savService.sendAvisRequest, campagne
+    // passée en paramètre). Même mécanique que l'avis d'entretien, texte propre à la pose.
+    key: 'avis_pose',
+    label: 'Demande d’avis après une installation',
+    trigger: 'Bouton « Avis » d’un chantier réceptionné (carte ou fiche, page Chantiers).',
+    variables: [
+      { name: 'first_name', label: 'Prénom du client' },
+      { name: 'short_link', label: 'Lien court vers la page d’avis (généré à l’envoi)' },
+    ],
+    sample: { first_name: 'Véronique' },
+    suggested: {
+      whatsapp:
+        'Bonjour {{first_name}},\n\nMerci de nous avoir confié votre installation ! '
+        + 'Votre avis aide d’autres clients à nous choisir :\n{{short_link}}\n\nMerci et à bientôt !',
+      sms:
+        'Bonjour {{first_name}}, merci de nous avoir confié votre installation ! '
+        + 'Un avis pour aider d\'autres clients : {{short_link}} Merci !',
+      deburr: true,
+    },
+  },
+  {
     key: 'rappel_entretien',
     label: 'Rappel d’entretien annuel',
     trigger: 'Bulle SMS d’une ligne « à planifier » de l’onglet Programmation.',

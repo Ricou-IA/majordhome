@@ -7,9 +7,11 @@
  * ============================================================================
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chantiersService } from '@services/chantiers.service';
+import { savService } from '@services/sav.service';
+import { CAMPAGNE_AVIS_POSE, contratsParClient } from '@/lib/chantierApresVente';
 import { chantierKeys, appointmentKeys, pennylaneKeys, leadKeys, kanbanCardKeys } from '@hooks/cacheKeys';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { useAuth } from '@contexts/AuthContext';
@@ -38,6 +40,63 @@ export function useChantiers(orgId) {
     isLoading,
     error,
     refresh: refetch,
+  };
+}
+
+// ============================================================================
+// HOOK - useChantiersApresVente (contrats par client, avis déjà demandés)
+// ============================================================================
+
+/**
+ * Listes de l'après-vente. Tant que la requête n'a pas répondu (ou si elle échoue),
+ * `contrats` et `avis` valent `undefined` : l'écran affiche « inconnu » et ferme
+ * l'envoi du SMS, il ne suppose jamais une liste vide.
+ * @returns {{ contrats: Map<string, string[]>|undefined, avis: Set<string>|undefined }}
+ */
+export function useChantiersApresVente(orgId) {
+  const { data } = useQuery({
+    queryKey: chantierKeys.apresVente(orgId),
+    queryFn: async () => {
+      const { data: listes, error } = await chantiersService.getApresVente(orgId);
+      if (error) throw error;
+      return listes;
+    },
+    enabled: !!orgId,
+    staleTime: 30_000,
+  });
+
+  return useMemo(() => (data
+    ? {
+      contrats: contratsParClient(data.contrats),
+      avis: new Set(data.avis.map((ligne) => ligne.client_id).filter(Boolean)),
+    }
+    : { contrats: undefined, avis: undefined }), [data]);
+}
+
+// ============================================================================
+// HOOK - useDemanderAvisPose (SMS de demande d'avis après une installation)
+// ============================================================================
+
+export function useDemanderAvisPose() {
+  const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const mutation = useMutation({
+    mutationFn: (chantier) => unwrapResult(savService.sendAvisRequest({
+      campaign: CAMPAGNE_AVIS_POSE,
+      clientId: chantier.client_id,
+      clientFirstName: chantier.first_name,
+      clientPhone: chantier.phone,
+      orgId,
+    })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: chantierKeys.apresVente(orgId) }),
+  });
+
+  return {
+    demanderAvis: mutation.mutateAsync,
+    // Chantier dont l'envoi est en cours (un seul à la fois).
+    envoiEnCoursPour: mutation.isPending ? mutation.variables?.id ?? null : null,
   };
 }
 

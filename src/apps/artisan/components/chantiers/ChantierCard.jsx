@@ -9,13 +9,14 @@
  *   ligne 1 : nom + montant
  *   ligne 2 : objet du chantier (type d'équipement · libellé)
  *   lignes 3-4 : adresse complète (voie, puis code postal et ville)
- *   ligne 5 : commandes (Éq. / Mat.) + repères de devis
+ *   ligne 5 : commandes (Éq. / Mat.) + repères de devis ; sur un chantier réceptionné,
+ *             les repères d'après-vente (PV, avis, contrat, facturé — src/lib/chantierApresVente.js)
  *
  * @version 2.0.0 - carte à hauteur fixe, bande selon la colonne (2026-11-17)
  * ============================================================================
  */
 
-import { MapPin, Calendar, CalendarClock, CalendarPlus, Package } from 'lucide-react';
+import { MapPin, Calendar, CalendarClock, CalendarPlus, Package, Check, Clock, AlertTriangle, MessageSquare, Loader2 } from 'lucide-react';
 import { formatEuroCeil } from '@/lib/utils';
 import { getChantierStatusConfig, getChantierAmount } from '@services/chantiers.service';
 import { poseProvisoire } from '@/lib/installOrder';
@@ -42,7 +43,16 @@ function jourEtMois(dateStr) {
   return { jour: d.getDate(), mois: d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '') };
 }
 
-export function ChantierCard({ chantier, onClick }) {
+/**
+ * @param {Object} props
+ * @param {Object} props.chantier
+ * @param {Function} [props.onClick]
+ * @param {Array|null} [props.reperes]        repères d'après-vente (chantier réceptionné), sinon null
+ * @param {string|null} [props.avisBlocage]   pourquoi l'avis ne peut pas partir ; null = il peut
+ * @param {Function} [props.onDemanderAvis]   absent = la personne ne peut pas envoyer de SMS
+ * @param {boolean} [props.avisEnCours]
+ */
+export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = null, onDemanderAvis, avisEnCours = false }) {
   if (!chantier) return null;
 
   const name = `${chantier.last_name || ''} ${chantier.first_name || ''}`.trim() || 'Sans nom';
@@ -77,10 +87,15 @@ export function ChantierCard({ chantier, onClick }) {
   const sansDevisValide = Number(chantier.validated_quotes_count) === 0;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onClick?.(chantier)}
-      className="w-full h-[124px] text-left bg-white rounded-lg border hover:shadow-md transition-shadow
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(chantier); }
+      }}
+      className="w-full h-[124px] text-left bg-white rounded-lg border hover:shadow-md transition-shadow cursor-pointer
                  focus:outline-none focus:ring-2 focus:ring-blue-500 flex overflow-hidden"
     >
       {/* Bande de gauche : date de la colonne, ou icône quand elle n'en a pas */}
@@ -120,7 +135,27 @@ export function ChantierCard({ chantier, onClick }) {
           </div>
         </div>
 
-        {/* Ligne 5 : commandes + repères de devis */}
+        {/* Ligne 5 : après-vente d'un chantier réceptionné, sinon commandes + repères de devis */}
+        {reperes ? (
+          <div className="mt-auto flex items-center gap-1 min-w-0 overflow-hidden">
+            {reperes.map((repere) => (
+              repere.cle === 'avis' && onDemanderAvis && !avisBlocage ? (
+                <button
+                  key={repere.cle}
+                  type="button"
+                  disabled={avisEnCours}
+                  onClick={(e) => { e.stopPropagation(); onDemanderAvis(chantier); }}
+                  title="Demander un avis au client par SMS"
+                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 border
+                             border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 disabled:opacity-60"
+                >
+                  {avisEnCours ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <MessageSquare className="h-2.5 w-2.5" />}
+                  Avis
+                </button>
+              ) : <Repere key={repere.cle} repere={repere} />
+            ))}
+          </div>
+        ) : (
         <div className="mt-auto flex items-center gap-1.5 min-w-0">
           <OrderIndicator label="Éq." nom="Équipement" status={chantier.equipment_order_status} />
           <OrderIndicator label="Mat." nom="Matériaux" status={chantier.materials_order_status} />
@@ -136,8 +171,28 @@ export function ChantierCard({ chantier, onClick }) {
             </span>
           )}
         </div>
+        )}
       </div>
-    </button>
+    </div>
+  );
+}
+
+/** Pastille d'un repère d'après-vente : l'état se lit à l'icône et au remplissage, pas à la couleur seule. */
+const REPERE_STYLES = {
+  fait: { css: 'bg-emerald-500 text-white border-emerald-500', Icone: Check },
+  en_cours: { css: 'bg-blue-50 text-blue-700 border-blue-200', Icone: Clock },
+  attention: { css: 'bg-amber-100 text-amber-800 border-amber-300', Icone: AlertTriangle },
+  a_faire: { css: 'bg-white text-gray-400 border-gray-200', Icone: null },
+  inconnu: { css: 'bg-gray-50 text-gray-300 border-dashed border-gray-200', Icone: null },
+};
+
+function Repere({ repere }) {
+  const { css, Icone } = REPERE_STYLES[repere.etat] || REPERE_STYLES.a_faire;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 border ${css}`} title={repere.titre}>
+      {Icone && <Icone className="h-2.5 w-2.5" />}
+      {repere.libelle}
+    </span>
   );
 }
 

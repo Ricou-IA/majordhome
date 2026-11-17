@@ -28,10 +28,10 @@ import {
 
 const VAR_RE = /\{\{\s*([a-z0-9_]+)\s*\}\}/gi;
 
-test('registre — les 4 campagnes appelées par le code, variables de rappel_rdv et heure_de_passage', () => {
+test('registre — les campagnes appelées par le code, variables de rappel_rdv et heure_de_passage', () => {
   assert.deepEqual(
     SMS_CAMPAIGNS.map((c) => c.key),
-    ['avis_j1', 'rappel_entretien', 'rappel_rdv', 'heure_de_passage'],
+    ['avis_j1', 'avis_pose', 'rappel_entretien', 'rappel_rdv', 'heure_de_passage', 'auto_rdv_relance'],
   );
   // « Figer la journée » (savService.sendHeureDePassage) envoie exactement ces variables
   assert.deepEqual(
@@ -109,10 +109,10 @@ test('normalizeSmsTemplates — retire les textes vides et les campagnes sans te
 
 test('listSmsCampaignsForEditor — registre d’abord, clés inconnues en base préservées et signalées', () => {
   const rows = listSmsCampaignsForEditor({ rappel_rdv: { sms: 'x' }, legacy_promo: { sms: 'y' } });
-  assert.deepEqual(rows.map((r) => r.key), ['avis_j1', 'rappel_entretien', 'rappel_rdv', 'heure_de_passage', 'legacy_promo']);
-  assert.equal(rows[2].unknown, false);
-  assert.equal(rows[4].unknown, true);
-  assert.deepEqual(rows[4].variables, []);
+  assert.deepEqual(rows.map((r) => r.key), ['avis_j1', 'avis_pose', 'rappel_entretien', 'rappel_rdv', 'heure_de_passage', 'auto_rdv_relance', 'legacy_promo']);
+  assert.equal(rows[3].unknown, false);
+  assert.equal(rows[6].unknown, true);
+  assert.deepEqual(rows[6].variables, []);
   assert.deepEqual(listSmsCampaignsForEditor(undefined).map((r) => r.key), SMS_CAMPAIGNS.map((c) => c.key));
 });
 

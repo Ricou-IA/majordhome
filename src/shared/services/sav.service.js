@@ -1213,7 +1213,7 @@ export const savService = {
   /**
    * Envoie une demande d'avis client (WhatsApp + fallback SMS) via N8N
    */
-  async sendAvisRequest({ interventionId, clientId, clientFirstName, clientPhone, clientPhoneSecondary, orgId }) {
+  async sendAvisRequest({ interventionId = null, clientId, clientFirstName, clientPhone, clientPhoneSecondary, orgId, campaign = 'avis_j1' }) {
     // Normaliser pour dédupliquer (ex: "06 12..." et "0612...")
     const normalize = (phone) => String(phone || '').replace(/[\s.-]/g, '');
 
@@ -1243,7 +1243,7 @@ export const savService = {
 
     for (const phone of mobiles) {
       const { error } = await invokeSmsSend({
-        campaign: 'avis_j1',
+        campaign,
         phone,
         org_id: orgId,
         client_id: clientId,
