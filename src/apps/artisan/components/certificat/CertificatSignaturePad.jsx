@@ -25,6 +25,7 @@ export function CertificatSignaturePad({
   disclaimerText = null,
   nomLabel = 'Nom du technicien', // paramétrable : « Nom du client » côté dossier PV
   signatureLabel = 'Signature du technicien',
+  placeholder = 'Demandez au client de signer ici', // page signée par le client lui-même : « Signez ici »
 }) {
   const sigCanvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -146,7 +147,7 @@ export function CertificatSignaturePad({
         {/* Placeholder */}
         {isEmpty && !disabled && (
           <p className="absolute inset-0 flex items-center justify-center text-gray-400 text-base pointer-events-none mt-6">
-            Demandez au client de signer ici
+            {placeholder}
           </p>
         )}
       </div>

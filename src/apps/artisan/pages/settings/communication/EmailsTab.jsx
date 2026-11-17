@@ -14,6 +14,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { moduleActif } from '@/lib/modules';
 import { DEFAULT_INVOICE_EMAIL } from '@/lib/invoiceEmailTemplate';
 import { DEFAULT_DPE_RAPPORT_EMAIL } from '@/lib/dpeRapportEmailTemplate';
+import { DEFAULT_PV_RECEPTION_EMAIL } from '@/lib/pvReception';
 import ResendDomainSection from './ResendDomainSection';
 import EmailAutoLigne from './EmailAutoLigne';
 import AccueilLeadMetaSection from './AccueilLeadMetaSection';
@@ -129,6 +130,11 @@ export default function EmailsTab() {
               orgId={orgId} gabarit={DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL}
               titre="Confirmer le rendez-vous choisi en ligne"
               description="Envoyé quand le client a choisi sa demi-journée."
+            />
+            <EmailAutoLigne
+              orgId={orgId} gabarit={DEFAULT_PV_RECEPTION_EMAIL}
+              titre="Faire signer le PV de réception au client"
+              description="Utilisé par « Envoyer au client » de la fiche chantier : le client signe la réception des travaux depuis le lien, sur son téléphone."
             />
             {moduleActif(settings, 'dpe') && (
               <EmailAutoLigne

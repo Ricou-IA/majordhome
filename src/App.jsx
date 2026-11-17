@@ -31,6 +31,7 @@ const MaintenanceBorne = lazy(() => import('@apps/maintenance/pages/Borne'));
 // Pages utilitaires
 import NotFound from '@pages/NotFound';
 const PriseRdv = lazy(() => import('@pages/PriseRdv'));
+const PvReception = lazy(() => import('@pages/PvReception'));
 // Chantier Gaillac — module PROVISOIRE : lien externe en lecture seule
 import { CHANTIER_GAILLAC_ACTIF } from '@apps/chantier-gaillac/config';
 const ChantierGaillacPartage = lazy(() => import('@apps/chantier-gaillac/pages/ChantierGaillacPartage'));
@@ -92,6 +93,16 @@ export default function App() {
           )}
         />
       )}
+
+      {/* PV de réception des travaux signé par le client (lien signé, sans compte) */}
+      <Route
+        path="/pv/:token"
+        element={(
+          <Suspense fallback={<div className="min-h-screen bg-secondary-50" />}>
+            <PvReception />
+          </Suspense>
+        )}
+      />
 
       {/* Prise de rendez-vous d'entretien par le client (lien signé, sans compte) */}
       <Route

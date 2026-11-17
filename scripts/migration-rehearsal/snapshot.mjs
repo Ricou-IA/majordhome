@@ -70,6 +70,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'pennylane_quotes', columns: null, data: false }, // 20260930_16 : libellé du chantier ; 20261012_5 : toutes les colonnes (candidats du rattachement automatique)
   { schema: 'majordhome', table: 'pennylane_quote_dismissals', columns: null, data: false }, // 20261012_5 : un devis écarté n'est jamais rattaché automatiquement
   { schema: 'majordhome', table: 'chantiers', columns: null, data: false }, // 20261001_2 : realized_date (entité en prod depuis 20260930_16)
+  { schema: 'majordhome', table: 'chantier_pv', columns: null, data: false }, // 20261117_3 : lue par majordhome_chantiers (pv_sent_at, pv_signed_at, pv_avec_reserves)
   { schema: 'majordhome', table: 'chantier_line_receptions', columns: null, data: false }, // 20260930_16 : chantier_id → majordhome.chantiers
   { schema: 'majordhome', table: 'lead_activities', columns: null, data: false }, // 20260930_17 : activités chantier_*
   { schema: 'majordhome', table: 'sms_logs', columns: ['id', 'intervention_id', 'campaign_name', 'sent_at'], data: false },

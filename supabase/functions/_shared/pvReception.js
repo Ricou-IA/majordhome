@@ -1,0 +1,217 @@
+// ⚠️ COPIE GÉNÉRÉE par scripts/sync-tournee-engine.mjs depuis src/lib/pvReception.js — ne pas éditer.
+// src/lib/pvReception.js
+// ============================================================================
+// PV de réception signé en ligne — règles PURES partagées par l'écran (fiche chantier,
+// page publique /pv/:token) et l'edge `chantier-pv` (copie Deno générée par
+// `npm run sync:tournee-engine`, ne jamais éditer la copie).
+// Spec : docs/superpowers/specs/2026-11-17-chantier-apres-vente-pv-en-ligne-design.md
+//
+// ⚠ Ce fichier doit rester exécutable sous Deno : pas d'import, pas d'alias Vite.
+// Testé : node --test scripts/pv-reception.test.mjs
+// ============================================================================
+
+/** Gabarit transactionnel de l'e-mail qui porte le lien (créé depuis Paramètres → Emails). */
+export const PV_RECEPTION_TEMPLATE_KEY = 'pv_reception';
+
+export const DEFAULT_PV_RECEPTION_EMAIL = Object.freeze({
+  key: PV_RECEPTION_TEMPLATE_KEY,
+  label: 'PV de réception à signer en ligne',
+  subject: 'Votre installation est terminée : merci de signer la réception des travaux',
+  html_body: [
+    '<p>Bonjour {{PRENOM}},</p>',
+    '<p>Votre installation est terminée ({{OBJET}}). Pour clore le chantier, merci de signer le procès-verbal de réception des travaux :',
+    ' cela prend une minute, depuis votre téléphone.</p>',
+    '<p style="text-align:center;margin:28px 0">',
+    '<a href="{{LIEN_PV}}" style="background:{{ACCENT_COLOR}};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Signer la réception des travaux</a>',
+    '</p>',
+    '<p>Si quelque chose ne vous convient pas, vous pourrez l’indiquer avant de signer : nous reviendrons vers vous.',
+    ' Une question ? Appelez-nous au {{ORG_PHONE}}.</p>',
+    '<p>Merci de votre confiance,<br>{{BRAND_NAME}}</p>',
+  ].join(''),
+  is_transactional: true,
+});
+
+/** Durée de validité du lien envoyé au client. */
+export const PV_LIEN_VALIDITE_JOURS = 60;
+
+export const PV_NOM_MAX = 120;
+export const PV_TEXTE_MAX = 2000;
+/** Longueur maximale de l'image de la signature (data URL PNG), même borne que la RPC. */
+export const PV_SIGNATURE_MAX = 400000;
+const PV_SIGNATURE_MIN = 200;
+const PREFIXE_PNG = 'data:image/png;base64,';
+
+export const PV_RECEPTION_TYPES = Object.freeze(['sans_reserves', 'avec_reserves']);
+
+/**
+ * Codes rendus par l'edge `chantier-pv` (et par la RPC `chantier_pv_signer`) → message à l'écran.
+ * Un code ajouté d'un côté s'ajoute ici (le test le vérifie pour ceux de la validation).
+ */
+const MESSAGES = Object.freeze({
+  // validation de la réponse du client
+  choix_requis: 'Indiquez si vous acceptez la réception avec ou sans réserve.',
+  nom_requis: 'Écrivez votre nom et votre prénom.',
+  signature_requise: 'Signez dans le cadre, puis appuyez sur « Valider la signature ».',
+  reserves_a_decrire: 'Décrivez les réserves que vous souhaitez signaler.',
+  texte_trop_long: 'Le texte est trop long (2 000 caractères au plus).',
+  // état du chantier ou du lien
+  deja_signe: 'Ce procès-verbal a déjà été signé.',
+  chantier_introuvable: 'Ce chantier est introuvable.',
+  invalid_token: 'Ce lien n’est pas valable.',
+  signature_mismatch: 'Ce lien n’est pas valable.',
+  token_expired: 'Ce lien a expiré. Demandez-en un nouveau à votre installateur.',
+  too_many_requests: 'Trop de tentatives. Réessayez dans une heure.',
+  // envoi par le bureau
+  client_sans_email: 'Le client n’a pas d’adresse e-mail : copiez le lien pour l’envoyer autrement.',
+  template_missing: 'Le texte de l’e-mail n’est pas encore créé (Paramètres → Communication → Emails).',
+  expediteur_absent: 'L’adresse d’expédition des e-mails n’est pas renseignée (Paramètres → Communication → Emails).',
+  module_communication_ferme: 'L’envoi d’e-mails n’est pas ouvert pour votre entreprise : copiez le lien pour l’envoyer autrement.',
+  droit_requis: 'Vous n’avez pas le droit de modifier les chantiers.',
+  envoi_echoue: 'L’e-mail n’a pas pu partir.',
+  envoi_non_note: 'L’e-mail est parti, mais son envoi n’a pas pu être noté sur le chantier.',
+  secret_non_configure: 'Le lien de signature n’est pas configuré sur le serveur.',
+  resend_non_configure: 'L’envoi d’e-mails n’est pas configuré sur le serveur.',
+});
+
+/**
+ * @param {string|null|undefined} code
+ * @param {string} [defaut]
+ * @returns {string}
+ */
+export function messagePv(code, defaut = 'Une erreur est survenue. Réessayez dans un instant.') {
+  return MESSAGES[code] || defaut;
+}
+
+/** Les codes connus (pour les tests). */
+export const PV_CODES = Object.freeze(Object.keys(MESSAGES));
+
+/**
+ * Valide la réponse du client AVANT de l'envoyer (page publique) et avant d'appeler la RPC
+ * (edge). Mêmes règles que `public.chantier_pv_signer` : ce qui passe ici passe en base.
+ * @param {Object|null|undefined} reponse
+ * @returns {string|null} code du refus, ou `null` si la réponse est complète
+ */
+export function validerReponsePv(reponse) {
+  const r = reponse || {};
+  if (!PV_RECEPTION_TYPES.includes(r.reception_type)) return 'choix_requis';
+  const nom = String(r.signataire_nom ?? '').trim();
+  if (!nom || nom.length > PV_NOM_MAX) return 'nom_requis';
+  const signature = String(r.signature_png ?? '');
+  if (!signature.startsWith(PREFIXE_PNG) || signature.length < PV_SIGNATURE_MIN || signature.length > PV_SIGNATURE_MAX) {
+    return 'signature_requise';
+  }
+  const nature = String(r.reserves_nature ?? '').trim();
+  const travaux = String(r.reserves_travaux ?? '').trim();
+  if (r.reception_type === 'avec_reserves' && !nature) return 'reserves_a_decrire';
+  if (nature.length > PV_TEXTE_MAX || travaux.length > PV_TEXTE_MAX) return 'texte_trop_long';
+  return null;
+}
+
+/**
+ * Réponse nettoyée, telle qu'elle part à la RPC : textes rognés, réserves vidées pour une
+ * réception sans réserve, cases ramenées à des booléens.
+ * @param {Object} reponse
+ * @returns {Object}
+ */
+export function normaliserReponsePv(reponse) {
+  const r = reponse || {};
+  const avecReserves = r.reception_type === 'avec_reserves';
+  return {
+    reception_type: r.reception_type,
+    signataire_nom: String(r.signataire_nom ?? '').trim(),
+    signature_png: String(r.signature_png ?? ''),
+    reserves_nature: avecReserves ? String(r.reserves_nature ?? '').trim() : '',
+    reserves_travaux: avecReserves ? String(r.reserves_travaux ?? '').trim() : '',
+    info_recues: r.info_recues === true,
+    notices_recues: r.notices_recues === true,
+    entretien_recues: r.entretien_recues === true,
+  };
+}
+
+/**
+ * Objet des travaux sur une ligne : type d'équipement et libellé du chantier.
+ * @param {{ equipement?: string|null, libelle?: string|null }} p
+ * @returns {string}
+ */
+export function objetDuPv({ equipement, libelle } = {}) {
+  const type = String(equipement ?? '').trim();
+  const texte = String(libelle ?? '').trim();
+  if (type && texte && type.toLowerCase() === texte.toLowerCase()) return type;
+  return [type, texte].filter(Boolean).join(' · ') || 'Installation';
+}
+
+/** `YYYY-MM-DD` → « 4 novembre 2026 » (construit en UTC : pas de glissement de jour). */
+export function dateLongue(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ''));
+  if (!m) return '';
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+    .format(d).replace(/^1 /, '1er ');
+}
+
+/**
+ * Jours de pose en une phrase : « le 4 novembre 2026 » pour un jour, sinon les bornes
+ * (« du 3 novembre 2026 au 5 novembre 2026 »), que les jours se suivent ou non.
+ * @param {string[]|null|undefined} poses dates `YYYY-MM-DD`
+ * @returns {string} chaîne vide si aucun jour
+ */
+export function periodeDePose(poses) {
+  const jours = [...new Set((poses || []).filter(Boolean))].sort();
+  if (jours.length === 0) return '';
+  if (jours.length === 1) return `le ${dateLongue(jours[0])}`;
+  return `du ${dateLongue(jours[0])} au ${dateLongue(jours[jours.length - 1])}`;
+}
+
+/** Horodatage ISO → `YYYY-MM-DD` à l'heure de Paris (jour où le client a signé). */
+export function jourDeParis(horodatage) {
+  const d = new Date(horodatage);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(d);
+  const v = (t) => p.find((x) => x.type === t)?.value || '';
+  return `${v('year')}-${v('month')}-${v('day')}`;
+}
+
+/**
+ * Données du PDF du PV (`generatePvReceptionPdfBlob`) depuis l'enregistrement de la signature en
+ * ligne. Même document côté bureau (« Voir le PV ») et côté client (« Télécharger mon PV ») :
+ * les deux lisent l'ENREGISTREMENT, rien n'est recalculé.
+ * @param {Object} p
+ * @param {string} p.chantierId
+ * @param {{ prenom?: string, nom?: string, adresse?: string, code_postal?: string, ville?: string }} p.client
+ * @param {string} p.objet            objet des travaux (`objetDuPv`)
+ * @param {string} p.entreprise       nom de l'entreprise (case « Signature de l'entreprise »)
+ * @param {Object} p.signature        ligne `chantier_pv` signée
+ * @returns {Object}
+ */
+export function donneesPdfPv({ chantierId, client, objet, entreprise, signature }) {
+  const c = client || {};
+  const s = signature || {};
+  const avecReserves = s.reception_type === 'avec_reserves';
+  return {
+    pvNumber: `PV-${String(chantierId || '').slice(0, 8).toUpperCase()}`,
+    pvDate: dateLongue(jourDeParis(s.signed_at)),
+    clientName: [c.nom, c.prenom].map((v) => String(v ?? '').trim()).filter(Boolean).join(' ') || 'Client',
+    clientAddress: c.adresse || '-',
+    clientPostalCode: c.code_postal || '',
+    clientCity: c.ville || '',
+    clientPhone: '',
+    clientEmail: '',
+    equipmentLabel: objet || 'Installation',
+    equipmentRef: null,
+    orderAmountHT: null,
+    technicianName: entreprise || '',
+    receptionType: s.reception_type,
+    reservesNature: avecReserves ? s.reserves_nature || null : null,
+    reservesTravaux: avecReserves ? s.reserves_travaux || null : null,
+    infoRecues: s.info_recues === true,
+    noticesRecues: s.notices_recues === true,
+    entretienRecues: s.entretien_recues === true,
+    signatureClientBase64: s.signature_png || null,
+    signatureClientNom: s.signataire_nom || '',
+    signatureTechBase64: null,
+    signatureTechNom: entreprise || '',
+    lieu: c.ville || '',
+  };
+}

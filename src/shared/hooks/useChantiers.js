@@ -11,6 +11,7 @@ import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chantiersService } from '@services/chantiers.service';
 import { savService } from '@services/sav.service';
+import { chantierPvService } from '@services/chantierPv.service';
 import { CAMPAGNE_AVIS_POSE, contratsParClient } from '@/lib/chantierApresVente';
 import { chantierKeys, appointmentKeys, pennylaneKeys, leadKeys, kanbanCardKeys } from '@hooks/cacheKeys';
 import { unwrapResult } from '@/lib/serviceHelpers';
@@ -97,6 +98,50 @@ export function useDemanderAvisPose() {
     demanderAvis: mutation.mutateAsync,
     // Chantier dont l'envoi est en cours (un seul à la fois).
     envoiEnCoursPour: mutation.isPending ? mutation.variables?.id ?? null : null,
+  };
+}
+
+// ============================================================================
+// HOOKS - PV de réception signé en ligne
+// ============================================================================
+
+/** Enregistrement du PV en ligne d'un chantier (envoi, ouverture, signature) ; `null` s'il n'y en a pas. */
+export function useChantierPv(orgId, chantierId, { enabled = true } = {}) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: chantierKeys.pv(orgId, chantierId),
+    queryFn: () => unwrapResult(chantierPvService.getPv(orgId, chantierId)),
+    enabled: !!orgId && !!chantierId && enabled,
+    staleTime: 15_000,
+  });
+  return { pv: data ?? null, isLoading, error };
+}
+
+/** Envoyer le lien au client, le copier, produire le PDF. Chaque geste rejette avec un message affichable. */
+export function useChantierPvMutations() {
+  const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const invalider = () => queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
+
+  const envoi = useMutation({
+    mutationFn: (chantierId) => unwrapResult(chantierPvService.envoyer({ orgId, chantierId })),
+    onSuccess: invalider,
+  });
+  const lien = useMutation({
+    mutationFn: (chantierId) => unwrapResult(chantierPvService.lien({ orgId, chantierId })),
+  });
+  const pdf = useMutation({
+    mutationFn: ({ chantier, company }) => unwrapResult(chantierPvService.genererPdf({ orgId, chantier, company })),
+    onSuccess: invalider,
+  });
+
+  return {
+    envoyerPv: envoi.mutateAsync,
+    lienPv: lien.mutateAsync,
+    genererPdfPv: pdf.mutateAsync,
+    isEnvoiPv: envoi.isPending,
+    isLienPv: lien.isPending,
+    isPdfPv: pdf.isPending,
   };
 }
 

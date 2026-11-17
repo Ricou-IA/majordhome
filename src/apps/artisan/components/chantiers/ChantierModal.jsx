@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Loader2, ArrowLeft, ArrowRight, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, Car, Layers, Trash2 } from 'lucide-react';
+import { X, Loader2, ArrowLeft, ArrowRight, User, MapPin, FileText, Car, Layers, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuroCeil } from '@/lib/utils';
@@ -20,7 +20,6 @@ import {
   CHANTIER_TRANSITIONS,
   getChantierStatusConfig,
   getChantierAmount,
-  chantiersService,
 } from '@services/chantiers.service';
 import { useChantierMutations } from '@hooks/useChantiers';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -36,6 +35,7 @@ import { FormField, TextInput, TextArea } from '@apps/artisan/components/FormFie
 import { poseProvisoire } from '@/lib/installOrder';
 import { enApresVente } from '@/lib/chantierApresVente';
 import { ChantierApresVenteSection } from './ChantierApresVenteSection';
+import { ChantierPvSection } from './ChantierPvSection';
 import { ChantierReceptionSection } from './ChantierReceptionSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';
 import { GroupChantiersDialog } from './GroupChantiersDialog';
@@ -70,9 +70,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [label, setLabel] = useState(chantier?.label || '');
   useEffect(() => { setLabel(chantier?.label || ''); }, [chantier?.id, chantier?.label]);
-
-  // PV de réception
-  const [pvPath] = useState(chantier?.pv_reception_path || null);
 
   // Grouper / supprimer ce chantier
   const [showGroup, setShowGroup] = useState(false);
@@ -135,6 +132,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
   if (!chantier) return null;
 
+  // PV de réception : archivé (signé sur tablette) ou signé en ligne par le client.
+  const pvSigne = Boolean(chantier.pv_reception_path || chantier.pv_signed_at);
+
   const statusConfig = getChantierStatusConfig(chantier.chantier_status);
   const isTechnicien = effectiveRole === 'technicien';
   const isOwner = chantier.assigned_user_id === user?.id;
@@ -152,7 +152,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   // Grouper (≥ 2 chantiers sur le lead) / supprimer (chantier vide : ni devis validé, ni RDV, ni PV)
   const canGroup = can('chantiers', 'edit') && Number(chantier.lead_chantiers_count) >= 2;
   const canDelete = can('chantiers', 'edit') && Number(chantier.validated_quotes_count) === 0
-    && !installAppointments.length && !pvPath;
+    && !installAppointments.length && !pvSigne;
   const name = `${chantier.last_name || ''} ${chantier.first_name || ''}`.trim() || 'Sans nom';
   const amount = getChantierAmount(chantier);
 
@@ -179,15 +179,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     }
   };
 
-  const handleViewPv = async () => {
-    const { url, error } = await chantiersService.getPvReceptionUrl(pvPath);
-    if (error || !url) {
-      toast.error('Impossible de charger le PV');
-      return;
-    }
-    window.open(url, '_blank');
-  };
-
   const handleSignPv = () => {
     onClose();
     navigate(`/chantiers/${chantier.id}/pv-reception`);
@@ -195,8 +186,8 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
   const handleTransition = async (newStatus) => {
     // Bloquer transition vers réceptionné sans PV
-    if (newStatus === 'realise' && !pvPath) {
-      toast.error('Veuillez d\'abord téléverser le PV de réception');
+    if (newStatus === 'realise' && !pvSigne) {
+      toast.error('Le PV de réception doit d\'abord être signé');
       return;
     }
     try {
@@ -358,68 +349,16 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
               disabled={!canEditChantier}
             />
 
-          {/* PV de réception — visible dès planification */}
+          {/* PV de réception — visible dès que la pose est planifiée */}
           {['planification', 'realise', 'facture'].includes(chantier.chantier_status) && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                PV de Réception
-              </h3>
-
-              {pvPath ? (
-                <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
-                  <span className="text-sm text-green-800 font-medium flex-1">PV signé</span>
-                  <button
-                    type="button"
-                    onClick={handleViewPv}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-green-300 text-green-700 hover:bg-green-100 transition-colors"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Voir le PV
-                  </button>
-                  {canEditChantier && (
-                    <button
-                      type="button"
-                      onClick={handleSignPv}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors"
-                    >
-                      <PenTool className="w-3.5 h-3.5" />
-                      Refaire
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800 mb-3">
-                    Le PV de réception signé est requis pour passer en « Réceptionné ».
-                  </p>
-                  {canEditChantier && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleSignPv}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-green-300 text-green-700 hover:bg-green-50 bg-green-50 transition-colors"
-                      >
-                        <PenTool className="w-4 h-4" />
-                        Signer le PV de réception
-                      </button>
-                      {chantier.chantier_status === 'planification' && (
-                        <button
-                          type="button"
-                          onClick={handleValidateReceptionWithoutPv}
-                          disabled={isUpdatingStatus}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-100 transition-colors disabled:opacity-50"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          Valider la réception sans PV
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <ChantierPvSection
+              chantier={chantier}
+              canEdit={canEditChantier}
+              isUpdatingStatus={isUpdatingStatus}
+              onSignerSurPlace={handleSignPv}
+              onValiderSansPv={handleValidateReceptionWithoutPv}
+              onUpdated={onUpdated}
+            />
           )}
 
           {/* Après-vente (avis, contrat, facturation) — chantier réceptionné, hors technicien */}
@@ -504,7 +443,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
               {/* Avancer à droite */}
               {forwardTransitions.map((targetStatus) => {
                 const config = getChantierStatusConfig(targetStatus);
-                const needsPv = targetStatus === 'realise' && !pvPath;
+                const needsPv = targetStatus === 'realise' && !pvSigne;
                 return (
                   <button
                     key={targetStatus}

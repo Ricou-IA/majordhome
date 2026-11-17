@@ -21,6 +21,7 @@ import { formatEuroCeil } from '@/lib/utils';
 import { getChantierStatusConfig, getChantierAmount } from '@services/chantiers.service';
 import { poseProvisoire } from '@/lib/installOrder';
 import { bandeDeCarteChantier, adresseDeCarte, objetDeCarte } from '@/lib/chantierCardDate';
+import { reperePv } from '@/lib/chantierApresVente';
 
 const AMBRE = { backgroundColor: '#F59E0B14', borderColor: '#F59E0B40' };
 /** Bande hachurée (pose provisoire : appros non reçues), même motif que le planning. */
@@ -83,6 +84,8 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
   }
   const Icone = ICONES[bande.repere] || Calendar;
 
+  // PV envoyé au client et pas encore signé : visible sur la carte tant qu'elle n'est pas réceptionnée.
+  const pvEnAttente = !reperes && reperePv(chantier).etat === 'en_cours';
   const plusieursDevis = Number(chantier.quotes_count) >= 2;
   const sansDevisValide = Number(chantier.validated_quotes_count) === 0;
 
@@ -160,6 +163,7 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
           <OrderIndicator label="Éq." nom="Équipement" status={chantier.equipment_order_status} />
           <OrderIndicator label="Mat." nom="Matériaux" status={chantier.materials_order_status} />
           <span className="flex-1" />
+          {pvEnAttente && <Repere repere={reperePv(chantier)} />}
           {plusieursDevis && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold shrink-0" title="Devis groupés sur ce chantier">
               {chantier.quotes_count} devis

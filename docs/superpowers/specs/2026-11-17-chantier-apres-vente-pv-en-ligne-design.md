@@ -72,7 +72,7 @@ Date : 2026-11-17 · Demandeur : Eric · Module : Chantiers
 ### Données
 
 - `majordhome.chantier_pv` (une ligne par chantier) : envoi (`sent_at`, `sent_to`, `sent_by`,
-  `sent_count`, `token_exp`), ouverture (`opened_at`), signature (`signed_at`, `signataire_nom`,
+  `sent_count`), ouverture (`opened_at`), signature (`signed_at`, `signataire_nom`,
   `signature_png`, `reception_type`, `reserves_nature`, `reserves_travaux`, `info_recues`,
   `notices_recues`, `entretien_recues`). Lecture : membres de l'org. **Aucune écriture par
   l'application** : trois RPC `service_role` (`chantier_pv_contexte`, `chantier_pv_marquer_envoi`,
@@ -90,7 +90,9 @@ Date : 2026-11-17 · Demandeur : Eric · Module : Chantiers
 | `GET ?token=` | public | ce que la page affiche ; note l'ouverture |
 | `signer` | public | enregistre la signature, fait avancer le chantier |
 
-- Jeton `pv.<chantier_id>.<exp>.<sig>`, HMAC-SHA256 (`MDH_PV_SECRET`), valable 60 jours.
+- Jeton `pv.<chantier_id>.<exp>.<sig>`, HMAC-SHA256, valable 60 jours, sans état (rien n'est
+  stocké : un lien se recalcule à la demande). Secret : `MDH_PV_SECRET` s'il est posé, sinon
+  `MDH_AUTO_RDV_SECRET` — le préfixe signé (`pv.` / `rdv.`) sépare les deux usages.
 - L'adresse e-mail est relue EN BASE, jamais prise dans la requête.
 - La page publique ne reçoit ni montant, ni note interne, ni téléphone du client.
 - Signature : image PNG en data URL, 300 Ko au plus ; textes bornés ; débit limité par jeton.
@@ -116,6 +118,22 @@ carte (le statut `facture` existe déjà, sa colonne est masquée, aucun chantie
 - Le PV en ligne ne porte que la signature du client (pas celle du technicien).
 - Lien valable 60 jours.
 - Le SMS d'avis part d'un clic sur la carte, sans confirmation, comme pour les entretiens.
+
+## Livré le 2026-11-17
+
+- Tranche 1 : commit `52692146`. Tranche 2 : migration `20261117_3` (répétée sur
+  `assert-chantier-pv.sql`, appliquée en production), edge `chantier-pv` déployée, page `/pv/:token`.
+- **Pas de secret dédié** : la CLI Supabase demande l'accord explicite d'Eric pour écrire un secret
+  en production. Le lien est signé avec `MDH_AUTO_RDV_SECRET` (préfixe `pv.`). Poser
+  `MDH_PV_SECRET` plus tard invalide les liens déjà envoyés.
+- **Non essayé en réel** : l'envoi de l'e-mail, l'ouverture d'un vrai lien et une vraie signature
+  (il faut un compte utilisateur et un client). Essayés : les refus de l'edge en production, le
+  jeton en local, les trois RPC et les droits sur la copie locale de la base.
+- La copie déployée de l'edge diffère du dépôt par un message d'écran de `pvReception.js` (retouché après
+  le déploiement, non lu par l'edge) et par l'en-tête de commentaires de `modules.js` : sans effet, à
+  réaligner au prochain déploiement.
+- Le gabarit d'e-mail `pv_reception` et le texte du SMS `avis_pose` restent à créer par Eric
+  (Paramètres → Communication → Emails, et → SMS & WhatsApp).
 
 ## Laissé au constructeur
 

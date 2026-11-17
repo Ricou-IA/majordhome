@@ -162,6 +162,10 @@ verify_jwt = false
 [functions.auto-rdv]
 verify_jwt = false
 
+# PV de réception signé en ligne : page publique (jeton HMAC), actions du bureau gardées dans le code.
+[functions.chantier-pv]
+verify_jwt = false
+
 [functions.auto-rdv-cron]
 verify_jwt = false
 
