@@ -24,7 +24,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, withErrorHandlingCount } from '@/lib/serviceHelpers';
-import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { escapePostgrestSearchTerm, fetchAllPages } from '@/lib/postgrestUtils';
 import { formatPhoneForSearch } from '@/lib/phoneUtils';
 import { buildDuplicateProbe, matchLeadDuplicates } from '@/lib/leadDuplicateMatch';
 import { clientsService } from '@services/clients.service';
@@ -103,6 +103,69 @@ function enrichLead(row) {
       color: row.source_color,
     } : null,
   };
+}
+
+/**
+ * Requête sur la vue des leads, filtrée et triée, SANS borne : l'appelant pose son `.range()`.
+ * Une seule définition des filtres pour la lecture d'une page (getLeads) et la lecture
+ * complète (getAllLeads). Le tri finit par `id` : sans départage, deux leads de même
+ * date peuvent changer de page d'une lecture à l'autre.
+ * @param {string} orgId
+ * @param {Object} [filters]
+ * @param {{ count?: 'exact' }} [selectOptions]
+ */
+function requeteLeads(orgId, filters = {}, selectOptions = undefined) {
+  let query = supabase
+    .from('majordhome_leads')
+    .select('*', selectOptions)
+    .eq('org_id', orgId)
+    .eq('is_deleted', false);
+
+  // Filtre par statut
+  if (filters.statusId) {
+    query = query.eq('status_id', filters.statusId);
+  }
+
+  // Filtre par source
+  if (filters.sourceId) {
+    query = query.eq('source_id', filters.sourceId);
+  }
+
+  // Filtre par commercial assigne
+  if (filters.assignedUserId) {
+    query = query.eq('assigned_user_id', filters.assignedUserId);
+  }
+
+  // Filtre Long Term Project (3 modes : true / false / null=pas de filtre)
+  if (filters.isLongTermProject === true) {
+    query = query.eq('is_long_term_project', true);
+  } else if (filters.excludeLongTerm === true) {
+    query = query.eq('is_long_term_project', false);
+  }
+
+  // Recherche textuelle — P0.26 : escape pour eviter injection PostgREST.
+  if (filters.search) {
+    const safe = escapePostgrestSearchTerm(filters.search);
+    if (safe) {
+      const term = `%${safe}%`;
+      query = query.or(
+        `first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},phone.ilike.${term},city.ilike.${term}`
+      );
+    }
+  }
+
+  // Filtre par date de creation
+  if (filters.dateFrom) {
+    query = query.gte('created_date', filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    query = query.lte('created_date', filters.dateTo);
+  }
+
+  // Tri
+  const orderBy = filters.orderBy || 'created_date';
+  const ascending = filters.ascending ?? false;
+  return query.order(orderBy, { ascending }).order('id');
 }
 
 /**
@@ -223,62 +286,8 @@ export const leadsService = {
     if (!orgId) throw new Error('[leads] orgId requis');
 
     return withErrorHandlingCount(async () => {
-      let query = supabase
-        .from('majordhome_leads')
-        .select('*', { count: 'exact' })
-        .eq('org_id', orgId)
-        .eq('is_deleted', false);
-
-      // Filtre par statut
-      if (filters.statusId) {
-        query = query.eq('status_id', filters.statusId);
-      }
-
-      // Filtre par source
-      if (filters.sourceId) {
-        query = query.eq('source_id', filters.sourceId);
-      }
-
-      // Filtre par commercial assigne
-      if (filters.assignedUserId) {
-        query = query.eq('assigned_user_id', filters.assignedUserId);
-      }
-
-      // Filtre Long Term Project (3 modes : true / false / null=pas de filtre)
-      if (filters.isLongTermProject === true) {
-        query = query.eq('is_long_term_project', true);
-      } else if (filters.excludeLongTerm === true) {
-        query = query.eq('is_long_term_project', false);
-      }
-
-      // Recherche textuelle — P0.26 : escape pour eviter injection PostgREST.
-      if (filters.search) {
-        const safe = escapePostgrestSearchTerm(filters.search);
-        if (safe) {
-          const term = `%${safe}%`;
-          query = query.or(
-            `first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},phone.ilike.${term},city.ilike.${term}`
-          );
-        }
-      }
-
-      // Filtre par date de creation
-      if (filters.dateFrom) {
-        query = query.gte('created_date', filters.dateFrom);
-      }
-      if (filters.dateTo) {
-        query = query.lte('created_date', filters.dateTo);
-      }
-
-      // Tri
-      const orderBy = filters.orderBy || 'created_date';
-      const ascending = filters.ascending ?? false;
-      query = query.order(orderBy, { ascending });
-
-      // Pagination
-      query = query.range(offset, offset + limit - 1);
-
-      const { data, count, error } = await query;
+      const { data, count, error } = await requeteLeads(orgId, filters, { count: 'exact' })
+        .range(offset, offset + limit - 1);
 
       if (error) throw error;
 
@@ -286,6 +295,24 @@ export const leadsService = {
       const enriched = (data || []).map(enrichLead);
       return { data: enriched, count: count || 0 };
     }, 'leads.getLeads');
+  },
+
+  /**
+   * Tous les leads qui passent les filtres, sans plafond : lecture page par page.
+   * Pour les écrans qui croisent les leads avec une autre liste (Kanban du pipeline) :
+   * une liste coupée à N lignes y fait disparaître des cartes sans rien signaler.
+   * @param {Object} params
+   * @param {string} params.orgId
+   * @param {Object} [params.filters] mêmes filtres que getLeads
+   * @returns {Promise<{ data: Object[] | null, error: Error | null }>}
+   */
+  async getAllLeads({ orgId, filters = {} }) {
+    if (!orgId) throw new Error('[leads] orgId requis');
+
+    return withErrorHandling(async () => {
+      const rows = await fetchAllPages((from, to) => requeteLeads(orgId, filters).range(from, to));
+      return rows.map(enrichLead);
+    }, 'leads.getAllLeads');
   },
 
   /**

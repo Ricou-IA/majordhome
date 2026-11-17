@@ -8,10 +8,13 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
+import { fetchAllPages } from '@/lib/postgrestUtils';
 
 /**
  * Récupère toutes les cartes Kanban pour une org.
  * 1 lead peut produire 1 ou 2 cartes selon mix devis.
+ * Lecture page par page : PostgREST coupe une réponse à 1 000 lignes sans le dire,
+ * et une carte absente de la liste disparaît du pipeline.
  *
  * @param {string} orgId
  * @returns {Promise<Array>} cartes avec { card_key, lead_id, org_id, card_type,
@@ -19,12 +22,12 @@ import { withErrorHandling } from '@/lib/serviceHelpers';
  */
 async function getKanbanCards(orgId) {
   if (!orgId) return [];
-  const { data, error } = await supabase
+  return fetchAllPages((from, to) => supabase
     .from('majordhome_kanban_cards')
     .select('*')
-    .eq('org_id', orgId);
-  if (error) throw error;
-  return data || [];
+    .eq('org_id', orgId)
+    .order('card_key')
+    .range(from, to));
 }
 
 export const kanbanService = {

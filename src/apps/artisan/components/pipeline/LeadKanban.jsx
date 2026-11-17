@@ -345,12 +345,9 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
       // Les leads MT-LT restent dans la liste : ils sont masqués des colonnes
       // amont à la fusion cartes/leads (kanbanItems), mais s'affichent en
       // Gagné / Perdu dès que Pennylane les y place (2026-09-16).
-      const { data, error } = await leadsService.getLeads({
-        orgId,
-        filters: dateFilters,
-        limit: 500,
-        offset: 0,
-      });
+      // Lecture complète : une liste coupée à N leads retire du board les cartes
+      // des leads les plus anciens, sans rien signaler.
+      const { data, error } = await leadsService.getAllLeads({ orgId, filters: dateFilters });
       if (error) throw error;
       setAllLeads(data || []);
     } catch (err) {
@@ -381,12 +378,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
         if (selectedSourceId) {
           dateFilters.sourceId = selectedSourceId;
         }
-        const { data, error } = await leadsService.getLeads({
-          orgId,
-          filters: dateFilters,
-          limit: 500,
-          offset: 0,
-        });
+        const { data, error } = await leadsService.getAllLeads({ orgId, filters: dateFilters });
         if (error) throw error;
         setAllLeads(data || []);
       } catch (err) {

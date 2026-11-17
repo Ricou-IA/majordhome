@@ -12,22 +12,13 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, getMajordhomeOrgId } from '@/lib/serviceHelpers';
-
-const PAGE = 1000;
+import { fetchAllPages } from '@/lib/postgrestUtils';
 
 /**
  * Lit toutes les lignes d'une requête, page après page.
  * @param {() => any} requete fabrique la requête (filtres + tri STABLE), sans `.range()`
  */
-async function toutLire(requete) {
-  const lignes = [];
-  for (let debut = 0; ; debut += PAGE) {
-    const { data, error } = await requete().range(debut, debut + PAGE - 1);
-    if (error) throw error;
-    lignes.push(...(data || []));
-    if (!data || data.length < PAGE) return lignes;
-  }
-}
+const toutLire = (requete) => fetchAllPages((from, to) => requete().range(from, to));
 
 const COLONNES_LEADS = 'id, created_date, assigned_user_id, source_id, won_date, status_is_won, status_is_final, '
   + 'status_changed_at, is_long_term_project, last_followup_date, last_interaction_at, quote_sent_date, order_amount_ht';
