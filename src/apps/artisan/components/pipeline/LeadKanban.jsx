@@ -278,8 +278,9 @@ function SourceFilterDropdown({ value, onChange, sources }) {
  * @param {Function} props.onLeadClick - Callback clic sur un lead
  * @param {Function} props.onNewLead - Callback nouveau lead
  * @param {Function} [props.onNewQuote] - Callback « Nouveau devis » (fiche client courte puis devis)
+ * @param {string} [props.initialCommercialId] - Filtre commercial posé à l'ouverture (venue du Dashboard)
  */
-export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger }) {
+export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger, initialCommercialId = '' }) {
   const { organization, user, effectiveRole } = useAuth();
   const orgId = organization?.id;
   const userId = user?.id;
@@ -316,7 +317,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger 
   const [allLeads, setAllLeads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState('');
-  const [selectedCommercialId, setSelectedCommercialId] = useState('');
+  const [selectedCommercialId, setSelectedCommercialId] = useState(initialCommercialId);
   const [selectedSourceId, setSelectedSourceId] = useState('');
 
   const canFilterCommercial = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';

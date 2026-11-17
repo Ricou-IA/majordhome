@@ -4,116 +4,103 @@
  * Onglet "Suivi MT-LT" du Pipeline. Liste les leads basculés en projet long-terme.
  *
  * Caractéristiques :
- *  - Table simple, pas de Kanban
- *  - Tri par défaut : dernière interaction ASC (les plus négligés en haut)
- *  - Couleur ligne selon fraîcheur (🟢 <30j / 🟡 <60j / 🟠 <90j / 🔴 >90j)
- *  - Filtres : recherche + commercial + niveau de fraîcheur
+ *  - Bande de repères (projets suivis, sans contact, jamais relancés, montant)
+ *  - Table dense, tri par défaut : les plus négligés en haut
+ *  - L'ancienneté du dernier contact est écrite en jours ; au-delà de 60 jours elle
+ *    est en gras ambre (le texte porte l'information, pas la couleur seule)
+ *  - Filtres : recherche + commercial + ancienneté du dernier contact
  *  - Click ligne → ouvre le drawer dédié
  *
- * @version 1.0.0
+ * @version 2.0.0 - Présentation alignée sur le Dashboard du pipeline
  * ============================================================================
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import {
-  Loader2,
-  Search,
-  X,
-  RefreshCw,
-  AlertTriangle,
-  Hourglass,
-  ChevronDown,
-  CheckCircle2,
-  UserCircle,
-  Plus,
-} from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, Hourglass, ChevronDown, Check, UserCircle, Plus, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLongTermLeads, useLeadInteractionMutations } from '@hooks/useLeadInteractions';
 import { useLeadCommercials } from '@hooks/useLeads';
 import { useKanbanCards } from '@hooks/useKanbanCards';
-import { formatEuroCeil } from '@/lib/utils';
+import { formatEuroCeil, cn } from '@/lib/utils';
+import { StatStrip } from '@/apps/artisan/components/shared/StatStrip';
+import { Th, Td } from '@components/pipeline/dashboard/Tableau';
 import { computeFreshness, formatShortDate } from './longTermUtils';
 import { LongTermLeadDrawer } from './LongTermLeadDrawer';
 import { AddInteractionModal } from './AddInteractionModal';
 
 const FRESHNESS_FILTERS = [
-  { value: 'all', label: 'Toutes les fraîcheurs' },
-  { value: 'forgotten', label: '🔴 Oubliés > 90j' },
-  { value: 'stale', label: '🟠 60-90j' },
-  { value: 'medium', label: '🟡 30-60j' },
-  { value: 'fresh', label: '🟢 < 30j' },
-  { value: 'never', label: '⚪ Jamais relancés' },
+  { value: 'all', label: 'Tous les délais' },
+  { value: 'forgotten', label: 'Sans contact depuis plus de 90 j' },
+  { value: 'stale', label: 'Sans contact depuis 60 à 90 j' },
+  { value: 'medium', label: 'Sans contact depuis 30 à 60 j' },
+  { value: 'fresh', label: 'Contact de moins de 30 j' },
+  { value: 'never', label: 'Jamais relancés' },
 ];
 
-// Palette badges initiales commerciaux (cohérent avec LeadCard)
-const COMMERCIAL_COLORS = [
-  'bg-indigo-100 text-indigo-700 ring-indigo-300',
-  'bg-teal-100 text-teal-700 ring-teal-300',
-  'bg-rose-100 text-rose-700 ring-rose-300',
-  'bg-amber-100 text-amber-700 ring-amber-300',
-];
-
-function getInitials(fullName) {
-  if (!fullName) return '?';
-  return fullName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join('');
-}
-
-function CommercialBadge({ commercial }) {
-  if (!commercial) return <span className="text-gray-300">—</span>;
-  return (
-    <span
-      className={`inline-flex items-center justify-center text-[10px] px-1.5 py-0.5 rounded-full font-bold ring-1 ${COMMERCIAL_COLORS[commercial.colorIndex % COMMERCIAL_COLORS.length]}`}
-      title={commercial.full_name}
-    >
-      {commercial.initials}
-    </span>
-  );
-}
+/** Niveaux de fraîcheur « négligés » : plus de 60 jours sans contact. */
+const NEGLIGES = new Set(['stale', 'forgotten']);
 
 function FilterDropdown({ value, onChange, options, icon: Icon, placeholder }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
-  const hasValue = value && value !== 'all' && value !== '';
+  const hasValue = value && value !== 'all';
 
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors min-h-[40px] ${
-          hasValue ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-        }`}
+        className={cn(
+          'inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+          hasValue
+            ? 'border-primary-200 bg-primary-50 text-primary-800'
+            : 'border-secondary-200 bg-white text-secondary-700 hover:bg-secondary-50',
+        )}
       >
-        {Icon && <Icon className="w-4 h-4" />}
-        <span className="text-sm font-medium truncate max-w-[180px]">
-          {selected?.label || placeholder}
-        </span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        {Icon && <Icon className="h-4 w-4" />}
+        <span className="max-w-[200px] truncate">{selected?.label || placeholder}</span>
+        <ChevronDown className={cn('h-4 w-4 opacity-60 transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 w-60 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
+          <div className="absolute right-0 top-full z-20 mt-1 max-h-64 w-64 overflow-y-auto rounded-md border border-secondary-200 bg-white py-1 shadow-md">
             {options.map((option) => (
               <button
                 key={option.value}
+                type="button"
                 onClick={() => { onChange(option.value); setOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
-                  option.value === value ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                className={cn(
+                  'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors',
+                  option.value === value ? 'bg-primary-50 text-primary-800' : 'text-secondary-700 hover:bg-secondary-50',
+                )}
               >
                 <span>{option.label}</span>
-                {option.value === value && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                {option.value === value && <Check className="h-4 w-4 shrink-0" />}
               </button>
             ))}
           </div>
         </>
       )}
     </div>
+  );
+}
+
+/** Ancienneté du dernier contact : le nombre de jours, puis ce qu'il mesure. */
+function DernierContact({ lead }) {
+  const { freshness } = lead;
+  if (freshness.days === null) return <span className="text-secondary-400">—</span>;
+  const depuis = freshness.days === 0 ? 'aujourd’hui' : `il y a ${freshness.days} j`;
+  return (
+    <>
+      <span className={NEGLIGES.has(freshness.level) ? 'font-semibold text-amber-700' : 'text-secondary-800'}>
+        {depuis}
+      </span>
+      {!freshness.hasInteraction && (
+        <span className="ml-1.5 text-xs text-secondary-500">jamais relancé</span>
+      )}
+    </>
   );
 }
 
@@ -133,18 +120,7 @@ export function LongTermTab() {
     return commercials.find((c) => c.profile_id === userId)?.id || null;
   }, [effectiveRole, userId, commercials]);
 
-  // Map commercial id → { initials, colorIndex, full_name } pour le badge dans la table
-  const commercialById = useMemo(() => {
-    const map = new Map();
-    commercials.forEach((c, idx) => {
-      map.set(c.id, {
-        ...c,
-        initials: getInitials(c.full_name),
-        colorIndex: idx,
-      });
-    });
-    return map;
-  }, [commercials]);
+  const commercialNames = useMemo(() => new Map(commercials.map((c) => [c.id, c.full_name])), [commercials]);
 
   const [search, setSearch] = useState('');
   const [freshnessFilter, setFreshnessFilter] = useState('all');
@@ -177,15 +153,19 @@ export function LongTermTab() {
       }));
   }, [leads, classifiedLeadIds]);
 
-  const filteredLeads = useMemo(() => {
-    let out = enrichedLeads;
-
-    // Filtrage commercial
+  // Le périmètre de l'utilisateur : un commercial ne voit que ses projets
+  const scopedLeads = useMemo(() => {
     if (effectiveRole === 'commercial' && myCommercialId) {
-      out = out.filter((l) => l.assigned_user_id === myCommercialId);
-    } else if (canFilterCommercial && commercialFilter) {
-      out = out.filter((l) => l.assigned_user_id === commercialFilter);
+      return enrichedLeads.filter((l) => l.assigned_user_id === myCommercialId);
     }
+    if (canFilterCommercial && commercialFilter) {
+      return enrichedLeads.filter((l) => l.assigned_user_id === commercialFilter);
+    }
+    return enrichedLeads;
+  }, [enrichedLeads, effectiveRole, myCommercialId, canFilterCommercial, commercialFilter]);
+
+  const filteredLeads = useMemo(() => {
+    let out = scopedLeads;
 
     // Filtrage fraîcheur
     if (freshnessFilter !== 'all') {
@@ -219,14 +199,15 @@ export function LongTermTab() {
     });
 
     return out;
-  }, [enrichedLeads, freshnessFilter, commercialFilter, search, effectiveRole, myCommercialId, canFilterCommercial]);
+  }, [scopedLeads, freshnessFilter, search]);
 
-  // Compteurs header
-  const stats = useMemo(() => {
-    const total = enrichedLeads.length;
-    const forgotten = enrichedLeads.filter((l) => l.freshness.level === 'forgotten' || l.freshness.level === 'stale').length;
-    return { total, forgotten };
-  }, [enrichedLeads]);
+  // Repères de la bande : sur le périmètre de l'utilisateur, avant recherche et filtre d'ancienneté
+  const stats = useMemo(() => ({
+    total: scopedLeads.length,
+    negliges: scopedLeads.filter((l) => NEGLIGES.has(l.freshness.level)).length,
+    jamais: scopedLeads.filter((l) => !l.last_interaction_at).length,
+    montant: scopedLeads.reduce((s, l) => s + (Number(l.order_amount_ht) || Number(l.estimated_revenue) || 0), 0),
+  }), [scopedLeads]);
 
   const drawerLead = useMemo(
     () => filteredLeads.find((l) => l.id === drawerLeadId) || enrichedLeads.find((l) => l.id === drawerLeadId) || null,
@@ -257,160 +238,146 @@ export function LongTermTab() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+        <Loader2 className="h-6 w-6 animate-spin text-secondary-400" />
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Header : compteurs + filtres */}
-      <div className="flex flex-wrap items-center gap-3 justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Hourglass className="h-5 w-5 text-purple-600" />
-            <span className="text-sm text-gray-700">
-              <strong>{stats.total}</strong> projet{stats.total !== 1 ? 's' : ''} en suivi
-            </span>
-          </div>
-          {stats.forgotten > 0 && (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200 text-xs font-medium">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              <strong>{stats.forgotten}</strong> oublié{stats.forgotten !== 1 ? 's' : ''} depuis &gt; 60j
-            </div>
-          )}
-        </div>
+      <StatStrip
+        items={[
+          { key: 'total', label: 'Projets en suivi', value: stats.total.toLocaleString('fr-FR') },
+          {
+            key: 'negliges',
+            label: 'Sans contact depuis plus de 60 j',
+            value: stats.negliges.toLocaleString('fr-FR'),
+            sub: stats.total > 0 ? `${Math.round((stats.negliges / stats.total) * 100)} % des projets` : null,
+          },
+          { key: 'jamais', label: 'Jamais relancés', value: stats.jamais.toLocaleString('fr-FR'), sub: 'depuis leur mise en suivi' },
+          { key: 'montant', label: 'Montant suivi HT', value: formatEuroCeil(stats.montant) },
+        ]}
+      />
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher un lead…"
-              className="pl-9 pr-9 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none min-w-[220px]"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600">
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          {canFilterCommercial && (
-            <FilterDropdown
-              value={commercialFilter}
-              onChange={setCommercialFilter}
-              options={commercialOptions}
-              icon={UserCircle}
-              placeholder="Commercial"
-            />
-          )}
-
-          <FilterDropdown
-            value={freshnessFilter}
-            onChange={setFreshnessFilter}
-            options={FRESHNESS_FILTERS}
-            placeholder="Fraîcheur"
+      {/* Filtres */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="relative mr-auto">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un projet…"
+            aria-label="Rechercher un projet"
+            className="h-9 w-64 rounded-md border border-secondary-200 bg-white pl-9 pr-9 text-sm text-secondary-900 placeholder:text-secondary-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
-
-          <button
-            onClick={refresh}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Rafraîchir"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              aria-label="Effacer la recherche"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-secondary-400 hover:text-secondary-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
+
+        {canFilterCommercial && (
+          <FilterDropdown
+            value={commercialFilter}
+            onChange={setCommercialFilter}
+            options={commercialOptions}
+            icon={UserCircle}
+            placeholder="Commercial"
+          />
+        )}
+
+        <FilterDropdown
+          value={freshnessFilter}
+          onChange={setFreshnessFilter}
+          options={FRESHNESS_FILTERS}
+          icon={Clock}
+          placeholder="Dernier contact"
+        />
+
+        <button
+          type="button"
+          onClick={refresh}
+          className="rounded-md p-2 text-secondary-500 hover:bg-secondary-100 hover:text-secondary-700"
+          title="Rafraîchir"
+          aria-label="Rafraîchir"
+        >
+          <RefreshCw className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Table */}
       {filteredLeads.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <Hourglass className="mx-auto h-12 w-12 text-gray-300" />
-          <h3 className="mt-3 text-base font-medium text-gray-900">
-            {enrichedLeads.length === 0 ? 'Aucun projet MT-LT pour l\'instant' : 'Aucun résultat'}
+        <div className="rounded-lg border border-secondary-200 bg-white px-6 py-12 text-center">
+          <Hourglass className="mx-auto h-8 w-8 text-secondary-300" />
+          <h3 className="mt-3 text-sm font-semibold text-secondary-900">
+            {enrichedLeads.length === 0 ? 'Aucun projet en suivi MT-LT' : 'Aucun projet ne correspond'}
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mx-auto mt-1 max-w-md text-sm text-secondary-500">
             {enrichedLeads.length === 0
-              ? 'Cliquez sur le sablier d\'une carte du pipeline (Nouveau, Contacté, RDV planifié ou Devis envoyé) pour commencer à suivre un projet long-terme.'
-              : 'Modifiez les filtres pour voir d\'autres projets.'}
+              ? 'Le sablier d’une carte du Kanban (Nouveau, Contacté, RDV planifié ou Devis envoyé) fait passer un lead en suivi long terme.'
+              : 'Modifiez la recherche ou les filtres pour voir d’autres projets.'}
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-hidden rounded-lg border border-secondary-200 bg-white">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+            <table className="w-full">
+              <thead className="border-b border-secondary-200 bg-secondary-50">
                 <tr>
-                  <th className="text-left font-medium text-gray-600 px-4 py-3">Client</th>
-                  <th className="text-center font-medium text-gray-600 px-4 py-3 whitespace-nowrap">Commercial</th>
-                  <th className="text-right font-medium text-gray-600 px-4 py-3 whitespace-nowrap">Montant</th>
-                  <th className="text-left font-medium text-gray-600 px-4 py-3 whitespace-nowrap">Passé en MT-LT</th>
-                  <th className="text-left font-medium text-gray-600 px-4 py-3 whitespace-nowrap">Dernière interaction</th>
-                  <th className="text-left font-medium text-gray-600 px-4 py-3">Notes</th>
-                  <th className="text-right font-medium text-gray-600 px-4 py-3"></th>
+                  <Th gauche>Client</Th>
+                  <Th gauche>Commercial</Th>
+                  <Th>Montant HT</Th>
+                  <Th gauche>En suivi depuis</Th>
+                  <Th gauche>Dernier contact</Th>
+                  <Th gauche className="w-full">Notes</Th>
+                  <Th><span className="sr-only">Actions</span></Th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-secondary-100">
                 {filteredLeads.map((l) => {
                   const name = `${l.last_name || ''} ${l.first_name || ''}`.trim() || 'Sans nom';
-                  const amount = l.order_amount_ht || l.estimated_revenue || 0;
+                  const amount = Number(l.order_amount_ht) || Number(l.estimated_revenue) || 0;
                   return (
                     <tr
                       key={l.id}
                       onClick={() => setDrawerLeadId(l.id)}
-                      className={`border-b border-gray-100 hover:bg-blue-50/30 cursor-pointer transition-colors ${l.freshness.rowClasses}`}
+                      className="cursor-pointer transition-colors hover:bg-secondary-50/60"
                     >
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{name}</div>
-                        <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
-                          {l.city && <span>{l.city}</span>}
-                          {l.source_name && (
-                            <span className="inline-flex items-center gap-1">
-                              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: l.source_color || '#9ca3af' }} />
-                              {l.source_name}
-                            </span>
-                          )}
+                      <Td gauche>
+                        <div className="font-medium text-secondary-900">{name}</div>
+                        <div className="mt-0.5 text-xs font-normal text-secondary-500">
+                          {[l.city, l.source_name].filter(Boolean).join(' · ') || '—'}
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-center whitespace-nowrap">
-                        <CommercialBadge commercial={commercialById.get(l.assigned_user_id)} />
-                      </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <span className={`font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-                          {formatEuroCeil(amount)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                        {formatShortDate(l.long_term_started_at)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${l.freshness.classes}`}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full ${l.freshness.dot}`} />
-                          {l.freshness.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 max-w-xs">
-                        <p className="truncate" title={l.long_term_notes || ''}>
-                          {l.long_term_notes || <span className="text-gray-300 italic">—</span>}
+                      </Td>
+                      <Td gauche className="text-secondary-700">
+                        {commercialNames.get(l.assigned_user_id) || <span className="text-secondary-400">—</span>}
+                      </Td>
+                      <Td>{amount > 0 ? formatEuroCeil(amount) : <span className="text-secondary-400">—</span>}</Td>
+                      <Td gauche className="text-secondary-700">{formatShortDate(l.long_term_started_at)}</Td>
+                      <Td gauche><DernierContact lead={l} /></Td>
+                      <Td gauche className="max-w-0 whitespace-normal">
+                        <p className="truncate text-secondary-600" title={l.long_term_notes || ''}>
+                          {l.long_term_notes || <span className="text-secondary-300">—</span>}
                         </p>
-                      </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                      </Td>
+                      <Td>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setAddInteractionLead(l); }}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors"
-                          title="Ajouter une interaction"
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                          title="Noter une interaction"
                         >
-                          <Plus className="h-3 w-3" />
+                          <Plus className="h-3.5 w-3.5" />
                           Interaction
                         </button>
-                      </td>
+                      </Td>
                     </tr>
                   );
                 })}

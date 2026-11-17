@@ -92,6 +92,12 @@ export const kanbanCardKeys = {
   all: (orgId) => ['kanban-cards', orgId],
 };
 
+// --- Dashboard du pipeline (leads + cartes + RDV commerciaux + devis, depuis une date) ---
+export const pipelineDashboardKeys = {
+  all: (orgId) => ['pipeline-dashboard', orgId],
+  data: (orgId, depuis) => [...pipelineDashboardKeys.all(orgId), depuis],
+};
+
 // --- Appointments ---
 export const appointmentKeys = {
   all: (orgId) => ['appointments', orgId],
