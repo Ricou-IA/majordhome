@@ -36,7 +36,9 @@ Aujourd'hui, un chantier réceptionné avec réserves n'a aucun document de clô
   règles d'accès du dossier de fichiers `interventions` comparent le nom d'un projet à son propre
   identifiant (anomalie déjà notée dans `20260809_2_storage_buckets_et_policies.sql`) : aucun des
   3 854 projets ne la remplit, le dossier contient 0 fichier et aucun chantier n'a de
-  `pv_reception_path`. Seuls les PV utilisent ce dossier. Déduit des règles et des compteurs :
+  `pv_reception_path`. Les PV ne sont pas seuls à viser ce dossier : `InterventionDetail.jsx` y
+  dépose aussi photos et signature sous `{project_id}/…`, dépôts refusés avant comme après cette
+  évolution (non traité ici). Déduit des règles et des compteurs :
   aucun dépôt n'a été tenté en production pour le prouver.
 - La vue `majordhome_pricing_equipment_types` porte encore en production la colonne
   `equipment_category` : la contraction `20260920_1` (fichier présent dans le dépôt) n'est pas
@@ -198,8 +200,9 @@ Page `/pv/:token`, dans cet ordre :
    (2 ans), décennale (10 ans), qui courent à partir de la date de signature.
 6. Nom, signature, bouton (inchangé).
 
-Un lien ouvert alors que le PV n'est pas préparé (cas d'un lien copié avant cette évolution : il
-n'en existe aucun) affiche « Ce procès-verbal n'est pas encore prêt » et rien à signer.
+Un lien ouvert alors que le PV n'est pas préparé (cas d'un lien copié avant cette évolution : aucun
+envoi n'est noté, mais un lien copié ne laisse aucune trace, on ne peut donc pas établir qu'il n'en
+existe aucun) affiche « Ce procès-verbal n'est pas encore prêt » et rien à signer.
 
 ### 3. Suite d'un PV avec réserves
 
@@ -379,3 +382,41 @@ copiés pour Deno (`scripts/sync-tournee-engine.mjs`).
 Mise en page de la fenêtre et de la page, libellés d'interface hors textes des points, découpage
 des composants, règle de valeur de départ des gabarits par type (résultat à lister), nom exact du
 fichier de migration, ordre des tranches de livraison.
+
+## Livré le 2026-11-18
+
+**En production** : les deux migrations, appliquées et vérifiées par le contrôleur (fichiers du
+dépôt envoyés tels quels) — `20261118_1_chantier_pv_points_levee` (colonnes de préparation, de
+points et de levée sur `chantier_pv`, `reception_profile` sur les types, RPC `chantier_pv_*`
+fermées à `anon` et `authenticated`, quatre règles `interventions_org_*`) et
+`20261118_2_chantier_pv_signature_version` (signature liée au `prepare_at` lu). Les écrans
+suivent `main` (déployé par Vercel) : les premiers commits du lot ont été poussés par une autre
+session avant la fin du lot.
+
+**Pas en production** : l'edge `chantier-pv` de ce lot, en attente du oui d'Eric. Tant qu'elle
+n'est pas déployée, la fenêtre « Préparer le PV » répond « Cette action n'est pas encore
+disponible sur le serveur » (`action_inconnue`), et un lien copié depuis l'ancien écran est
+refusé par la base (`pv_non_prepare`).
+
+**Jamais essayé en réel** : l'envoi d'un e-mail (gabarits `pv_reception` et `pv_levee_reserves`
+encore à créer dans Paramètres → Emails), une vraie signature, une levée des réserves,
+l'archivage d'un PDF dans le dossier `interventions` ; aucun des écrans n'a été vu dans un
+navigateur.
+
+**Écarts au plan** :
+- garde `prepare_at` et migration `20261118_2`, ajoutées après la relecture de l'edge (la
+  signature doit prouver la version de la déclaration lue) ;
+- PDF de levée minimal créé dès la tâche 5 (le build ne reste jamais rouge), réécrit en tâche 6 ;
+- fichiers ajoutés : `src/pages/pv/PvFormulaire.jsx`, `pvBoutons.js`, `pvPdfShared.jsx`,
+  `chantiersService.updateEquipmentType` (aucune mutation ne changeait le type d'un chantier) ;
+- la ligne des devis n'est pas affichée dans la fenêtre du bureau (la vue ne porte ni numéros ni
+  dates), seulement sur la page du client et dans le PDF ;
+- vague de corrections finale : gabarit de la fenêtre comparé à celui du serveur
+  (`gabarit_different`), déclaration identique non re-préparée, demande de levée fermée tant
+  qu'une réponse saisie n'est pas enregistrée (répondre reste facultatif), nom de fichier ASCII
+  du PV sur tablette, presse-papiers refusé traité à part.
+
+**Limites connues** : un PV sur tablette avec une réserve longue tient sur 2 pages (« Fait à » et
+signatures seuls en page 2) ; le PV de levée n'a pas de logo (logo du PV en dur) ; tout membre de
+l'organisation peut supprimer un PV archivé (décision d'Eric à prendre) ; les dépôts
+d'`InterventionDetail` restent refusés.
