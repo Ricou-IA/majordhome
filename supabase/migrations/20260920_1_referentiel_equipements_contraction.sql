@@ -7,6 +7,10 @@
 -- fenêtre d'observation (≥ 1 semaine) sans écart. PAS DE RETOUR ARRIÈRE après
 -- cette migration (le type enum disparaît) — c'est la raison des deux temps.
 --
+-- ⚠ À appliquer APRÈS 20261118_1 (PV de réception) : la vue
+-- majordhome_pricing_equipment_types recréée plus bas cite `reception_profile`,
+-- colonne ajoutée par 20261118_1.
+--
 -- Ce qu'elle retire :
 --   1. les vues internes mortes v_planning / v_equipments_maintenance
 --   2. equipments.category (enum) + le TYPE majordhome.equipment_category
@@ -112,6 +116,7 @@ CREATE VIEW public.majordhome_pricing_equipment_types
          duration_base_minutes, duration_per_extra_unit_minutes, unfavorable_months,
          category_id, reception_profile
   FROM majordhome.pricing_equipment_types;
+REVOKE ALL ON public.majordhome_pricing_equipment_types FROM PUBLIC, anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.majordhome_pricing_equipment_types TO authenticated, service_role;
 
 -- ── 4. team_members.specialties + RPC à 3 paramètres ───────────────────────
