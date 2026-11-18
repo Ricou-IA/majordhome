@@ -24,12 +24,9 @@ import { chantiersService } from '@services/chantiers.service';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { moduleActif } from '@/lib/modules';
 import { formatDateTimeFR } from '@/lib/utils';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-
-const BOUTON = 'inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors '
-  + 'disabled:opacity-50 disabled:cursor-not-allowed';
-const BOUTON_NEUTRE = `${BOUTON} border-gray-300 text-gray-600 bg-white hover:bg-gray-100`;
-const BOUTON_PRINCIPAL = `${BOUTON} border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100`;
+import { BOUTON_NEUTRE, BOUTON_PRINCIPAL } from './pvBoutons';
+import { PreparerPvDialog } from './PreparerPvDialog';
+import { ChantierPvReserves } from './ChantierPvReserves';
 
 export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSignerSurPlace, onValiderSansPv, onUpdated }) {
   const { organization } = useAuth();
@@ -44,33 +41,12 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
   const envoye = Boolean(chantier.pv_sent_at);
 
   // Détail de l'envoi et de la signature : chargé seulement s'il y a quelque chose à dire.
-  const { pv } = useChantierPv(orgId, chantier.id, { enabled: envoye || signeEnLigne });
-  const { envoyerPv, lienPv, genererPdfPv, isEnvoiPv, isLienPv, isPdfPv } = useChantierPvMutations();
-  const [confirmerEnvoi, setConfirmerEnvoi] = useState(false);
+  const { pv, isLoading: pvEnChargement, error: pvEnErreur } = useChantierPv(orgId, chantier.id, { enabled: envoye || signeEnLigne });
+  const { genererPdfPv, isPdfPv } = useChantierPvMutations();
+  const [preparation, setPreparation] = useState(false);
   const [ouverture, setOuverture] = useState(false);
-
-  const handleEnvoyer = async () => {
-    try {
-      const res = await envoyerPv(chantier.id);
-      setConfirmerEnvoi(false);
-      toast.success(`PV envoyé à ${res?.sent_to || 'l\'adresse du client'}`);
-      onUpdated?.();
-    } catch (err) {
-      setConfirmerEnvoi(false);
-      // « L'e-mail est parti mais n'a pas pu être noté » : dit tel quel, ce n'est pas un échec d'envoi.
-      toast.error(err?.message || 'Le PV n\'a pas pu être envoyé');
-    }
-  };
-
-  const handleCopierLien = async () => {
-    try {
-      const res = await lienPv(chantier.id);
-      await navigator.clipboard.writeText(res.url);
-      toast.success('Lien copié : collez-le dans un SMS ou un message au client');
-    } catch (err) {
-      toast.error(err?.message || 'Le lien n\'a pas pu être copié');
-    }
-  };
+  // Détail du PV inconnu (chargement, erreur) ≠ « pas de réponse » : rien n'est proposé sur une donnée inconnue.
+  const detailPv = pvEnChargement || pvEnErreur ? undefined : pv;
 
   const handleVoir = async () => {
     // PV archivé (signé sur tablette, ou déjà produit) : on ouvre le fichier.
@@ -106,6 +82,7 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
       </h3>
 
       {signe ? (
+        <>
         <div className={`p-3 border rounded-lg space-y-2 ${avecReserves ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
           <div className="flex items-center gap-3 flex-wrap">
             {avecReserves
@@ -140,6 +117,11 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
             </div>
           )}
         </div>
+        <ChantierPvReserves
+          chantier={chantier} pv={detailPv} canEdit={canEdit} company={company}
+          communicationOuverte={communicationOuverte} onUpdated={onUpdated}
+        />
+        </>
       ) : (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
           <p className="text-sm text-amber-800">
@@ -161,13 +143,13 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
           {canEdit && (
             <div className="flex flex-wrap items-center gap-2">
               {communicationOuverte && (
-                <button type="button" onClick={() => setConfirmerEnvoi(true)} disabled={isEnvoiPv} className={BOUTON_PRINCIPAL}>
-                  {isEnvoiPv ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                <button type="button" onClick={() => setPreparation(true)} className={BOUTON_PRINCIPAL}>
+                  <Send className="w-4 h-4" />
                   {envoye ? 'Renvoyer au client' : 'Envoyer au client'}
                 </button>
               )}
-              <button type="button" onClick={handleCopierLien} disabled={isLienPv} className={BOUTON_NEUTRE}>
-                {isLienPv ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+              <button type="button" onClick={() => setPreparation(true)} className={BOUTON_NEUTRE}>
+                <Link2 className="w-4 h-4" />
                 Copier le lien
               </button>
               <button type="button" onClick={onSignerSurPlace} className={BOUTON_NEUTRE}>
@@ -185,18 +167,7 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
         </div>
       )}
 
-      <ConfirmDialog
-        open={confirmerEnvoi}
-        onOpenChange={setConfirmerEnvoi}
-        title="Envoyer le PV de réception au client ?"
-        description={`Le client reçoit un e-mail${chantier.email ? ` (${chantier.email})` : ''} avec un lien pour signer la réception des travaux. `
-          + 'À envoyer une fois la pose terminée : sa signature fait passer le chantier en « Réceptionné ».'}
-        confirmLabel={isEnvoiPv ? 'Envoi…' : 'Envoyer'}
-        cancelLabel="Annuler"
-        variant="default"
-        loading={isEnvoiPv}
-        onConfirm={handleEnvoyer}
-      />
+      <PreparerPvDialog open={preparation} onOpenChange={setPreparation} chantier={chantier} canEdit={canEdit} onUpdated={onUpdated} />
     </div>
   );
 }

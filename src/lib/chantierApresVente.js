@@ -1,7 +1,7 @@
 /**
  * chantierApresVente.js — l'après-vente d'un chantier réceptionné.
  * ============================================================================
- * Module PUR (aucun import). Un chantier réceptionné porte quatre repères :
+ * Module PUR (seul import : `pvReception.js`, pur lui aussi). Un chantier réceptionné porte quatre repères :
  * PV de réception, demande d'avis, contrat d'entretien, facturation.
  *
  * Deux listes viennent d'ailleurs que du chantier (contrats par client, clients à
@@ -10,6 +10,8 @@
  * prise pour « personne n'a été sollicité » renverrait le SMS à tout le monde.
  * ============================================================================
  */
+
+import { dateLongue, jourDeParis } from './pvReception.js';
 
 /** Campagne SMS de la demande d'avis après une installation (registre smsCampaigns.js). */
 export const CAMPAGNE_AVIS_POSE = 'avis_pose';
@@ -59,6 +61,10 @@ export function contratsParClient(lignes) {
 /** PV de réception : archivé ou signé en ligne = fait ; envoyé au client = en cours. */
 export function reperePv(chantier) {
   const signe = Boolean(chantier?.pv_reception_path || chantier?.pv_signed_at);
+  if (chantier?.pv_reserves_levees_at) {
+    const jour = dateLongue(jourDeParis(chantier.pv_reserves_levees_at));
+    return { cle: 'pv', libelle: 'PV', etat: 'fait', titre: jour ? `Réserves levées le ${jour}` : 'Réserves levées' };
+  }
   if (signe && chantier?.pv_avec_reserves) {
     return { cle: 'pv', libelle: 'Réserves', etat: 'attention', titre: 'PV de réception signé avec réserves' };
   }
@@ -67,6 +73,23 @@ export function reperePv(chantier) {
     return { cle: 'pv', libelle: 'PV', etat: 'en_cours', titre: 'PV envoyé au client, pas encore signé' };
   }
   return { cle: 'pv', libelle: 'PV', etat: 'a_faire', titre: 'Pas de PV de réception' };
+}
+
+/**
+ * Où en est la suite d'un PV signé EN LIGNE avec réserves (réponse du bureau, levée).
+ * `'aucune'` tant que le détail du PV n'est pas connu (`undefined`) : on ne propose rien sur une
+ * donnée inconnue. Un PV signé sur tablette n'a pas de suite en ligne.
+ * @param {Object|null|undefined} chantier ligne de `majordhome_chantiers`
+ * @param {Object|null|undefined} pv ligne de `majordhome_chantier_pv`
+ * @returns {'aucune'|'a_repondre'|'a_lever'|'levee_demandee'|'levee_signee'}
+ */
+export function suiteDesReserves(chantier, pv) {
+  if (!chantier?.pv_signed_at || !chantier?.pv_avec_reserves) return 'aucune';
+  if (!pv || pv.reception_type !== 'avec_reserves') return 'aucune';
+  if (pv.levee_signed_at) return 'levee_signee';
+  if (pv.levee_demandee_at) return 'levee_demandee';
+  if (pv.reserves_repondu_at) return 'a_lever';
+  return 'a_repondre';
 }
 
 /**

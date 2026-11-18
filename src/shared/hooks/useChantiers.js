@@ -227,6 +227,13 @@ export function useChantierMutations() {
     onSuccess: invalidateChantiers,
   });
 
+  // Mutation : type d'équipement du chantier (choisi depuis la préparation du PV)
+  const equipmentTypeMutation = useMutation({
+    mutationFn: ({ chantierId, equipmentTypeId }) =>
+      unwrapResult(chantiersService.updateEquipmentType(orgId, chantierId, equipmentTypeId)),
+    onSuccess: invalidateChantiers,
+  });
+
   // Mutation : commande « personnes × jours » (spec 2026-09-21)
   const plannedOrderMutation = useMutation({
     mutationFn: ({ chantierId, teamSize, days }) =>
@@ -275,6 +282,10 @@ export function useChantierMutations() {
       (chantierId, label) => labelMutation.mutateAsync({ chantierId, label }),
       [labelMutation]
     ),
+    updateEquipmentType: useCallback(
+      (chantierId, equipmentTypeId) => equipmentTypeMutation.mutateAsync({ chantierId, equipmentTypeId }),
+      [equipmentTypeMutation]
+    ),
     uploadPvReception: useCallback(
       (chantierId, file) => pvMutation.mutateAsync({ chantierId, file }),
       [pvMutation]
@@ -300,6 +311,7 @@ export function useChantierMutations() {
     isUpdatingStatus: statusMutation.isPending,
     isUpdatingOrder: orderMutation.isPending,
     isUploadingPv: pvMutation.isPending,
+    isUpdatingEquipmentType: equipmentTypeMutation.isPending,
     isGrouping: groupMutation.isPending,
     isDetaching: detachMutation.isPending,
     isDeleting: deleteMutation.isPending,

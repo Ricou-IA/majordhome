@@ -221,6 +221,8 @@ export const chantiersService = {
     withErrorHandling(() => patchChantier(orgId, chantierId, { chantier_notes: notes || null }), 'chantiers.updateChantierNotes'),
   updateLabel: (orgId, chantierId, label) =>
     withErrorHandling(() => patchChantier(orgId, chantierId, { label: (label || '').trim() || null }), 'chantiers.updateLabel'),
+  updateEquipmentType: (orgId, chantierId, equipmentTypeId) =>
+    withErrorHandling(() => patchChantier(orgId, chantierId, { equipment_type_id: equipmentTypeId || null }), 'chantiers.updateEquipmentType'),
   updatePlannedOrder: (orgId, chantierId, { teamSize, days }) =>
     withErrorHandling(() => patchChantier(orgId, chantierId, { planned_team_size: teamSize ?? null, planned_days: days ?? null }), 'chantiers.updatePlannedOrder'),
 

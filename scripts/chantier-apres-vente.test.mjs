@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   enApresVente, etatContrat, contratsParClient, reperePv, reperesApresVente, blocageAvis, CAMPAGNE_AVIS_POSE,
-  messageAvisEnvoye, messageAvisRefuse,
+  messageAvisEnvoye, messageAvisRefuse, suiteDesReserves,
 } from '../src/lib/chantierApresVente.js';
 import { getSmsCampaign } from '../src/lib/smsCampaigns.js';
 
@@ -95,4 +95,35 @@ test('demande d\'avis : fermée hors après-vente, sans fiche client, sans tél�
   assert.ok(blocageAvis(chantier({ chantier_status: 'planification' }), new Set()));
   assert.ok(blocageAvis(chantier({ client_id: null }), new Set()));
   assert.ok(blocageAvis(chantier({ phone: ' ' }), new Set()));
+});
+
+test('repère PV : réserves levées = fait, date en toutes lettres', () => {
+  const r = reperePv(chantier({ pv_signed_at: '2026-11-17T10:00:00Z', pv_avec_reserves: true, pv_reserves_levees_at: '2026-12-01T10:00:00Z' }));
+  assert.equal(r.etat, 'fait');
+  assert.equal(r.libelle, 'PV');
+  assert.equal(r.titre, 'Réserves levées le 1er décembre 2026');
+});
+
+test('repère PV : la levée prime sur « signé avec réserves »', () => {
+  const sans = reperePv(chantier({ pv_signed_at: 'x', pv_avec_reserves: true }));
+  assert.equal(sans.etat, 'attention');
+  const levee = reperePv(chantier({ pv_signed_at: 'x', pv_avec_reserves: true, pv_reserves_levees_at: '2026-12-01T23:30:00Z' }));
+  assert.equal(levee.etat, 'fait');
+  assert.match(levee.titre, /^Réserves levées le /);
+});
+
+test('suite des réserves : rien pour un PV sur tablette, étapes pour un PV en ligne', () => {
+  assert.equal(suiteDesReserves({ pv_reception_path: 'p', pv_avec_reserves: false }, null), 'aucune');
+  const c = { pv_signed_at: 'x', pv_avec_reserves: true };
+  assert.equal(suiteDesReserves(c, { reception_type: 'avec_reserves' }), 'a_repondre');
+  assert.equal(suiteDesReserves(c, { reception_type: 'avec_reserves', reserves_repondu_at: 'x' }), 'a_lever');
+  assert.equal(suiteDesReserves(c, { reception_type: 'avec_reserves', levee_demandee_at: 'x' }), 'levee_demandee');
+  assert.equal(suiteDesReserves(c, { reception_type: 'avec_reserves', levee_signed_at: 'x' }), 'levee_signee');
+  assert.equal(suiteDesReserves(c, undefined), 'aucune'); // détail pas encore chargé : on ne propose rien
+});
+
+test('suite des réserves : sans réserves, sans signature en ligne, ou PV tablette = aucune', () => {
+  assert.equal(suiteDesReserves({ pv_signed_at: 'x', pv_avec_reserves: false }, { reception_type: 'sans_reserves' }), 'aucune');
+  assert.equal(suiteDesReserves({ pv_avec_reserves: true, pv_reception_path: 'p' }, { reception_type: 'avec_reserves' }), 'aucune');
+  assert.equal(suiteDesReserves(null, { reception_type: 'avec_reserves' }), 'aucune');
 });
