@@ -137,14 +137,13 @@ export function buildCertificatConforme({ certificat, appareil = null, contractN
   const marque = certificat.equipement_marque
     ? ` de marque ${certificat.equipement_marque.toUpperCase()}${certificat.equipement_modele ? ` ${certificat.equipement_modele}` : ''}`
     : (certificat.equipement_modele ? ` ${certificat.equipement_modele}` : '');
-  const technicien = String(certificat.technicien_nom || '').trim();
   const ramone = (certificat.donnees_ramonage?.conduits || []).some((c) => c?.resultat === 'ramone');
 
   const paragraphes = [
     [
       { text: `Nous attestons être intervenus${datePassage ? ` le ${datePassage.long}` : ''} au domicile de ${client.name}${adresseClient ? `, ${adresseClient},` : ''} pour l’entretien annuel de son ` },
       { text: `${minuscule(appareil || 'appareil de chauffage')}${marque}`, bold: true },
-      { text: `.${technicien ? ` L’intervention a été réalisée par ${technicien}.` : ''}` },
+      { text: '.' },
     ],
     [
       { text: 'Aucune anomalie n’a été relevée', bold: true },

@@ -70,7 +70,7 @@ Appareil   Poêle à granulés PALAZZETTI eco fire beatrice 6
 Contrat    CTR-00881
 
 Nous attestons être intervenus le 13 novembre 2026 pour l'entretien annuel
-de cet appareil. Intervention réalisée par Mohammed.
+de cet appareil. (Le technicien n'est pas nommé : retiré le 2026-11-18, Eric.)
 
 Aucune anomalie n'a été relevée. L'installation est conforme et apte à un
 usage normal.

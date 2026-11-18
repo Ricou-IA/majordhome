@@ -111,7 +111,7 @@ test('certificatAllegePayload : TVA inconnue ⇒ laissée au défaut de la base'
   assert.equal('tva_taux' in certificatAllegePayload(entree({ tvaTaux: null })), false);
 });
 
-test('buildCertificatConforme : la lettre dit le passage, l’absence d’anomalie et qui est intervenu', () => {
+test('buildCertificatConforme : la lettre dit le passage et l’absence d’anomalie, sans nommer le technicien', () => {
   const certificat = { ...certificatAllegePayload(entree()), reference: 'CERT-2026-01617' };
   const { lettre } = buildCertificatConforme({
     certificat, appareil: 'Poêle à granulés', contractNumber: 'CTR-00881', client, company, dateEdition: '2026-11-16',
@@ -126,7 +126,8 @@ test('buildCertificatConforme : la lettre dit le passage, l’absence d’anomal
   assert.match(t, /intervenus le 13 novembre 2026/);
   assert.match(t, /AMAR JEANNE, 1 Impasse Emilien Natoly, 81370 SAINT-SULPICE-LA-POINTE/);
   assert.match(t, /poêle à granulés de marque PALAZZETTI eco fire beatrice 6/);
-  assert.match(t, /réalisée par Mohammed\./);
+  assert.match(t, /beatrice 6\.\s*Aucune/);
+  assert.doesNotMatch(t, /réalisée par|Mohammed/);
   assert.match(t, /Aucune anomalie n’a été relevée/);
   assert.match(t, /conforme et apte à un usage normal/);
   assert.doesNotMatch(t, /ramon/i);
