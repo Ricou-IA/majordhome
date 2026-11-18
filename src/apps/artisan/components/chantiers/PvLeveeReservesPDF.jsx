@@ -87,7 +87,7 @@ function PvLeveeDocument({ data, company }) {
 
         {reponse || echeance ? (
           <>
-            <Text style={s.sectionTitle}>Réponse de l&apos;entreprise</Text>
+            <Text style={s.sectionTitle}>Réponse de l’entreprise</Text>
             <View style={s.receptionBox}>
               {reponse ? <Text style={s.bodyText}>{reponse}</Text> : null}
               {echeance ? (
@@ -103,8 +103,9 @@ function PvLeveeDocument({ data, company }) {
           Le client constate que les réserves ci-dessus sont levées.
         </Text>
 
+        <View wrap={false}>
         <View style={s.dateRow}>
-          <Text>Fait à : {lieu || clientCity || '—'}</Text>
+          <Text>Fait à{lieu ? ` : ${lieu}` : ''}</Text>
           <Text>Le : {date}</Text>
         </View>
 
@@ -114,10 +115,11 @@ function PvLeveeDocument({ data, company }) {
             {signatureBase64 ? (
               <Image src={signatureBase64} style={s.signatureImage} />
             ) : (
-              <View style={{ height: 60 }} />
+              <View style={{ height: 40 }} />
             )}
             <Text style={s.signatureName}>{signatureNom || clientName || '—'}</Text>
           </View>
+        </View>
         </View>
 
         {COMPANY.legalName ? <Text style={s.footer} fixed>{piedLegal(COMPANY)}</Text> : null}

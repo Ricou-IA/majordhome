@@ -177,7 +177,7 @@ function PvReceptionDocument({ data, company }) {
         {pointsEnLigne ? (
           <>
             <View style={s.pointsBox}>
-              <Text style={s.pointsTitle}>L&apos;entreprise déclare</Text>
+              <Text style={s.pointsTitle} minPresenceAhead={40}>L’entreprise déclare</Text>
               {pointsEntreprise.map((p, i) => (
                 <View key={i} style={s.pointRow} wrap={false}>
                   <Text style={s.pointText}>{p.texte}</Text>
@@ -186,8 +186,8 @@ function PvReceptionDocument({ data, company }) {
               ))}
             </View>
             {pointsClient?.length ? (
-              <View style={s.confirmBox}>
-                <Text style={s.confirmTitle}>Le client confirme</Text>
+              <View style={s.pointsBox}>
+                <Text style={[s.pointsTitle, { color: C.vert }]} minPresenceAhead={40}>Le client confirme</Text>
                 {pointsClient.map((p, i) => (
                   <View key={i} style={s.checkRow} wrap={false}>
                     <Checkbox checked={p.confirme} />
@@ -234,41 +234,44 @@ function PvReceptionDocument({ data, company }) {
           ))}
         </View>
 
-        {/* Date et lieu */}
-        <View style={s.dateRow}>
-          <Text>Fait à : {lieu || clientCity || '—'}</Text>
-          <Text>Le : {pvDate}</Text>
-          <Text>En 2 exemplaires</Text>
-        </View>
-
-        {/* Signatures */}
-        <View style={s.signaturesRow}>
-          <View style={s.signatureBlock}>
-            <Text style={s.signatureLabel}>Signature de l&apos;entreprise</Text>
-            {signatureTechBase64 ? (
-              <Image src={signatureTechBase64} style={s.signatureImage} />
-            ) : (
-              <View style={{ height: 60 }} />
-            )}
-            <Text style={s.signatureName}>{signatureTechNom || technicianName || '—'}</Text>
+        {/* Fait à, signatures et note : un seul bloc, jamais coupé */}
+        <View wrap={false}>
+          {/* Date et lieu */}
+          <View style={s.dateRow}>
+            <Text>Fait à : {lieu || clientCity || '—'}</Text>
+            <Text>Le : {pvDate}</Text>
+            <Text>En 2 exemplaires</Text>
           </View>
-          <View style={s.signatureBlock}>
-            <Text style={s.signatureLabel}>Signature du client</Text>
-            {signatureClientBase64 ? (
-              <Image src={signatureClientBase64} style={s.signatureImage} />
-            ) : (
-              <View style={{ height: 60 }} />
-            )}
-            <Text style={s.signatureName}>{signatureClientNom || clientName || '—'}</Text>
-          </View>
-        </View>
 
-        {/* Note conservation */}
-        <View style={s.conservationNote}>
-          <Text style={s.conservationText}>
-            DOCUMENT À CONSERVER 10 ANS — La réception des travaux est indispensable
-            pour faire valoir les garanties légales et les assurances.
-          </Text>
+          {/* Signatures */}
+          <View style={s.signaturesRow}>
+            <View style={s.signatureBlock}>
+              <Text style={s.signatureLabel}>Signature de l&apos;entreprise</Text>
+              {signatureTechBase64 ? (
+                <Image src={signatureTechBase64} style={s.signatureImage} />
+              ) : (
+                <View style={{ height: 40 }} />
+              )}
+              <Text style={s.signatureName}>{signatureTechNom || technicianName || '—'}</Text>
+            </View>
+            <View style={s.signatureBlock}>
+              <Text style={s.signatureLabel}>Signature du client</Text>
+              {signatureClientBase64 ? (
+                <Image src={signatureClientBase64} style={s.signatureImage} />
+              ) : (
+                <View style={{ height: 40 }} />
+              )}
+              <Text style={s.signatureName}>{signatureClientNom || clientName || '—'}</Text>
+            </View>
+          </View>
+
+          {/* Note conservation */}
+          <View style={s.conservationNote}>
+            <Text style={s.conservationText}>
+              DOCUMENT À CONSERVER 10 ANS — La réception des travaux est indispensable
+              pour faire valoir les garanties légales et les assurances.
+            </Text>
+          </View>
         </View>
 
         {/* Footer */}

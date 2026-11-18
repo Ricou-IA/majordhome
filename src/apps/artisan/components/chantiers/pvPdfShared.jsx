@@ -32,7 +32,7 @@ export const C = {
 
 export const s = StyleSheet.create({
   page: {
-    padding: '15mm 18mm 20mm 18mm',
+    padding: '15mm 18mm 16mm 18mm',
     fontSize: 9,
     fontFamily: 'Helvetica',
     color: C.noir,
@@ -50,7 +50,7 @@ export const s = StyleSheet.create({
     borderBottomColor: C.orange,
     borderBottomStyle: 'solid',
   },
-  logo: { height: 90, marginTop: -10, marginBottom: -10 },
+  logo: { height: 70, marginTop: -5, marginBottom: -5 },
   headerRight: { alignItems: 'flex-end' },
   title: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: C.noir },
   subtitle: { fontSize: 10, color: C.orange, marginTop: 2 },
@@ -65,7 +65,7 @@ export const s = StyleSheet.create({
   },
 
   // Parties (client + entreprise)
-  parties: { flexDirection: 'row', gap: 12, marginBottom: 14 },
+  parties: { flexDirection: 'row', gap: 12, marginBottom: 8 },
   party: {
     flex: 1,
     borderWidth: 1,
@@ -129,8 +129,8 @@ export const s = StyleSheet.create({
     borderColor: C.grisBorder,
     borderStyle: 'solid',
     borderRadius: 3,
-    padding: 10,
-    marginBottom: 12,
+    padding: 8,
+    marginBottom: 8,
   },
   checkRow: {
     flexDirection: 'row',
@@ -189,7 +189,7 @@ export const s = StyleSheet.create({
     borderStyle: 'solid',
     borderRadius: 3,
     padding: 8,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   confirmTitle: {
     fontSize: 8,
@@ -203,7 +203,7 @@ export const s = StyleSheet.create({
   signaturesRow: {
     flexDirection: 'row',
     gap: 16,
-    marginTop: 10,
+    marginTop: 4,
   },
   signatureBlock: {
     flex: 1,
@@ -211,7 +211,7 @@ export const s = StyleSheet.create({
     borderColor: C.grisBorder,
     borderStyle: 'solid',
     borderRadius: 3,
-    padding: 8,
+    padding: 6,
     alignItems: 'center',
   },
   signatureLabel: {
@@ -222,7 +222,7 @@ export const s = StyleSheet.create({
     marginBottom: 4,
   },
   signatureImage: {
-    maxHeight: 60,
+    maxHeight: 40,
     maxWidth: 160,
     marginBottom: 4,
   },
@@ -236,7 +236,7 @@ export const s = StyleSheet.create({
   dateRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 4,
     fontSize: 9,
     color: C.gris,
   },
@@ -263,8 +263,8 @@ export const s = StyleSheet.create({
     borderColor: '#FCD34D',
     borderStyle: 'solid',
     borderRadius: 3,
-    padding: 6,
-    marginTop: 10,
+    padding: 5,
+    marginTop: 6,
   },
   conservationText: {
     fontSize: 7.5,
@@ -277,24 +277,22 @@ export const s = StyleSheet.create({
   pointRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 4,
+    marginBottom: 2,
     gap: 6,
   },
   pointText: { fontSize: 9, flex: 1, lineHeight: 1.4 },
   pointAnswer: { fontSize: 9, fontFamily: 'Helvetica-Bold', width: 60, textAlign: 'right' },
-  pointsBox: {
-    borderWidth: 1,
-    borderColor: C.grisBorder,
-    borderStyle: 'solid',
-    borderRadius: 3,
-    padding: 8,
-    marginBottom: 10,
-  },
+  // Bloc de points : sans cadre, il peut se couper entre deux points sans laisser un cadre ouvert.
+  pointsBox: { marginBottom: 8 },
   pointsTitle: {
     fontSize: 8,
     fontFamily: 'Helvetica-Bold',
     color: C.orange,
     marginBottom: 4,
+    paddingBottom: 2,
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.grisBorder,
+    borderBottomStyle: 'solid',
     textTransform: 'uppercase',
   },
   garantiesBox: { marginTop: 4 },
@@ -305,8 +303,8 @@ export const s = StyleSheet.create({
 
 export function Checkbox({ checked }) {
   return (
-    <View style={[s.checkbox, checked && s.checkboxChecked]}>
-      {checked && <Text style={s.checkMark}>✓</Text>}
+    <View style={s.checkbox}>
+      {checked && <View style={{ width: 6, height: 6, backgroundColor: C.noir }} />}
     </View>
   );
 }
