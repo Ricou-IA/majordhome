@@ -155,7 +155,7 @@ export default function PvReceptionSign() {
 
       // Upload
       const safeName = clientName.replace(/[^a-zA-Z0-9À-ÿ _-]/g, '').replace(/\s+/g, '_');
-      const storagePath = `pv-reception/${chantier.id}/PV_Reception_-_${safeName}.pdf`;
+      const storagePath = `${orgId}/pv-reception/${chantier.id}/PV_Reception_-_${safeName}.pdf`;
 
       const { error: uploadError } = await storageService.uploadFile(
         'interventions',
