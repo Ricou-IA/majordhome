@@ -84,6 +84,7 @@ const MESSAGES = Object.freeze({
   levee_deja_signee: 'Les réserves de ce procès-verbal ont déjà été levées.',
   echeance_invalide: 'La date prévue n’est pas valable : elle doit être un vrai jour, au plus tôt celui de la signature du procès-verbal.',
   reponse_vide: 'Indiquez ce qui a été fait ou la date prévue pour les réserves.',
+  pv_modifie: 'Votre installateur vient de mettre à jour ce procès-verbal. Rechargez la page et relisez-le avant de signer.',
   // état du chantier ou du lien
   deja_signe: 'Ce procès-verbal a déjà été signé.',
   chantier_introuvable: 'Ce chantier est introuvable.',

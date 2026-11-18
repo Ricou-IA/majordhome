@@ -31,6 +31,8 @@
 //   POST { action: "signer", token, reponse }
 //        → enregistre la signature (RPC chantier_pv_signer) avec les points confirmés, validés
 //          contre le gabarit de la préparation ; un chantier Planifié passe en Réceptionné.
+//          La signature porte la version de la déclaration lue (`reponse.prepare_at`, rendu par
+//          le GET tel quel) : déclaration préparée à nouveau depuis ⇒ refus pv_modifie (409).
 //   POST { action: "signer_levee", token, reponse: { signataire_nom, signature_png } }
 //        → signe la levée des réserves (RPC chantier_pv_signer_levee).
 //
@@ -159,7 +161,7 @@ async function lienPour(chantierId: string): Promise<{ url: string; exp: number 
 
 /** Code de refus d'une RPC → statut HTTP. */
 function statutDuRefus(code: string): number {
-  if (code === "deja_signe" || code === "levee_deja_signee" || code === "point_inconnu") return 409;
+  if (code === "deja_signe" || code === "levee_deja_signee" || code === "point_inconnu" || code === "pv_modifie") return 409;
   if (code === "chantier_introuvable") return 404;
   return 400;
 }
@@ -428,6 +430,8 @@ function pourLaPage(ctx: ContextePv): Json {
     poses: ctx.poses || [],
     deja_signe: signe,
     pret: prepare || signe,
+    // Version de la déclaration affichée, à renvoyer telle quelle à la signature.
+    prepare_at: pv?.prepare_at ?? null,
     // Devis photographiés à la signature une fois signé en ligne, sinon les devis validés du jour.
     devis: signeEnLigne ? (Array.isArray(pv?.devis) ? pv.devis : []) : (Array.isArray(ctx.devis) ? ctx.devis : []),
     declaration: (prepare ? pv!.points_entreprise! : []).map((p) => ({
@@ -484,12 +488,17 @@ async function actionSigner(req: Request, body: Json): Promise<Response> {
   if (dejaSigne(ctx)) return jsonResponse({ error: "deja_signe" }, 409, req);
   if (!estPrepare(ctx)) return jsonResponse({ error: "pv_non_prepare" }, 400, req);
 
+  // Version lue par le client : le texte exact rendu par le GET, comparé en texte, jamais
+  // reformaté. Refus anticipé ; la RPC, sous son verrou, reste l'autorité.
+  const prepareAt = typeof brute.prepare_at === "string" ? brute.prepare_at : "";
+  if (!prepareAt || prepareAt !== ctx.pv!.prepare_at) return jsonResponse({ error: "pv_modifie" }, 409, req);
+
   // Points du client validés contre le gabarit RETENU à la préparation, textes repris du module.
   const points = figerPointsClient(ctx.pv!.gabarit, points_confirmes);
   if (!points.ok) return jsonResponse({ error: points.code }, 409, req);
 
   const { data, error } = await getAdminClient().rpc("chantier_pv_signer", {
-    p_chantier_id: v.chantierId, p_payload: { ...reponse, points_client: points.points },
+    p_chantier_id: v.chantierId, p_payload: { ...reponse, points_client: points.points, prepare_at: prepareAt },
   });
   const refus = refusRpc(req, data, error, "signature");
   if (refus) return refus;
@@ -534,7 +543,9 @@ Deno.serve(async (req: Request) => {
       return await actionLire(req, new URL(req.url).searchParams.get("token") || "");
     }
     if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405, req);
-    const body = (await req.json().catch(() => ({}))) as Json;
+    const brut: unknown = await req.json().catch(() => ({}));
+    // Corps non objet (null, tableau, nombre…) ⇒ {} ⇒ action_inconnue, jamais un 500.
+    const body = (brut && typeof brut === "object" && !Array.isArray(brut) ? brut : {}) as Json;
     switch (body.action) {
       case "preparer": return await actionPreparer(req, body);
       case "envoyer": return await actionEnvoyer(req, body);

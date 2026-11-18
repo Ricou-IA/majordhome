@@ -180,7 +180,7 @@ test('PDF de levée : réponse et échéance présentes', () => {
   assert.deepEqual(d.devis, [{ libelle: 'D1', date: '3 septembre 2026' }]);
 });
 test('chaque code nouveau a un message', () => {
-  for (const c of ['pv_non_prepare','declaration_incomplete','point_inconnu','gabarit_inconnu','pas_de_reserves','levee_non_demandee','levee_deja_signee','echeance_invalide','reponse_vide']) {
+  for (const c of ['pv_non_prepare','declaration_incomplete','point_inconnu','gabarit_inconnu','pas_de_reserves','levee_non_demandee','levee_deja_signee','echeance_invalide','reponse_vide','pv_modifie']) {
     assert.notEqual(messagePv(c, 'DEFAUT'), 'DEFAUT');
   }
 });
