@@ -393,10 +393,14 @@ fermées à `anon` et `authenticated`, quatre règles `interventions_org_*`) et
 suivent `main` (déployé par Vercel) : les premiers commits du lot ont été poussés par une autre
 session avant la fin du lot.
 
-**Pas en production** : l'edge `chantier-pv` de ce lot, en attente du oui d'Eric. Tant qu'elle
-n'est pas déployée, la fenêtre « Préparer le PV » répond « Cette action n'est pas encore
-disponible sur le serveur » (`action_inconnue`), et un lien copié depuis l'ancien écran est
-refusé par la base (`pv_non_prepare`).
+**Edge `chantier-pv` déployée le 2026-11-18**, sur le oui d'Eric (« Oui, déployer »), par la CLI
+depuis le dépôt au commit `1c898674`. Éprouvée ensuite en production sans compte et sans rien
+écrire : lecture sans jeton ⇒ 400 `invalid_token` ; jeton fantaisiste, à la lecture comme à la
+signature et à la levée ⇒ 401 `signature_mismatch` ; corps `null` ou action inconnue ⇒ 400
+`action_inconnue` ; `preparer`, `envoyer`, `lien`, `repondre_reserves`, `demander_levee` sans
+session ⇒ 401. Entre le premier push (par une autre session, en cours de lot) et ce déploiement,
+un lien copié depuis l'ancien écran était refusé par la base (`pv_non_prepare`) : un lien copié
+ne laisse pas de trace, on ne peut pas établir que personne n'en a reçu.
 
 **Jamais essayé en réel** : l'envoi d'un e-mail (gabarits `pv_reception` et `pv_levee_reserves`
 encore à créer dans Paramètres → Emails), une vraie signature, une levée des réserves,
