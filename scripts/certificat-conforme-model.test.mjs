@@ -139,7 +139,7 @@ test('buildCertificatConforme : ramonage ⇒ la lettre vaut attestation R. 1331-
   assert.equal(lettre.objet, 'CERTIFICAT D’ENTRETIEN ET ATTESTATION DE RAMONAGE');
   const t = texte(lettre);
   assert.match(t, /entretien annuel de son poêle à granulés de marque PALAZZETTI eco fire beatrice 6 et le ramonage du conduit de fumée/);
-  assert.match(t, /Conduit ramoné : conduit de fumée, raccordé au poêle à granulés de marque PALAZZETTI eco fire beatrice 6\./);
+  assert.match(t, /Conduit ramoné : conduit de fumée, raccordé à cet appareil\. L’opération a été effectuée par brossage mécanique/);
   assert.match(t, /brossage mécanique au moyen d’un hérisson/);
   assert.match(t, /vacant sur toute sa longueur/);
   assert.match(t, /attestation de ramonage au sens de l’article R\. 1331-75 du Code de la santé publique/);

@@ -60,9 +60,14 @@ export async function chargerVisuelsLettre(company) {
  * @param {object} p.company  buildCompanyInfo(settings)
  * @param {Array<{ code: string, label: string, certificate_profile?: string }>} p.categories
  * @param {string} p.invoiceDate  `YYYY-MM-DD`
+ * @param {{ rendrePdf?: (p: object) => Promise<Blob|Uint8Array>, archiver?: (path: string, pdf: Blob|Uint8Array) => Promise<{ error?: { message: string }|null }> }} [p.deps]
+ *   rendu et archivage, remplaçables par un script Node (rattrapage `scripts/certificats/regenerer-attestations.mjs` :
+ *   `pdf().toBlob()` n'existe pas hors navigateur). L'app ne les passe jamais.
  * @returns {Promise<{ generated: { certificatId: string, path: string }[], skipped: { certificatId: string|null, message: string }[], warnings: string[] }>}
  */
-export async function genererAttestationsIntervention({ orgId, interventionId, client, company, categories = [], invoiceDate }) {
+export async function genererAttestationsIntervention({ orgId, interventionId, client, company, categories = [], invoiceDate, deps = {} }) {
+  const rendrePdf = deps.rendrePdf || generateAttestationPdfBlob;
+  const archiver = deps.archiver || ((path, blob) => certificatsService.uploadAttestation(path, blob));
   const result = { generated: [], skipped: [], warnings: [] };
   const { data: certificats, error } = await certificatsService.listForInterventionTree(orgId, interventionId);
   if (error) throw new Error(`Certificats illisibles : ${error.message}`);
@@ -118,8 +123,8 @@ export async function genererAttestationsIntervention({ orgId, interventionId, c
       continue;
     }
     const { logoSrc, signatureSrc } = await loadAssets();
-    const blob = await generateAttestationPdfBlob({ lettre: model.lettre, company, logoSrc, signatureSrc });
-    const up = await certificatsService.uploadAttestation(path, blob);
+    const blob = await rendrePdf({ lettre: model.lettre, company, logoSrc, signatureSrc });
+    const up = await archiver(path, blob);
     if (up.error) {
       result.skipped.push({ certificatId: certificat.id, message: `Archivage impossible : ${up.error.message}` });
       continue;

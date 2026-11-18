@@ -89,21 +89,23 @@ export function descriptionConduit(c) {
 }
 
 /**
- * Les trois paragraphes qu'exige l'attestation de ramonage (R. 1331-75) : conduit(s) ramoné(s),
- * méthode, vacuité sur toute la longueur. Partagés par l'attestation et le certificat « Conforme »
- * allégé, qui en tient lieu. Segments non nettoyés (le modèle appelant applique son `clean`).
+ * Les mentions qu'exige l'attestation de ramonage (R. 1331-75), en deux paragraphes : conduit(s)
+ * ramoné(s) et méthode, puis vacuité sur toute la longueur. Partagés par l'attestation et le
+ * certificat « Conforme » allégé, qui en tient lieu. « raccordé à cet appareil » : l'appareil est
+ * nommé plus haut, et un libellé repris ici imposerait d'accorder (« au poêle », « à la chaudière »).
+ * Deux paragraphes et pas trois : la lettre doit tenir sur une page avec la signature.
+ * Segments non nettoyés (le modèle appelant applique son `clean`).
  * @param {{ methode?: string, methode_autre?: string, conduits?: { label?: string, resultat?: string }[] }} ramonage
- * @param {string} appareilTexte  ex. « poêle à granulés de marque PALAZZETTI »
  * @returns {{ text: string, bold?: boolean }[][]}
  */
-export function paragraphesRamonage(ramonage, appareilTexte) {
+export function paragraphesRamonage(ramonage) {
   const conduits = (ramonage?.conduits || []).filter((c) => c && c.resultat === 'ramone');
   const pluriel = conduits.length > 1;
   const methode = METHODES[ramonage?.methode] || null;
 
   const identification = pluriel
-    ? [{ text: `Conduits ramonés, raccordés au ${appareilTexte} : ` }, { text: listeFr(conduits.map(descriptionConduit)), bold: true }, { text: '.' }]
-    : [{ text: `Conduit ramoné : ` }, { text: descriptionConduit(conduits[0]), bold: true }, { text: `, raccordé au ${appareilTexte}.` }];
+    ? [{ text: 'Conduits ramonés, raccordés à cet appareil : ' }, { text: listeFr(conduits.map(descriptionConduit)), bold: true }, { text: '. ' }]
+    : [{ text: 'Conduit ramoné : ' }, { text: descriptionConduit(conduits[0]), bold: true }, { text: ', raccordé à cet appareil. ' }];
 
   const operation = methode
     ? methode.phrase
@@ -115,7 +117,7 @@ export function paragraphesRamonage(ramonage, appareilTexte) {
     { text: pluriel ? 'vacants sur toute leur longueur' : 'vacant sur toute sa longueur', bold: true },
     { text: ' et apte' + (pluriel ? 's' : '') + ' à un usage normal en sécurité.' },
   ];
-  return [identification, operation, vacuite];
+  return [[...identification, ...operation], vacuite];
 }
 
 /** Motifs pour lesquels aucune attestation n'est produite. `silencieux` : rien à signaler (pas un ramonage). */
@@ -205,7 +207,7 @@ export function buildAttestationEntretien({ certificat, sections, nettoyageItems
   if (controlesOk.length) p3.push({ text: `${nettoyes.length ? ', ' : ''}le contrôle : ${listeFr(controlesOk)}` });
   p3.push({ text: `${nettoyes.length || controlesOk.length ? ', ainsi que ' : ''}la vérification du bon fonctionnement général de l’appareil.` });
 
-  const ramonageParas = paragraphesRamonage(ramonage, appareilTexte);
+  const ramonageParas = paragraphesRamonage(ramonage);
 
   const p6 = [{
     text: `La présente attestation est délivrée à l’intéressé(e) pour servir et valoir ce que de droit.${dateFacture ? ` Elle se rapporte à la facture du ${dateFacture.long}.` : ''}`,

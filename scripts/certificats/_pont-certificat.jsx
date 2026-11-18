@@ -11,6 +11,7 @@
  */
 import { renderToStream } from '@react-pdf/renderer';
 import { CertificatDocument } from '@/apps/artisan/components/certificat/CertificatPDF';
+import { AttestationEntretienDocument } from '@/apps/artisan/components/certificat/AttestationEntretienPDF';
 
 export { savService } from '@/shared/services/sav.service';
 export { certificatsService } from '@/shared/services/certificats.service';
@@ -18,6 +19,7 @@ export { equipmentCategoriesService } from '@/shared/services/equipmentCategorie
 export { buildCompanyInfo } from '@/lib/orgBranding';
 export { indexReferentiel } from '@/lib/equipmentReferential';
 export { supabase } from '@/lib/supabaseClient';
+export { genererAttestationsIntervention } from '@/apps/artisan/components/certificat/attestationExport';
 
 /**
  * Rend le certificat en PDF (Buffer), avec le même composant que l'app.
@@ -27,6 +29,18 @@ export { supabase } from '@/lib/supabaseClient';
  */
 export async function renderCertificatPdf(data, company) {
   const stream = await renderToStream(<CertificatDocument data={data} company={company} />);
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+
+/**
+ * Rend l'attestation d'entretien et de ramonage en PDF (Buffer), avec le même composant que l'app.
+ * @param {{ lettre: object, company: object, logoSrc?: string|null, signatureSrc?: string|null }} p
+ * @returns {Promise<Buffer>}
+ */
+export async function renderAttestationPdf(p) {
+  const stream = await renderToStream(<AttestationEntretienDocument {...p} />);
   const chunks = [];
   for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   return Buffer.concat(chunks);

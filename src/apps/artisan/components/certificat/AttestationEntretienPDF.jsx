@@ -28,8 +28,11 @@ const s = StyleSheet.create({
   salutation: { marginTop: 10 },
   para: { marginTop: 9, fontSize: 10, lineHeight: 1.45, textAlign: 'justify' },
   bold: { fontFamily: 'Helvetica-Bold' },
-  faitA: { marginTop: 14 },
-  sigBloc: { alignSelf: 'flex-end', width: 200, marginTop: 18, alignItems: 'center' },
+  // « Fait à » et la signature sur la même rangée : la lettre tient sur une page même avec une
+  // longue liste de nettoyage (vécu 2026-11-18 : la signature passait seule en page 2).
+  signature: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 14 },
+  faitA: {},
+  sigBloc: { width: 200, alignItems: 'center' },
   sigEntreprise: { fontFamily: 'Helvetica-Bold', fontSize: 10 },
   sigNom: { fontSize: 9.5 },
   sigFonction: { fontSize: 8, color: C.gris },
@@ -54,7 +57,7 @@ function Paragraphe({ segments }) {
 /**
  * @param {{ lettre: object, company: object, logoSrc?: string|null, signatureSrc?: string|null }} p
  */
-function AttestationEntretienDocument({ lettre, company, logoSrc = null, signatureSrc = null }) {
+export function AttestationEntretienDocument({ lettre, company, logoSrc = null, signatureSrc = null }) {
   const accent = company.accentColor || '#64748b';
   const adresse = [company.address, [company.postalCode, company.city].filter(Boolean).join(' ')].filter(Boolean).join(' - ');
   return (
@@ -89,13 +92,14 @@ function AttestationEntretienDocument({ lettre, company, logoSrc = null, signatu
 
         {lettre.paragraphes.map((p, i) => <Paragraphe key={i} segments={p} />)}
 
-        <Text style={s.faitA}>{lettre.faitA}</Text>
-
-        <View style={s.sigBloc} wrap={false}>
-          <Text style={[s.sigEntreprise, { color: accent }]}>{lettre.signataire.entreprise}</Text>
-          <Text style={s.sigNom}>{lettre.signataire.nom}</Text>
-          {lettre.signataire.fonction ? <Text style={s.sigFonction}>{lettre.signataire.fonction}</Text> : null}
-          {signatureSrc ? <Image src={signatureSrc} style={s.sigImg} /> : null}
+        <View style={s.signature} wrap={false}>
+          <Text style={s.faitA}>{lettre.faitA}</Text>
+          <View style={s.sigBloc}>
+            <Text style={[s.sigEntreprise, { color: accent }]}>{lettre.signataire.entreprise}</Text>
+            <Text style={s.sigNom}>{lettre.signataire.nom}</Text>
+            {lettre.signataire.fonction ? <Text style={s.sigFonction}>{lettre.signataire.fonction}</Text> : null}
+            {signatureSrc ? <Image src={signatureSrc} style={s.sigImg} /> : null}
+          </View>
         </View>
 
         <View style={s.footer} fixed>

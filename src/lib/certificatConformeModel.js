@@ -154,7 +154,7 @@ export function buildCertificatConforme({ certificat, appareil = null, contractN
       { text: 'Aucune anomalie n’a été relevée', bold: true },
       { text: ' lors de cette intervention. L’installation est conforme et apte à un usage normal.' },
     ],
-    ...(ramone ? paragraphesRamonage(certificat.donnees_ramonage, appareilTexte) : []),
+    ...(ramone ? paragraphesRamonage(certificat.donnees_ramonage) : []),
     [{
       text: ramone
         ? `Le présent document vaut certificat d’entretien et attestation de ramonage au sens de l’${ARTICLE_ATTESTATION_RAMONAGE}. Il est délivré pour servir et valoir ce que de droit.`

@@ -106,7 +106,7 @@ test('R. 1331-75 : base légale codifiée, conduit identifié avec ses mesures, 
   assert.match(r.lettre.references, /R\. 1331-75/);
   assert.doesNotMatch(r.lettre.references, /R\. 1331-14/);
   const t = texte(r.lettre);
-  assert.match(t, /Conduit ramoné : conduit principal \(Ø 80 mm, longueur 6,5 m\), raccordé au poêle à granulés de marque EDILKAMIN Blade H\./);
+  assert.match(t, /Conduit ramoné : conduit principal \(Ø 80 mm, longueur 6,5 m\), raccordé à cet appareil\. L’opération a été effectuée par brossage/);
   assert.match(t, /jusqu’à son débouché à l’extérieur/);
   assert.doesNotMatch(t, /toiture/);
 });
@@ -115,6 +115,11 @@ test('R. 1331-75 : plusieurs conduits ramonés, tous nommés', () => {
   const certificat = cert({ donnees_ramonage: { methode: 'mecanique', conduits: [{ label: 'Conduit 1', resultat: 'ramone' }, { label: 'Conduit 2', diametre_mm: 150, resultat: 'ramone' }, { label: 'Conduit 3', resultat: 'na' }] } });
   const r = buildAttestationEntretien({ certificat, sections: bois, appareil: 'Poêle à bois', client, company, invoiceDate: '2026-09-14', ...items });
   const t = texte(r.lettre);
-  assert.match(t, /Conduits ramonés, raccordés au poêle à bois de marque EDILKAMIN : conduit 1 et conduit 2 \(Ø 150 mm\)\./);
+  assert.match(t, /Conduits ramonés, raccordés à cet appareil : conduit 1 et conduit 2 \(Ø 150 mm\)\./);
   assert.match(t, /vacants sur toute leur longueur/);
+});
+
+test('l’appareil n’est jamais repris après « raccordé » (accord : « au chaudière » vécu 2026-11-18)', () => {
+  const r = buildAttestationEntretien({ certificat: cert(), sections: bois, appareil: 'Chaudière bois', client, company, invoiceDate: '2026-09-14', ...items });
+  assert.doesNotMatch(texte(r.lettre), /raccordé au chaudière|raccordé au /);
 });
