@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { FormField, TextInput } from '@apps/artisan/components/FormFields';
 import { ToolbarHeader, ActionButtons, ModalShell, selectClass } from '../pricing/ui';
 import { prochainOrdre } from '../pricing/ordre';
+import { GABARITS_RECEPTION, LIBELLES_GABARIT, GABARIT_GENERIQUE, normaliserGabarit } from '@/lib/pvPoints';
 
 export function TypesPanel({ admin }) {
   const [showModal, setShowModal] = useState(false);
@@ -55,6 +56,7 @@ export function TypesPanel({ admin }) {
                 <th className="py-2 pr-3 font-medium">Code</th>
                 <th className="py-2 pr-3 font-medium">Libellé</th>
                 <th className="py-2 pr-3 font-medium">Catégorie</th>
+                <th className="py-2 pr-3 font-medium">PV de réception</th>
                 <th className="py-2 pr-3 font-medium text-center">Actif</th>
                 <th className="py-2 w-20"></th>
               </tr>
@@ -65,6 +67,7 @@ export function TypesPanel({ admin }) {
                   <td className="py-2 pr-3 font-mono text-xs">{type.code}</td>
                   <td className="py-2 pr-3 font-medium text-secondary-900">{type.label}</td>
                   <td className="py-2 pr-3 text-secondary-500 text-xs">{libelleCategorie(type.category_id)}</td>
+                  <td className="py-2 pr-3 text-secondary-500 text-xs">{LIBELLES_GABARIT[normaliserGabarit(type.reception_profile)]}</td>
                   <td className="py-2 pr-3 text-center">{type.is_active ? '✓' : '—'}</td>
                   <td className="py-2 pr-3">
                     <ActionButtons
@@ -109,6 +112,7 @@ function TypeModal({ type, categories = [], nextSortOrder, onClose, onSave, isSa
     code: type?.code || '',
     label: type?.label || '',
     category_id: type?.category_id || '',
+    reception_profile: type ? normaliserGabarit(type.reception_profile) : GABARIT_GENERIQUE,
     is_active: type?.is_active ?? true,
   });
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
@@ -129,6 +133,7 @@ function TypeModal({ type, categories = [], nextSortOrder, onClose, onSave, isSa
       ...(isEdit ? {} : { code: form.code.trim(), sort_order: nextSortOrder }),
       label: form.label.trim(),
       category_id: form.category_id,
+      reception_profile: form.reception_profile,
       is_active: form.is_active,
     });
   };
@@ -161,6 +166,18 @@ function TypeModal({ type, categories = [], nextSortOrder, onClose, onSave, isSa
             <p className="text-xs text-amber-700 mt-1">Aucune catégorie active : créez-en une dans l&apos;onglet Catégories.</p>
           )}
           <p className="text-xs text-secondary-400 mt-1">Porte la compétence requise (Équipe) et le gabarit du certificat.</p>
+        </FormField>
+        <FormField label="Gabarit du PV de réception">
+          <select
+            value={form.reception_profile}
+            onChange={(e) => set('reception_profile', e.target.value)}
+            className={selectClass}
+          >
+            {GABARITS_RECEPTION.map((code) => (
+              <option key={code} value={code}>{LIBELLES_GABARIT[code]}</option>
+            ))}
+          </select>
+          <p className="text-xs text-secondary-400 mt-1">Points que l&apos;entreprise déclare et que le client confirme sur le PV de réception de ce type d&apos;équipement.</p>
         </FormField>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />

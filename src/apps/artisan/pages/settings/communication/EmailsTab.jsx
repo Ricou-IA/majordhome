@@ -14,7 +14,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { moduleActif } from '@/lib/modules';
 import { DEFAULT_INVOICE_EMAIL } from '@/lib/invoiceEmailTemplate';
 import { DEFAULT_DPE_RAPPORT_EMAIL } from '@/lib/dpeRapportEmailTemplate';
-import { DEFAULT_PV_RECEPTION_EMAIL } from '@/lib/pvReception';
+import { DEFAULT_PV_RECEPTION_EMAIL, DEFAULT_PV_LEVEE_EMAIL } from '@/lib/pvReception';
 import ResendDomainSection from './ResendDomainSection';
 import EmailAutoLigne from './EmailAutoLigne';
 import AccueilLeadMetaSection from './AccueilLeadMetaSection';
@@ -135,6 +135,11 @@ export default function EmailsTab() {
               orgId={orgId} gabarit={DEFAULT_PV_RECEPTION_EMAIL}
               titre="Faire signer le PV de réception au client"
               description="Utilisé par « Envoyer au client » de la fiche chantier : le client signe la réception des travaux depuis le lien, sur son téléphone."
+            />
+            <EmailAutoLigne
+              orgId={orgId} gabarit={DEFAULT_PV_LEVEE_EMAIL}
+              titre="Demander au client de confirmer la levée des réserves"
+              description="Utilisé par « Demander la levée » de la fiche chantier : le client confirme depuis le lien, sur son téléphone, que ses réserves sont levées."
             />
             {moduleActif(settings, 'dpe') && (
               <EmailAutoLigne
