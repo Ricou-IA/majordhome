@@ -20,12 +20,16 @@ import { ArrowLeft, Loader2, AlertCircle, FileText, Download } from 'lucide-reac
 import { useAuth } from '@/contexts/AuthContext';
 import { useIntervention } from '@hooks/useInterventions';
 import { useCertificat } from '@hooks/useCertificats';
+import { useCertificatEntretienMutations } from '@hooks/useCertificatEntretien';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { buildCompanyInfo } from '@/lib/orgBranding';
 import { certificatsService } from '@services/certificats.service';
 import { CertificatWizard } from '../components/certificat/CertificatWizard';
 import { estAllege } from '@/lib/certificatConformeModel';
 import { EquipmentModelDocuments } from '../components/interventions/EquipmentModelDocuments';
 import { supabase } from '@/lib/supabaseClient';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 // ============================================================================
 // HOOK : Charger les équipements du client (pour StepEquipementType)
@@ -113,7 +117,7 @@ export default function CertificatEntretien() {
   const { intervention, client, equipment, isLoading: loadingIntervention, error: errorIntervention } = useIntervention(interventionId);
 
   // Charger certificat existant
-  const { certificat, isLoading: loadingCertificat } = useCertificat(interventionId);
+  const { certificat, isLoading: loadingCertificat, refetch: refetchCertificat } = useCertificat(interventionId);
 
   // Charger équipements du client (pour le sélecteur)
   const clientEquipments = useClientEquipments(client?.id);
@@ -123,6 +127,7 @@ export default function CertificatEntretien() {
 
   // Charger contrat si lié
   const [contract, setContract] = useState(null);
+  const [contractCharge, setContractCharge] = useState(false);
   useEffect(() => {
     if (!intervention?.contract_id) return;
     async function loadContract() {
@@ -132,6 +137,7 @@ export default function CertificatEntretien() {
         .eq('id', intervention.contract_id)
         .single();
       setContract(data);
+      setContractCharge(true);
     }
     loadContract();
   }, [intervention?.contract_id]);
@@ -169,6 +175,36 @@ export default function CertificatEntretien() {
     });
   }, [certificat?.pdf_storage_path, certificat?.pdf_url]);
 
+  // Certificat « Conforme » sans document (posé sans PDF, ou PDF retiré pour être refait) : il est
+  // généré ici, une fois, avec le même contexte de lettre que la fiche d'entretien.
+  const { regenererConforme } = useCertificatEntretienMutations();
+  const { index: referentiel, isLoading: loadingReferentiel } = useEquipmentReferential();
+  const { settings, isLoading: loadingSettings } = useOrgSettings();
+  const conformeLanceRef = useRef(false);
+  const [conformeEchec, setConformeEchec] = useState(null);
+  const conformeAGenerer = estAllege(certificat) && !certificat?.pdf_storage_path;
+  const contextePret = !!intervention && !!client && !loadingReferentiel && !loadingSettings && !!settings
+    && (!intervention.contract_id || contractCharge);
+  useEffect(() => {
+    if (!conformeAGenerer || !contextePret || conformeLanceRef.current || conformeEchec) return;
+    conformeLanceRef.current = true;
+    const type = equipment?.equipment_type_id ? referentiel.typesById.get(equipment.equipment_type_id) : null;
+    const categorie = equipment?.category_id ? referentiel.categoriesById.get(equipment.category_id) : null;
+    regenererConforme({
+      certificat,
+      parentId: intervention.parent_id || intervention.id,
+      lettreCtx: {
+        appareil: type?.label || categorie?.label || null,
+        contractNumber: contract?.contract_number || null,
+        client: { name: client.display_name || '', address: client.address, postal_code: client.postal_code, city: client.city },
+        company: buildCompanyInfo(settings),
+        orgId,
+      },
+    })
+      .then(() => refetchCertificat())
+      .catch((err) => setConformeEchec(err?.message || 'erreur inconnue'));
+  }, [conformeAGenerer, contextePret, conformeEchec]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isLoading = loadingIntervention || loadingCertificat;
 
   // ── Loading ──
@@ -199,19 +235,25 @@ export default function CertificatEntretien() {
   }
 
   // ── Certificat allégé posé par le bureau : jamais la saisie complète, qui l'écraserait ──
-  // (spec 2026-11-16). Son document se régénère depuis « Voir certificat » de la fiche d'entretien.
+  // (spec 2026-11-16). Sans document, il est généré ici (useEffect plus haut), comme depuis
+  // « Voir certificat » de la fiche d'entretien — cette page s'ouvre aussi depuis la fiche client.
   if (estAllege(certificat) && !(hasPdf && freshPdfUrl)) {
     return (
       <div className="max-w-lg mx-auto mt-12 p-6 bg-sky-50 border border-sky-200 rounded-lg text-center space-y-3">
-        {hasPdf ? (
-          <Loader2 className="w-8 h-8 text-sky-700 animate-spin mx-auto" />
+        {hasPdf || !conformeEchec ? (
+          <>
+            <Loader2 className="w-8 h-8 text-sky-700 animate-spin mx-auto" />
+            {!hasPdf && <p className="text-sm text-sky-900">Génération du certificat {certificat.reference}…</p>}
+          </>
         ) : (
           <>
-            <FileText className="w-8 h-8 text-sky-700 mx-auto" />
-            <p className="text-sm text-sky-900">
-              Certificat conforme {certificat.reference}, posé par le bureau : il n&apos;y a pas de saisie détaillée.
-              Son document n&apos;est pas encore généré — ouvrez « Voir certificat » depuis la fiche d&apos;entretien.
+            <AlertCircle className="w-8 h-8 text-red-600 mx-auto" />
+            <p className="text-sm text-red-800">
+              Le document du certificat {certificat.reference} n&apos;a pas pu être généré : {conformeEchec}
             </p>
+            <button onClick={() => { conformeLanceRef.current = false; setConformeEchec(null); }} className="text-sm font-medium text-sky-800 hover:underline">
+              Réessayer
+            </button>
           </>
         )}
         <button onClick={() => navigate(-1)} className="text-sm text-blue-600 hover:underline">

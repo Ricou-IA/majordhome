@@ -145,7 +145,7 @@ export const interventionsService = {
         intervention.equipment_id
           ? supabase
               .from('majordhome_equipments')
-              .select('id, category_id, brand, model, serial_number, install_date, installation_year, metadata, notes')
+              .select('id, category_id, equipment_type_id, brand, model, serial_number, install_date, installation_year, metadata, notes')
               .eq('id', intervention.equipment_id)
               .single()
           : Promise.resolve({ data: null, error: null }),
