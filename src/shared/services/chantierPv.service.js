@@ -23,15 +23,19 @@ async function invoquer(body) {
   if (!error) return data;
   let code = null;
   let detail = null;
+  let gabarit = null;
   try {
     const corps = await error.context?.json?.();
     code = corps?.error || null;
     detail = corps?.detail || null;
+    // `gabarit_different` : le gabarit qui fait foi côté serveur.
+    gabarit = corps?.gabarit ?? null;
   } catch {
     // Corps non JSON : on garde le message brut.
   }
   const err = new Error(messagePv(code, detail || error.message || 'Le serveur n\'a pas répondu'));
   err.code = code;
+  err.gabarit = gabarit;
   throw err;
 }
 
@@ -91,10 +95,14 @@ export const chantierPvService = {
     }, 'chantierPv.genererPdf');
   },
 
-  /** Enregistre les réponses du bureau aux points de contrôle (oui / non / sans objet). → `{ prepare_at }` */
-  preparer: ({ orgId, chantierId, reponses }) =>
+  /**
+   * Enregistre les réponses du bureau aux points de contrôle (oui / non / sans objet). → `{ prepare_at }`
+   * `gabarit` = celui que la fenêtre affiche ; le serveur le compare au sien et refuse
+   * `gabarit_different` (`error.gabarit` = le sien) sans rien écrire.
+   */
+  preparer: ({ orgId, chantierId, gabarit, reponses }) =>
     withErrorHandling(
-      () => invoquer({ action: 'preparer', org_id: orgId, chantier_id: chantierId, reponses }),
+      () => invoquer({ action: 'preparer', org_id: orgId, chantier_id: chantierId, gabarit, reponses }),
       'chantierPv.preparer',
     ),
 

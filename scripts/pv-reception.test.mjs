@@ -184,6 +184,22 @@ test('chaque code nouveau a un message', () => {
     assert.notEqual(messagePv(c, 'DEFAUT'), 'DEFAUT');
   }
 });
+test('gabarit différent et action inconnue ont leur message', () => {
+  for (const c of ['gabarit_different', 'action_inconnue']) {
+    assert.ok(PV_CODES.includes(c), `${c} sans message`);
+    assert.notEqual(messagePv(c, 'DEFAUT'), 'DEFAUT');
+  }
+  assert.match(messagePv('gabarit_different'), /points/);
+  assert.match(messagePv('action_inconnue'), /pas encore disponible/);
+});
+test('messages lisibles par le client : ni devis à renseigner, ni « Rechargez la page »', () => {
+  assert.doesNotMatch(messagePv('pv_non_prepare'), /devis/i);
+  assert.match(messagePv('pv_non_prepare'), /pas encore prêt/);
+  for (const c of ['pv_modifie', 'point_inconnu']) {
+    assert.doesNotMatch(messagePv(c), /Rechargez/i, c);
+    assert.match(messagePv(c), /relisez/i, c);
+  }
+});
 test('gabarit d’e-mail de levée : clé, lien et transactionnel', () => {
   assert.equal(DEFAULT_PV_LEVEE_EMAIL.key, PV_LEVEE_TEMPLATE_KEY);
   assert.equal(PV_LEVEE_TEMPLATE_KEY, 'pv_levee_reserves');

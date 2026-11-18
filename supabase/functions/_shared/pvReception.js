@@ -76,16 +76,18 @@ const MESSAGES = Object.freeze({
   reserves_a_decrire: 'Décrivez les réserves que vous souhaitez signaler.',
   texte_trop_long: 'Le texte est trop long (2 000 caractères au plus).',
   // PV complété et levée des réserves
-  pv_non_prepare: 'Le procès-verbal n’est pas encore préparé : renseignez d’abord les devis et les points de l’entreprise.',
+  // Lu par le bureau ET par le client (signature d'un PV dont la préparation a disparu).
+  pv_non_prepare: 'Ce procès-verbal n’est pas encore prêt à être signé.',
   declaration_incomplete: 'La déclaration de l’entreprise est incomplète : répondez à chaque point avant d’envoyer le lien.',
-  point_inconnu: 'Un des points confirmés ne figure pas sur ce procès-verbal. Rechargez la page et recommencez.',
+  point_inconnu: 'Ce procès-verbal vient d’être mis à jour : relisez-le avant de signer.',
+  gabarit_different: 'Les points de ce procès-verbal ont changé : complétez les nouveaux points avant d’envoyer.',
   gabarit_inconnu: 'Ce gabarit de points n’existe pas : choisissez-en un autre.',
   pas_de_reserves: 'Ce procès-verbal a été signé sans réserve : il n’y a rien à lever.',
   levee_non_demandee: 'La levée des réserves ne vous a pas encore été demandée. Contactez votre installateur.',
   levee_deja_signee: 'Les réserves de ce procès-verbal ont déjà été levées.',
   echeance_invalide: 'La date prévue n’est pas valable : elle doit être un vrai jour, au plus tôt celui de la signature du procès-verbal.',
   reponse_vide: 'Indiquez ce qui a été fait ou la date prévue pour les réserves.',
-  pv_modifie: 'Votre installateur vient de mettre à jour ce procès-verbal. Rechargez la page et relisez-le avant de signer.',
+  pv_modifie: 'Votre installateur vient de mettre à jour ce procès-verbal : relisez-le avant de signer.',
   // état du chantier ou du lien
   deja_signe: 'Ce procès-verbal a déjà été signé.',
   chantier_introuvable: 'Ce chantier est introuvable.',
@@ -103,6 +105,7 @@ const MESSAGES = Object.freeze({
   envoi_non_note: 'L’e-mail est parti, mais son envoi n’a pas pu être noté sur le chantier.',
   secret_non_configure: 'Le lien de signature n’est pas configuré sur le serveur.',
   resend_non_configure: 'L’envoi d’e-mails n’est pas configuré sur le serveur.',
+  action_inconnue: 'Cette action n’est pas encore disponible sur le serveur : réessayez dans quelques minutes ou prévenez votre administrateur.',
 });
 
 /**

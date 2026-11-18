@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   enApresVente, etatContrat, contratsParClient, reperePv, reperesApresVente, blocageAvis, CAMPAGNE_AVIS_POSE,
-  messageAvisEnvoye, messageAvisRefuse, suiteDesReserves,
+  messageAvisEnvoye, messageAvisRefuse, suiteDesReserves, reponseReservesNonEnregistree,
 } from '../src/lib/chantierApresVente.js';
 import { getSmsCampaign } from '../src/lib/smsCampaigns.js';
 
@@ -120,6 +120,22 @@ test('suite des réserves : rien pour un PV sur tablette, étapes pour un PV en 
   assert.equal(suiteDesReserves(c, { reception_type: 'avec_reserves', levee_demandee_at: 'x' }), 'levee_demandee');
   assert.equal(suiteDesReserves(c, { reception_type: 'avec_reserves', levee_signed_at: 'x' }), 'levee_signee');
   assert.equal(suiteDesReserves(c, undefined), 'aucune'); // détail pas encore chargé : on ne propose rien
+});
+
+test('réponse aux réserves : le formulaire diffère-t-il de l\'enregistrement ?', () => {
+  const pv = { reserves_reponse: 'Joint repris', reserves_echeance: '2026-11-25' };
+  assert.equal(reponseReservesNonEnregistree({ reponse: 'Joint repris', echeance: '2026-11-25' }, pv), false);
+  // Texte identique après rognage : pas de différence.
+  assert.equal(reponseReservesNonEnregistree({ reponse: '  Joint repris \n', echeance: '2026-11-25' }, pv), false);
+  // Date vide et null : identiques ; rien saisi et rien enregistré : identiques.
+  assert.equal(reponseReservesNonEnregistree({ reponse: '', echeance: '' }, { reserves_reponse: null, reserves_echeance: null }), false);
+  assert.equal(reponseReservesNonEnregistree({ reponse: 'Joint repris', echeance: '' }, { ...pv, reserves_echeance: null }), false);
+  assert.equal(reponseReservesNonEnregistree({ reponse: '   ', echeance: null }, {}), false);
+  // Texte ou date changés : différence.
+  assert.equal(reponseReservesNonEnregistree({ reponse: 'Joint repris demain', echeance: '2026-11-25' }, pv), true);
+  assert.equal(reponseReservesNonEnregistree({ reponse: 'Joint repris', echeance: '2026-11-26' }, pv), true);
+  assert.equal(reponseReservesNonEnregistree({ reponse: 'Joint repris', echeance: '' }, pv), true);
+  assert.equal(reponseReservesNonEnregistree({ reponse: 'Réponse tapée', echeance: '' }, { reserves_reponse: null, reserves_echeance: null }), true);
 });
 
 test('suite des réserves : sans réserves, sans signature en ligne, ou PV tablette = aucune', () => {

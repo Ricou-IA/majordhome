@@ -178,6 +178,25 @@ export function figerDeclaration(code, reponses) {
 }
 
 /**
+ * Vrai si la déclaration que l'on s'apprête à envoyer est exactement celle déjà enregistrée
+ * (mêmes points, mêmes textes, mêmes réponses, dans l'ordre du gabarit) : la préparer à nouveau
+ * changerait sa version et ferait refuser la signature du client en `pv_modifie` pour rien.
+ * Le gabarit enregistré se compare à part (`pv.gabarit`).
+ * @param {string | null | undefined} code
+ * @param {Record<string, string> | null | undefined} reponses
+ * @param {{ cle: string, texte: string, reponse: string }[] | null | undefined} pointsEnregistres
+ * @returns {boolean}
+ */
+export function memeDeclaration(code, reponses, pointsEnregistres) {
+  const decl = figerDeclaration(code, reponses);
+  if (!decl.ok || !Array.isArray(pointsEnregistres) || pointsEnregistres.length !== decl.points.length) return false;
+  return decl.points.every((pt, i) => {
+    const e = pointsEnregistres[i] || {};
+    return e.cle === pt.cle && e.texte === pt.texte && e.reponse === pt.reponse;
+  });
+}
+
+/**
  * Fige les points du client : un point non coché est non confirmé.
  * @param {string | null | undefined} code
  * @param {string[] | null | undefined} clesConfirmees

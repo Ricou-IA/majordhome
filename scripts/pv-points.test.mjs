@@ -10,6 +10,7 @@ import {
   declarationComplete,
   figerDeclaration,
   figerPointsClient,
+  memeDeclaration,
 } from '../src/lib/pvPoints.js';
 
 // ASCII imprimable, Latin-1 (160 a 255), apostrophe typographique et oe : ce que Helvetica rend.
@@ -69,4 +70,23 @@ test('figer les points du client : non coché = non confirmé, clé étrangère 
   assert.deepEqual(r.points.map((p) => p.confirme), [true, false, false]);
   assert.deepEqual(figerPointsClient('generique', ['c_filtres']), { ok: false, code: 'point_inconnu' });
   assert.equal(figerPointsClient('generique', []).ok, true);
+});
+
+test('même déclaration : renvoyer sans rien changer ne prépare pas à nouveau', () => {
+  const reponses = { e_mise_en_service: 'oui', e_conforme_devis: 'sans_objet' };
+  const enregistres = figerDeclaration('generique', reponses).points;
+  assert.equal(memeDeclaration('generique', reponses, enregistres), true);
+  // Une réponse changée, un point en moins ou en trop : différent.
+  assert.equal(memeDeclaration('generique', { ...reponses, e_conforme_devis: 'non' }, enregistres), false);
+  assert.equal(memeDeclaration('generique', { e_mise_en_service: 'oui' }, enregistres), false);
+  assert.equal(memeDeclaration('generique', { ...reponses, e_conduit: 'oui' }, enregistres), false);
+  // Rien d'enregistré (pas encore préparé) ou enregistrement illisible : différent.
+  assert.equal(memeDeclaration('generique', reponses, []), false);
+  assert.equal(memeDeclaration('generique', reponses, null), false);
+  assert.equal(memeDeclaration('generique', reponses, undefined), false);
+  // Enregistrement d'un autre gabarit (points différents) : différent.
+  const granules = { e_mise_en_service: 'oui', e_conforme_devis: 'oui', e_conduit: 'oui', e_distances: 'oui', e_reglages: 'oui', e_differentiel: 'oui' };
+  assert.equal(memeDeclaration('generique', reponses, figerDeclaration('poele_granules', granules).points), false);
+  // Texte enregistré qui n'est plus celui du module : le serveur l'écrirait autrement, donc différent.
+  assert.equal(memeDeclaration('generique', reponses, enregistres.map((pt, i) => (i === 0 ? { ...pt, texte: 'ancien' } : pt))), false);
 });

@@ -8,9 +8,11 @@
 //
 // Bureau (JWT utilisateur ; membre de l'org + droit de modifier les chantiers ; le chantier
 // doit appartenir à l'org de l'appelant) :
-//   POST { action: "preparer", org_id, chantier_id, reponses }
+//   POST { action: "preparer", org_id, chantier_id, gabarit?, reponses }
 //        → déclaration de l'entreprise, point par point (oui | non | sans_objet). Le gabarit
-//          vient du TYPE du chantier, jamais du corps ; textes repris de pvPoints.js.
+//          vient du TYPE du chantier, jamais du corps ; textes repris de pvPoints.js. Le
+//          `gabarit` de la fenêtre n'est que comparé : différent ⇒ 409 gabarit_different
+//          + `gabarit` du serveur, rien n'est écrit.
 //          Reprise permise tant que le client n'a pas signé.
 //   POST { action: "envoyer", org_id, chantier_id }
 //        → + module Communication. E-mail au client (gabarit pv_reception) avec le lien, trace
@@ -161,7 +163,8 @@ async function lienPour(chantierId: string): Promise<{ url: string; exp: number 
 
 /** Code de refus d'une RPC → statut HTTP. */
 function statutDuRefus(code: string): number {
-  if (code === "deja_signe" || code === "levee_deja_signee" || code === "point_inconnu" || code === "pv_modifie") return 409;
+  if (code === "deja_signe" || code === "levee_deja_signee" || code === "point_inconnu" || code === "pv_modifie"
+      || code === "gabarit_different") return 409;
   if (code === "chantier_introuvable") return 404;
   return 400;
 }
@@ -291,6 +294,11 @@ async function actionPreparer(req: Request, body: Json): Promise<Response> {
   }
   // Gabarit du type du chantier, jamais du corps ; textes repris du module d'après les clés.
   const gabarit = normaliserGabarit(ctx.gabarit_type);
+  // Le gabarit de la fenêtre n'est que COMPARÉ : s'il diffère (type inactif, gabarit changé
+  // entre-temps), rien n'est écrit et la fenêtre reçoit celui du serveur pour compléter.
+  if (typeof body.gabarit === "string" && body.gabarit !== "" && body.gabarit !== gabarit) {
+    return jsonResponse({ error: "gabarit_different", gabarit }, statutDuRefus("gabarit_different"), req);
+  }
   const decl = figerDeclaration(gabarit, reponses as Record<string, string>);
   if (!decl.ok) return jsonResponse({ error: decl.code }, 400, req);
 

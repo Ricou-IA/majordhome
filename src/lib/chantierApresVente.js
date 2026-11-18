@@ -93,6 +93,20 @@ export function suiteDesReserves(chantier, pv) {
 }
 
 /**
+ * La réponse aux réserves saisie diffère-t-elle de celle enregistrée ? Tant que oui, la levée ne
+ * se demande pas : une réponse tapée puis non enregistrée serait perdue, et figée vide à la levée.
+ * Texte comparé après rognage ; date vide et `null` sont la même absence de date.
+ * @param {{ reponse?: string|null, echeance?: string|null }} formulaire
+ * @param {Object|null|undefined} pv ligne de `majordhome_chantier_pv`
+ * @returns {boolean}
+ */
+export function reponseReservesNonEnregistree(formulaire, pv) {
+  const texte = (v) => String(v ?? '').trim();
+  return texte(formulaire?.reponse) !== texte(pv?.reserves_reponse)
+    || texte(formulaire?.echeance) !== texte(pv?.reserves_echeance);
+}
+
+/**
  * @param {Object} chantier ligne de `majordhome_chantiers`
  * @param {{ contrats?: Map<string, string[]>, avis?: Set<string> }} [listes] `undefined` = pas encore connues
  * @returns {Repere[]}
