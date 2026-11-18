@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   validerReponsePv, normaliserReponsePv, messagePv, PV_CODES, objetDuPv, dateLongue, periodeDePose,
   jourDeParis, donneesPdfPv, DEFAULT_PV_RECEPTION_EMAIL, PV_RECEPTION_TEMPLATE_KEY, PV_SIGNATURE_MAX,
+  validerReponseLevee, validerReponseReserves, donneesPdfLevee, DEFAULT_PV_LEVEE_EMAIL, PV_LEVEE_TEMPLATE_KEY,
 } from '../src/lib/pvReception.js';
 
 const SIGNATURE = `data:image/png;base64,${'A'.repeat(400)}`;
@@ -38,12 +39,11 @@ test('chaque code de la validation a un message', () => {
   assert.equal(messagePv('code_inconnu', 'repli'), 'repli');
 });
 
-test('normalisation : textes rognés, réserves vidées sans réserve, cases en booléens', () => {
+test('normalisation : textes rognés, réserves vidées sans réserve, plus de cases booléennes', () => {
   const n = normaliserReponsePv(reponse({ signataire_nom: '  Marie DURAND ', reserves_nature: 'oubli', info_recues: 'oui', notices_recues: undefined }));
   assert.equal(n.signataire_nom, 'Marie DURAND');
   assert.equal(n.reserves_nature, '');
-  assert.equal(n.info_recues, false);
-  assert.equal(n.notices_recues, false);
+  for (const k of ['info_recues', 'notices_recues', 'entretien_recues']) assert.equal(k in n, false);
   const avec = normaliserReponsePv(reponse({ reception_type: 'avec_reserves', reserves_nature: ' Joint ', reserves_travaux: ' Le reprendre ' }));
   assert.equal(avec.reserves_nature, 'Joint');
   assert.equal(avec.reserves_travaux, 'Le reprendre');
@@ -106,4 +106,87 @@ test('gabarit d\'e-mail : clé, lien et transactionnel', () => {
   assert.equal(DEFAULT_PV_RECEPTION_EMAIL.is_transactional, true);
   assert.ok(DEFAULT_PV_RECEPTION_EMAIL.html_body.includes('{{LIEN_PV}}'));
   assert.ok(DEFAULT_PV_RECEPTION_EMAIL.html_body.includes('{{PRENOM}}'));
+});
+
+const complete = reponse();
+const sig = SIGNATURE;
+const base = {
+  chantierId: 'abcdef12-0000-0000-0000-000000000000',
+  client: { prenom: 'Marie', nom: 'DURAND', adresse: '12 chemin des Vignes', code_postal: '81600', ville: 'Gaillac' },
+  objet: 'Poêle à bois',
+  entreprise: 'Mayer Énergie',
+};
+const signee = {
+  signed_at: '2026-11-17T10:00:00Z', signataire_nom: 'Marie DURAND', signature_png: sig,
+  reception_type: 'sans_reserves',
+};
+const avecReserves = { ...signee, reception_type: 'avec_reserves', reserves_nature: 'Joint', reserves_travaux: 'Reprise du joint' };
+
+test('normalisation : clés confirmées dédoublonnées, plus de booléens', () => {
+  const r = normaliserReponsePv({ ...complete, points_confirmes: ['c_notice', 'c_notice', '', 7] });
+  assert.deepEqual(r.points_confirmes, ['c_notice']);
+  assert.equal('info_recues' in r, false);
+  assert.equal(normaliserReponsePv({ ...complete, points_confirmes: [' a ', ...Array.from({ length: 40 }, (_, i) => `k${i}`)] }).points_confirmes.length, 30);
+  assert.deepEqual(normaliserReponsePv(complete).points_confirmes, []);
+});
+test('réserves : au moins un des deux, date jamais avant la signature', () => {
+  assert.equal(validerReponseReserves({ reponse: ' ', echeance: null }, '2026-11-20'), 'reponse_vide');
+  assert.equal(validerReponseReserves({ reponse: '', echeance: '2026-11-19' }, '2026-11-20'), 'echeance_invalide');
+  assert.equal(validerReponseReserves({ reponse: '', echeance: '2026-11-20' }, '2026-11-20'), null);
+  assert.equal(validerReponseReserves({ reponse: 'Reprise du joint', echeance: null }, '2026-11-20'), null);
+  assert.equal(validerReponseReserves({ reponse: 'x', echeance: '20/11/2026' }, '2026-11-20'), 'echeance_invalide');
+  assert.equal(validerReponseReserves({ reponse: 'x', echeance: '2026-02-30' }, '2026-11-20'), 'echeance_invalide');
+  assert.equal(validerReponseReserves({ reponse: 'x'.repeat(2001), echeance: null }, '2026-11-20'), 'texte_trop_long');
+});
+test('levée : nom et signature, mêmes bornes que le PV', () => {
+  assert.equal(validerReponseLevee({ signataire_nom: '', signature_png: sig }), 'nom_requis');
+  assert.equal(validerReponseLevee({ signataire_nom: 'Marie Durand', signature_png: 'x' }), 'signature_requise');
+  assert.equal(validerReponseLevee({ signataire_nom: 'Marie Durand', signature_png: sig }), null);
+});
+test('PDF du PV : points et devis lus dans l’enregistrement', () => {
+  const d = donneesPdfPv({ ...base, signature: { ...signee, devis: [{ libelle: 'D-2026-0412', date: '2026-09-03' }],
+    points_entreprise: [{ cle: 'e_mise_en_service', texte: 'T1', reponse: 'sans_objet' }],
+    points_client: [{ cle: 'c_notice', texte: 'T2', confirme: false }] } });
+  assert.deepEqual(d.devis, [{ libelle: 'D-2026-0412', date: '3 septembre 2026' }]);
+  assert.deepEqual(d.pointsEntreprise, [{ texte: 'T1', reponse: 'sans objet' }]);
+  assert.deepEqual(d.pointsClient, [{ texte: 'T2', confirme: false }]);
+  assert.equal(d.infoRecues, false);
+});
+test('PDF du PV : sans points_client (tablette), les trois cases restent lues', () => {
+  const d = donneesPdfPv({ ...base, signature: { ...signee, info_recues: true, notices_recues: true, entretien_recues: false } });
+  assert.equal(d.infoRecues, true);
+  assert.equal(d.noticesRecues, true);
+  assert.equal(d.entretienRecues, false);
+  assert.deepEqual(d.pointsClient, []);
+  assert.deepEqual(d.devis, []);
+});
+test('PDF de levée : réponse et échéance absentes restent nulles', () => {
+  const d = donneesPdfLevee({ ...base, pv: { ...avecReserves, levee_signed_at: '2026-12-01T10:00:00Z', levee_signataire_nom: 'Marie Durand', levee_signature_png: sig } });
+  assert.equal(d.numero, 'LR-' + base.chantierId.slice(0, 8).toUpperCase());
+  assert.equal(d.reponse, null); assert.equal(d.echeance, null);
+  assert.equal(d.date, '1er décembre 2026');
+  assert.equal(d.pvNumber, 'PV-ABCDEF12');
+  assert.equal(d.pvDate, '17 novembre 2026');
+  assert.equal(d.reservesNature, 'Joint');
+  assert.equal(d.signatureNom, 'Marie Durand');
+  assert.equal(d.entreprise, 'Mayer Énergie');
+  assert.equal(d.lieu, 'Gaillac');
+});
+test('PDF de levée : réponse et échéance présentes', () => {
+  const d = donneesPdfLevee({ ...base, pv: { ...avecReserves, reserves_reponse: 'Joint repris', reserves_echeance: '2026-11-25',
+    levee_signed_at: '2026-12-01T10:00:00Z', levee_signataire_nom: 'M', levee_signature_png: sig, devis: [{ libelle: 'D1', date: '2026-09-03' }] } });
+  assert.equal(d.reponse, 'Joint repris');
+  assert.equal(d.echeance, '25 novembre 2026');
+  assert.deepEqual(d.devis, [{ libelle: 'D1', date: '3 septembre 2026' }]);
+});
+test('chaque code nouveau a un message', () => {
+  for (const c of ['pv_non_prepare','declaration_incomplete','point_inconnu','gabarit_inconnu','pas_de_reserves','levee_non_demandee','levee_deja_signee','echeance_invalide','reponse_vide']) {
+    assert.notEqual(messagePv(c, 'DEFAUT'), 'DEFAUT');
+  }
+});
+test('gabarit d’e-mail de levée : clé, lien et transactionnel', () => {
+  assert.equal(DEFAULT_PV_LEVEE_EMAIL.key, PV_LEVEE_TEMPLATE_KEY);
+  assert.equal(PV_LEVEE_TEMPLATE_KEY, 'pv_levee_reserves');
+  assert.equal(DEFAULT_PV_LEVEE_EMAIL.is_transactional, true);
+  for (const v of ['{{LIEN_PV}}', '{{PRENOM}}', '{{OBJET}}', '{{ACCENT_COLOR}}', '{{ORG_PHONE}}', '{{BRAND_NAME}}']) assert.ok(DEFAULT_PV_LEVEE_EMAIL.html_body.includes(v), v);
 });

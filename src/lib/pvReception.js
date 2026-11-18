@@ -30,6 +30,27 @@ export const DEFAULT_PV_RECEPTION_EMAIL = Object.freeze({
   is_transactional: true,
 });
 
+/** Gabarit transactionnel de l'e-mail qui demande de signer la levée des réserves. */
+export const PV_LEVEE_TEMPLATE_KEY = 'pv_levee_reserves';
+
+export const DEFAULT_PV_LEVEE_EMAIL = Object.freeze({
+  key: PV_LEVEE_TEMPLATE_KEY,
+  label: 'Levée des réserves à signer en ligne',
+  subject: 'Les points signalés sont réglés : merci de confirmer la levée des réserves',
+  html_body: [
+    '<p>Bonjour {{PRENOM}},</p>',
+    '<p>Lors de la réception de votre installation ({{OBJET}}), vous nous avez signalé des points à reprendre.',
+    ' Nous nous en sommes occupés. Merci de nous confirmer, en signant, que ces réserves sont levées :',
+    ' cela prend une minute, depuis votre téléphone.</p>',
+    '<p style="text-align:center;margin:28px 0">',
+    '<a href="{{LIEN_PV}}" style="background:{{ACCENT_COLOR}};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Confirmer la levée des réserves</a>',
+    '</p>',
+    '<p>Si quelque chose n’est pas réglé, ne signez pas : appelez-nous au {{ORG_PHONE}} et nous reviendrons chez vous.</p>',
+    '<p>Merci de votre confiance,<br>{{BRAND_NAME}}</p>',
+  ].join(''),
+  is_transactional: true,
+});
+
 /** Durée de validité du lien envoyé au client. */
 export const PV_LIEN_VALIDITE_JOURS = 60;
 
@@ -53,6 +74,16 @@ const MESSAGES = Object.freeze({
   signature_requise: 'Signez dans le cadre, puis appuyez sur « Valider la signature ».',
   reserves_a_decrire: 'Décrivez les réserves que vous souhaitez signaler.',
   texte_trop_long: 'Le texte est trop long (2 000 caractères au plus).',
+  // PV complété et levée des réserves
+  pv_non_prepare: 'Le procès-verbal n’est pas encore préparé : renseignez d’abord les devis et les points de l’entreprise.',
+  declaration_incomplete: 'La déclaration de l’entreprise est incomplète : répondez à chaque point avant d’envoyer le lien.',
+  point_inconnu: 'Un des points confirmés ne figure pas sur ce procès-verbal. Rechargez la page et recommencez.',
+  gabarit_inconnu: 'Ce gabarit de points n’existe pas : choisissez-en un autre.',
+  pas_de_reserves: 'Ce procès-verbal a été signé sans réserve : il n’y a rien à lever.',
+  levee_non_demandee: 'La levée des réserves ne vous a pas encore été demandée. Contactez votre installateur.',
+  levee_deja_signee: 'Les réserves de ce procès-verbal ont déjà été levées.',
+  echeance_invalide: 'La date prévue n’est pas valable : elle doit être un vrai jour, au plus tôt celui de la signature du procès-verbal.',
+  reponse_vide: 'Indiquez ce qui a été fait ou la date prévue pour les réserves.',
   // état du chantier ou du lien
   deja_signe: 'Ce procès-verbal a déjà été signé.',
   chantier_introuvable: 'Ce chantier est introuvable.',
@@ -107,23 +138,63 @@ export function validerReponsePv(reponse) {
 }
 
 /**
+ * Valide la signature de la levée des réserves (nom et image), mêmes bornes que le PV.
+ * @param {Object|null|undefined} reponse
+ * @returns {string|null} code du refus, ou `null`
+ */
+export function validerReponseLevee(reponse) {
+  const r = reponse || {};
+  const nom = String(r.signataire_nom ?? '').trim();
+  if (!nom || nom.length > PV_NOM_MAX) return 'nom_requis';
+  const signature = String(r.signature_png ?? '');
+  if (!signature.startsWith(PREFIXE_PNG) || signature.length < PV_SIGNATURE_MIN || signature.length > PV_SIGNATURE_MAX) {
+    return 'signature_requise';
+  }
+  return null;
+}
+
+/**
+ * Valide la réponse du bureau aux réserves : une description et/ou une date prévue.
+ * @param {{ reponse?: string|null, echeance?: string|null }} saisie
+ * @param {string} jourSignature jour de signature du PV, `YYYY-MM-DD`
+ * @returns {string|null} code du refus, ou `null`
+ */
+export function validerReponseReserves(saisie, jourSignature) {
+  const s = saisie || {};
+  const reponse = String(s.reponse ?? '').trim();
+  const echeance = String(s.echeance ?? '').trim();
+  if (!reponse && !echeance) return 'reponse_vide';
+  if (reponse.length > PV_TEXTE_MAX) return 'texte_trop_long';
+  if (echeance) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(echeance);
+    if (!m) return 'echeance_invalide';
+    const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    if (d.getUTCFullYear() !== Number(m[1]) || d.getUTCMonth() !== Number(m[2]) - 1 || d.getUTCDate() !== Number(m[3])) {
+      return 'echeance_invalide';
+    }
+    if (echeance < String(jourSignature ?? '')) return 'echeance_invalide';
+  }
+  return null;
+}
+
+/**
  * Réponse nettoyée, telle qu'elle part à la RPC : textes rognés, réserves vidées pour une
- * réception sans réserve, cases ramenées à des booléens.
+ * réception sans réserve, clés des points confirmés nettoyées (30 au plus).
  * @param {Object} reponse
  * @returns {Object}
  */
 export function normaliserReponsePv(reponse) {
   const r = reponse || {};
   const avecReserves = r.reception_type === 'avec_reserves';
+  const confirmes = Array.isArray(r.points_confirmes) ? r.points_confirmes : [];
+  const points = [...new Set(confirmes.filter((k) => typeof k === 'string').map((k) => k.trim()).filter(Boolean))].slice(0, 30);
   return {
     reception_type: r.reception_type,
     signataire_nom: String(r.signataire_nom ?? '').trim(),
     signature_png: String(r.signature_png ?? ''),
     reserves_nature: avecReserves ? String(r.reserves_nature ?? '').trim() : '',
     reserves_travaux: avecReserves ? String(r.reserves_travaux ?? '').trim() : '',
-    info_recues: r.info_recues === true,
-    notices_recues: r.notices_recues === true,
-    entretien_recues: r.entretien_recues === true,
+    points_confirmes: points,
   };
 }
 
@@ -188,6 +259,7 @@ export function donneesPdfPv({ chantierId, client, objet, entreprise, signature 
   const c = client || {};
   const s = signature || {};
   const avecReserves = s.reception_type === 'avec_reserves';
+  const pointsClient = Array.isArray(s.points_client) ? s.points_client : null;
   return {
     pvNumber: `PV-${String(chantierId || '').slice(0, 8).toUpperCase()}`,
     pvDate: dateLongue(jourDeParis(s.signed_at)),
@@ -204,13 +276,61 @@ export function donneesPdfPv({ chantierId, client, objet, entreprise, signature 
     receptionType: s.reception_type,
     reservesNature: avecReserves ? s.reserves_nature || null : null,
     reservesTravaux: avecReserves ? s.reserves_travaux || null : null,
-    infoRecues: s.info_recues === true,
-    noticesRecues: s.notices_recues === true,
-    entretienRecues: s.entretien_recues === true,
+    // Cases d'avant : lues seulement pour un PV sans `points_client` (signé sur tablette).
+    infoRecues: !pointsClient && s.info_recues === true,
+    noticesRecues: !pointsClient && s.notices_recues === true,
+    entretienRecues: !pointsClient && s.entretien_recues === true,
+    devis: devisEnMots(s.devis),
+    pointsEntreprise: (Array.isArray(s.points_entreprise) ? s.points_entreprise : []).map((p) => ({
+      texte: p.texte,
+      reponse: String(p.reponse ?? '').replace('_', ' '),
+    })),
+    pointsClient: (pointsClient || []).map((p) => ({ texte: p.texte, confirme: p.confirme === true })),
     signatureClientBase64: s.signature_png || null,
     signatureClientNom: s.signataire_nom || '',
     signatureTechBase64: null,
     signatureTechNom: entreprise || '',
     lieu: c.ville || '',
   };
+}
+
+/**
+ * Données du PDF de levée des réserves, depuis la ligne `chantier_pv` (réserves, réponse du
+ * bureau, signature de la levée). Rien n'est recalculé.
+ * @param {Object} p
+ * @param {string} p.chantierId
+ * @param {{ prenom?: string, nom?: string, adresse?: string, code_postal?: string, ville?: string }} p.client
+ * @param {string} p.objet        objet des travaux (`objetDuPv`)
+ * @param {string} p.entreprise   nom de l'entreprise
+ * @param {Object} p.pv           ligne `chantier_pv` dont la levée est signée
+ * @returns {Object}
+ */
+export function donneesPdfLevee({ chantierId, client, objet, entreprise, pv }) {
+  const c = client || {};
+  const s = pv || {};
+  return {
+    numero: `LR-${String(chantierId || '').slice(0, 8).toUpperCase()}`,
+    date: dateLongue(jourDeParis(s.levee_signed_at)),
+    pvNumber: `PV-${String(chantierId || '').slice(0, 8).toUpperCase()}`,
+    pvDate: dateLongue(jourDeParis(s.signed_at)),
+    clientName: [c.nom, c.prenom].map((v) => String(v ?? '').trim()).filter(Boolean).join(' ') || 'Client',
+    clientAddress: c.adresse || '-',
+    clientPostalCode: c.code_postal || '',
+    clientCity: c.ville || '',
+    equipmentLabel: objet || 'Installation',
+    devis: devisEnMots(s.devis),
+    reservesNature: s.reserves_nature || null,
+    reservesTravaux: s.reserves_travaux || null,
+    reponse: s.reserves_reponse || null,
+    echeance: s.reserves_echeance ? dateLongue(s.reserves_echeance) : null,
+    signatureNom: s.levee_signataire_nom || '',
+    signatureBase64: s.levee_signature_png || null,
+    entreprise: entreprise || '',
+    lieu: c.ville || '',
+  };
+}
+
+/** Devis cités au PV : date en toutes lettres. */
+function devisEnMots(devis) {
+  return (Array.isArray(devis) ? devis : []).map((d) => ({ libelle: d.libelle, date: dateLongue(d.date) }));
 }
