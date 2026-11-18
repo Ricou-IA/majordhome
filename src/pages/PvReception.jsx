@@ -153,6 +153,12 @@ export default function PvReception() {
           <section className="mt-8 space-y-3">
             <p className="text-base font-medium">{messagePv(erreur, 'Ce procès-verbal est momentanément indisponible.')}</p>
             <p className="text-sm text-secondary-600">Contactez votre installateur : il vous renverra un lien.</p>
+            <button
+              type="button" onClick={charger}
+              className="w-full min-h-[48px] rounded-lg border border-secondary-300 bg-white text-base font-medium text-secondary-800 hover:bg-secondary-100"
+            >
+              Réessayer
+            </button>
           </section>
         )}
 

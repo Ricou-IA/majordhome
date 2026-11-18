@@ -4,7 +4,7 @@
  */
 import { CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { CertificatSignaturePad } from '@apps/artisan/components/certificat/CertificatSignaturePad';
-import { periodeDePose, dateLongue } from '@/lib/pvReception';
+import { periodeDePose, dateLongue, ligneDevis } from '@/lib/pvReception';
 import PvDeclaration from './PvDeclaration';
 import PvPointsClient from './PvPointsClient';
 
@@ -35,8 +35,8 @@ export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner 
         <div><dt className="text-secondary-500">Travaux</dt><dd className="font-medium">{pv.objet}</dd></div>
         {pose && <div><dt className="text-secondary-500">Réalisés</dt><dd className="font-medium">{pose}</dd></div>}
         {adresse && <div><dt className="text-secondary-500">Adresse</dt><dd className="font-medium">{adresse}</dd></div>}
-        {pv.devis?.map((d, i) => (
-          <div key={`${i}-${d.libelle}`}><dd className="font-medium">Devis {d.libelle} du {dateLongue(d.date)}</dd></div>
+        {pv.devis?.map((d) => ligneDevis(d.libelle, dateLongue(d.date))).filter(Boolean).map((texte, i) => (
+          <div key={`${i}-${texte}`}><dd className="font-medium">{texte}</dd></div>
         ))}
       </dl>
 

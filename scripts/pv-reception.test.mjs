@@ -5,6 +5,7 @@ import {
   validerReponsePv, normaliserReponsePv, messagePv, PV_CODES, objetDuPv, dateLongue, periodeDePose,
   jourDeParis, donneesPdfPv, DEFAULT_PV_RECEPTION_EMAIL, PV_RECEPTION_TEMPLATE_KEY, PV_SIGNATURE_MAX,
   validerReponseLevee, validerReponseReserves, donneesPdfLevee, DEFAULT_PV_LEVEE_EMAIL, PV_LEVEE_TEMPLATE_KEY,
+  ligneDevis,
 } from '../src/lib/pvReception.js';
 
 const SIGNATURE = `data:image/png;base64,${'A'.repeat(400)}`;
@@ -199,6 +200,13 @@ test('messages lisibles par le client : ni devis à renseigner, ni « Rechargez 
     assert.doesNotMatch(messagePv(c), /Rechargez/i, c);
     assert.match(messagePv(c), /relisez/i, c);
   }
+});
+test('ligne de devis : jamais « Devis  du … » ni « Devis X du  »', () => {
+  assert.equal(ligneDevis('D-2026-0412', '3 septembre 2026'), 'Devis D-2026-0412 du 3 septembre 2026');
+  assert.equal(ligneDevis('D-2026-0412', ''), 'Devis D-2026-0412');
+  assert.equal(ligneDevis(null, '3 septembre 2026'), 'Devis du 3 septembre 2026');
+  assert.equal(ligneDevis('  ', null), '');
+  assert.equal(ligneDevis(undefined, undefined), '');
 });
 test('gabarit d’e-mail de levée : clé, lien et transactionnel', () => {
   assert.equal(DEFAULT_PV_LEVEE_EMAIL.key, PV_LEVEE_TEMPLATE_KEY);

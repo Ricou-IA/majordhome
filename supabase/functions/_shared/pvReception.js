@@ -335,6 +335,20 @@ export function donneesPdfLevee({ chantierId, client, objet, entreprise, pv }) {
   };
 }
 
+/**
+ * Ligne d'un devis cité au PV (écran et PDF) : « Devis X du <date> », « Devis X »,
+ * « Devis du <date> », ou rien si les deux manquent.
+ * @param {string|null|undefined} libelle numéro du devis
+ * @param {string|null|undefined} date date déjà en toutes lettres
+ * @returns {string}
+ */
+export function ligneDevis(libelle, date) {
+  const l = String(libelle ?? '').trim();
+  const d = String(date ?? '').trim();
+  if (!l && !d) return '';
+  return ['Devis', l, d ? `du ${d}` : ''].filter(Boolean).join(' ');
+}
+
 /** Devis cités au PV : date en toutes lettres. */
 function devisEnMots(devis) {
   return (Array.isArray(devis) ? devis : []).map((d) => ({ libelle: d.libelle, date: dateLongue(d.date) }));

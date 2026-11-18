@@ -153,9 +153,9 @@ export default function PvReceptionSign() {
       // Générer le PDF
       const blob = await generatePvReceptionPdfBlob(pdfData, company);
 
-      // Upload
-      const safeName = clientName.replace(/[^a-zA-Z0-9À-ÿ _-]/g, '').replace(/\s+/g, '_');
-      const storagePath = `${orgId}/pv-reception/${chantier.id}/PV_Reception_-_${safeName}.pdf`;
+      // Upload : nom de fichier ASCII fixe (un accent dans la clé peut être refusé par Storage),
+      // l'upsert remplace un PV refait.
+      const storagePath = `${orgId}/pv-reception/${chantier.id}/PV_Reception_sur_place.pdf`;
 
       const { error: uploadError } = await storageService.uploadFile(
         'interventions',

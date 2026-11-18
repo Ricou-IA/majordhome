@@ -7,7 +7,11 @@
  *
  * - Les points viennent du gabarit du type d'équipement du chantier (`pvPoints.js`) ; le
  *   serveur dérive le gabarit de la même façon et fait foi : ici on AFFICHE et on envoie
- *   `{ [cle]: 'oui' | 'non' | 'sans_objet' }`.
+ *   `{ [cle]: 'oui' | 'non' | 'sans_objet' }` avec le gabarit affiché. S'il n'est pas le sien
+ *   (type inactif, gabarit changé), le serveur refuse `gabarit_different` en rendant le sien :
+ *   la fenêtre l'adopte pour cette ouverture (réponses des points communs gardées, rien coché).
+ * - Renvoyer une déclaration identique à l'enregistrement (`memeDeclaration`) ne la prépare pas
+ *   à nouveau : sa version changerait et la page déjà ouverte par le client refuserait de signer.
  * - Aucune réponse n'est présélectionnée : une case jamais touchée n'est pas un « oui ».
  * - Le détail du PV (reprise d'une préparation) est INCONNU tant qu'il charge ou en erreur :
  *   dans cet état les boutons restent fermés, on n'affiche jamais une déclaration vide.
@@ -27,9 +31,13 @@ import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { moduleActif } from '@/lib/modules';
 import {
-  declarationComplete, LIBELLE_REPONSE, LIBELLES_GABARIT, normaliserGabarit, pointsDuGabarit, REPONSES_ENTREPRISE,
+  declarationComplete, LIBELLE_REPONSE, LIBELLES_GABARIT, memeDeclaration, normaliserGabarit, pointsDuGabarit,
+  REPONSES_ENTREPRISE,
 } from '@/lib/pvPoints';
+import { messagePv } from '@/lib/pvReception';
 import { BOUTON_NEUTRE, BOUTON_PRINCIPAL } from './pvBoutons';
+import { LienACopier } from './LienACopier';
+import { copierDansPressePapiers, MESSAGE_COPIE_ECHOUEE } from './pvPressePapiers';
 
 const RADIO = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 bg-white cursor-pointer '
   + 'hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-300';
@@ -54,19 +62,26 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
   const [changerType, setChangerType] = useState(false);
   const [reponses, setReponses] = useState({});
   const [amorce, setAmorce] = useState(false);
+  // Gabarit rendu par le serveur sur `gabarit_different`, pour cette ouverture seulement.
+  const [gabaritServeur, setGabaritServeur] = useState(null);
+  const [enCours, setEnCours] = useState(false);
+  const [lienManuel, setLienManuel] = useState('');
 
   const donneesInconnues = Boolean(pvEnChargement || pvEnErreur || refEnChargement || refEnErreur);
   const deja = Boolean(pv?.signed_at || chantier.pv_signed_at);
   const type = equipmentTypes.find((t) => t.id === typeId) || null;
-  const gabarit = normaliserGabarit(type?.reception_profile);
+  const gabarit = gabaritServeur || normaliserGabarit(type?.reception_profile);
   const points = useMemo(() => pointsDuGabarit(gabarit), [gabarit]);
   const actives = useMemo(() => reponsesDuGabarit(reponses, gabarit), [reponses, gabarit]);
   const complete = declarationComplete(gabarit, actives);
-  const occupe = isPreparationPv || isEnvoiPv || isLienPv;
+  const occupe = enCours || isPreparationPv || isEnvoiPv || isLienPv;
 
   // Reprise d'une préparation existante : une fois par ouverture, quand tout est connu.
   useEffect(() => {
-    if (!open) { setAmorce(false); setChangerType(false); return; }
+    if (!open) {
+      setAmorce(false); setChangerType(false); setGabaritServeur(null); setLienManuel('');
+      return;
+    }
     if (amorce || donneesInconnues) return;
     setTypeId(chantier.equipment_type_id || '');
     const precedent = Object.fromEntries((pv?.points_entreprise || []).map((pt) => [pt.cle, pt.reponse]));
@@ -82,6 +97,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
       await updateEquipmentType(chantier.id, id);
       const nouveau = normaliserGabarit(equipmentTypes.find((t) => t.id === id)?.reception_profile);
       setTypeId(id);
+      setGabaritServeur(null); // le serveur dérivera désormais le gabarit de ce type
       setReponses((prec) => reponsesDuGabarit(prec, nouveau));
       setChangerType(false);
       onUpdated?.();
@@ -91,33 +107,61 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
   };
 
   const agir = async (mode) => {
+    if (enCours) return;
+    setEnCours(true);
+    setLienManuel('');
     let prepare = false;
     try {
-      await preparerPv({ chantierId: chantier.id, reponses: actives });
-      prepare = true;
+      // Déclaration identique à l'enregistrement : la préparer à nouveau changerait sa version
+      // (`prepare_at`) et ferait refuser la signature du client en `pv_modifie`.
+      const inchangee = pv?.gabarit === gabarit && memeDeclaration(gabarit, actives, pv?.points_entreprise);
+      if (!inchangee) {
+        await preparerPv({ chantierId: chantier.id, gabarit, reponses: actives });
+        prepare = true;
+      }
       if (mode === 'envoyer') {
         const res = await envoyerPv(chantier.id);
         toast.success(`PV envoyé à ${res?.sent_to || 'l\'adresse du client'}`);
       } else {
         const res = await lienPv(chantier.id);
-        await navigator.clipboard.writeText(res.url);
+        if (!(await copierDansPressePapiers(res.url))) {
+          // Le lien existe côté serveur : seule la copie a échoué, la fenêtre reste ouverte pour le montrer.
+          setLienManuel(res.url);
+          toast.error(MESSAGE_COPIE_ECHOUEE);
+          onUpdated?.();
+          return;
+        }
         toast.success('Lien copié : collez-le dans un SMS ou un message au client');
       }
       onUpdated?.();
       onOpenChange(false);
     } catch (err) {
+      if (err?.code === 'gabarit_different' && err.gabarit) {
+        // Le serveur fait foi : on adopte son gabarit, on garde les réponses des points communs,
+        // rien n'est coché d'office, rien n'est envoyé. L'utilisateur complète puis renvoie.
+        const serveur = normaliserGabarit(err.gabarit);
+        setGabaritServeur(serveur);
+        setReponses(reponsesDuGabarit(actives, serveur));
+        toast.error(messagePv('gabarit_different'));
+        return;
+      }
       const suite = prepare ? ' Votre déclaration est enregistrée.' : '';
-      toast.error(`${err?.message || (mode === 'envoyer' ? 'Le PV n\'a pas pu être envoyé.' : 'Le lien n\'a pas pu être copié.')}${suite}`);
+      toast.error(`${err?.message || (mode === 'envoyer' ? 'Le PV n\'a pas pu être envoyé.' : 'Le lien n\'a pas pu être obtenu.')}${suite}`);
       if (prepare) onUpdated?.();
+    } finally {
+      setEnCours(false);
     }
   };
 
-  const fermes = !canEdit || donneesInconnues || deja || !complete || occupe;
+  // Pendant un envoi, la fenêtre ne se ferme pas (Échap, Annuler) : le résultat doit s'afficher.
+  const changerOuverture = (suivant) => { if (suivant || !enCours) onOpenChange(suivant); };
+
+  const fermes = !canEdit || donneesInconnues || deja || !complete || occupe || isUpdatingEquipmentType;
   const groupes = grouperTypesParCategorie(index);
   const libelleType = type?.label || chantier.equipment_type_label || '';
 
   return (
-    <AlertDialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <AlertDialogPrimitive.Root open={open} onOpenChange={changerOuverture}>
       <AlertDialogPrimitive.Portal>
         <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
         <AlertDialogPrimitive.Content
@@ -135,7 +179,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                 <>
                   <span className="text-gray-900">{libelleType}</span>
                   {canEdit && !donneesInconnues && (
-                    <button type="button" onClick={() => setChangerType(true)} className="text-blue-700 underline text-sm">changer</button>
+                    <button type="button" disabled={occupe} onClick={() => setChangerType(true)} className="text-blue-700 underline text-sm disabled:opacity-50">changer</button>
                   )}
                 </>
               ) : (
@@ -143,7 +187,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                   <select
                     aria-label="Type d'équipement du chantier"
                     value=""
-                    disabled={!canEdit || donneesInconnues || isUpdatingEquipmentType}
+                    disabled={!canEdit || donneesInconnues || isUpdatingEquipmentType || occupe}
                     onChange={(e) => choisirType(e.target.value)}
                     className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                   >
@@ -159,8 +203,11 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                 </>
               )}
             </div>
-            {!donneesInconnues && type && (
+            {!donneesInconnues && (type || gabaritServeur) && (
               <p className="text-xs text-gray-500">Points du gabarit : {LIBELLES_GABARIT[gabarit]}.</p>
+            )}
+            {gabaritServeur && !deja && (
+              <p className="text-sm text-amber-800" role="alert">{messagePv('gabarit_different')}</p>
             )}
 
             {pvEnChargement || refEnChargement ? (
@@ -179,7 +226,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                   <h3 id="pv-declaration" className="text-sm font-semibold text-gray-900">L&apos;entreprise déclare</h3>
                   <button
                     type="button"
-                    disabled={!canEdit}
+                    disabled={!canEdit || occupe}
                     onClick={() => setReponses(Object.fromEntries(points.entreprise.map((pt) => [pt.cle, 'oui'])))}
                     className={BOUTON_NEUTRE}
                   >
@@ -200,7 +247,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                               name={`pv-${pt.cle}`}
                               value={rep}
                               checked={actives[pt.cle] === rep}
-                              disabled={!canEdit}
+                              disabled={!canEdit || occupe}
                               onChange={() => setReponses((prec) => ({ ...prec, [pt.cle]: rep }))}
                               className="accent-blue-600"
                             />
@@ -222,6 +269,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
           {communicationOuverte && chantier.email && !donneesInconnues && !deja && (
             <p className="mt-1 text-xs text-gray-500">L&apos;e-mail part à {chantier.email}.</p>
           )}
+          {lienManuel && <div className="mt-3"><LienACopier url={lienManuel} id={`pv-lien-${chantier.id}`} /></div>}
 
           <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
             <AlertDialogPrimitive.Cancel className={BOUTON_NEUTRE} disabled={occupe}>Annuler</AlertDialogPrimitive.Cancel>

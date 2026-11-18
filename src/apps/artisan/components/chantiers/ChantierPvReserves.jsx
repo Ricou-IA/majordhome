@@ -6,6 +6,8 @@
  *
  * - Répondre n'est PAS un préalable à la demande de levée (une reprise faite le lendemain se
  *   clôt sans réponse écrite) ; la réponse reste modifiable jusqu'à la signature de la levée.
+ *   Mais une réponse saisie et NON enregistrée ferme la demande de levée
+ *   (`reponseReservesNonEnregistree`) : sinon elle serait perdue, et figée vide à la levée.
  * - `pv` vaut `undefined` tant que le détail du PV n'est pas connu (chargement, erreur) :
  *   `suiteDesReserves` rend alors `'aucune'` et le composant ne rend rien.
  * - La réponse part toujours en entier (texte ET date) : le serveur remplace les deux.
@@ -19,10 +21,12 @@ import { AlertTriangle, CheckCircle2, ExternalLink, Link2, Loader2, Mail } from 
 import { toast } from 'sonner';
 import { useChantierPvMutations } from '@hooks/useChantiers';
 import { chantiersService } from '@services/chantiers.service';
-import { suiteDesReserves } from '@/lib/chantierApresVente';
+import { reponseReservesNonEnregistree, suiteDesReserves } from '@/lib/chantierApresVente';
 import { dateLongue, jourDeParis, messagePv, validerReponseReserves } from '@/lib/pvReception';
 import { formatDateTimeFR } from '@/lib/utils';
 import { BOUTON_NEUTRE, BOUTON_PRINCIPAL } from './pvBoutons';
+import { LienACopier } from './LienACopier';
+import { copierDansPressePapiers, MESSAGE_COPIE_ECHOUEE } from './pvPressePapiers';
 
 export function ChantierPvReserves({ chantier, pv, canEdit, company, communicationOuverte, onUpdated }) {
   const suite = suiteDesReserves(chantier, pv);
@@ -33,6 +37,7 @@ export function ChantierPvReserves({ chantier, pv, canEdit, company, communicati
   const [echeance, setEcheance] = useState(pv?.reserves_echeance || '');
   const [erreur, setErreur] = useState('');
   const [ouverture, setOuverture] = useState(false);
+  const [lienManuel, setLienManuel] = useState('');
 
   // Resynchronise avec l'enregistrement seulement quand sa valeur change (pas à chaque relecture).
   useEffect(() => { setReponse(pv?.reserves_reponse || ''); }, [pv?.reserves_reponse]);
@@ -42,6 +47,7 @@ export function ChantierPvReserves({ chantier, pv, canEdit, company, communicati
 
   const jourSignature = jourDeParis(pv.signed_at);
   const leveeSignee = suite === 'levee_signee';
+  const nonEnregistree = reponseReservesNonEnregistree({ reponse, echeance }, pv);
 
   const handleRepondre = async (e) => {
     e.preventDefault();
@@ -58,18 +64,25 @@ export function ChantierPvReserves({ chantier, pv, canEdit, company, communicati
   };
 
   const handleLevee = async (mode) => {
+    if (nonEnregistree) return;
+    setLienManuel('');
+    let res;
     try {
-      const res = await demanderLeveePv({ chantierId: chantier.id, mode });
-      if (mode === 'email') {
-        toast.success(`Demande envoyée à ${res?.sent_to || 'l\'adresse du client'}`);
-      } else {
-        await navigator.clipboard.writeText(res.url);
-        toast.success('Lien copié : collez-le dans un SMS ou un message au client');
-      }
-      onUpdated?.();
+      res = await demanderLeveePv({ chantierId: chantier.id, mode });
     } catch (err) {
-      toast.error(err?.message || (mode === 'email' ? 'La demande n\'a pas pu être envoyée' : 'Le lien n\'a pas pu être copié'));
+      toast.error(err?.message || (mode === 'email' ? 'La demande n\'a pas pu être envoyée' : 'Le lien n\'a pas pu être obtenu'));
+      return;
     }
+    if (mode === 'email') {
+      toast.success(`Demande envoyée à ${res?.sent_to || 'l\'adresse du client'}`);
+    } else if (await copierDansPressePapiers(res.url)) {
+      toast.success('Demande notée et lien copié : collez-le dans un SMS ou un message au client');
+    } else {
+      // La demande est notée côté serveur : seule la copie a échoué.
+      setLienManuel(res.url);
+      toast.error(MESSAGE_COPIE_ECHOUEE);
+    }
+    onUpdated?.();
   };
 
   const handleVoirLevee = async () => {
@@ -150,17 +163,31 @@ export function ChantierPvReserves({ chantier, pv, canEdit, company, communicati
           )}
 
           {canEdit && (
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              {communicationOuverte && (
-                <button type="button" onClick={() => handleLevee('email')} disabled={isDemandeLeveePv} className={BOUTON_PRINCIPAL}>
-                  {isDemandeLeveePv ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                  {suite === 'levee_demandee' ? 'Redemander la levée par e-mail' : 'Demander la levée par e-mail'}
+            <div className="space-y-2 pt-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {communicationOuverte && (
+                  <button
+                    type="button" onClick={() => handleLevee('email')} disabled={isDemandeLeveePv || nonEnregistree}
+                    aria-describedby={nonEnregistree ? `pv-levee-raison-${chantier.id}` : undefined} className={BOUTON_PRINCIPAL}
+                  >
+                    {isDemandeLeveePv ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                    {suite === 'levee_demandee' ? 'Redemander la levée par e-mail' : 'Demander la levée par e-mail'}
+                  </button>
+                )}
+                <button
+                  type="button" onClick={() => handleLevee('lien')} disabled={isDemandeLeveePv || nonEnregistree}
+                  aria-describedby={nonEnregistree ? `pv-levee-raison-${chantier.id}` : undefined} className={BOUTON_NEUTRE}
+                >
+                  <Link2 className="w-4 h-4" />
+                  Demander la levée : copier le lien
                 </button>
+              </div>
+              {nonEnregistree && (
+                <p id={`pv-levee-raison-${chantier.id}`} className="text-sm text-amber-800" role="status">
+                  Enregistrez votre réponse avant de demander la levée.
+                </p>
               )}
-              <button type="button" onClick={() => handleLevee('lien')} disabled={isDemandeLeveePv} className={BOUTON_NEUTRE}>
-                <Link2 className="w-4 h-4" />
-                Copier le lien
-              </button>
+              <LienACopier url={lienManuel} id={`pv-levee-lien-${chantier.id}`} />
             </div>
           )}
         </>

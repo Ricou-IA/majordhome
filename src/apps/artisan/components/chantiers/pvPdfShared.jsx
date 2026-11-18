@@ -7,6 +7,7 @@
 /* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM */
 
 import { StyleSheet, Text, View } from '@react-pdf/renderer';
+import { ligneDevis } from '@/lib/pvReception';
 
 // ============================================================================
 // COULEURS
@@ -350,9 +351,10 @@ export function Parties({ entreprise, client }) {
   );
 }
 
-/** Une ligne par devis cité : `Devis <libellé> du <date>` (date déjà en toutes lettres). */
+/** Une ligne par devis cité (`ligneDevis`, date déjà en toutes lettres) ; rien pour un devis sans numéro ni date. */
 export function LignesDevis({ devis }) {
-  return (devis || []).map((d, i) => (
-    <Text key={i} style={{ fontSize: 9, marginTop: 2 }}>Devis {d.libelle} du {d.date}</Text>
-  ));
+  return (devis || [])
+    .map((d) => ligneDevis(d.libelle, d.date))
+    .filter(Boolean)
+    .map((texte, i) => <Text key={i} style={{ fontSize: 9, marginTop: 2 }}>{texte}</Text>);
 }
