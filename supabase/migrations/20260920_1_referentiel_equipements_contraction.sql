@@ -110,7 +110,7 @@ CREATE VIEW public.majordhome_pricing_equipment_types
   SELECT id, org_id, code, label, category, has_unit_pricing, unit_label,
          included_units, sort_order, is_active, created_at, updated_at,
          duration_base_minutes, duration_per_extra_unit_minutes, unfavorable_months,
-         category_id
+         category_id, reception_profile
   FROM majordhome.pricing_equipment_types;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.majordhome_pricing_equipment_types TO authenticated, service_role;
 

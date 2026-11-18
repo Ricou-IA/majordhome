@@ -1,5 +1,8 @@
 -- assert-chantier-pv.sql — vérifie 20261117_3 (PV de réception signé en ligne) sur le cluster de
 -- répétition. Autonome : crée son lead, ses chantiers et leurs RDV. Un écart lève une exception.
+-- Depuis 20261118_1 (chaîne 20261117_3 + 20261118_1) : une signature exige une préparation par
+-- l'entreprise (chantier_pv_preparer) et n'écrit plus les trois booléens ; majordhome_chantiers a
+-- deux colonnes de plus (46). Le reste du PV complété est vérifié par assert-chantier-pv-points.sql.
 DO $$
 DECLARE
   v_org     uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
@@ -10,6 +13,8 @@ DECLARE
   v_archive uuid := '77777777-7777-7777-7777-000000000003'; -- PV déjà archivé (signé sur tablette)
   v_absent  uuid := '77777777-7777-7777-7777-0000000000ff';
   v_membre  uuid;
+  v_points  jsonb := jsonb_build_array(
+              jsonb_build_object('cle', 'e_mise_en_service', 'texte', 'L''installation a été mise en service et essayée.', 'reponse', 'oui'));
   v_today   date := CURRENT_DATE;
   v_sig     text := 'data:image/png;base64,' || repeat('A', 400);
   v_ok      jsonb := jsonb_build_object(
@@ -62,7 +67,7 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO n FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'majordhome_chantiers';
-  IF n <> 44 THEN RAISE EXCEPTION 'majordhome_chantiers : 44 colonnes attendues, % trouvées', n; END IF;
+  IF n <> 46 THEN RAISE EXCEPTION 'majordhome_chantiers : 46 colonnes attendues (44 + 2 de 20261118_1), % trouvées', n; END IF;
   SELECT count(*) INTO n FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = 'majordhome_chantiers' AND ordinal_position > 41
      AND column_name IN ('pv_sent_at', 'pv_signed_at', 'pv_avec_reserves');
@@ -125,6 +130,11 @@ BEGIN
   IF r->>'code' <> 'chantier_introuvable' THEN RAISE EXCEPTION 'signature : chantier inconnu : %', r; END IF;
   r := public.chantier_pv_signer(v_archive, v_ok);
   IF r->>'code' <> 'deja_signe' THEN RAISE EXCEPTION 'signature : PV déjà archivé doit être refusé : %', r; END IF;
+  -- 20261118_1 : préparation de l'entreprise exigée avant toute signature
+  r := public.chantier_pv_signer(v_planif, v_ok);
+  IF r->>'code' <> 'pv_non_prepare' THEN RAISE EXCEPTION 'signature : PV non préparé accepté : %', r; END IF;
+  r := public.chantier_pv_preparer(v_planif, 'generique', v_points, NULL);
+  IF (r->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'préparation refusée : %', r; END IF;
   r := public.chantier_pv_signer(v_planif, v_ok || '{"reception_type":"autre"}');
   IF r->>'code' <> 'choix_requis' THEN RAISE EXCEPTION 'signature : choix invalide accepté : %', r; END IF;
   r := public.chantier_pv_signer(v_planif, v_ok || '{"signataire_nom":"   "}');
@@ -150,7 +160,9 @@ BEGIN
   END IF;
   SELECT * INTO ligne FROM majordhome.chantier_pv WHERE chantier_id = v_planif;
   IF ligne.signataire_nom <> 'Marie DURAND' OR ligne.reserves_nature <> 'Joint de porte à reprendre' OR ligne.reserves_travaux IS NOT NULL
-     OR ligne.info_recues IS NOT TRUE OR ligne.entretien_recues IS NOT FALSE OR ligne.sent_count <> 2 OR ligne.signed_at IS NULL THEN
+     OR ligne.info_recues IS NOT NULL OR ligne.notices_recues IS NOT NULL OR ligne.entretien_recues IS NOT NULL -- plus écrits depuis 20261118_1
+     OR ligne.points_client IS DISTINCT FROM '[]'::jsonb OR ligne.devis IS DISTINCT FROM '[]'::jsonb
+     OR ligne.sent_count <> 2 OR ligne.signed_at IS NULL THEN
     RAISE EXCEPTION 'signature : enregistrement inattendu (nom %, nature %, travaux %, envois %)', ligne.signataire_nom, ligne.reserves_nature, ligne.reserves_travaux, ligne.sent_count;
   END IF;
   IF (SELECT chantier_status FROM majordhome.chantiers WHERE id = v_planif) <> 'realise' THEN RAISE EXCEPTION 'signature : le chantier Planifié doit passer en Réceptionné'; END IF;
@@ -172,6 +184,8 @@ BEGIN
   IF (SELECT reception_type FROM majordhome.chantier_pv WHERE chantier_id = v_planif) <> 'avec_reserves' THEN RAISE EXCEPTION 'signature : la première a été écrasée'; END IF;
 
   -- Un chantier en amont : la signature est enregistrée, la carte ne bouge pas
+  r := public.chantier_pv_preparer(v_amont, 'generique', v_points, NULL);
+  IF (r->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'préparation en amont refusée : %', r; END IF;
   r := public.chantier_pv_signer(v_amont, v_ok);
   IF (r->>'ok')::boolean IS NOT TRUE OR (r->>'passe_en_receptionne')::boolean THEN RAISE EXCEPTION 'signature en amont : %', r; END IF;
   IF (SELECT chantier_status FROM majordhome.chantiers WHERE id = v_amont) <> 'commande_recue' THEN RAISE EXCEPTION 'signature en amont : la carte a bougé'; END IF;
