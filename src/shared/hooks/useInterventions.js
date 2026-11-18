@@ -169,10 +169,11 @@ export function useInterventionMutations(interventionId) {
     onSuccess: invalidateIntervention,
   });
 
-  // Mutation : upload fichier — résout avec { path, url }
+  // Mutation : upload fichier — résout avec { path, url }.
+  // orgId (org CORE) ouvre le chemin : les règles d'accès du dossier `interventions` l'exigent.
   const uploadMutation = useMutation({
     mutationFn: ({ projectId, file, fileType }) =>
-      unwrapResult(interventionsService.uploadFile(projectId, interventionId, file, fileType)),
+      unwrapResult(interventionsService.uploadFile(orgId, projectId, interventionId, file, fileType)),
     onSuccess: invalidateIntervention,
   });
 

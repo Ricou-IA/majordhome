@@ -7,7 +7,10 @@
  * Les photos et signatures sont stockées dans le bucket Storage "interventions".
  * La génération PDF et l'envoi email sont délégués à N8N via webhooks.
  *
- * Convention Storage path : {project_id}/{intervention_id}/{type}_{timestamp}.{ext}
+ * Convention Storage path : {org_id}/{project_id}/{intervention_id}/{type}_{timestamp}.{ext}
+ * (org CORE en premier segment : c'est ce que comparent les règles d'accès `interventions_org_*`,
+ * cf. `src/lib/interventionStoragePath.js`). La lecture et la suppression reprennent le chemin
+ * enregistré sur l'intervention, tel quel.
  *
  * @version 1.0.0 - Sprint 3 Outil Terrain Tablette
  * ============================================================================
@@ -15,6 +18,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
+import { buildInterventionStoragePath } from '@/lib/interventionStoragePath';
 
 // ============================================================================
 // CONSTANTES
@@ -72,15 +76,6 @@ export function getInterventionTypeConfig(type) {
  */
 export function getInterventionStatusConfig(status) {
   return INTERVENTION_STATUSES.find(s => s.value === status) || INTERVENTION_STATUSES[INTERVENTION_STATUSES.length - 1];
-}
-
-/**
- * Génère un chemin Storage pour un fichier
- * Convention : {project_id}/{intervention_id}/{type}_{timestamp}.{ext}
- */
-function buildStoragePath(projectId, interventionId, fileType, extension = 'jpg') {
-  const timestamp = Date.now();
-  return `${projectId}/${interventionId}/${fileType}_${timestamp}.${extension}`;
 }
 
 /**
@@ -331,20 +326,22 @@ export const interventionsService = {
 
   /**
    * Upload un fichier dans le bucket Storage "interventions"
+   * @param {string} orgId - Organisation CORE de l'utilisateur : premier segment du chemin,
+   *   comparé à son adhésion par les règles d'accès du dossier
    * @param {string} projectId - UUID du projet (pour le path)
    * @param {string} interventionId - UUID de l'intervention
    * @param {File|Blob} file - Fichier à uploader
    * @param {string} fileType - Type de fichier (FILE_TYPES)
    * @returns {{ data: { path, url }, error }}
    */
-  async uploadFile(projectId, interventionId, file, fileType) {
-    if (!projectId || !interventionId || !file || !fileType) {
-      throw new Error('[interventions] projectId, interventionId, file et fileType requis');
+  async uploadFile(orgId, projectId, interventionId, file, fileType) {
+    if (!orgId || !projectId || !interventionId || !file || !fileType) {
+      throw new Error('[interventions] orgId, projectId, interventionId, file et fileType requis');
     }
 
     return withErrorHandling(async () => {
       const extension = getFileExtension(file);
-      const path = buildStoragePath(projectId, interventionId, fileType, extension);
+      const path = buildInterventionStoragePath({ orgId, projectId, interventionId, fileType, extension });
 
       const { data, error } = await supabase.storage
         .from('interventions')
