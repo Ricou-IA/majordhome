@@ -227,13 +227,16 @@ export const chantiersService = {
   async uploadPvReception(orgId, chantierId, file) {
     if (!chantierId || !file) throw new Error('[chantiers] chantierId et file requis');
     const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
-    const storagePath = `pv-reception/${chantierId}/PV_Reception_${Date.now()}.${ext}`;
+    // Le premier segment est l'organisation : la règle du bucket le compare à l'adhésion de l'utilisateur.
+    const storagePath = `${orgId}/pv-reception/${chantierId}/PV_Reception_${Date.now()}.${ext}`;
     const { error: uploadError } = await storageService.uploadFile('interventions', storagePath, file, { upsert: true, contentType: file.type });
     if (uploadError) return { data: null, error: uploadError };
     return withErrorHandling(() => patchChantier(orgId, chantierId, { pv_reception_path: storagePath }), 'chantiers.uploadPvReception');
   },
   updatePvReceptionPath: (orgId, chantierId, storagePath) =>
     withErrorHandling(() => patchChantier(orgId, chantierId, { pv_reception_path: storagePath }), 'chantiers.updatePvReceptionPath'),
+  updatePvLeveePath: (orgId, chantierId, storagePath) =>
+    withErrorHandling(() => patchChantier(orgId, chantierId, { pv_levee_path: storagePath }), 'chantiers.updatePvLeveePath'),
   async getPvReceptionUrl(pdfPath) {
     if (!pdfPath) return { url: null, error: null };
     return storageService.getSignedUrl('interventions', pdfPath);

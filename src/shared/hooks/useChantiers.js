@@ -134,14 +134,39 @@ export function useChantierPvMutations() {
     mutationFn: ({ chantier, company }) => unwrapResult(chantierPvService.genererPdf({ orgId, chantier, company })),
     onSuccess: invalider,
   });
+  const preparation = useMutation({
+    mutationFn: ({ chantierId, reponses }) => unwrapResult(chantierPvService.preparer({ orgId, chantierId, reponses })),
+    onSuccess: invalider,
+  });
+  const reponseReserves = useMutation({
+    mutationFn: ({ chantierId, reponse, echeance }) =>
+      unwrapResult(chantierPvService.repondreReserves({ orgId, chantierId, reponse, echeance })),
+    onSuccess: invalider,
+  });
+  const demandeLevee = useMutation({
+    mutationFn: ({ chantierId, mode }) => unwrapResult(chantierPvService.demanderLevee({ orgId, chantierId, mode })),
+    onSuccess: invalider,
+  });
+  const pdfLevee = useMutation({
+    mutationFn: ({ chantier, company }) => unwrapResult(chantierPvService.genererPdfLevee({ orgId, chantier, company })),
+    onSuccess: invalider,
+  });
 
   return {
     envoyerPv: envoi.mutateAsync,
     lienPv: lien.mutateAsync,
     genererPdfPv: pdf.mutateAsync,
+    preparerPv: preparation.mutateAsync,
+    repondreReservesPv: reponseReserves.mutateAsync,
+    demanderLeveePv: demandeLevee.mutateAsync,
+    genererPdfLeveePv: pdfLevee.mutateAsync,
     isEnvoiPv: envoi.isPending,
     isLienPv: lien.isPending,
     isPdfPv: pdf.isPending,
+    isPreparationPv: preparation.isPending,
+    isReponseReservesPv: reponseReserves.isPending,
+    isDemandeLeveePv: demandeLevee.isPending,
+    isPdfLeveePv: pdfLevee.isPending,
   };
 }
 

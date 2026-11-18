@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@lib/serviceHelpers';
 import { storageService } from '@services/storage.service';
 import { chantiersService } from '@services/chantiers.service';
-import { messagePv, donneesPdfPv, objetDuPv } from '@/lib/pvReception';
+import { messagePv, donneesPdfPv, donneesPdfLevee, objetDuPv } from '@/lib/pvReception';
 
 /**
  * Appelle l'edge. Une réponse non-2xx porte un CODE (`error`) : il devient `err.code`,
@@ -83,12 +83,75 @@ export const chantierPvService = {
       }), company);
 
       if (chantier.pv_reception_path) return { blob, archive: true };
-      const chemin = `pv-reception/${chantier.id}/PV_Reception_en_ligne.pdf`;
+      const chemin = `${orgId}/pv-reception/${chantier.id}/PV_Reception_en_ligne.pdf`;
       const { error: uploadError } = await storageService.uploadFile('interventions', chemin, blob, { upsert: true, contentType: 'application/pdf' });
       if (uploadError) return { blob, archive: false };
       const { error: cheminError } = await chantiersService.updatePvReceptionPath(orgId, chantier.id, chemin);
       return { blob, archive: !cheminError };
     }, 'chantierPv.genererPdf');
+  },
+
+  /** Enregistre les réponses du bureau aux points de contrôle (oui / non / sans objet). → `{ prepare_at }` */
+  preparer: ({ orgId, chantierId, reponses }) =>
+    withErrorHandling(
+      () => invoquer({ action: 'preparer', org_id: orgId, chantier_id: chantierId, reponses }),
+      'chantierPv.preparer',
+    ),
+
+  /**
+   * Réponse du bureau aux réserves. La base REMPLACE le texte ET la date à chaque appel :
+   * les deux partent toujours, une valeur vide en `null`. → `{ ok, repondu_at }`
+   */
+  repondreReserves: ({ orgId, chantierId, reponse, echeance }) =>
+    withErrorHandling(
+      () => invoquer({
+        action: 'repondre_reserves',
+        org_id: orgId,
+        chantier_id: chantierId,
+        reponse: String(reponse ?? '').trim() || null,
+        echeance: echeance || null,
+      }),
+      'chantierPv.repondreReserves',
+    ),
+
+  /** Demande de levée des réserves : `mode` 'email' → `{ sent_to }`, 'lien' → `{ url, expires_at }`. */
+  demanderLevee: ({ orgId, chantierId, mode }) =>
+    withErrorHandling(
+      () => invoquer({ action: 'demander_levee', org_id: orgId, chantier_id: chantierId, mode }),
+      'chantierPv.demanderLevee',
+    ),
+
+  /**
+   * PDF de la levée des réserves, produit depuis l'ENREGISTREMENT de la signature de levée,
+   * puis archivé (`pv_levee_path`) si ce n'est pas déjà fait. Le PDF est rendu même si
+   * l'archivage échoue : `archive` dit ce qui a été fait.
+   * @returns {Promise<{ data: { blob: Blob, archive: boolean } | null, error: Error | null }>}
+   */
+  async genererPdfLevee({ orgId, chantier, company }) {
+    return withErrorHandling(async () => {
+      const { data: pv, error } = await chantierPvService.getPv(orgId, chantier.id);
+      if (error) throw error;
+      if (!pv?.levee_signed_at) throw new Error('La levée des réserves n\'a pas encore été signée');
+
+      const { generatePvLeveePdfBlob } = await import('@/apps/artisan/components/chantiers/PvLeveeReservesPDF');
+      const blob = await generatePvLeveePdfBlob(donneesPdfLevee({
+        chantierId: chantier.id,
+        client: {
+          prenom: chantier.first_name, nom: chantier.last_name,
+          adresse: chantier.address, code_postal: chantier.postal_code, ville: chantier.city,
+        },
+        objet: objetDuPv({ equipement: chantier.equipment_type_label, libelle: chantier.label }),
+        entreprise: company?.name || '',
+        pv,
+      }), company);
+
+      if (chantier.pv_levee_path) return { blob, archive: true };
+      const chemin = `${orgId}/pv-levee/${chantier.id}/PV_Levee_reserves.pdf`;
+      const { error: uploadError } = await storageService.uploadFile('interventions', chemin, blob, { upsert: true, contentType: 'application/pdf' });
+      if (uploadError) return { blob, archive: false };
+      const { error: cheminError } = await chantiersService.updatePvLeveePath(orgId, chantier.id, chemin);
+      return { blob, archive: !cheminError };
+    }, 'chantierPv.genererPdfLevee');
   },
 };
 
