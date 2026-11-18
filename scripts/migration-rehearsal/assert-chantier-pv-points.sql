@@ -1,6 +1,7 @@
 -- assert-chantier-pv-points.sql — vérifie 20261118_1 (PV complété : préparation par l'entreprise,
 -- points du client, photo des devis, réponse aux réserves, levée des réserves, gabarit par type,
--- dossier Storage `interventions`). Chaîne : 20261117_3 puis 20261118_1.
+-- dossier Storage `interventions`) et 20261118_2 (signature liée à la version de la déclaration
+-- lue, `prepare_at`). Chaîne : 20261117_3, 20261118_1, 20261118_2.
 -- Autonome : crée son lead, ses chantiers, un devis validé D-TEST-1 et un devis refusé D-TEST-2.
 -- Un écart lève une exception.
 DO $$
@@ -111,6 +112,35 @@ BEGIN
     RAISE EXCEPTION '2. préparation mal enregistrée : gabarit %, par %, points %', ligne.gabarit, ligne.prepare_par, ligne.points_entreprise;
   END IF;
 
+  -- ── 2b. La signature est liée à la version lue (20261118_2) ─────────────
+  -- La valeur à renvoyer est exactement le texte rendu par le contexte : l'edge la repasse telle quelle.
+  r := public.chantier_pv_contexte(v_c1);
+  IF r->'pv'->>'prepare_at' IS DISTINCT FROM (SELECT to_jsonb(prepare_at) #>> '{}' FROM majordhome.chantier_pv WHERE chantier_id = v_c1) THEN
+    RAISE EXCEPTION '2b. prepare_at du contexte (%) ≠ to_jsonb(prepare_at) de la ligne', r->'pv'->>'prepare_at';
+  END IF;
+  r := public.chantier_pv_signer(v_c1, v_signer);
+  IF r->>'code' IS DISTINCT FROM 'pv_modifie' THEN RAISE EXCEPTION '2b. signature sans prepare_at : %', r; END IF;
+  r := public.chantier_pv_signer(v_c1, v_signer || '{"prepare_at":null}');
+  IF r->>'code' IS DISTINCT FROM 'pv_modifie' THEN RAISE EXCEPTION '2b. signature avec prepare_at nul : %', r; END IF;
+  r := public.chantier_pv_signer(v_c1, v_signer || '{"prepare_at":"2000-01-01T00:00:00+00:00"}');
+  IF r->>'code' IS DISTINCT FROM 'pv_modifie' THEN RAISE EXCEPTION '2b. signature avec un autre prepare_at : %', r; END IF;
+  r := public.chantier_pv_signer(v_c1, v_signer || '{"prepare_at":"n-importe-quoi"}');
+  IF r->>'code' IS DISTINCT FROM 'pv_modifie' THEN RAISE EXCEPTION '2b. signature avec prepare_at mal formé : %', r; END IF;
+  IF (SELECT signed_at FROM majordhome.chantier_pv WHERE chantier_id = v_c1) IS NOT NULL THEN RAISE EXCEPTION '2b. un refus pv_modifie a signé'; END IF;
+  -- Le bureau prépare à nouveau après la lecture du client. Toute l'assertion tient dans une
+  -- transaction (now() constant) : la lecture « ancienne » est vieillie d'une minute pour simuler
+  -- le temps écoulé entre les deux préparations.
+  UPDATE majordhome.chantier_pv SET prepare_at = prepare_at - interval '1 minute' WHERE chantier_id = v_c1;
+  f := public.chantier_pv_contexte(v_c1)->'pv'->>'prepare_at'; -- version lue par le client
+  r := public.chantier_pv_preparer(v_c1, 'poele_granules',
+         v_points || jsonb_build_array(jsonb_build_object('cle', 'e_conduit', 'texte', 'Le conduit de fumée a été contrôlé.', 'reponse', 'non')), v_user);
+  IF (r->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION '2b. nouvelle préparation refusée : %', r; END IF;
+  IF (public.chantier_pv_contexte(v_c1)->'pv'->>'prepare_at') = f THEN RAISE EXCEPTION '2b. la nouvelle préparation n''a pas changé prepare_at'; END IF;
+  r := public.chantier_pv_signer(v_c1, v_signer || jsonb_build_object('prepare_at', f));
+  IF r->>'code' IS DISTINCT FROM 'pv_modifie' THEN RAISE EXCEPTION '2b. signature contre une déclaration remplacée : %', r; END IF;
+  IF (SELECT signed_at FROM majordhome.chantier_pv WHERE chantier_id = v_c1) IS NOT NULL THEN RAISE EXCEPTION '2b. un refus pv_modifie a signé'; END IF;
+  -- (la signature avec la valeur relue du contexte est faite au § 4)
+
   -- ── 3. Contexte : devis validés, gabarit du type ───────────────────────
   r := public.chantier_pv_contexte(v_c1);
   IF jsonb_typeof(r->'devis') <> 'array' OR jsonb_array_length(r->'devis') <> 1
@@ -130,7 +160,7 @@ BEGIN
   -- Chantier sans devis : la signature passe
   r := public.chantier_pv_preparer(v_c2, 'generique', v_points, v_user);
   IF (r->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION '3. préparation sans devis : %', r; END IF;
-  r := public.chantier_pv_signer(v_c2, v_signer);
+  r := public.chantier_pv_signer(v_c2, v_signer || jsonb_build_object('prepare_at', public.chantier_pv_contexte(v_c2)->'pv'->>'prepare_at'));
   IF (r->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION '3. signature sans devis refusée : %', r; END IF;
   SELECT * INTO ligne FROM majordhome.chantier_pv WHERE chantier_id = v_c2;
   IF ligne.devis IS DISTINCT FROM '[]'::jsonb OR ligne.points_client IS DISTINCT FROM '[]'::jsonb THEN
@@ -138,7 +168,9 @@ BEGIN
   END IF;
 
   -- ── 4. Signature avec points du client ─────────────────────────────────
+  -- Signée avec la valeur RELUE du contexte après la nouvelle préparation (§ 2b) : acceptée.
   r := public.chantier_pv_signer(v_c1, v_signer || jsonb_build_object(
+         'prepare_at', public.chantier_pv_contexte(v_c1)->'pv'->>'prepare_at',
          'reception_type', 'avec_reserves', 'reserves_nature', 'Habillage rayé',
          'points_client', jsonb_build_array(
            jsonb_build_object('cle', 'c_notice', 'texte', 'J''ai reçu la notice d''utilisation en français.', 'confirme', true),

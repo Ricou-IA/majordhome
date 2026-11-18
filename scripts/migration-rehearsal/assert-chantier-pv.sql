@@ -2,7 +2,8 @@
 -- répétition. Autonome : crée son lead, ses chantiers et leurs RDV. Un écart lève une exception.
 -- Depuis 20261118_1 (chaîne 20261117_3 + 20261118_1) : une signature exige une préparation par
 -- l'entreprise (chantier_pv_preparer) et n'écrit plus les trois booléens ; majordhome_chantiers a
--- deux colonnes de plus (46). Le reste du PV complété est vérifié par assert-chantier-pv-points.sql.
+-- deux colonnes de plus (46). Depuis 20261118_2 la signature porte `prepare_at` (chaîne 20261117_3 +
+-- 20261118_1 + 20261118_2). Le reste du PV complété est vérifié par assert-chantier-pv-points.sql.
 DO $$
 DECLARE
   v_org     uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
@@ -135,6 +136,8 @@ BEGIN
   IF r->>'code' <> 'pv_non_prepare' THEN RAISE EXCEPTION 'signature : PV non préparé accepté : %', r; END IF;
   r := public.chantier_pv_preparer(v_planif, 'generique', v_points, NULL);
   IF (r->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'préparation refusée : %', r; END IF;
+  -- 20261118_2 : la signature porte la version lue de la déclaration (texte rendu par le contexte)
+  v_ok := v_ok || jsonb_build_object('prepare_at', public.chantier_pv_contexte(v_planif)->'pv'->>'prepare_at');
   r := public.chantier_pv_signer(v_planif, v_ok || '{"reception_type":"autre"}');
   IF r->>'code' <> 'choix_requis' THEN RAISE EXCEPTION 'signature : choix invalide accepté : %', r; END IF;
   r := public.chantier_pv_signer(v_planif, v_ok || '{"signataire_nom":"   "}');
@@ -186,7 +189,7 @@ BEGIN
   -- Un chantier en amont : la signature est enregistrée, la carte ne bouge pas
   r := public.chantier_pv_preparer(v_amont, 'generique', v_points, NULL);
   IF (r->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'préparation en amont refusée : %', r; END IF;
-  r := public.chantier_pv_signer(v_amont, v_ok);
+  r := public.chantier_pv_signer(v_amont, v_ok || jsonb_build_object('prepare_at', public.chantier_pv_contexte(v_amont)->'pv'->>'prepare_at'));
   IF (r->>'ok')::boolean IS NOT TRUE OR (r->>'passe_en_receptionne')::boolean THEN RAISE EXCEPTION 'signature en amont : %', r; END IF;
   IF (SELECT chantier_status FROM majordhome.chantiers WHERE id = v_amont) <> 'commande_recue' THEN RAISE EXCEPTION 'signature en amont : la carte a bougé'; END IF;
   IF (SELECT pv_avec_reserves FROM public.majordhome_chantiers WHERE id = v_amont) THEN RAISE EXCEPTION 'vue : réserves à tort'; END IF;
