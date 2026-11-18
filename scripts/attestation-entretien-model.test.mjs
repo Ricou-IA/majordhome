@@ -95,3 +95,26 @@ test('textes PDF-safe : aucun caractère hors cp1252', () => {
     assert.ok(ok, `caractère hors cp1252 : ${ch} (U+${cp.toString(16)})`);
   }
 });
+
+test('R. 1331-75 : base légale codifiée, conduit identifié avec ses mesures, débouché et non « toiture »', () => {
+  const certificat = cert({
+    equipement_modele: 'Blade H',
+    donnees_ramonage: { methode: 'mecanique', conduits: [{ label: 'Conduit principal', diametre_mm: 80, longueur_ml: 6.5, resultat: 'ramone' }] },
+  });
+  const r = buildAttestationEntretien({ certificat, sections: bois, appareil: 'Poêle à granulés', client, company, invoiceDate: '2026-09-14', ...items });
+  assert.match(r.lettre.references, /R\. 1331-66 à R\. 1331-78/);
+  assert.match(r.lettre.references, /R\. 1331-75/);
+  assert.doesNotMatch(r.lettre.references, /R\. 1331-14/);
+  const t = texte(r.lettre);
+  assert.match(t, /Conduit ramoné : conduit principal \(Ø 80 mm, longueur 6,5 m\), raccordé au poêle à granulés de marque EDILKAMIN Blade H\./);
+  assert.match(t, /jusqu’à son débouché à l’extérieur/);
+  assert.doesNotMatch(t, /toiture/);
+});
+
+test('R. 1331-75 : plusieurs conduits ramonés, tous nommés', () => {
+  const certificat = cert({ donnees_ramonage: { methode: 'mecanique', conduits: [{ label: 'Conduit 1', resultat: 'ramone' }, { label: 'Conduit 2', diametre_mm: 150, resultat: 'ramone' }, { label: 'Conduit 3', resultat: 'na' }] } });
+  const r = buildAttestationEntretien({ certificat, sections: bois, appareil: 'Poêle à bois', client, company, invoiceDate: '2026-09-14', ...items });
+  const t = texte(r.lettre);
+  assert.match(t, /Conduits ramonés, raccordés au poêle à bois de marque EDILKAMIN : conduit 1 et conduit 2 \(Ø 150 mm\)\./);
+  assert.match(t, /vacants sur toute leur longueur/);
+});

@@ -6,7 +6,7 @@ import {
   MODE_ALLEGE, estAllege, dateDePassage, blocageConforme, brouillonRemplace, certificatAllegePayload,
   buildCertificatConforme, peutAnnulerConforme,
 } from '../src/lib/certificatConformeModel.js';
-import { eligibiliteAttestation } from '../src/lib/attestationEntretienModel.js';
+import { eligibiliteAttestation, MOTIFS } from '../src/lib/attestationEntretienModel.js';
 
 const company = {
   name: 'Mayer Énergie', legalName: 'MAYER ENERGIE', city: 'Gaillac',
@@ -93,16 +93,16 @@ test('certificatAllegePayload : allégé, finalisé, conforme, sans signature', 
   assert.equal(p.tva_taux, 5.5);
 });
 
-test('certificatAllegePayload : ramonage coché ⇒ un conduit ramoné, sans méthode affirmée', () => {
+test('certificatAllegePayload : « Ramonage mécanique effectué » ⇒ un conduit ramoné, méthode mécanique', () => {
   const p = certificatAllegePayload(entree({ ramonage: true }));
   assert.equal(p.type_document, 'entretien_ramonage');
-  assert.deepEqual(p.donnees_ramonage, { conduits: [{ label: 'Conduit principal', resultat: 'ramone' }] });
-  assert.equal('methode' in p.donnees_ramonage, false);
+  assert.deepEqual(p.donnees_ramonage, { methode: 'mecanique', conduits: [{ label: 'Conduit de fumée', resultat: 'ramone' }] });
 });
 
-test('certificatAllegePayload : ce certificat ouvre droit à l’attestation de ramonage', () => {
+test('certificatAllegePayload : pas de seconde attestation, la lettre du certificat en tient lieu (silencieux)', () => {
   const p = certificatAllegePayload(entree({ ramonage: true }));
-  assert.deepEqual(eligibiliteAttestation(p, { showRamonage: true }, company), { eligible: true });
+  assert.deepEqual(eligibiliteAttestation(p, { showRamonage: true }, company), { eligible: false, motif: 'attestation_dans_certificat' });
+  assert.equal(MOTIFS.attestation_dans_certificat.silencieux, true);
   const sans = certificatAllegePayload(entree());
   assert.deepEqual(eligibiliteAttestation(sans, { showRamonage: true }, company), { eligible: false, motif: 'pas_de_ramonage' });
 });
@@ -133,10 +133,24 @@ test('buildCertificatConforme : la lettre dit le passage et l’absence d’anom
   assert.doesNotMatch(t, /ramon/i);
 });
 
-test('buildCertificatConforme : la phrase de ramonage n’apparaît que si un conduit est noté ramoné', () => {
-  const certificat = { ...certificatAllegePayload(entree({ ramonage: true })), reference: 'CERT-2026-01617' };
-  const { lettre } = buildCertificatConforme({ certificat, appareil: 'Poêle à granulés', client, company, dateEdition: '2026-11-16' });
-  assert.match(texte(lettre), /Le conduit de fumée raccordé à l’appareil a été ramoné\./);
+test('buildCertificatConforme : ramonage ⇒ la lettre vaut attestation R. 1331-75 (conduit, méthode, vacuité)', () => {
+  const certificat = { ...certificatAllegePayload(entree({ ramonage: true })), reference: 'CERT-2026-01654' };
+  const { lettre } = buildCertificatConforme({ certificat, appareil: 'Poêle à granulés', client, company, dateEdition: '2026-11-18' });
+  assert.equal(lettre.objet, 'CERTIFICAT D’ENTRETIEN ET ATTESTATION DE RAMONAGE');
+  const t = texte(lettre);
+  assert.match(t, /entretien annuel de son poêle à granulés de marque PALAZZETTI eco fire beatrice 6 et le ramonage du conduit de fumée/);
+  assert.match(t, /Conduit ramoné : conduit de fumée, raccordé au poêle à granulés de marque PALAZZETTI eco fire beatrice 6\./);
+  assert.match(t, /brossage mécanique au moyen d’un hérisson/);
+  assert.match(t, /vacant sur toute sa longueur/);
+  assert.match(t, /attestation de ramonage au sens de l’article R\. 1331-75 du Code de la santé publique/);
+  assert.doesNotMatch(t, /toiture/);
+});
+
+test('buildCertificatConforme : sans ramonage, ni vacuité ni article R. 1331-75', () => {
+  const certificat = { ...certificatAllegePayload(entree()), reference: 'CERT-2026-01654' };
+  const { lettre } = buildCertificatConforme({ certificat, appareil: 'Poêle à granulés', client, company, dateEdition: '2026-11-18' });
+  assert.equal(lettre.objet, 'CERTIFICAT D’ENTRETIEN');
+  assert.doesNotMatch(texte(lettre), /vacant|1331/);
 });
 
 test('buildCertificatConforme : organisation et fiches incomplètes ⇒ ni « undefined » ni séparateur orphelin', () => {

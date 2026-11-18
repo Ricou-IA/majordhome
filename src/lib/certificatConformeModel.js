@@ -10,7 +10,9 @@
 //
 // ⚠️ PDF Helvetica/WinAnsi : pas de caractère hors cp1252 dans les textes produits.
 
-import { formatDateLettre } from './attestationEntretienModel.js';
+import {
+  formatDateLettre, marqueModele, paragraphesRamonage, ARTICLE_ATTESTATION_RAMONAGE,
+} from './attestationEntretienModel.js';
 
 export const MODE_ALLEGE = 'allege';
 
@@ -62,7 +64,10 @@ const texteOuNull = (s) => {
 /**
  * Ligne `certificats` du certificat allégé, prête pour l'upsert (une par ligne d'équipement).
  * Finalisée (`statut = 'signe'`) sans signature du client. Ramonage coché ⇒ un conduit noté
- * « ramoné », sans méthode : on n'affirme pas une méthode qu'on ne connaît pas.
+ * « ramoné », méthode MÉCANIQUE : c'est ce que la case dit (« Ramonage mécanique effectué »), et
+ * c'est la définition légale du ramonage (R. 1331-70 : action mécanique directe sur la paroi). Le
+ * certificat vaut alors attestation de ramonage (R. 1331-75) — vécu AMAR 2026-11-18 : la lettre
+ * disait seulement « a été ramoné », la cliente a réclamé méthode, conduit et vacuité.
  *
  * @param {object} p
  * @param {string} p.interventionId  intervention enfant (ligne d'équipement)
@@ -92,7 +97,9 @@ export function certificatAllegePayload({
     equipement_modele: texteOuNull(equipement.modele),
     equipement_numero_serie: texteOuNull(equipement.numeroSerie),
     donnees_entretien: {},
-    donnees_ramonage: ramonage ? { conduits: [{ label: 'Conduit principal', resultat: 'ramone' }] } : null,
+    donnees_ramonage: ramonage
+      ? { methode: 'mecanique', conduits: [{ label: 'Conduit de fumée', resultat: 'ramone' }] }
+      : null,
     mesures: {},
     pieces_remplacees: [],
     bilan_conformite: 'conforme',
@@ -134,23 +141,25 @@ export function buildCertificatConforme({ certificat, appareil = null, contractN
   const cpVille = [client.postal_code, (client.city || '').toUpperCase()].filter(Boolean).join(' ');
   const adresseClient = [client.address, cpVille].filter(Boolean).join(', ');
 
-  const marque = certificat.equipement_marque
-    ? ` de marque ${certificat.equipement_marque.toUpperCase()}${certificat.equipement_modele ? ` ${certificat.equipement_modele}` : ''}`
-    : (certificat.equipement_modele ? ` ${certificat.equipement_modele}` : '');
+  const appareilTexte = `${minuscule(appareil || 'appareil de chauffage')}${marqueModele(certificat)}`;
   const ramone = (certificat.donnees_ramonage?.conduits || []).some((c) => c?.resultat === 'ramone');
 
   const paragraphes = [
     [
       { text: `Nous attestons être intervenus${datePassage ? ` le ${datePassage.long}` : ''} au domicile de ${client.name}${adresseClient ? `, ${adresseClient},` : ''} pour l’entretien annuel de son ` },
-      { text: `${minuscule(appareil || 'appareil de chauffage')}${marque}`, bold: true },
-      { text: '.' },
+      { text: appareilTexte, bold: true },
+      { text: ramone ? ' et le ramonage du conduit de fumée qui lui est raccordé.' : '.' },
     ],
     [
       { text: 'Aucune anomalie n’a été relevée', bold: true },
       { text: ' lors de cette intervention. L’installation est conforme et apte à un usage normal.' },
     ],
-    ...(ramone ? [[{ text: 'Le conduit de fumée raccordé à l’appareil a été ramoné.' }]] : []),
-    [{ text: 'Le présent certificat est délivré pour servir et valoir ce que de droit.' }],
+    ...(ramone ? paragraphesRamonage(certificat.donnees_ramonage, appareilTexte) : []),
+    [{
+      text: ramone
+        ? `Le présent document vaut certificat d’entretien et attestation de ramonage au sens de l’${ARTICLE_ATTESTATION_RAMONAGE}. Il est délivré pour servir et valoir ce que de droit.`
+        : 'Le présent certificat est délivré pour servir et valoir ce que de droit.',
+    }],
   ];
 
   const ville = company.city || '';
@@ -158,7 +167,7 @@ export function buildCertificatConforme({ certificat, appareil = null, contractN
     lettre: {
       lieuDate: pdfSafe(dateLettre ? `${ville ? `${ville}, le ` : 'Le '}${dateLettre.long}` : ville),
       destinataire: [client.name, client.address, cpVille].filter(Boolean).map(pdfSafe),
-      objet: 'CERTIFICAT D’ENTRETIEN',
+      objet: ramone ? 'CERTIFICAT D’ENTRETIEN ET ATTESTATION DE RAMONAGE' : 'CERTIFICAT D’ENTRETIEN',
       references: pdfSafe([
         certificat.reference ? `Référence ${certificat.reference}` : '',
         contractNumber ? `Contrat ${contractNumber}` : '',

@@ -120,10 +120,11 @@ export function CertificatConformeDialog({
               disabled={!!blocage || loading}
             />
             <span>
-              <span className="font-medium text-gray-900">Ramonage effectué</span>
+              <span className="font-medium text-gray-900">Ramonage mécanique effectué</span>
               <span className="mt-0.5 block text-gray-600">
-                Le client recevra aussi l&apos;attestation de ramonage, qui écrit que le conduit est vacant
-                après test. À cocher seulement si le conduit a bien été ramoné.
+                Le certificat vaudra attestation de ramonage : il écrit que le conduit a été brossé au
+                hérisson sur toute sa longueur et qu&apos;il est vacant après test. À cocher seulement si
+                c&apos;est le cas.
               </span>
             </span>
           </label>

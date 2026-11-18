@@ -34,6 +34,13 @@ export function listeFr(items) {
 }
 
 const minuscule = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+
+/** « de marque PALAZZETTI eco fire beatrice 6 » (ou le modèle seul, ou rien). @param {{ equipement_marque?: string|null, equipement_modele?: string|null }} c */
+export function marqueModele(c) {
+  const modele = String(c?.equipement_modele || '').trim();
+  if (c?.equipement_marque) return ` de marque ${c.equipement_marque.toUpperCase()}${modele ? ` ${modele}` : ''}`;
+  return modele ? ` ${modele}` : '';
+}
 const sansCaracteresHorsPdf = (s) => String(s ?? '').replace(/\s/g, ' ').replace(/[−]/g, '-').replace(/[→←]/g, '-');
 
 const METHODES = {
@@ -41,28 +48,80 @@ const METHODES = {
     adjectif: 'mécanique',
     phrase: [
       { text: 'L’opération a été effectuée par ' }, { text: 'brossage mécanique', bold: true },
-      { text: ' au moyen d’un hérisson de section adaptée, sur la totalité du conduit, depuis le raccordement de l’appareil jusqu’à la sortie en toiture.' },
+      { text: ' au moyen d’un hérisson de section adaptée, sur la totalité du conduit, depuis le raccordement de l’appareil jusqu’à son débouché à l’extérieur.' },
     ],
   },
   chimique: {
     adjectif: 'chimique',
     phrase: [
       { text: 'L’opération a été effectuée par ' }, { text: 'ramonage chimique', bold: true },
-      { text: ', sur la totalité du conduit, depuis le raccordement de l’appareil jusqu’à la sortie en toiture.' },
+      { text: ', sur la totalité du conduit, depuis le raccordement de l’appareil jusqu’à son débouché à l’extérieur.' },
     ],
   },
   aspiration: {
     adjectif: 'par aspiration',
     phrase: [
       { text: 'L’opération a été effectuée par ' }, { text: 'aspiration', bold: true },
-      { text: ', sur la totalité du conduit, depuis le raccordement de l’appareil jusqu’à la sortie en toiture.' },
+      { text: ', sur la totalité du conduit, depuis le raccordement de l’appareil jusqu’à son débouché à l’extérieur.' },
     ],
   },
 };
 
+/**
+ * Base légale, numérotation CODIFIÉE (le décret 2023-641 tel que publié numérotait R. 1331-14 à
+ * R. 1331-23 ; le décret 2023-695 les a renumérotés). L'article R. 1331-75 exige que l'attestation
+ * précise le ou les conduits ramonés et atteste leur vacuité sur toute leur longueur (vécu : un
+ * client l'a réclamé, 2026-11-18).
+ */
+export const ARTICLE_ATTESTATION_RAMONAGE = 'article R. 1331-75 du Code de la santé publique';
+export const REFERENCES_RAMONAGE = 'Établie en application du décret n° 2023-641 du 20 juillet 2023 et de l’arrêté du même jour (articles R. 1331-66 à R. 1331-78 du Code de la santé publique), conformément à l’article R. 1331-75.';
+
+const nombreFr = (n) => String(n).replace('.', ',');
+
+/** « conduit principal (Ø 150 mm, longueur 8,5 m) » — seulement ce qui est connu. @param {{ label?: string, diametre_mm?: number|null, longueur_ml?: number|null }} c */
+export function descriptionConduit(c) {
+  const label = minuscule(String(c?.label || '').trim()) || 'conduit de fumée';
+  const mesures = [
+    Number(c?.diametre_mm) > 0 ? `Ø ${nombreFr(c.diametre_mm)} mm` : '',
+    Number(c?.longueur_ml) > 0 ? `longueur ${nombreFr(c.longueur_ml)} m` : '',
+  ].filter(Boolean);
+  return mesures.length ? `${label} (${mesures.join(', ')})` : label;
+}
+
+/**
+ * Les trois paragraphes qu'exige l'attestation de ramonage (R. 1331-75) : conduit(s) ramoné(s),
+ * méthode, vacuité sur toute la longueur. Partagés par l'attestation et le certificat « Conforme »
+ * allégé, qui en tient lieu. Segments non nettoyés (le modèle appelant applique son `clean`).
+ * @param {{ methode?: string, methode_autre?: string, conduits?: { label?: string, resultat?: string }[] }} ramonage
+ * @param {string} appareilTexte  ex. « poêle à granulés de marque PALAZZETTI »
+ * @returns {{ text: string, bold?: boolean }[][]}
+ */
+export function paragraphesRamonage(ramonage, appareilTexte) {
+  const conduits = (ramonage?.conduits || []).filter((c) => c && c.resultat === 'ramone');
+  const pluriel = conduits.length > 1;
+  const methode = METHODES[ramonage?.methode] || null;
+
+  const identification = pluriel
+    ? [{ text: `Conduits ramonés, raccordés au ${appareilTexte} : ` }, { text: listeFr(conduits.map(descriptionConduit)), bold: true }, { text: '.' }]
+    : [{ text: `Conduit ramoné : ` }, { text: descriptionConduit(conduits[0]), bold: true }, { text: `, raccordé au ${appareilTexte}.` }];
+
+  const operation = methode
+    ? methode.phrase
+    : [{ text: `L’opération a été effectuée${ramonage?.methode_autre ? ` (${ramonage.methode_autre})` : ''} sur la totalité du conduit, depuis le raccordement de l’appareil jusqu’à son débouché à l’extérieur.` }];
+
+  const vacuite = [
+    { text: 'À l’issue de l’opération, le ' }, { text: 'test de vacuité', bold: true },
+    { text: pluriel ? ' a été réalisé avec succès : les conduits sont déclarés ' : ' a été réalisé avec succès : le conduit est déclaré ' },
+    { text: pluriel ? 'vacants sur toute leur longueur' : 'vacant sur toute sa longueur', bold: true },
+    { text: ' et apte' + (pluriel ? 's' : '') + ' à un usage normal en sécurité.' },
+  ];
+  return [identification, operation, vacuite];
+}
+
 /** Motifs pour lesquels aucune attestation n'est produite. `silencieux` : rien à signaler (pas un ramonage). */
 export const MOTIFS = {
   pas_de_ramonage: { silencieux: true, message: 'Pas de ramonage sur ce certificat' },
+  attestation_dans_certificat: { silencieux: true, message: 'Le certificat « Conforme » vaut attestation de ramonage' },
   conduit_obstrue: { silencieux: false, message: 'Conduit noté obstrué : vacuité non attestable' },
   arret_urgence: { silencieux: false, message: 'Bilan « arrêt d’urgence » : appareil non apte à l’usage' },
   certificat_non_signe: { silencieux: false, message: 'Certificat non signé' },
@@ -80,6 +139,9 @@ export const MOTIFS = {
 export function eligibiliteAttestation(certificat, sections, company) {
   const conduits = (certificat?.donnees_ramonage?.conduits || []).filter((c) => c && c.resultat !== 'na');
   if (!sections?.showRamonage || conduits.length === 0) return { eligible: false, motif: 'pas_de_ramonage' };
+  // Certificat « Conforme » allégé : sa lettre porte déjà l'attestation (buildCertificatConforme),
+  // y compris quand il est posé après la facture — une seconde lettre ferait doublon.
+  if (certificat.mode === 'allege') return { eligible: false, motif: 'attestation_dans_certificat' };
   if (certificat.statut !== 'signe' && certificat.statut !== 'envoye') return { eligible: false, motif: 'certificat_non_signe' };
   if (certificat.bilan_conformite === 'arret_urgence') return { eligible: false, motif: 'arret_urgence' };
   if (conduits.some((c) => c.resultat !== 'ramone')) return { eligible: false, motif: 'conduit_obstrue' };
@@ -127,10 +189,10 @@ export function buildAttestationEntretien({ certificat, sections, nettoyageItems
     { text: ',' },
   ];
 
-  const marque = certificat.equipement_marque ? ` de marque ${certificat.equipement_marque.toUpperCase()}` : '';
+  const appareilTexte = `${minuscule(appareil || 'appareil de chauffage')}${marqueModele(certificat)}`;
   const p2 = [
     { text: `Atteste par la présente être intervenu le ${dateIntervention.long} au domicile de : ${client.name}${adresseClient ? `, ${adresseClient}` : ''}, dans le cadre de l’entretien annuel de son ` },
-    { text: `${minuscule(appareil || 'appareil de chauffage')}${marque}`, bold: true },
+    { text: appareilTexte, bold: true },
     { text: ` et du ramonage${methode ? ` ${methode.adjectif}` : ''} ${pluriel ? 'des conduits de fumée raccordés' : 'du conduit de fumée raccordé'} à cet appareil.` },
   ];
 
@@ -143,16 +205,7 @@ export function buildAttestationEntretien({ certificat, sections, nettoyageItems
   if (controlesOk.length) p3.push({ text: `${nettoyes.length ? ', ' : ''}le contrôle : ${listeFr(controlesOk)}` });
   p3.push({ text: `${nettoyes.length || controlesOk.length ? ', ainsi que ' : ''}la vérification du bon fonctionnement général de l’appareil.` });
 
-  const p4 = methode
-    ? methode.phrase
-    : [{ text: `L’opération a été effectuée${ramonage.methode_autre ? ` (${ramonage.methode_autre})` : ''} sur la totalité du conduit, depuis le raccordement de l’appareil jusqu’à la sortie en toiture.` }];
-
-  const p5 = [
-    { text: 'À l’issue de l’opération, le ' }, { text: 'test de vacuité', bold: true },
-    { text: pluriel ? ' a été réalisé avec succès : les conduits sont déclarés ' : ' a été réalisé avec succès : le conduit est déclaré ' },
-    { text: pluriel ? 'vacants sur toute leur longueur' : 'vacant sur toute sa longueur', bold: true },
-    { text: ' et apte' + (pluriel ? 's' : '') + ' à un usage normal en sécurité.' },
-  ];
+  const ramonageParas = paragraphesRamonage(ramonage, appareilTexte);
 
   const p6 = [{
     text: `La présente attestation est délivrée à l’intéressé(e) pour servir et valoir ce que de droit.${dateFacture ? ` Elle se rapporte à la facture du ${dateFacture.long}.` : ''}`,
@@ -168,9 +221,9 @@ export function buildAttestationEntretien({ certificat, sections, nettoyageItems
       lieuDate: `${ville ? `${ville}, le ` : 'Le '}${dateLettre.long}`,
       destinataire: [client.name, client.address, [client.postal_code, (client.city || '').toUpperCase()].filter(Boolean).join(' ')].filter(Boolean),
       objet: 'ATTESTATION D’ENTRETIEN ET DE RAMONAGE',
-      references: 'Établie en application du décret n° 2023-641 du 20 juillet 2023 et de l’arrêté du 20 juillet 2023, articles R. 1331-14 à R. 1331-21 du Code de la santé publique.',
+      references: REFERENCES_RAMONAGE,
       salutation: 'Madame, Monsieur,',
-      paragraphes: [p1, p2, p3, p4, p5, p6].map(clean),
+      paragraphes: [p1, p2, p3, ...ramonageParas, p6].map(clean),
       faitA: `Fait à ${ville || '..........'}, le ${dateLettre.court}`,
       signataire: { entreprise: nomSociete, nom: company.signatoryName, fonction: company.signatoryRole || '' },
     },
