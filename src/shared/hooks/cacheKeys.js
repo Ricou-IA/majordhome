@@ -136,6 +136,8 @@ export const interventionKeys = {
   detail: (orgId, id) => [...interventionKeys.all(orgId), 'detail', id],
   fileUrls: (orgId, id) => [...interventionKeys.all(orgId), 'files', id],
   byProject: (orgId, projectId) => [...interventionKeys.all(orgId), 'project', projectId],
+  // Rapport d'intervention SAV : RDV de la carte et leurs techniciens (date et intervenants proposés)
+  rapportSav: (orgId, id) => [...interventionKeys.all(orgId), 'rapport-sav', id],
 };
 
 // --- Chantiers ---

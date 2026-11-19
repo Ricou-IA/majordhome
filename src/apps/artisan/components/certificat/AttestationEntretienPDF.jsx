@@ -61,7 +61,7 @@ export function AttestationEntretienDocument({ lettre, company, logoSrc = null, 
   const accent = company.accentColor || '#64748b';
   const adresse = [company.address, [company.postalCode, company.city].filter(Boolean).join(' ')].filter(Boolean).join(' - ');
   return (
-    <Document title={`Attestation d'entretien - ${lettre.destinataire[0] || ''}`} author={company.name}>
+    <Document title={lettre.titreDocument || `Attestation d'entretien - ${lettre.destinataire[0] || ''}`} author={company.name}>
       <Page size="A4" style={s.page}>
         <View style={[s.header, { borderBottomColor: accent }]}>
           <View style={s.logoZone}>

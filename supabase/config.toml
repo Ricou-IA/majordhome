@@ -243,3 +243,7 @@ verify_jwt = true
 # assistant-pieces-cron : balayage chaque minute des recherches de pièces restées en cours — protégée par MDH_CRON_SECRET. 2026-11-13.
 [functions.assistant-pieces-cron]
 verify_jwt = false
+
+# sav-report-send : envoi au client du rapport d'intervention SAV archivé (Resend). JWT user + module Communication + user_can(sav | entretiens, edit). 2026-11-19.
+[functions.sav-report-send]
+verify_jwt = true

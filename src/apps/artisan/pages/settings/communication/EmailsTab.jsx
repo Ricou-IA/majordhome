@@ -14,6 +14,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { moduleActif } from '@/lib/modules';
 import { DEFAULT_INVOICE_EMAIL } from '@/lib/invoiceEmailTemplate';
 import { DEFAULT_DPE_RAPPORT_EMAIL } from '@/lib/dpeRapportEmailTemplate';
+import { DEFAULT_RAPPORT_SAV_EMAIL } from '@/lib/rapportSav';
 import { DEFAULT_PV_RECEPTION_EMAIL, DEFAULT_PV_LEVEE_EMAIL } from '@/lib/pvReception';
 import ResendDomainSection from './ResendDomainSection';
 import EmailAutoLigne from './EmailAutoLigne';
@@ -140,6 +141,11 @@ export default function EmailsTab() {
               orgId={orgId} gabarit={DEFAULT_PV_LEVEE_EMAIL}
               titre="Demander au client de confirmer la levée des réserves"
               description="Utilisé par « Demander la levée » de la fiche chantier : le client confirme depuis le lien, sur son téléphone, que ses réserves sont levées."
+            />
+            <EmailAutoLigne
+              orgId={orgId} gabarit={DEFAULT_RAPPORT_SAV_EMAIL}
+              titre="Envoyer le rapport d’intervention SAV au client"
+              description="Utilisé par « Envoyer au client » de la fenêtre Rapport d’intervention d’une demande SAV réalisée : le rapport part en pièce jointe."
             />
             {moduleActif(settings, 'dpe') && (
               <EmailAutoLigne

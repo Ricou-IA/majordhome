@@ -104,10 +104,23 @@ BEGIN
   SELECT count(*) INTO n FROM storage.objects WHERE bucket_id = 'interventions' AND name = v_signature;
   IF n <> 1 THEN RAISE EXCEPTION '7. la signature devrait rester lisible'; END IF;
 
+  -- ── 8. Rapport d'intervention SAV : un fichier fixe par carte, déposé puis REMPLACÉ ──
+  -- (`buildInterventionReportPath` ; l'écran dépose en « upsert » : INSERT la première fois, UPDATE ensuite)
+  INSERT INTO storage.objects (bucket_id, name) VALUES ('interventions', v_org || '/' || v_projet || '/' || v_intervention || '/rapport-intervention.pdf');
+  UPDATE storage.objects SET created_at = now()
+   WHERE bucket_id = 'interventions' AND name = v_org || '/' || v_projet || '/' || v_intervention || '/rapport-intervention.pdf';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 1 THEN RAISE EXCEPTION '8. remplacement du rapport : 1 ligne attendue, %', n; END IF;
+  PERFORM set_config('request.jwt.claim.sub', v_etranger::text, true);
+  UPDATE storage.objects SET created_at = now()
+   WHERE bucket_id = 'interventions' AND name = v_org || '/' || v_projet || '/' || v_intervention || '/rapport-intervention.pdf';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 0 THEN RAISE EXCEPTION '8. un non-membre a remplacé le rapport de l''org'; END IF;
+
   RESET ROLE;
   PERFORM set_config('request.jwt.claim.sub', '', true);
   DELETE FROM storage.objects WHERE bucket_id = 'interventions' AND name LIKE '%' || v_intervention || '%';
   REVOKE ALL ON storage.objects FROM authenticated; REVOKE USAGE ON SCHEMA storage FROM authenticated;
 
-  RAISE NOTICE 'assert-interventions-fiche-storage : OK (dépôt photo et signature, lecture au même chemin, suppression, ancienne forme refusée, autre org et non-membre refusés)';
+  RAISE NOTICE 'assert-interventions-fiche-storage : OK (dépôt photo et signature, lecture au même chemin, suppression, ancienne forme refusée, autre org et non-membre refusés, rapport SAV déposé puis remplacé)';
 END $$;

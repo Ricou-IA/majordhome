@@ -370,3 +370,15 @@ test('sujet d’une intervention : SAV, Entretien, Certificat d’un équipement
   assert.equal(sujetIntervention({ table_name: 'interventions', action: 'DELETE', old_values: { intervention_type: 'sav' } }), 'SAV');
   assert.equal(sujetIntervention({ table_name: 'clients', action: 'UPDATE' }), null);
 });
+
+test('rapport d’intervention SAV : le journal dit « édité » ou « envoyé », jamais le JSON de la trace', () => {
+  const editee = { rapport_sav: { path: 'o/p/i/rapport-intervention.pdf', edite_le: '2026-11-19T10:00:00Z', contenu: { travaux: 'Fait' } } };
+  assert.equal(formatAuditValue('interventions', 'metadata', editee), 'Rapport d’intervention édité');
+  assert.equal(
+    formatAuditValue('interventions', 'metadata', { rapport_sav: { ...editee.rapport_sav, envoye_le: '2026-11-19T10:05:00Z', envoye_a: 'a@b.fr' } }),
+    'Rapport d’intervention envoyé à a@b.fr',
+  );
+  // Autre contenu de metadata, ou autre table : comportement inchangé.
+  assert.equal(formatAuditValue('interventions', 'metadata', { autre: 1 }), '{"autre":1}');
+  assert.equal(formatAuditValue('equipments', 'metadata', { rapport_sav: {} }), '{"rapport_sav":{}}');
+});

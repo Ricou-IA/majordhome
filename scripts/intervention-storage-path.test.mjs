@@ -3,7 +3,7 @@
 // Lancer : node --test scripts/intervention-storage-path.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildInterventionStoragePath } from '../src/lib/interventionStoragePath.js';
+import { buildInterventionStoragePath, buildInterventionReportPath } from '../src/lib/interventionStoragePath.js';
 
 const ORG = '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
 const PROJET = '11111111-1111-1111-1111-111111111111';
@@ -30,4 +30,17 @@ test('projet, intervention ou type manquant : refus', () => {
   assert.throws(() => buildInterventionStoragePath({ orgId: ORG, projectId: '', interventionId: INTERVENTION, fileType: 'photo_after' }), /requis/);
   assert.throws(() => buildInterventionStoragePath({ orgId: ORG, projectId: PROJET, interventionId: null, fileType: 'photo_after' }), /requis/);
   assert.throws(() => buildInterventionStoragePath({ orgId: ORG, projectId: PROJET, interventionId: INTERVENTION, fileType: '' }), /requis/);
+});
+
+test('rapport SAV : un fichier fixe par carte, sous l\'organisation', () => {
+  assert.equal(
+    buildInterventionReportPath({ orgId: ORG, projectId: PROJET, interventionId: INTERVENTION }),
+    `${ORG}/${PROJET}/${INTERVENTION}/rapport-intervention.pdf`,
+  );
+});
+
+test('rapport SAV : identifiants manquants ou mal formés refusés (le chemin est dérivé côté serveur)', () => {
+  assert.throws(() => buildInterventionReportPath({ orgId: '', projectId: PROJET, interventionId: INTERVENTION }), /organisation requise/);
+  assert.throws(() => buildInterventionReportPath({ orgId: ORG, projectId: '../autre', interventionId: INTERVENTION }), /requis/);
+  assert.throws(() => buildInterventionReportPath({ orgId: ORG, projectId: PROJET, interventionId: undefined }), /requis/);
 });

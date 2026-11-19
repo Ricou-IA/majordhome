@@ -473,6 +473,13 @@ export function formatAuditValue(table, field, value, resolvers = {}) {
   if (PERCENT_FIELDS.has(field)) return `${value} %`;
   if (MINUTE_FIELDS.has(field)) return `${value} min`;
 
+  // Rapport d'intervention SAV : sa trace vit dans `interventions.metadata.rapport_sav` — dire ce
+  // qui s'est passé plutôt qu'afficher le JSON (chemin du fichier, contenu saisi).
+  if (table === 'interventions' && field === 'metadata' && typeof value === 'object' && value.rapport_sav) {
+    const rapport = value.rapport_sav;
+    return rapport.envoye_le ? `Rapport d’intervention envoyé à ${rapport.envoye_a || 'un client'}` : 'Rapport d’intervention édité';
+  }
+
   if (typeof value === 'object') return truncate(JSON.stringify(value), MAX_JSON);
 
   const text = String(value);

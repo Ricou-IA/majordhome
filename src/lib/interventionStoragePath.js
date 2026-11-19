@@ -28,3 +28,18 @@ export function buildInterventionStoragePath({ orgId, projectId, interventionId,
   if (!projectId || !interventionId || !fileType) throw new Error('[interventions] projectId, interventionId et fileType requis');
   return `${orgId}/${projectId}/${interventionId}/${fileType}_${now}.${extension}`;
 }
+
+/**
+ * Chemin du rapport d'intervention SAV archivé : un seul fichier par carte, remplacé à chaque
+ * édition (nom fixe). L'edge `sav-report-send` le DÉRIVE par cette même fonction (copie Deno) :
+ * un chemin n'est jamais reçu d'une requête.
+ * @param {{ orgId: string, projectId: string, interventionId: string }} p
+ * @returns {string} `${orgId}/${projectId}/${interventionId}/rapport-intervention.pdf`
+ */
+export function buildInterventionReportPath({ orgId, projectId, interventionId }) {
+  if (!UUID.test(String(orgId || ''))) throw new Error('[interventions] organisation requise pour ranger le rapport');
+  if (!UUID.test(String(projectId || '')) || !UUID.test(String(interventionId || ''))) {
+    throw new Error('[interventions] projectId et interventionId requis pour ranger le rapport');
+  }
+  return `${orgId}/${projectId}/${interventionId}/rapport-intervention.pdf`;
+}

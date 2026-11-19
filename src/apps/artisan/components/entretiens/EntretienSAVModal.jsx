@@ -62,6 +62,8 @@ import { SAVUrgencySelect, SAVUrgencyBadge } from './SAVUrgency';
 import { urgenceDe } from '@/lib/savUrgency';
 import { peutCloturerSansPlanifier, limiteALaCloture, peutIdentifierPieces } from '@/lib/savCloture';
 import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
+import { RapportSavDialog } from './RapportSavDialog';
+import { peutFaireRapportSav } from '@/lib/rapportSav';
 import { SAVLinkedQuotes } from './SAVLinkedQuotes';
 import { SAVModelPartsSection } from './SAVModelPartsSection';
 import { CertificatsSection } from './CertificatsSection';
@@ -117,6 +119,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
   // État planification
   const [showScheduling, setShowScheduling] = useState(initialScheduling); // ouverte sur l'assistant après « Créer et planifier »
   const [showCloture, setShowCloture] = useState(false); // fenêtre « Intervention faite » (SAV sans planification)
+  const [showRapport, setShowRapport] = useState(false); // fenêtre « Rapport d'intervention » (SAV réalisé)
   const [confirmAnnuler, setConfirmAnnuler] = useState(false); // « Annuler la demande » (SAV, org_admin)
   const [annulation, setAnnulation] = useState(false);
 
@@ -900,6 +903,18 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                   </button>
                 )}
 
+                {/* SAV réalisé : rapport d'une page remis au client (édition, archive, e-mail) */}
+                {peutFaireRapportSav(item) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRapport(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-blue-600 text-blue-700 bg-white transition-colors hover:shadow-sm hover:bg-blue-50"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Rapport d&apos;intervention
+                  </button>
+                )}
+
                 {/* Avancer à droite */}
                 {forwardTransitions.map((targetStatus) => {
                   const col = KANBAN_COLUMNS.find(c => c.value === targetStatus)
@@ -939,6 +954,16 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
         onConfirm={handleAnnulerDemande}
         loading={annulation}
       />
+
+      {showRapport && (
+        <RapportSavDialog
+          item={item}
+          equipements={equipementsClient}
+          referentiel={referentiel}
+          membres={teamMembers}
+          onClose={() => setShowRapport(false)}
+        />
+      )}
 
       {showCloture && (
         <SAVInterventionFaiteModal
