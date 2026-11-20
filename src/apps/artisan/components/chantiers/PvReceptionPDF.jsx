@@ -116,7 +116,7 @@ function PvReceptionDocument({ data, company }) {
 
         {/* Objet des travaux */}
         <Text style={s.sectionTitle}>Objet des Travaux</Text>
-        <View style={{ ...s.receptionBox, marginBottom: 12 }}>
+        <View style={s.receptionBox}>
           <Text style={{ fontSize: 9, lineHeight: 1.5 }}>
             Installation et mise en service : {equipmentLabel || 'Équipement'}
           </Text>
@@ -136,7 +136,7 @@ function PvReceptionDocument({ data, company }) {
         {/* Réception */}
         <Text style={s.sectionTitle}>Déclaration de Réception</Text>
         <View style={s.receptionBox}>
-          <Text style={{ fontSize: 8, color: C.gris, marginBottom: 8, lineHeight: 1.5 }}>
+          <Text style={{ fontSize: 8, color: C.gris, marginBottom: 5, lineHeight: 1.4 }}>
             Je soussigné(e), {clientName}, maître de l&apos;ouvrage, après avoir procédé à la visite
             des travaux effectués par l&apos;entreprise {COMPANY.name}, déclare :
           </Text>
@@ -165,7 +165,7 @@ function PvReceptionDocument({ data, company }) {
               ) : null}
               {reservesTravaux ? (
                 <>
-                  <Text style={{ ...s.reservesLabel, marginTop: 6 }}>Travaux à exécuter :</Text>
+                  <Text style={{ ...s.reservesLabel, marginTop: 4 }}>Travaux à exécuter :</Text>
                   <Text style={s.reservesText}>{reservesTravaux}</Text>
                 </>
               ) : null}
@@ -226,16 +226,16 @@ function PvReceptionDocument({ data, company }) {
           </>
         )}
 
-        {/* Garanties */}
-        <View style={s.garantiesBox} wrap={false}>
+        {/* Garanties, « Fait à », signatures et note : un seul bloc, jamais coupé. Si le PV déborde
+            (réserves longues), les signatures passent à la page suivante AVEC les garanties, jamais seules. */}
+        <View wrap={false}>
+        <View style={s.garantiesBox}>
           <Text style={s.garantiesTitle}>Garanties</Text>
           {GARANTIES_RECEPTION.map((g, i) => (
             <Text key={i} style={s.garantiesText}>{g}</Text>
           ))}
         </View>
 
-        {/* Fait à, signatures et note : un seul bloc, jamais coupé */}
-        <View wrap={false}>
           {/* Date et lieu */}
           <View style={s.dateRow}>
             <Text>Fait à : {lieu || clientCity || '—'}</Text>
@@ -250,7 +250,7 @@ function PvReceptionDocument({ data, company }) {
               {signatureTechBase64 ? (
                 <Image src={signatureTechBase64} style={s.signatureImage} />
               ) : (
-                <View style={{ height: 40 }} />
+                <View style={{ height: 34 }} />
               )}
               <Text style={s.signatureName}>{signatureTechNom || technicianName || '—'}</Text>
             </View>
@@ -259,7 +259,7 @@ function PvReceptionDocument({ data, company }) {
               {signatureClientBase64 ? (
                 <Image src={signatureClientBase64} style={s.signatureImage} />
               ) : (
-                <View style={{ height: 40 }} />
+                <View style={{ height: 34 }} />
               )}
               <Text style={s.signatureName}>{signatureClientNom || clientName || '—'}</Text>
             </View>

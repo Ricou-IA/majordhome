@@ -33,7 +33,8 @@ export const C = {
 
 export const s = StyleSheet.create({
   page: {
-    padding: '15mm 18mm 16mm 18mm',
+    // Marges tenues serrées : un PV sans réserve doit tenir sur UNE page, signatures comprises.
+    padding: '10mm 18mm 13mm 18mm',
     fontSize: 9,
     fontFamily: 'Helvetica',
     color: C.noir,
@@ -45,13 +46,13 @@ export const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
     paddingBottom: 4,
     borderBottomWidth: 3,
     borderBottomColor: C.orange,
     borderBottomStyle: 'solid',
   },
-  logo: { height: 70, marginTop: -5, marginBottom: -5 },
+  logo: { height: 46, marginTop: -3, marginBottom: -3 },
   headerRight: { alignItems: 'flex-end' },
   title: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: C.noir },
   subtitle: { fontSize: 10, color: C.orange, marginTop: 2 },
@@ -62,7 +63,7 @@ export const s = StyleSheet.create({
     justifyContent: 'space-between',
     fontSize: 9,
     color: C.gris,
-    marginBottom: 10,
+    marginBottom: 6,
   },
 
   // Parties (client + entreprise)
@@ -72,7 +73,7 @@ export const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.grisBorder,
     borderStyle: 'solid',
-    padding: 8,
+    padding: 6,
     borderRadius: 3,
   },
   partyLabel: {
@@ -83,17 +84,17 @@ export const s = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  partyLine: { fontSize: 9, lineHeight: 1.5 },
-  partyLineBold: { fontSize: 9, lineHeight: 1.5, fontFamily: 'Helvetica-Bold' },
+  partyLine: { fontSize: 9, lineHeight: 1.4 },
+  partyLineBold: { fontSize: 9, lineHeight: 1.4, fontFamily: 'Helvetica-Bold' },
 
   // Section title
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: 'Helvetica-Bold',
     color: C.noir,
     backgroundColor: C.grisBg,
-    padding: '6 8',
-    marginBottom: 8,
+    padding: '3 8',
+    marginBottom: 5,
     borderLeftWidth: 3,
     borderLeftColor: C.orange,
     borderLeftStyle: 'solid',
@@ -130,13 +131,13 @@ export const s = StyleSheet.create({
     borderColor: C.grisBorder,
     borderStyle: 'solid',
     borderRadius: 3,
-    padding: 8,
-    marginBottom: 8,
+    padding: 7,
+    marginBottom: 6,
   },
   checkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 3,
     gap: 6,
   },
   checkbox: {
@@ -163,8 +164,8 @@ export const s = StyleSheet.create({
   // Réserves
   reservesBox: {
     marginLeft: 18,
-    marginTop: 4,
-    padding: 8,
+    marginTop: 3,
+    padding: 5,
     borderWidth: 1,
     borderColor: C.grisBorder,
     borderStyle: 'dashed',
@@ -178,8 +179,7 @@ export const s = StyleSheet.create({
   },
   reservesText: {
     fontSize: 9,
-    lineHeight: 1.5,
-    minHeight: 30,
+    lineHeight: 1.4,
   },
 
   // Confirmations client
@@ -223,7 +223,7 @@ export const s = StyleSheet.create({
     marginBottom: 4,
   },
   signatureImage: {
-    maxHeight: 40,
+    maxHeight: 34,
     maxWidth: 160,
     marginBottom: 4,
   },
@@ -237,7 +237,7 @@ export const s = StyleSheet.create({
   dateRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: 3,
     fontSize: 9,
     color: C.gris,
   },
@@ -264,8 +264,8 @@ export const s = StyleSheet.create({
     borderColor: '#FCD34D',
     borderStyle: 'solid',
     borderRadius: 3,
-    padding: 5,
-    marginTop: 6,
+    padding: 4,
+    marginTop: 5,
   },
   conservationText: {
     fontSize: 7.5,
@@ -281,10 +281,10 @@ export const s = StyleSheet.create({
     marginBottom: 2,
     gap: 6,
   },
-  pointText: { fontSize: 9, flex: 1, lineHeight: 1.4 },
+  pointText: { fontSize: 9, flex: 1, lineHeight: 1.3 },
   pointAnswer: { fontSize: 9, fontFamily: 'Helvetica-Bold', width: 60, textAlign: 'right' },
   // Bloc de points : sans cadre, il peut se couper entre deux points sans laisser un cadre ouvert.
-  pointsBox: { marginBottom: 8 },
+  pointsBox: { marginBottom: 6 },
   pointsTitle: {
     fontSize: 8,
     fontFamily: 'Helvetica-Bold',
@@ -296,7 +296,7 @@ export const s = StyleSheet.create({
     borderBottomStyle: 'solid',
     textTransform: 'uppercase',
   },
-  garantiesBox: { marginTop: 4 },
+  garantiesBox: { marginTop: 2 },
   garantiesTitle: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: C.gris, marginBottom: 1 },
   garantiesText: { fontSize: 7, color: C.gris, lineHeight: 1.2 },
   bodyText: { fontSize: 9, lineHeight: 1.5 },
@@ -336,8 +336,7 @@ export function Parties({ entreprise, client }) {
         <Text style={s.partyLabel}>Entreprise</Text>
         <Text style={s.partyLineBold}>{entreprise.name}</Text>
         <Text style={s.partyLine}>{entreprise.address}</Text>
-        <Text style={s.partyLine}>Tél. : {entreprise.phone}</Text>
-        <Text style={s.partyLine}>{entreprise.email}</Text>
+        <Text style={s.partyLine}>{[entreprise.phone && `Tél. : ${entreprise.phone}`, entreprise.email].filter(Boolean).join(' · ')}</Text>
       </View>
       <View style={s.party}>
         <Text style={s.partyLabel}>Client (Maître d&apos;ouvrage)</Text>
