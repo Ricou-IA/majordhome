@@ -3,9 +3,12 @@
  * ============================================================================
  * Template PDF A4 avec @react-pdf/renderer.
  * Inspiré du modèle Qualit'EnR (Procès-verbal Réception des travaux).
- * 2 signatures : client + technicien.
+ * 2 signatures : client + entreprise. Logo, nom et signature de l'entreprise viennent des
+ * réglages de l'organisation (`company` = buildCompanyInfo, `visuels` = images déjà chargées) :
+ * aucune valeur propre à une entreprise n'est écrite ici. Sur tablette, le technicien signe
+ * lui-même ; en ligne, c'est la signature du signataire de l'organisation qui est posée.
  *
- * Exporté : generatePvReceptionPdfBlob(data) → Blob
+ * Exporté : generatePvReceptionPdfBlob(data, company, visuels) → Blob
  * ============================================================================
  */
 /* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
@@ -21,35 +24,22 @@ import {
 
 import { GARANTIES_RECEPTION } from '@/lib/pvPoints';
 
-import { LOGO_BASE64 } from '../contrat/logo-base64';
 import { C, s, Checkbox, identiteEntreprise, piedLegal, Parties, LignesDevis } from './pvPdfShared';
 
 // ============================================================================
 // CONSTANTES
 // ============================================================================
 
-// P0.13/P0.14 multi-tenant — Fallback Mayer si pas de company en prop.
-// Le caller doit passer `company` issu de buildCompanyInfo(useOrgSettings().settings).
-const DEFAULT_COMPANY = {
-  name: 'Mayer Énergie',
-  legalName: 'MAYER ENERGIE',
-  legalForm: 'SAS à associé unique',
-  capital: '6 000',
-  rcs: '100 288 224 R.C.S. Albi',
-  address: '26 Rue des Pyrénées – 81600 Gaillac',
-  phone: '05 63 33 23 14',
-  email: 'contact@mayer-energie.fr',
-};
-
-const DEFAULT_LEGAL_FOOTER = `${DEFAULT_COMPANY.legalName} — ${DEFAULT_COMPANY.legalForm}, capital ${DEFAULT_COMPANY.capital} € — ${DEFAULT_COMPANY.rcs} — ${DEFAULT_COMPANY.address} — ${DEFAULT_COMPANY.email}`;
+// Sans `company` (jamais le cas dans l'app) : un document neutre, pas celui d'une entreprise.
+const VIDE = { name: '', address: '', phone: '', email: '', legalName: '', legalForm: '', capital: '', rcs: '', signataire: '' };
 
 // ============================================================================
 // COMPOSANT PDF
 // ============================================================================
 
-function PvReceptionDocument({ data, company }) {
-  const COMPANY = company ? identiteEntreprise(company) : DEFAULT_COMPANY;
-  const LEGAL_FOOTER = company ? piedLegal(COMPANY) : DEFAULT_LEGAL_FOOTER;
+function PvReceptionDocument({ data, company, visuels }) {
+  const COMPANY = company ? identiteEntreprise(company) : VIDE;
+  const LEGAL_FOOTER = company ? piedLegal(COMPANY) : '';
   const {
     pvNumber,
     pvDate,
@@ -80,6 +70,13 @@ function PvReceptionDocument({ data, company }) {
   } = data;
   const pointsEnLigne = Boolean(pointsEntreprise?.length);
 
+  // Signature de l'entreprise : celle du technicien quand il a signé sur tablette, sinon celle du
+  // signataire de l'organisation, avec son nom et sa qualité.
+  const signatureEntreprise = signatureTechBase64 || visuels?.signatureSrc || null;
+  const nomSignataire = signatureTechBase64
+    ? signatureTechNom || technicianName
+    : COMPANY.signataire || signatureTechNom || technicianName;
+
   const sansReserves = receptionType === 'sans_reserves';
   const avecReserves = receptionType === 'avec_reserves';
 
@@ -88,7 +85,7 @@ function PvReceptionDocument({ data, company }) {
       <Page size="A4" style={s.page}>
         {/* Header */}
         <View style={s.header}>
-          <Image src={LOGO_BASE64} style={s.logo} />
+          {visuels?.logoSrc ? <Image src={visuels.logoSrc} style={s.logo} /> : <View />}
           <View style={s.headerRight}>
             <Text style={s.title}>Procès-Verbal</Text>
             <Text style={s.subtitle}>Réception des Travaux</Text>
@@ -247,12 +244,12 @@ function PvReceptionDocument({ data, company }) {
           <View style={s.signaturesRow}>
             <View style={s.signatureBlock}>
               <Text style={s.signatureLabel}>Signature de l&apos;entreprise</Text>
-              {signatureTechBase64 ? (
-                <Image src={signatureTechBase64} style={s.signatureImage} />
+              {signatureEntreprise ? (
+                <Image src={signatureEntreprise} style={s.signatureImage} />
               ) : (
                 <View style={{ height: 34 }} />
               )}
-              <Text style={s.signatureName}>{signatureTechNom || technicianName || '—'}</Text>
+              <Text style={s.signatureName}>{nomSignataire || '—'}</Text>
             </View>
             <View style={s.signatureBlock}>
               <Text style={s.signatureLabel}>Signature du client</Text>
@@ -285,7 +282,12 @@ function PvReceptionDocument({ data, company }) {
 // EXPORT : generatePvReceptionPdfBlob
 // ============================================================================
 
-export async function generatePvReceptionPdfBlob(data, company) {
-  const blob = await pdf(<PvReceptionDocument data={data} company={company} />).toBlob();
+/**
+ * @param {Object} data     données du PV (`donneesPdfPv`, ou la saisie sur tablette)
+ * @param {Object} company  buildCompanyInfo(settings)
+ * @param {{ logoSrc?: string|null, signatureSrc?: string|null }} [visuels] logo et signature de l'organisation
+ */
+export async function generatePvReceptionPdfBlob(data, company, visuels) {
+  const blob = await pdf(<PvReceptionDocument data={data} company={company} visuels={visuels} />).toBlob();
   return blob;
 }

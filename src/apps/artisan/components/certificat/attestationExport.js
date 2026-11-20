@@ -9,29 +9,13 @@ import { storageService } from '@services/storage.service';
 import { buildAttestationEntretien, attestationPathFor, MOTIFS } from '@/lib/attestationEntretienModel';
 import { CONTROLES_SECURITE_ITEMS, getNettoyageItems, sectionsPourProfil } from './constants';
 import { generateAttestationPdfBlob } from './AttestationEntretienPDF';
+import { fetchAsDataUrl } from '@/lib/imageDataUrl';
 
 const SIGNATURE_BUCKET = 'product-documents';
 
-async function blobToDataUrl(blob) {
-  const buf = new Uint8Array(await blob.arrayBuffer());
-  let bin = '';
-  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-  return `data:${blob.type || 'image/png'};base64,${btoa(bin)}`;
-}
-
-async function fetchAsDataUrl(url) {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    return await blobToDataUrl(await res.blob());
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Logo et signature du signataire en data URL, pour une lettre à l'en-tête de l'entreprise
- * (attestation de ramonage, certificat allégé). Jamais bloquant : ce qui manque est renvoyé
+ * Logo et signature du signataire en data URL, pour un document à l'en-tête de l'entreprise
+ * (attestation de ramonage, certificat allégé, rapport SAV, PV de réception). Jamais bloquant : ce qui manque est renvoyé
  * dans `warnings`, le document sort sans.
  * @param {object} company  buildCompanyInfo(settings)
  * @returns {Promise<{ logoSrc: string|null, signatureSrc: string|null, warnings: string[] }>}

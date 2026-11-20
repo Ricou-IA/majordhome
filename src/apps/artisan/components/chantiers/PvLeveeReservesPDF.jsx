@@ -3,10 +3,10 @@
  * ============================================================================
  * Une page A4. Données = `donneesPdfLevee` (src/lib/pvReception.js) : le composant
  * ne calcule ni ne formate rien. Styles communs avec le PV de réception.
- * Logo = celui de l'organisation (`company.logoUrl`, réglage `logo_url`), jamais une constante
- * propre à une entreprise ; sans logo réglé, ou si l'image ne se charge pas, l'en-tête reste sans logo.
+ * Logo = celui de l'organisation (réglage `logo_url`, chargé par l'appelant dans `visuels`), jamais
+ * une constante propre à une entreprise ; sans logo, l'en-tête reste sans logo.
  *
- * Exporté : generatePvLeveePdfBlob(data, company) → Blob
+ * Exporté : generatePvLeveePdfBlob(data, company, visuels) → Blob
  * ============================================================================
  */
 /* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
@@ -17,7 +17,7 @@ import { s, identiteEntreprise, piedLegal, Parties, LignesDevis } from './pvPdfS
 
 const VIDE = { name: '', address: '', phone: '', email: '', legalName: '', legalForm: '', capital: '', rcs: '' };
 
-function PvLeveeDocument({ data, company }) {
+function PvLeveeDocument({ data, company, visuels }) {
   const COMPANY = company ? identiteEntreprise(company) : VIDE;
   const {
     numero,
@@ -43,7 +43,7 @@ function PvLeveeDocument({ data, company }) {
     <Document>
       <Page size="A4" style={s.page}>
         <View style={s.header}>
-          {company?.logoUrl ? <Image src={company.logoUrl} style={{ ...s.logo, height: 40 }} /> : <View />}
+          {visuels?.logoSrc ? <Image src={visuels.logoSrc} style={s.logo} /> : <View />}
           <View style={s.headerRight}>
             <Text style={s.title}>Procès-Verbal</Text>
             <Text style={s.subtitle}>Levée des réserves</Text>
@@ -129,7 +129,7 @@ function PvLeveeDocument({ data, company }) {
   );
 }
 
-export async function generatePvLeveePdfBlob(data, company) {
-  const blob = await pdf(<PvLeveeDocument data={data} company={company} />).toBlob();
+export async function generatePvLeveePdfBlob(data, company, visuels) {
+  const blob = await pdf(<PvLeveeDocument data={data} company={company} visuels={visuels} />).toBlob();
   return blob;
 }

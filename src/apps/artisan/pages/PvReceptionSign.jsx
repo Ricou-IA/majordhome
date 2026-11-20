@@ -25,6 +25,7 @@ import { chantiersService, getChantierAmount } from '@services/chantiers.service
 import { storageService } from '@services/storage.service';
 import { formatEuro, formatDateFR } from '@/lib/utils';
 import { generatePvReceptionPdfBlob } from '../components/chantiers/PvReceptionPDF';
+import { fetchAsDataUrl } from '@/lib/imageDataUrl';
 import { CertificatSignaturePad } from '../components/certificat/CertificatSignaturePad';
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@lib/logger';
@@ -151,7 +152,8 @@ export default function PvReceptionSign() {
       };
 
       // Générer le PDF
-      const blob = await generatePvReceptionPdfBlob(pdfData, company);
+      // Logo de l'organisation (réglages) ; le technicien signe lui-même, pas de signature d'office.
+      const blob = await generatePvReceptionPdfBlob(pdfData, company, { logoSrc: await fetchAsDataUrl(company.logoUrl) });
 
       // Upload : nom de fichier ASCII fixe (un accent dans la clé peut être refusé par Storage),
       // l'upsert remplace un PV refait.

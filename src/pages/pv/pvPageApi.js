@@ -5,6 +5,7 @@
  */
 
 import { donneesPdfLevee } from '@/lib/pvReception';
+import { fetchAsDataUrl } from '@/lib/imageDataUrl';
 
 const EDGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chantier-pv`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -54,6 +55,21 @@ export function donneesLeveePourPage(pv, nomEntreprise) {
       levee_signature_png: levee.signature_png,
     },
   });
+}
+
+/**
+ * Logo et signature de l'entreprise pour les PDF de la page, depuis ce que l'edge transmet
+ * (`logo_url` des réglages, `signature_url` = lien court vers la signature du signataire).
+ * Ce qui ne répond pas est absent du PDF : la page n'a rien d'autre à proposer au client.
+ * @param {Object|null|undefined} entreprise
+ * @returns {Promise<{ logoSrc: string|null, signatureSrc: string|null }>}
+ */
+export async function visuelsPourPage(entreprise) {
+  const [logoSrc, signatureSrc] = await Promise.all([
+    fetchAsDataUrl(entreprise?.logo_url),
+    fetchAsDataUrl(entreprise?.signature_url),
+  ]);
+  return { logoSrc, signatureSrc };
 }
 
 /** État de la page d'après ce que l'edge rend (hors chargement et erreur). */

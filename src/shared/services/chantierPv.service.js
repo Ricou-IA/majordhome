@@ -13,6 +13,7 @@ import { withErrorHandling } from '@lib/serviceHelpers';
 import { storageService } from '@services/storage.service';
 import { chantiersService } from '@services/chantiers.service';
 import { messagePv, donneesPdfPv, donneesPdfLevee, objetDuPv } from '@/lib/pvReception';
+import { fetchAsDataUrl } from '@/lib/imageDataUrl';
 
 /**
  * Appelle l'edge. Une réponse non-2xx porte un CODE (`error`) : il devient `err.code`,
@@ -64,8 +65,9 @@ export const chantierPvService = {
   /**
    * Produit le PDF du PV depuis l'ENREGISTREMENT de la signature en ligne, puis l'archive
    * (`pv_reception_path`) si ce n'est pas déjà fait. Le PDF est rendu même si l'archivage
-   * échoue : `archive` dit ce qui a été fait.
-   * @returns {Promise<{ data: { blob: Blob, archive: boolean } | null, error: Error | null }>}
+   * échoue : `archive` dit ce qui a été fait. Logo et signature du signataire viennent des
+   * réglages de l'organisation ; ce qui n'a pas pu être posé est dit dans `avertissements`.
+   * @returns {Promise<{ data: { blob: Blob, archive: boolean, avertissements: string[] } | null, error: Error | null }>}
    */
   async genererPdf({ orgId, chantier, company }) {
     return withErrorHandling(async () => {
@@ -75,6 +77,9 @@ export const chantierPvService = {
 
       // react-pdf est lourd : chargé à la demande, pas avec le board.
       const { generatePvReceptionPdfBlob } = await import('@/apps/artisan/components/chantiers/PvReceptionPDF');
+      const { chargerVisuelsLettre } = await import('@/apps/artisan/components/certificat/attestationExport');
+      const visuels = company ? await chargerVisuelsLettre(company) : { logoSrc: null, signatureSrc: null, warnings: [] };
+      const avertissements = visuels.warnings;
       const blob = await generatePvReceptionPdfBlob(donneesPdfPv({
         chantierId: chantier.id,
         client: {
@@ -84,14 +89,14 @@ export const chantierPvService = {
         objet: objetDuPv({ equipement: chantier.equipment_type_label, libelle: chantier.label }),
         entreprise: company?.name || '',
         signature: pv,
-      }), company);
+      }), company, visuels);
 
-      if (chantier.pv_reception_path) return { blob, archive: true };
+      if (chantier.pv_reception_path) return { blob, archive: true, avertissements };
       const chemin = `${orgId}/pv-reception/${chantier.id}/PV_Reception_en_ligne.pdf`;
       const { error: uploadError } = await storageService.uploadFile('interventions', chemin, blob, { upsert: true, contentType: 'application/pdf' });
-      if (uploadError) return { blob, archive: false };
+      if (uploadError) return { blob, archive: false, avertissements };
       const { error: cheminError } = await chantiersService.updatePvReceptionPath(orgId, chantier.id, chemin);
-      return { blob, archive: !cheminError };
+      return { blob, archive: !cheminError, avertissements };
     }, 'chantierPv.genererPdf');
   },
 
@@ -132,8 +137,8 @@ export const chantierPvService = {
   /**
    * PDF de la levée des réserves, produit depuis l'ENREGISTREMENT de la signature de levée,
    * puis archivé (`pv_levee_path`) si ce n'est pas déjà fait. Le PDF est rendu même si
-   * l'archivage échoue : `archive` dit ce qui a été fait.
-   * @returns {Promise<{ data: { blob: Blob, archive: boolean } | null, error: Error | null }>}
+   * l'archivage échoue : `archive` dit ce qui a été fait. Le logo vient des réglages de l'organisation.
+   * @returns {Promise<{ data: { blob: Blob, archive: boolean, avertissements: string[] } | null, error: Error | null }>}
    */
   async genererPdfLevee({ orgId, chantier, company }) {
     return withErrorHandling(async () => {
@@ -142,6 +147,9 @@ export const chantierPvService = {
       if (!pv?.levee_signed_at) throw new Error('La levée des réserves n\'a pas encore été signée');
 
       const { generatePvLeveePdfBlob } = await import('@/apps/artisan/components/chantiers/PvLeveeReservesPDF');
+      // Seul le client signe la levée : on ne charge que le logo.
+      const logoSrc = await fetchAsDataUrl(company?.logoUrl);
+      const avertissements = company?.logoUrl && !logoSrc ? ['Logo illisible : document édité sans logo.'] : [];
       const blob = await generatePvLeveePdfBlob(donneesPdfLevee({
         chantierId: chantier.id,
         client: {
@@ -151,14 +159,14 @@ export const chantierPvService = {
         objet: objetDuPv({ equipement: chantier.equipment_type_label, libelle: chantier.label }),
         entreprise: company?.name || '',
         pv,
-      }), company);
+      }), company, { logoSrc });
 
-      if (chantier.pv_levee_path) return { blob, archive: true };
+      if (chantier.pv_levee_path) return { blob, archive: true, avertissements };
       const chemin = `${orgId}/pv-levee/${chantier.id}/PV_Levee_reserves.pdf`;
       const { error: uploadError } = await storageService.uploadFile('interventions', chemin, blob, { upsert: true, contentType: 'application/pdf' });
-      if (uploadError) return { blob, archive: false };
+      if (uploadError) return { blob, archive: false, avertissements };
       const { error: cheminError } = await chantiersService.updatePvLeveePath(orgId, chantier.id, chemin);
-      return { blob, archive: !cheminError };
+      return { blob, archive: !cheminError, avertissements };
     }, 'chantierPv.genererPdfLevee');
   },
 };

@@ -74,7 +74,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CLES_ENTREPRISE = [
   "brand_name", "legal_name", "legal_form", "capital", "rcs", "siret", "tva_intra",
   "address", "postal_code", "city", "phone", "from_email", "website_url", "logo_url", "accent_color",
+  "signatory_name", "signatory_role",
 ];
+// Signature du signataire (Organisation → Identité) : fichier privé, transmis par un lien court.
+const SIGNATURE_BUCKET = "product-documents";
+const SIGNATURE_VALIDITE_S = 86_400;
 
 type Json = Record<string, unknown>;
 
@@ -416,13 +420,34 @@ async function actionDemanderLevee(req: Request, body: Json): Promise<Response> 
 
 // ── Actions du client (lien) ──────────────────────────────────────────────
 
-function pourLaPage(ctx: ContextePv): Json {
+/**
+ * Lien court vers l'image de signature du signataire de l'organisation, pour le PDF que le client
+ * télécharge. `null` si aucune n'est réglée, si le chemin n'est pas dans le dossier de
+ * l'organisation, ou si le lien ne peut pas être créé : le PDF sort alors sans cette signature.
+ */
+async function lienSignatureEntreprise(ctx: ContextePv): Promise<string | null> {
+  const chemin = String((ctx.settings || {}).signatory_signature_path ?? "");
+  if (!chemin || !chemin.startsWith(`${ctx.org_id}/`)) return null;
+  try {
+    const { data, error } = await getAdminClient().storage.from(SIGNATURE_BUCKET).createSignedUrl(chemin, SIGNATURE_VALIDITE_S);
+    return error ? null : data?.signedUrl ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function pourLaPage(ctx: ContextePv): Promise<Json> {
   const s = ctx.settings || {};
   const entreprise: Json = {};
   for (const cle of CLES_ENTREPRISE) if (s[cle] != null && s[cle] !== "") entreprise[cle] = s[cle];
   const pv = ctx.pv;
   const signeEnLigne = Boolean(pv?.signed_at);
   const signe = dejaSigne(ctx);
+  // La signature de l'entreprise ne sert qu'au PDF d'un PV signé : pas transmise avant.
+  if (signeEnLigne) {
+    const lien = await lienSignatureEntreprise(ctx);
+    if (lien) entreprise.signature_url = lien;
+  }
   const prepare = estPrepare(ctx);
   const avecReserves = signeAvecReserves(ctx);
   const libelles = LIBELLE_REPONSE as Record<string, string>;
@@ -477,7 +502,7 @@ async function actionLire(req: Request, token: string): Promise<Response> {
   const { ctx, erreur } = await contexte(v.chantierId, true);
   if (erreur) return jsonResponse({ error: sanitizeError(erreur, "chantier illisible") }, 500, req);
   if (!ctx) return jsonResponse({ error: "chantier_introuvable" }, 404, req);
-  return jsonResponse(pourLaPage(ctx), 200, req);
+  return jsonResponse(await pourLaPage(ctx), 200, req);
 }
 
 async function actionSigner(req: Request, body: Json): Promise<Response> {
@@ -518,7 +543,7 @@ async function actionSigner(req: Request, body: Json): Promise<Response> {
     ok: true,
     passe_en_receptionne: r.passe_en_receptionne === true,
     avec_reserves: r.avec_reserves === true,
-    pv: apres ? pourLaPage(apres) : null,
+    pv: apres ? await pourLaPage(apres) : null,
   }, 200, req);
 }
 
@@ -539,7 +564,7 @@ async function actionSignerLevee(req: Request, body: Json): Promise<Response> {
   if (refus) return refus;
 
   const { ctx } = await contexte(v.chantierId);
-  return jsonResponse({ ok: true, pv: ctx ? pourLaPage(ctx) : null }, 200, req);
+  return jsonResponse({ ok: true, pv: ctx ? await pourLaPage(ctx) : null }, 200, req);
 }
 
 // ── Routage ───────────────────────────────────────────────────────────────

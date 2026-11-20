@@ -52,7 +52,8 @@ export const s = StyleSheet.create({
     borderBottomColor: C.orange,
     borderBottomStyle: 'solid',
   },
-  logo: { height: 46, marginTop: -3, marginBottom: -3 },
+  // Logo de l'organisation (réglage `logo_url`) : hauteur fixe, largeur bornée pour ne pas pousser le titre.
+  logo: { height: 40, maxWidth: 220, objectFit: 'contain' },
   headerRight: { alignItems: 'flex-end' },
   title: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: C.noir },
   subtitle: { fontSize: 10, color: C.orange, marginTop: 2 },
@@ -321,6 +322,8 @@ export function identiteEntreprise(company) {
     address: `${company.address} – ${company.postalCode} ${company.city}`,
     phone: company.phone,
     email: company.email,
+    // Signataire de l'organisation (Organisation → Identité) : « Nom, qualité ».
+    signataire: [company.signatoryName, company.signatoryRole].map((v) => String(v ?? '').trim()).filter(Boolean).join(', '),
   };
 }
 

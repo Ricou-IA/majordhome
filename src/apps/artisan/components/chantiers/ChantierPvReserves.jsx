@@ -98,6 +98,7 @@ export function ChantierPvReserves({ chantier, pv, canEdit, company, communicati
       const res = await genererPdfLeveePv({ chantier, company });
       window.open(URL.createObjectURL(res.blob), '_blank');
       if (!res.archive) toast.warning('Le PV de levée s\'ouvre, mais il n\'a pas pu être archivé : rouvrez-le plus tard.');
+      res.avertissements?.forEach((message) => toast.warning(message));
       onUpdated?.();
     } catch (err) {
       toast.error(err?.message || 'Le PV de levée n\'a pas pu être produit');

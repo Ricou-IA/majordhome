@@ -66,6 +66,7 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
       const res = await genererPdfPv({ chantier, company });
       window.open(URL.createObjectURL(res.blob), '_blank');
       if (!res.archive) toast.warning('Le PV s\'ouvre, mais il n\'a pas pu être archivé : rouvrez-le plus tard.');
+      res.avertissements?.forEach((message) => toast.warning(message));
       onUpdated?.();
     } catch (err) {
       toast.error(err?.message || 'Le PV n\'a pas pu être produit');

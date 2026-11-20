@@ -8,7 +8,7 @@ import { buildCompanyInfo } from '@/lib/orgBranding';
 import { downloadBlob } from '@/lib/utils';
 import { dateLongue, jourDeParis, donneesPdfPv } from '@/lib/pvReception';
 import { prenomLisible } from '@/lib/pagePublique';
-import { donneesLeveePourPage } from './pvPageApi';
+import { donneesLeveePourPage, visuelsPourPage } from './pvPageApi';
 import { PageAlerte, PageBoutonSecondaire, PageCoche, PageFiche } from '../public/pageUi';
 
 /** Bouton de téléchargement : react-pdf, lourd, n'est chargé qu'au clic. */
@@ -65,14 +65,14 @@ export default function PvRecapitulatif({ pv, etat = 'signe', children }) {
     const { generatePvReceptionPdfBlob } = await import('@apps/artisan/components/chantiers/PvReceptionPDF');
     const blob = await generatePvReceptionPdfBlob(donneesPdfPv({
       chantierId: pv.chantier_id, client: pv.client, objet: pv.objet, entreprise: company.name, signature,
-    }), company);
+    }), company, await visuelsPourPage(pv.entreprise));
     return { blob, nom: 'PV_de_reception.pdf' };
   };
 
   const genererLevee = async () => {
     const company = buildCompanyInfo(pv.entreprise);
     const { generatePvLeveePdfBlob } = await import('@apps/artisan/components/chantiers/PvLeveeReservesPDF');
-    const blob = await generatePvLeveePdfBlob(donneesLeveePourPage(pv, nomEntreprise()), company);
+    const blob = await generatePvLeveePdfBlob(donneesLeveePourPage(pv, nomEntreprise()), company, await visuelsPourPage(pv.entreprise));
     return { blob, nom: 'PV_de_levee_des_reserves.pdf' };
   };
 
