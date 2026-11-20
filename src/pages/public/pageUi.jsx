@@ -23,7 +23,7 @@ export function PageCoque({ nom, logo, couleur, telephone, attente = false, chil
     >
       <div className="h-1 bg-[color:var(--marque)]" aria-hidden="true" />
       <header className="border-b border-secondary-200 bg-white">
-        <div className="mx-auto flex h-16 max-w-xl items-center justify-between gap-3 px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between gap-3 px-4 sm:px-8">
           {attente ? (
             <div className="h-5 w-40 rounded bg-secondary-100" aria-hidden="true" />
           ) : (
@@ -46,7 +46,8 @@ export function PageCoque({ nom, logo, couleur, telephone, attente = false, chil
         </div>
       </header>
 
-      <main className="mx-auto max-w-xl px-4 pb-16 pt-8 sm:px-6 sm:pt-10">
+      {/* Largeur d'une feuille A4, comme la page de signature du contrat d'entretien. */}
+      <main className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-8 sm:pt-10">
         {children}
         {telephone && (
           <footer className="mt-12 border-t border-secondary-200 pt-6 text-center text-sm text-secondary-600">
@@ -68,7 +69,7 @@ export function PageTitre({ surtitre, titre, children }) {
     <div className="space-y-3">
       {surtitre && <p className="text-sm font-medium text-secondary-600">{surtitre}</p>}
       <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{titre}</h1>
-      {children && <p className="text-base leading-relaxed text-secondary-700">{children}</p>}
+      {children && <p className="max-w-prose text-base leading-relaxed text-secondary-700">{children}</p>}
     </div>
   );
 }
@@ -102,14 +103,14 @@ export function PageFiche({ titre, lignes }) {
   const visibles = lignes.filter((l) => l && l.valeur);
   if (!titre && visibles.length === 0) return null;
   return (
-    <div className="rounded-2xl border border-secondary-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-secondary-200 bg-white p-5 shadow-sm sm:p-6">
       {titre && <p className="text-lg font-semibold leading-snug">{titre}</p>}
       {visibles.length > 0 && (
-        <dl className={`space-y-4 ${titre ? 'mt-4 border-t border-secondary-100 pt-4' : ''}`}>
+        <dl className={`space-y-4 sm:grid sm:grid-cols-2 sm:gap-x-8 sm:gap-y-4 sm:space-y-0 ${titre ? 'mt-4 border-t border-secondary-100 pt-4' : ''}`}>
           {visibles.map((l, i) => {
             const Icone = l.icone;
             return (
-              <div key={`${i}-${l.libelle || l.valeur}`} className="flex items-start gap-3">
+              <div key={`${i}-${l.libelle || l.valeur}`} className={`flex items-start gap-3 ${l.multiligne ? 'sm:col-span-2' : ''}`}>
                 {Icone && <Icone className="mt-0.5 h-5 w-5 shrink-0 text-secondary-400" aria-hidden="true" />}
                 <div className="min-w-0">
                   {l.libelle && <dt className="text-sm text-secondary-600">{l.libelle}</dt>}

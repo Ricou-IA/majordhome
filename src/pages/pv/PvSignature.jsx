@@ -54,7 +54,7 @@ export default function PvSignature({ nom, onNom, onSignature, disabled = false 
 
   return (
     <div className="space-y-5">
-      <label className="block">
+      <label className="block sm:max-w-md">
         <span className="mb-1.5 block text-sm font-medium text-secondary-700">Votre nom et prénom</span>
         <input
           type="text" autoComplete="name" value={nom || ''} disabled={disabled}

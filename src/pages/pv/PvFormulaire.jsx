@@ -79,13 +79,15 @@ export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner 
       <PageEtape numero={numeroDecision} titre="Votre décision">
         <fieldset disabled={envoi} className="space-y-3 disabled:opacity-60">
           <legend className="sr-only">Votre décision</legend>
-          {CHOIX.map((choix) => (
-            <Choix
-              key={choix.valeur} choix={choix}
-              actif={reponse.reception_type === choix.valeur}
-              onChoisir={() => maj({ reception_type: choix.valeur })}
-            />
-          ))}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {CHOIX.map((choix) => (
+              <Choix
+                key={choix.valeur} choix={choix}
+                actif={reponse.reception_type === choix.valeur}
+                onChoisir={() => maj({ reception_type: choix.valeur })}
+              />
+            ))}
+          </div>
 
           {avecReserves && (
             <div className="space-y-4 pt-2">
