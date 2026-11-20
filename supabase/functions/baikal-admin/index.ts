@@ -13,6 +13,11 @@
 //   modules        → { org_id, modules: { [key]: boolean }, auteur } ⇒ RPC org_set_modules
 //                    (service_role only, journal majordhome.org_modules_journal)
 // Les clés de modules sont validées contre le catalogue (validerModules) AVANT d'écrire.
+//
+// Contrat Membres v1 de Baikal (membres, membre-creer, membre-mot-de-passe, membre-bloquer) :
+// le manifeste porte un bloc `membres` (actions publiées + rôles), le relais
+// _shared/membres-relais-v1.ts valide et distribue, ./membres.ts porte le métier.
+// Migration 20261120_1 (RPC baikal_membres, ressource planning en service_role).
 // Env requis : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, MDH_BAIKAL_KEY.
 // ============================================================================
 
@@ -25,6 +30,8 @@ import {
   sanitizeError,
 } from "../_shared/auth.ts";
 import { CATALOGUE, modulesEffectifs, validerModules } from "../_shared/modules.js";
+import { blocManifeste, estActionMembres, traiterMembres } from "../_shared/membres-relais-v1.ts";
+import { siteMembres } from "./membres.ts";
 
 const MDH_BAIKAL_KEY = Deno.env.get("MDH_BAIKAL_KEY") || "";
 const ACTIONS = ["manifeste", "catalogue", "organisations", "modules"];
@@ -46,9 +53,20 @@ Deno.serve(async (req: Request) => {
   const action = typeof body?.action === "string" ? body.action : "";
 
   try {
+    if (estActionMembres(action)) {
+      // Le journal ne reçoit jamais le corps (il peut porter un mot de passe).
+      const r = await traiterMembres(body, siteMembres(getAdminClient()), (l) => console.log(`[baikal-admin] ${l}`));
+      return jsonResponse(r.corps, r.statut, req);
+    }
+
     switch (action) {
       case "manifeste":
-        return jsonResponse({ app: "majordhome", version: 1, actions: ACTIONS }, 200, req);
+        return jsonResponse({
+          app: "majordhome",
+          version: 1,
+          actions: ACTIONS,
+          membres: blocManifeste(siteMembres(getAdminClient())),
+        }, 200, req);
 
       case "catalogue":
         return jsonResponse({
