@@ -3,7 +3,8 @@
  * ============================================================================
  * Une page A4. Données = `donneesPdfLevee` (src/lib/pvReception.js) : le composant
  * ne calcule ni ne formate rien. Styles communs avec le PV de réception.
- * Pas de logo : celui du PV est une constante propre à une entreprise.
+ * Logo = celui de l'organisation (`company.logoUrl`, réglage `logo_url`), jamais une constante
+ * propre à une entreprise ; sans logo réglé, ou si l'image ne se charge pas, l'en-tête reste sans logo.
  *
  * Exporté : generatePvLeveePdfBlob(data, company) → Blob
  * ============================================================================
@@ -42,7 +43,7 @@ function PvLeveeDocument({ data, company }) {
     <Document>
       <Page size="A4" style={s.page}>
         <View style={s.header}>
-          <View />
+          {company?.logoUrl ? <Image src={company.logoUrl} style={{ ...s.logo, height: 40 }} /> : <View />}
           <View style={s.headerRight}>
             <Text style={s.title}>Procès-Verbal</Text>
             <Text style={s.subtitle}>Levée des réserves</Text>
