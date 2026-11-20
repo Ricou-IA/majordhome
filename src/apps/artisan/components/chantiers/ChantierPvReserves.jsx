@@ -20,23 +20,23 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ExternalLink, Link2, Loader2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { useChantierPvMutations } from '@hooks/useChantiers';
-import { chantiersService } from '@services/chantiers.service';
 import { reponseReservesNonEnregistree, suiteDesReserves } from '@/lib/chantierApresVente';
 import { dateLongue, jourDeParis, messagePv, validerReponseReserves } from '@/lib/pvReception';
 import { formatDateTimeFR } from '@/lib/utils';
 import { BOUTON_NEUTRE, BOUTON_PRINCIPAL } from './pvBoutons';
 import { LienACopier } from './LienACopier';
 import { copierDansPressePapiers, MESSAGE_COPIE_ECHOUEE } from './pvPressePapiers';
+import { useOuvrirPv } from './useOuvrirPv';
 
-export function ChantierPvReserves({ chantier, pv, canEdit, company, communicationOuverte, onUpdated }) {
+export function ChantierPvReserves({ chantier, pv, canEdit, communicationOuverte, onUpdated }) {
   const suite = suiteDesReserves(chantier, pv);
   const {
-    repondreReservesPv, demanderLeveePv, genererPdfLeveePv, isReponseReservesPv, isDemandeLeveePv, isPdfLeveePv,
+    repondreReservesPv, demanderLeveePv, isReponseReservesPv, isDemandeLeveePv,
   } = useChantierPvMutations();
+  const { ouvrirLevee, enCours: leveeEnOuverture } = useOuvrirPv({ onUpdated });
   const [reponse, setReponse] = useState(pv?.reserves_reponse || '');
   const [echeance, setEcheance] = useState(pv?.reserves_echeance || '');
   const [erreur, setErreur] = useState('');
-  const [ouverture, setOuverture] = useState(false);
   const [lienManuel, setLienManuel] = useState('');
 
   // Resynchronise avec l'enregistrement seulement quand sa valeur change (pas à chaque relecture).
@@ -85,25 +85,7 @@ export function ChantierPvReserves({ chantier, pv, canEdit, company, communicati
     onUpdated?.();
   };
 
-  const handleVoirLevee = async () => {
-    if (chantier.pv_levee_path) {
-      setOuverture(true);
-      const { url, error } = await chantiersService.getPvReceptionUrl(chantier.pv_levee_path);
-      setOuverture(false);
-      if (error || !url) { toast.error('Impossible de charger le PV de levée'); return; }
-      window.open(url, '_blank');
-      return;
-    }
-    try {
-      const res = await genererPdfLeveePv({ chantier, company });
-      window.open(URL.createObjectURL(res.blob), '_blank');
-      if (!res.archive) toast.warning('Le PV de levée s\'ouvre, mais il n\'a pas pu être archivé : rouvrez-le plus tard.');
-      res.avertissements?.forEach((message) => toast.warning(message));
-      onUpdated?.();
-    } catch (err) {
-      toast.error(err?.message || 'Le PV de levée n\'a pas pu être produit');
-    }
-  };
+  const handleVoirLevee = () => ouvrirLevee(chantier);
 
   const champ = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white disabled:bg-gray-50';
 
@@ -122,8 +104,8 @@ export function ChantierPvReserves({ chantier, pv, canEdit, company, communicati
           </p>
           {pv.reserves_reponse && <p className="text-sm text-gray-700"><span className="font-medium">Réponse de l&apos;entreprise : </span>{pv.reserves_reponse}</p>}
           {pv.reserves_echeance && <p className="text-sm text-gray-700"><span className="font-medium">Engagement : </span>levées avant le {dateLongue(pv.reserves_echeance)}</p>}
-          <button type="button" onClick={handleVoirLevee} disabled={isPdfLeveePv || ouverture} className={BOUTON_NEUTRE}>
-            {isPdfLeveePv || ouverture ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+          <button type="button" onClick={handleVoirLevee} disabled={leveeEnOuverture} className={BOUTON_NEUTRE}>
+            {leveeEnOuverture ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
             Voir le PV de levée
           </button>
         </div>

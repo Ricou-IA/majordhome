@@ -506,6 +506,31 @@ export const certificatsService = {
       return { data: null, error: err };
     }
   },
+
+  /**
+   * Certificats d'une liste d'interventions, pour dire lesquelles ont un document à ouvrir
+   * (onglet Interventions de la fiche client). Une lecture en échec est RENDUE en erreur :
+   * une liste vide se lirait « aucun certificat ».
+   * @param {string} orgId  org core
+   * @param {string[]} interventionIds
+   * @returns {Promise<{ data: { id: string, intervention_id: string, statut: string, mode: string|null, pdf_storage_path: string|null }[]|null, error: any }>}
+   */
+  async listForInterventions(orgId, interventionIds) {
+    if (!interventionIds?.length) return { data: [], error: null };
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_certificats')
+        .select('id, intervention_id, statut, mode, pdf_storage_path')
+        .eq('org_id', orgId)
+        .in('intervention_id', interventionIds)
+        .order('created_at', { ascending: true });
+      if (error) return { data: null, error };
+      return { data: data || [], error: null };
+    } catch (err) {
+      logger.error('[certificats] listForInterventions error:', err);
+      return { data: null, error: err };
+    }
+  },
 };
 
 export default certificatsService;

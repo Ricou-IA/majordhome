@@ -280,6 +280,8 @@ export const certificatKeys = {
   all: (orgId) => ['certificats', orgId],
   byIntervention: (orgId, interventionId) => [...certificatKeys.all(orgId), 'intervention', interventionId],
   tree: (orgId, interventionId) => [...certificatKeys.all(orgId), 'tree', interventionId],
+  // Certificats d'une liste d'interventions (documents de l'onglet Interventions d'une fiche client).
+  documents: (orgId, projectId) => [...certificatKeys.all(orgId), 'documents', projectId],
   attestation: (orgId, interventionId) => [...certificatKeys.all(orgId), 'attestation', interventionId],
   rdvTechniciens: (orgId, interventionId) => [...certificatKeys.all(orgId), 'rdv-techniciens', interventionId],
 };

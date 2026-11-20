@@ -14,25 +14,22 @@
  * ============================================================================
  */
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { FileText, CheckCircle2, AlertTriangle, ExternalLink, PenTool, Send, Link2, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { useChantierPv, useChantierPvMutations } from '@hooks/useChantiers';
-import { chantiersService } from '@services/chantiers.service';
-import { buildCompanyInfo } from '@/lib/orgBranding';
+import { useChantierPv } from '@hooks/useChantiers';
 import { moduleActif } from '@/lib/modules';
 import { formatDateTimeFR } from '@/lib/utils';
 import { BOUTON_NEUTRE, BOUTON_PRINCIPAL } from './pvBoutons';
 import { PreparerPvDialog } from './PreparerPvDialog';
 import { ChantierPvReserves } from './ChantierPvReserves';
+import { useOuvrirPv } from './useOuvrirPv';
 
 export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSignerSurPlace, onValiderSansPv, onUpdated }) {
   const { organization } = useAuth();
   const orgId = organization?.id;
   const { settings } = useOrgSettings();
-  const company = useMemo(() => buildCompanyInfo(settings), [settings]);
   const communicationOuverte = moduleActif(settings, 'communication');
 
   const signeEnLigne = Boolean(chantier.pv_signed_at);
@@ -42,36 +39,13 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
 
   // Détail de l'envoi et de la signature : chargé seulement s'il y a quelque chose à dire.
   const { pv, isLoading: pvEnChargement, error: pvEnErreur } = useChantierPv(orgId, chantier.id, { enabled: envoye || signeEnLigne });
-  const { genererPdfPv, isPdfPv } = useChantierPvMutations();
+  const { ouvrirPv, enCours: pvEnOuverture } = useOuvrirPv({ onUpdated });
   const [preparation, setPreparation] = useState(false);
-  const [ouverture, setOuverture] = useState(false);
   // Détail du PV inconnu (chargement, erreur) ≠ « pas de réponse » : rien n'est proposé sur une donnée inconnue.
   const detailPv = pvEnChargement || pvEnErreur ? undefined : pv;
 
-  const handleVoir = async () => {
-    // PV archivé (signé sur tablette, ou déjà produit) : on ouvre le fichier.
-    if (archive) {
-      setOuverture(true);
-      const { url, error } = await chantiersService.getPvReceptionUrl(chantier.pv_reception_path);
-      setOuverture(false);
-      if (error || !url) {
-        toast.error('Impossible de charger le PV');
-        return;
-      }
-      window.open(url, '_blank');
-      return;
-    }
-    // Signé en ligne, pas encore de fichier : le PDF est produit depuis l'enregistrement, puis archivé.
-    try {
-      const res = await genererPdfPv({ chantier, company });
-      window.open(URL.createObjectURL(res.blob), '_blank');
-      if (!res.archive) toast.warning('Le PV s\'ouvre, mais il n\'a pas pu être archivé : rouvrez-le plus tard.');
-      res.avertissements?.forEach((message) => toast.warning(message));
-      onUpdated?.();
-    } catch (err) {
-      toast.error(err?.message || 'Le PV n\'a pas pu être produit');
-    }
-  };
+  // Fichier archivé s'il existe, sinon PDF produit depuis l'enregistrement puis archivé (useOuvrirPv).
+  const handleVoir = () => ouvrirPv(chantier);
 
   const avecReserves = Boolean(chantier.pv_avec_reserves);
 
@@ -100,8 +74,8 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
                 </p>
               )}
             </div>
-            <button type="button" onClick={handleVoir} disabled={isPdfPv || ouverture} className={BOUTON_NEUTRE}>
-              {isPdfPv || ouverture ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+            <button type="button" onClick={handleVoir} disabled={pvEnOuverture} className={BOUTON_NEUTRE}>
+              {pvEnOuverture ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
               Voir le PV
             </button>
             {canEdit && !signeEnLigne && (
@@ -119,7 +93,7 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
           )}
         </div>
         <ChantierPvReserves
-          chantier={chantier} pv={detailPv} canEdit={canEdit} company={company}
+          chantier={chantier} pv={detailPv} canEdit={canEdit}
           communicationOuverte={communicationOuverte} onUpdated={onUpdated}
         />
         </>

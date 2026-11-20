@@ -8,12 +8,16 @@
  * compte rendu), où ça en est (état de la carte, urgence, devis, facturation),
  * et ouvre la fiche Entretien / SAV du kanban.
  *
+ * Chaque chantier et chaque carte présente aussi les DOCUMENTS qu'il a produits (Eric
+ * 2026-11-20) : PV de réception et de levée, certificat, attestation, rapport SAV —
+ * `DocumentsIntervention.jsx`, règle dans `src/lib/documentsIntervention.js`.
+ *
  * Les faits affichés viennent de `src/lib/interventionLigne.js` (pur, testé).
  * ============================================================================
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Wrench, HardHat, Ban, CalendarDays, Users, AlertCircle, RefreshCw, ChevronRight, Receipt, Package,
 } from 'lucide-react';
@@ -28,10 +32,15 @@ import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { INTERVENTION_TYPES } from '@services/interventions.service';
 import { getStatusConfig, DEVIS_STATUSES, PARTS_ORDER_STATUSES } from '@services/sav.service';
 import { chantiersService, getChantierStatusConfig } from '@services/chantiers.service';
+import { certificatsService } from '@services/certificats.service';
+import { certificatKeys } from '@hooks/cacheKeys';
+import { unwrapResult } from '@/lib/serviceHelpers';
+import { certificatsParIntervention } from '@/lib/documentsIntervention';
 import { formatDateFR, formatDateShortFR, formatEuro } from '@/lib/utils';
 import { decrireIntervention, ordonnerInterventions } from '@/lib/interventionLigne';
 import { logger } from '@lib/logger';
 import { FicheInterventionCarte } from './FicheInterventionCarte';
+import { DocumentsChantier, DocumentsCarte } from './DocumentsIntervention';
 
 const STATUTS_TECHNIQUES = {
   completed: { label: 'Terminé', className: 'bg-green-100 text-green-700' },
@@ -108,7 +117,7 @@ const ChildCard = ({ intervention }) => {
 };
 
 /** Intervention (carte Entretien / SAV, ou ligne d'historique importée). */
-const InterventionCard = ({ intervention, aujourdhui, nomsTechniciens, onOpen }) => {
+const InterventionCard = ({ intervention, certificat, aujourdhui, nomsTechniciens, onOpen }) => {
   const type = intervention.intervention_type;
   const typeConfig = INTERVENTION_TYPES.find((t) => t.value === type) || INTERVENTION_TYPES[INTERVENTION_TYPES.length - 1];
   const estCarte = ['entretien', 'sav'].includes(type) && !!intervention.workflow_status;
@@ -208,17 +217,24 @@ const InterventionCard = ({ intervention, aujourdhui, nomsTechniciens, onOpen })
     </>
   );
 
-  const classes = 'flex w-full items-start gap-3 p-4 bg-white rounded-lg border border-secondary-200 text-left';
-  if (!onOpen) return <div className={classes}>{contenu}</div>;
+  // Les documents sont rendus HORS du bouton qui ouvre la fiche : un bouton n'en contient pas d'autres.
+  const classes = 'flex w-full items-start gap-3 p-4 text-left';
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(intervention)}
-      title="Ouvrir la fiche"
-      className={`${classes} transition-colors hover:border-primary-300 hover:bg-primary-50/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500`}
-    >
-      {contenu}
-    </button>
+    <div className="bg-white rounded-lg border border-secondary-200 overflow-hidden">
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={() => onOpen(intervention)}
+          title="Ouvrir la fiche"
+          className={`${classes} transition-colors hover:bg-primary-50/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500`}
+        >
+          {contenu}
+        </button>
+      ) : (
+        <div className={classes}>{contenu}</div>
+      )}
+      <DocumentsCarte intervention={intervention} certificat={certificat} />
+    </div>
   );
 };
 
@@ -229,21 +245,20 @@ const ChantierSummary = ({ clientId }) => {
   const [chantiers, setChantiers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return; }
-    const load = async () => {
-      try {
-        const { data, error } = await chantiersService.getChantiersByClientId(clientId);
-        if (error) throw error;
-        setChantiers(data || []);
-      } catch (err) {
-        logger.error('[ChantierSummary] load error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    try {
+      const { data, error } = await chantiersService.getChantiersByClientId(clientId);
+      if (error) throw error;
+      setChantiers(data || []);
+    } catch (err) {
+      logger.error('[ChantierSummary] load error:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
+
+  useEffect(() => { load(); }, [load]);
 
   if (loading || chantiers.length === 0) return null;
   const orderLabels = { na: 'N/A', commande: 'Commandé', recu: 'Reçu' };
@@ -286,6 +301,8 @@ const ChantierSummary = ({ clientId }) => {
             {chantier.chantier_notes && (
               <p className="text-xs text-secondary-500 italic">{chantier.chantier_notes}</p>
             )}
+            {/* PV de réception, PV de levée : le chantier porte ensuite son fichier, on relit. */}
+            <DocumentsChantier chantier={chantier} onUpdated={load} />
           </div>
         );
       })}
@@ -309,6 +326,17 @@ export const TabInterventions = ({ projectId, clientId }) => {
   );
   const lignes = useMemo(() => ordonnerInterventions(interventions, aujourdhui), [interventions, aujourdhui]);
   const parentCount = useMemo(() => interventions.filter((i) => !i.parent_id).length, [interventions]);
+
+  // Certificats des interventions listées : c'est eux qui disent quelle ligne a un document.
+  // Liste inconnue (chargement, erreur) ≠ « aucun certificat » : l'erreur est dite plus bas.
+  const idsInterventions = useMemo(() => interventions.map((i) => i.id).sort(), [interventions]);
+  const { data: certificats, error: certificatsEnErreur } = useQuery({
+    queryKey: [...certificatKeys.documents(orgId, projectId), idsInterventions],
+    queryFn: () => unwrapResult(certificatsService.listForInterventions(orgId, idsInterventions)),
+    enabled: !!orgId && !!projectId && idsInterventions.length > 0,
+    staleTime: 60_000,
+  });
+  const certificatDe = useMemo(() => certificatsParIntervention(certificats), [certificats]);
 
   // La fiche Entretien / SAV ne s'ouvre que pour une carte du kanban, et pour qui a le droit de la voir.
   const peutVoirCartes = can('entretiens', 'view') || can('sav', 'view');
@@ -355,6 +383,12 @@ export const TabInterventions = ({ projectId, clientId }) => {
           <p className="text-sm text-secondary-500">
             {parentCount} intervention{parentCount !== 1 ? 's' : ''}
           </p>
+          {certificatsEnErreur && (
+            <p className="flex items-start gap-2 p-3 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              Les certificats n&apos;ont pas pu être lus : les documents des entretiens ne sont pas affichés.
+            </p>
+          )}
           <div className="space-y-3">
             {lignes.map((i) => (i.parent_id ? (
               <ChildCard key={i.id} intervention={i} />
@@ -362,6 +396,7 @@ export const TabInterventions = ({ projectId, clientId }) => {
               <InterventionCard
                 key={i.id}
                 intervention={i}
+                certificat={certificatDe.get(i.id) || null}
                 aujourdhui={aujourdhui}
                 nomsTechniciens={nomsTechniciens}
                 onOpen={peutOuvrir(i) ? (item) => setOuverte(item.id) : null}
