@@ -7,11 +7,17 @@
  * jamais figées dans un mail ; la pose est atomique côté serveur et, si la
  * demi-journée s'est remplie entre-temps, la page recharge les créneaux.
  * Le client ne voit que : sa date, matin / après-midi, le prénom du technicien.
+ * Habillage commun aux pages sans compte : src/pages/public/pageUi.jsx.
  * ============================================================================
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { CalendarCheck, CalendarDays, CalendarX2, Check, Clock, UserRound } from 'lucide-react';
+import { prenomLisible } from '@/lib/pagePublique';
+import {
+  PageAlerte, PageAttente, PageBouton, PageCoche, PageCoque, PageFiche, PageMessage, PageTitre,
+} from './public/pageUi';
 
 const EDGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-rdv`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -35,6 +41,20 @@ function formatDateLongue(iso) {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 }
 
+/** « mardi 24 novembre » → « Mardi 24 novembre ». */
+function majuscule(texte) {
+  return texte.charAt(0).toUpperCase() + texte.slice(1);
+}
+
+/** Les lignes de la fiche d'un rendez-vous : date, demi-journée, technicien. */
+function lignesRdv({ date, demi, technicien }) {
+  return [
+    { icone: CalendarDays, libelle: 'Date', valeur: majuscule(formatDateLongue(date)) },
+    { icone: Clock, libelle: 'Demi-journée', valeur: [LIBELLE_DEMI[demi], PLAGE_DEMI[demi] && `(${PLAGE_DEMI[demi]})`].filter(Boolean).join(' ') },
+    { icone: UserRound, libelle: 'Technicien', valeur: technicien },
+  ];
+}
+
 async function appelerEdge({ method = 'GET', token, body }) {
   const url = method === 'GET' ? `${EDGE_URL}?token=${encodeURIComponent(token)}` : EDGE_URL;
   const res = await fetch(url, {
@@ -47,29 +67,28 @@ async function appelerEdge({ method = 'GET', token, body }) {
   return { ok: res.ok, status: res.status, json };
 }
 
-function Entete({ org }) {
+function Creneau({ creneau, actif, disabled, onChoisir }) {
   return (
-    <header className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: org?.accent_color || '#64748b' }}>
-      {org?.logo_url ? (
-        <img src={org.logo_url} alt="" className="h-10 w-auto object-contain" />
-      ) : (
-        <div className="h-10 w-10 rounded-full" style={{ backgroundColor: org?.accent_color || '#64748b' }} />
-      )}
-      <div>
-        <p className="text-sm text-secondary-500">Prise de rendez-vous</p>
-        <h1 className="text-lg font-semibold text-secondary-900">{org?.name || 'Votre entreprise'}</h1>
-      </div>
-    </header>
-  );
-}
-
-function Pied({ org }) {
-  if (!org?.phone) return null;
-  return (
-    <footer className="mt-8 pt-4 border-t border-secondary-200 text-sm text-secondary-500">
-      Une question ? Appelez-nous au{' '}
-      <a href={`tel:${org.phone.replace(/\s/g, '')}`} className="font-medium text-secondary-800 underline">{org.phone}</a>.
-    </footer>
+    <button
+      type="button" onClick={onChoisir} disabled={disabled} aria-pressed={actif}
+      className={`flex min-h-[72px] items-start gap-2 rounded-2xl border-2 p-4 text-left transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-900 focus-visible:ring-offset-2 ${
+        actif ? 'border-[color:var(--marque)] bg-[color:var(--marque-doux)]' : 'border-secondary-200 bg-white hover:border-secondary-300'
+      }`}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-base font-semibold">{LIBELLE_DEMI[creneau.demi]}</span>
+        <span className="block text-sm text-secondary-700">{PLAGE_DEMI[creneau.demi]}</span>
+        {creneau.technicien && <span className="block text-sm text-secondary-700">avec {creneau.technicien}</span>}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
+          actif ? 'border-[color:var(--marque)] bg-[color:var(--marque)] text-[color:var(--marque-texte)]' : 'border-secondary-300 bg-white'
+        }`}
+      >
+        {actif && <Check className="h-4 w-4" strokeWidth={3} />}
+      </span>
+    </button>
   );
 }
 
@@ -132,118 +151,107 @@ export default function PriseRdv() {
   };
 
   const org = offre?.org;
+  const prenom = prenomLisible(offre?.client?.prenom);
+  const categories = offre?.contrat?.categories?.length ? ` de votre ${offre.contrat.categories.join(', ').toLowerCase()}` : '';
+  const enChoix = (etat === 'choix' || etat === 'confirmation' || etat === 'pose') && !!offre;
 
   return (
-    <div className="min-h-screen bg-secondary-50 text-secondary-900">
-      <main className="max-w-md mx-auto p-4 sm:p-6">
-        <Entete org={org} />
+    <PageCoque
+      nom={org?.name || 'Votre entreprise'} logo={org?.logo_url} couleur={org?.accent_color} telephone={org?.phone}
+      attente={etat === 'chargement' && !offre}
+    >
+      {etat === 'chargement' && (
+        <PageAttente libelle="Recherche des disponibilités">Nous regardons les disponibilités…</PageAttente>
+      )}
 
-        {etat === 'chargement' && (
-          <p className="mt-8 text-center text-secondary-500">Nous regardons les disponibilités…</p>
-        )}
+      {etat === 'erreur' && (
+        <PageMessage
+          icone={CalendarX2}
+          titre={MESSAGES_ERREUR[erreur] || 'La prise de rendez-vous en ligne est momentanément indisponible.'}
+        >
+          Contactez-nous par téléphone pour convenir d’un rendez-vous.
+        </PageMessage>
+      )}
 
-        {etat === 'erreur' && (
-          <section className="mt-8 space-y-3">
-            <p className="text-base font-medium">{MESSAGES_ERREUR[erreur] || 'La prise de rendez-vous en ligne est momentanément indisponible.'}</p>
-            <p className="text-sm text-secondary-600">Contactez-nous par téléphone pour convenir d’un rendez-vous.</p>
-          </section>
-        )}
+      {etat === 'deja' && offre?.deja && (
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <PageCoche />
+            <PageTitre titre="Votre entretien est déjà prévu">
+              {prenom ? `Bonjour ${prenom}, voici` : 'Voici'} le rendez-vous enregistré.
+            </PageTitre>
+          </div>
+          <PageFiche lignes={lignesRdv(offre.deja)} />
+          <p className="text-base leading-relaxed text-secondary-700">
+            L’heure exacte de passage vous sera confirmée par SMS. Pour le déplacer, appelez-nous.
+          </p>
+        </div>
+      )}
 
-        {etat === 'deja' && offre?.deja && (
-          <section className="mt-8 space-y-3">
-            <p className="text-base">Bonjour{offre.client?.prenom ? ` ${offre.client.prenom}` : ''},</p>
-            <p className="text-base font-medium">
-              Votre entretien est déjà prévu le {formatDateLongue(offre.deja.date)}, {LIBELLE_DEMI[offre.deja.demi]?.toLowerCase()}
-              {offre.deja.technicien ? ` avec ${offre.deja.technicien}` : ''}.
-            </p>
-            <p className="text-sm text-secondary-600">L’heure exacte de passage vous sera confirmée par SMS. Pour le déplacer, appelez-nous.</p>
-          </section>
-        )}
+      {enChoix && parDate.length === 0 && (
+        <div className="space-y-4">
+          {avis && <PageAlerte>{avis}</PageAlerte>}
+          <PageMessage icone={CalendarX2} titre="Aucune demi-journée n’est disponible en ligne ce mois-ci.">
+            {prenom ? `Bonjour ${prenom}, appelez-nous` : 'Appelez-nous'}, nous trouverons une date ensemble.
+          </PageMessage>
+        </div>
+      )}
 
-        {(etat === 'choix' || etat === 'confirmation' || etat === 'pose') && offre && (
-          <section className="mt-6 space-y-4">
-            <p className="text-base">Bonjour{offre.client?.prenom ? ` ${offre.client.prenom}` : ''},</p>
-            <p className="text-base">
-              C’est le moment de l’entretien annuel
-              {offre.contrat?.categories?.length ? ` de votre ${offre.contrat.categories.join(', ').toLowerCase()}` : ''}.
-              Choisissez la demi-journée qui vous convient : nous vous confirmerons l’heure exacte par SMS.
-            </p>
-            {avis && <p className="text-sm rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2">{avis}</p>}
+      {enChoix && parDate.length > 0 && (
+        <div className="space-y-8">
+          <PageTitre surtitre="Entretien annuel" titre="Choisissez votre demi-journée">
+            {prenom ? `Bonjour ${prenom}, c’est` : 'C’est'} le moment de l’entretien annuel{categories}. Choisissez la
+            demi-journée qui vous convient : nous vous confirmerons l’heure exacte par SMS.
+          </PageTitre>
+          {avis && <PageAlerte>{avis}</PageAlerte>}
 
-            {parDate.length === 0 ? (
-              <div className="rounded-md bg-white border border-secondary-200 p-4 space-y-2">
-                <p className="font-medium">Aucune demi-journée n’est disponible en ligne ce mois-ci.</p>
-                <p className="text-sm text-secondary-600">Appelez-nous, nous trouverons une date ensemble.</p>
-              </div>
-            ) : (
-              <ul className="space-y-3">
-                {parDate.map(([date, creneaux]) => (
-                  <li key={date} className="rounded-md bg-white border border-secondary-200 p-3">
-                    <p className="font-medium capitalize">{formatDateLongue(date)}</p>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {creneaux.map((c) => {
-                        const actif = choisi?.id === c.id;
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => { setChoisi(c); setEtat('confirmation'); }}
-                            disabled={etat === 'pose'}
-                            className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${actif ? 'border-secondary-900 bg-secondary-900 text-white' : 'border-secondary-300 hover:border-secondary-500'}`}
-                          >
-                            <span className="block font-medium">{LIBELLE_DEMI[c.demi]}</span>
-                            <span className={`block text-xs ${actif ? 'text-white/80' : 'text-secondary-500'}`}>{PLAGE_DEMI[c.demi]} · avec {c.technicien}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {choisi && (
-              <div className="sticky bottom-4 rounded-md bg-white border border-secondary-300 shadow-lg p-4 space-y-3">
-                <p className="text-sm">
-                  Confirmer le <span className="font-medium">{formatDateLongue(choisi.date)}, {LIBELLE_DEMI[choisi.demi].toLowerCase()}</span> avec {choisi.technicien} ?
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={confirmer}
-                    disabled={etat === 'pose'}
-                    className="flex-1 rounded-md px-4 py-2 text-white font-medium disabled:opacity-60"
-                    style={{ backgroundColor: org?.accent_color || '#0f172a' }}
-                  >
-                    {etat === 'pose' ? 'Enregistrement…' : 'Je confirme'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setChoisi(null); setEtat('choix'); }}
-                    disabled={etat === 'pose'}
-                    className="rounded-md border border-secondary-300 px-4 py-2 text-sm"
-                  >
-                    Changer
-                  </button>
+          <ul className="space-y-6">
+            {parDate.map(([date, creneaux]) => (
+              <li key={date}>
+                <h2 className="mb-3 text-base font-semibold">{majuscule(formatDateLongue(date))}</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  {creneaux.map((c) => (
+                    <Creneau
+                      key={c.id} creneau={c} actif={choisi?.id === c.id} disabled={etat === 'pose'}
+                      onChoisir={() => { setChoisi(c); setEtat('confirmation'); }}
+                    />
+                  ))}
                 </div>
-              </div>
-            )}
-          </section>
-        )}
+              </li>
+            ))}
+          </ul>
 
-        {etat === 'succes' && resultat && (
-          <section className="mt-8 space-y-3">
-            <p className="text-lg font-semibold">C’est noté, merci !</p>
-            <p className="text-base">
-              Votre entretien aura lieu le <span className="font-medium">{formatDateLongue(resultat.date)}, {LIBELLE_DEMI[resultat.demi].toLowerCase()}</span>
-              {resultat.technicien ? ` avec ${resultat.technicien}` : ''}.
-            </p>
-            <p className="text-sm text-secondary-600">L’heure exacte de passage vous sera envoyée par SMS quelques jours avant. Vous pouvez fermer cette page.</p>
-          </section>
-        )}
+          {choisi && (
+            <div className="sticky bottom-4 space-y-3 rounded-2xl border border-secondary-200 bg-white p-4 shadow-lg">
+              <p className="text-base">
+                <span className="font-semibold">{majuscule(formatDateLongue(choisi.date))}, {LIBELLE_DEMI[choisi.demi].toLowerCase()}</span>
+                {choisi.technicien ? `, avec ${choisi.technicien}` : ''}
+              </p>
+              <PageBouton onClick={confirmer} attente={etat === 'pose'} icone={CalendarCheck}>Je confirme ce rendez-vous</PageBouton>
+              <button
+                type="button" disabled={etat === 'pose'}
+                onClick={() => { setChoisi(null); setEtat('choix'); }}
+                className="min-h-[44px] w-full rounded-xl text-sm font-medium text-secondary-800 hover:bg-secondary-100 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-900"
+              >
+                Choisir une autre demi-journée
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
-        <Pied org={org} />
-      </main>
-    </div>
+      {etat === 'succes' && resultat && (
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <PageCoche />
+            <PageTitre titre="C’est noté, merci !">Votre entretien est enregistré.</PageTitre>
+          </div>
+          <PageFiche lignes={lignesRdv(resultat)} />
+          <p className="text-base leading-relaxed text-secondary-700">
+            L’heure exacte de passage vous sera envoyée par SMS quelques jours avant. Vous pouvez fermer cette page.
+          </p>
+        </div>
+      )}
+    </PageCoque>
   );
 }

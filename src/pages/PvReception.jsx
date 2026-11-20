@@ -23,7 +23,7 @@ import { Clock, FileWarning, FileCheck2 } from 'lucide-react';
 import PvFormulaire from './pv/PvFormulaire';
 import PvRecapitulatif from './pv/PvRecapitulatif';
 import PvLevee from './pv/PvLevee';
-import { PvAttente, PvBoutonSecondaire, PvCoque, PvMessage } from './pv/pvUi';
+import { PageAttente, PageBoutonSecondaire, PageCoque, PageMessage } from './public/pageUi';
 
 const REPONSE_VIERGE = {
   reception_type: null, reserves_nature: '', reserves_travaux: '', points_confirmes: [],
@@ -116,30 +116,34 @@ export default function PvReception() {
   const entreprise = pv?.entreprise;
 
   return (
-    <PvCoque entreprise={entreprise} attente={etat === 'chargement' && !pv}>
-      {etat === 'chargement' && <PvAttente />}
+    <PageCoque
+      nom={entreprise?.brand_name || 'Votre installateur'} logo={entreprise?.logo_url}
+      couleur={entreprise?.accent_color} telephone={entreprise?.phone}
+      attente={etat === 'chargement' && !pv}
+    >
+      {etat === 'chargement' && <PageAttente libelle="Chargement de votre procès-verbal" />}
 
       {etat === 'erreur' && (
-        <PvMessage
+        <PageMessage
           icone={FileWarning}
           titre={messagePv(erreur, 'Ce procès-verbal est momentanément indisponible.')}
-          action={<PvBoutonSecondaire onClick={charger}>Réessayer</PvBoutonSecondaire>}
+          action={<PageBoutonSecondaire onClick={charger}>Réessayer</PageBoutonSecondaire>}
         >
           Contactez votre installateur : il vous renverra un lien.
-        </PvMessage>
+        </PageMessage>
       )}
 
       {etat === 'pas_pret' && (
-        <PvMessage icone={Clock} titre="Ce procès-verbal n’est pas encore prêt.">
+        <PageMessage icone={Clock} titre="Ce procès-verbal n’est pas encore prêt.">
           Votre installateur vous renverra le lien dès qu’il le sera.
-        </PvMessage>
+        </PageMessage>
       )}
 
       {etat === 'enregistre' && (
-        <PvMessage
+        <PageMessage
           icone={FileCheck2}
           titre="Votre signature est enregistrée."
-          action={<PvBoutonSecondaire onClick={charger}>Recharger</PvBoutonSecondaire>}
+          action={<PageBoutonSecondaire onClick={charger}>Recharger</PageBoutonSecondaire>}
         />
       )}
 
@@ -154,6 +158,6 @@ export default function PvReception() {
       {(etat === 'formulaire' || etat === 'envoi') && pv && (
         <PvFormulaire pv={pv} reponse={reponse} maj={maj} envoi={etat === 'envoi'} refus={refus} onSigner={signer} />
       )}
-    </PvCoque>
+    </PageCoque>
   );
 }

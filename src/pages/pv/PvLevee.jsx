@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { PenLine } from 'lucide-react';
 import PvSignature from './PvSignature';
-import { PvAlerte, PvBouton } from './pvUi';
+import { PageAlerte, PageBouton } from '../public/pageUi';
 
 export default function PvLevee({ client, entreprise, onSigner }) {
   const [nom, setNom] = useState([client?.prenom, client?.nom].filter(Boolean).join(' '));
@@ -43,8 +43,8 @@ export default function PvLevee({ client, entreprise, onSigner }) {
       <p className="text-sm leading-relaxed text-secondary-600">
         En signant, vous constatez que les réserves décrites ci-dessus ont été levées.
       </p>
-      {refus && <PvAlerte>{refus}</PvAlerte>}
-      <PvBouton onClick={signer} attente={envoi} icone={PenLine}>Je constate que les réserves sont levées</PvBouton>
+      {refus && <PageAlerte>{refus}</PageAlerte>}
+      <PageBouton onClick={signer} attente={envoi} icone={PenLine}>Je constate que les réserves sont levées</PageBouton>
     </section>
   );
 }

@@ -1,6 +1,6 @@
 /** Ce que déclare l'installateur, en lecture : la réponse est écrite en toutes lettres. */
 import { Check, Minus, X } from 'lucide-react';
-import { PvEtape } from './pvUi';
+import { PageEtape } from '../public/pageUi';
 
 /** Habillage de la réponse : une icône et le mot, la couleur ne porte rien seule. */
 const HABILLAGE = {
@@ -23,7 +23,7 @@ function Reponse({ reponse }) {
 export default function PvDeclaration({ numero, declaration }) {
   if (!declaration?.length) return null;
   return (
-    <PvEtape numero={numero} titre="Ce que déclare votre installateur">
+    <PageEtape numero={numero} titre="Ce que déclare votre installateur">
       <ul className="divide-y divide-secondary-100 rounded-2xl border border-secondary-200 bg-white shadow-sm">
         {declaration.map((p, i) => (
           <li key={`${i}-${p.texte}`} className="flex items-start justify-between gap-4 p-4">
@@ -32,6 +32,6 @@ export default function PvDeclaration({ numero, declaration }) {
           </li>
         ))}
       </ul>
-    </PvEtape>
+    </PageEtape>
   );
 }

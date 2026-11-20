@@ -66,7 +66,7 @@ export default function PvSignature({ nom, onNom, onSignature, disabled = false 
         <p className="mb-1.5 text-sm font-medium text-secondary-700">Votre signature</p>
         <div
           className={`relative overflow-hidden rounded-2xl border-2 bg-white transition-colors ${
-            vide ? 'border-dashed border-secondary-300' : 'border-solid border-[color:var(--pv-accent)]'
+            vide ? 'border-dashed border-secondary-300' : 'border-solid border-[color:var(--marque)]'
           } ${disabled ? 'pointer-events-none opacity-60' : ''}`}
         >
           <SignatureCanvas

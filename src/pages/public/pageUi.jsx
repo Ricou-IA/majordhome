@@ -1,40 +1,41 @@
 /**
- * pvUi.jsx — habillage de la page publique /pv/:token : coque (en-tête, pied, teintes de
- * l'entreprise), étape numérotée, fiche, boutons, alerte, écran de message, attente.
+ * pageUi.jsx — habillage commun des pages ouvertes au client sans compte (/pv/:token,
+ * /rdv/:token) : coque (en-tête, pied, teintes de l'entreprise), titre, étape numérotée,
+ * fiche, pastille de confirmation, boutons, alerte, écran de message, attente.
  * Aucune règle ici : les teintes viennent de `teintesDeMarque` (src/lib/pagePublique.js),
- * posées en variables CSS sur la coque et lues par les classes `[color:var(--pv-…)]`.
+ * posées en variables CSS sur la coque et lues par les classes `[color:var(--marque…)]`.
  */
-import { AlertTriangle, Loader2, Phone } from 'lucide-react';
+import { AlertTriangle, Check, Loader2, Phone } from 'lucide-react';
 import { teintesDeMarque } from '@/lib/pagePublique';
 
 const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-900 focus-visible:ring-offset-2';
 
-/** Coque de la page : bandeau à la couleur de l'entreprise, en-tête, contenu, pied. */
-export function PvCoque({ entreprise, attente = false, children }) {
-  const t = teintesDeMarque(entreprise?.accent_color);
-  const telephone = entreprise?.phone;
+/**
+ * Coque de la page : bandeau à la couleur de l'entreprise, en-tête, contenu, pied.
+ * `attente` : le nom n'est pas encore connu, l'en-tête montre une silhouette.
+ */
+export function PageCoque({ nom, logo, couleur, telephone, attente = false, children }) {
+  const t = teintesDeMarque(couleur);
   return (
     <div
       className="min-h-screen bg-secondary-50 text-secondary-900 antialiased"
-      style={{ '--pv-accent': t.accent, '--pv-sur-accent': t.surAccent, '--pv-doux': t.doux }}
+      style={{ '--marque': t.accent, '--marque-texte': t.surAccent, '--marque-doux': t.doux }}
     >
-      <div className="h-1 bg-[color:var(--pv-accent)]" aria-hidden="true" />
+      <div className="h-1 bg-[color:var(--marque)]" aria-hidden="true" />
       <header className="border-b border-secondary-200 bg-white">
         <div className="mx-auto flex h-16 max-w-xl items-center justify-between gap-3 px-4 sm:px-6">
           {attente ? (
             <div className="h-5 w-40 rounded bg-secondary-100" aria-hidden="true" />
           ) : (
             <div className="flex min-w-0 items-center gap-3">
-              {entreprise?.logo_url && (
-                <img src={entreprise.logo_url} alt="" className="h-9 w-auto max-w-[120px] shrink-0 object-contain" />
-              )}
-              <p className="truncate text-base font-semibold">{entreprise?.brand_name || 'Votre installateur'}</p>
+              {logo && <img src={logo} alt="" className="h-9 w-auto max-w-[120px] shrink-0 object-contain" />}
+              <p className="truncate text-base font-semibold">{nom}</p>
             </div>
           )}
           {telephone && (
             <a
               href={`tel:${telephone.replace(/\s/g, '')}`}
-              aria-label={`Appeler ${entreprise?.brand_name || 'votre installateur'} au ${telephone}`}
+              aria-label={`Appeler ${nom} au ${telephone}`}
               className={`inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-full border border-secondary-200 px-4 text-sm font-medium text-secondary-800 hover:bg-secondary-50 ${FOCUS}`}
             >
               <Phone className="h-4 w-4" aria-hidden="true" />
@@ -62,7 +63,7 @@ export function PvCoque({ entreprise, attente = false, children }) {
 }
 
 /** Titre de page : surtitre discret, titre, phrase d'accueil. */
-export function PvTitre({ surtitre, titre, children }) {
+export function PageTitre({ surtitre, titre, children }) {
   return (
     <div className="space-y-3">
       {surtitre && <p className="text-sm font-medium text-secondary-600">{surtitre}</p>}
@@ -73,14 +74,14 @@ export function PvTitre({ surtitre, titre, children }) {
 }
 
 /** Étape numérotée du procès-verbal. */
-export function PvEtape({ numero, titre, aide, children }) {
+export function PageEtape({ numero, titre, aide, children }) {
   return (
     <section className="space-y-4">
       <div className="space-y-1.5">
         <div className="flex items-center gap-3">
           <span
             aria-hidden="true"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--pv-accent)] text-sm font-semibold text-[color:var(--pv-sur-accent)]"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--marque)] text-sm font-semibold text-[color:var(--marque-texte)]"
           >
             {numero}
           </span>
@@ -97,7 +98,7 @@ export function PvEtape({ numero, titre, aide, children }) {
  * Fiche : un titre facultatif puis des lignes « libellé / valeur », avec ou sans icône.
  * @param {{ titre?: string, lignes: { icone?: Function, libelle?: string, valeur: string, multiligne?: boolean }[] }} props
  */
-export function PvFiche({ titre, lignes }) {
+export function PageFiche({ titre, lignes }) {
   const visibles = lignes.filter((l) => l && l.valeur);
   if (!titre && visibles.length === 0) return null;
   return (
@@ -124,13 +125,13 @@ export function PvFiche({ titre, lignes }) {
 }
 
 /** Bouton principal, à la couleur de l'entreprise. */
-export function PvBouton({ attente = false, libelleAttente = 'Enregistrement…', icone: Icone, children, ...props }) {
+export function PageBouton({ attente = false, libelleAttente = 'Enregistrement…', icone: Icone, children, ...props }) {
   return (
     <button
       type="button"
       disabled={attente}
       {...props}
-      className={`inline-flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl py-3 bg-[color:var(--pv-accent)] px-5 text-base font-semibold text-[color:var(--pv-sur-accent)] shadow-sm transition hover:brightness-95 active:brightness-90 disabled:opacity-60 ${FOCUS}`}
+      className={`inline-flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl py-3 bg-[color:var(--marque)] px-5 text-base font-semibold text-[color:var(--marque-texte)] shadow-sm transition hover:brightness-95 active:brightness-90 disabled:opacity-60 ${FOCUS}`}
     >
       {attente
         ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -141,7 +142,7 @@ export function PvBouton({ attente = false, libelleAttente = 'Enregistrement…'
 }
 
 /** Bouton secondaire : contour, fond blanc. */
-export function PvBoutonSecondaire({ attente = false, icone: Icone, children, ...props }) {
+export function PageBoutonSecondaire({ attente = false, icone: Icone, children, ...props }) {
   return (
     <button
       type="button"
@@ -158,7 +159,7 @@ export function PvBoutonSecondaire({ attente = false, icone: Icone, children, ..
 }
 
 /** Refus ou avertissement : icône et texte, jamais la couleur seule. */
-export function PvAlerte({ children }) {
+export function PageAlerte({ children }) {
   return (
     <p className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-base text-amber-950" role="alert">
       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
@@ -168,7 +169,7 @@ export function PvAlerte({ children }) {
 }
 
 /** Écran de message (lien indisponible, PV pas encore prêt, signature enregistrée). */
-export function PvMessage({ icone: Icone, titre, children, action }) {
+export function PageMessage({ icone: Icone, titre, children, action }) {
   return (
     <section className="rounded-2xl border border-secondary-200 bg-white p-6 shadow-sm sm:p-8">
       {Icone && (
@@ -183,18 +184,33 @@ export function PvMessage({ icone: Icone, titre, children, action }) {
   );
 }
 
-/** Attente du premier chargement : la silhouette de la page, pas un texte seul. */
-export function PvAttente() {
+/** Pastille de confirmation, à la couleur de l'entreprise. */
+export function PageCoche() {
   return (
-    <div className="animate-pulse space-y-8 motion-reduce:animate-none" role="status" aria-label="Chargement de votre procès-verbal">
-      <div className="space-y-3">
-        <div className="h-4 w-36 rounded bg-secondary-200" />
-        <div className="h-8 w-4/5 rounded bg-secondary-200" />
-        <div className="h-4 w-full rounded bg-secondary-200" />
-        <div className="h-4 w-2/3 rounded bg-secondary-200" />
+    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--marque)] text-[color:var(--marque-texte)]">
+      <Check className="h-6 w-6" strokeWidth={3} aria-hidden="true" />
+    </span>
+  );
+}
+
+/**
+ * Attente du premier chargement : la silhouette de la page, pas un texte seul.
+ * `children` : une phrase visible quand l'attente peut durer (calcul des disponibilités).
+ */
+export function PageAttente({ libelle = 'Chargement', children }) {
+  return (
+    <div className="space-y-8" role="status" aria-label={libelle}>
+      {children && <p className="text-base text-secondary-600">{children}</p>}
+      <div className="animate-pulse space-y-8 motion-reduce:animate-none" aria-hidden="true">
+        <div className="space-y-3">
+          <div className="h-4 w-36 rounded bg-secondary-200" />
+          <div className="h-8 w-4/5 rounded bg-secondary-200" />
+          <div className="h-4 w-full rounded bg-secondary-200" />
+          <div className="h-4 w-2/3 rounded bg-secondary-200" />
+        </div>
+        <div className="h-44 rounded-2xl border border-secondary-200 bg-white" />
+        <div className="h-32 rounded-2xl border border-secondary-200 bg-white" />
       </div>
-      <div className="h-44 rounded-2xl border border-secondary-200 bg-white" />
-      <div className="h-32 rounded-2xl border border-secondary-200 bg-white" />
     </div>
   );
 }

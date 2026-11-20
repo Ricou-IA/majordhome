@@ -9,7 +9,7 @@ import { prenomLisible } from '@/lib/pagePublique';
 import PvDeclaration from './PvDeclaration';
 import PvPointsClient from './PvPointsClient';
 import PvSignature from './PvSignature';
-import { PvAlerte, PvBouton, PvEtape, PvFiche, PvTitre } from './pvUi';
+import { PageAlerte, PageBouton, PageEtape, PageFiche, PageTitre } from '../public/pageUi';
 
 const CHOIX = [
   { valeur: 'sans_reserves', titre: 'Je réceptionne les travaux sans réserve', aide: 'Les travaux sont terminés et conformes.' },
@@ -22,14 +22,14 @@ function Choix({ choix, actif, onChoisir }) {
   return (
     <label
       className={`flex cursor-pointer items-start gap-4 rounded-2xl border-2 p-4 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-secondary-900 has-[:focus-visible]:ring-offset-2 ${
-        actif ? 'border-[color:var(--pv-accent)] bg-[color:var(--pv-doux)]' : 'border-secondary-200 bg-white hover:border-secondary-300'
+        actif ? 'border-[color:var(--marque)] bg-[color:var(--marque-doux)]' : 'border-secondary-200 bg-white hover:border-secondary-300'
       }`}
     >
       <input type="radio" name="reception_type" className="sr-only" checked={actif} onChange={onChoisir} />
       <span
         aria-hidden="true"
         className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-          actif ? 'border-[color:var(--pv-accent)] bg-[color:var(--pv-accent)] text-[color:var(--pv-sur-accent)]' : 'border-secondary-300 bg-white'
+          actif ? 'border-[color:var(--marque)] bg-[color:var(--marque)] text-[color:var(--marque-texte)]' : 'border-secondary-300 bg-white'
         }`}
       >
         {actif && <Check className="h-4 w-4" strokeWidth={3} />}
@@ -60,11 +60,11 @@ export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner 
   return (
     <div className="space-y-10">
       <div className="space-y-6">
-        <PvTitre surtitre="Réception des travaux" titre="Votre installation est terminée">
+        <PageTitre surtitre="Réception des travaux" titre="Votre installation est terminée">
           {prenom ? `Bonjour ${prenom}, merci` : 'Merci'} de confirmer la réception des travaux : votre signature fait
           courir les garanties.
-        </PvTitre>
-        <PvFiche
+        </PageTitre>
+        <PageFiche
           titre={pv.objet}
           lignes={[
             { icone: CalendarDays, libelle: 'Travaux réalisés', valeur: pose },
@@ -76,7 +76,7 @@ export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner 
 
       <PvDeclaration numero={numeroDeclaration} declaration={pv.declaration} />
 
-      <PvEtape numero={numeroDecision} titre="Votre décision">
+      <PageEtape numero={numeroDecision} titre="Votre décision">
         <fieldset disabled={envoi} className="space-y-3 disabled:opacity-60">
           <legend className="sr-only">Votre décision</legend>
           {CHOIX.map((choix) => (
@@ -112,7 +112,7 @@ export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner 
             </div>
           )}
         </fieldset>
-      </PvEtape>
+      </PageEtape>
 
       <PvPointsClient
         numero={numeroPoints}
@@ -132,20 +132,20 @@ export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner 
         </section>
       )}
 
-      <PvEtape numero={numeroSignature} titre="Votre signature">
+      <PageEtape numero={numeroSignature} titre="Votre signature">
         <PvSignature
           nom={reponse.signataire_nom} onNom={(nom) => maj({ signataire_nom: nom })}
           onSignature={(image) => maj({ signature_png: image })}
           disabled={envoi}
         />
-      </PvEtape>
+      </PageEtape>
 
       <div className="space-y-4">
         <p className="text-sm leading-relaxed text-secondary-600">
           En signant, vous reconnaissez avoir réceptionné les travaux dans les conditions décrites ci-dessus.
         </p>
-        {refus && <PvAlerte>{refus}</PvAlerte>}
-        <PvBouton onClick={onSigner} attente={envoi} icone={PenLine}>Signer le procès-verbal</PvBouton>
+        {refus && <PageAlerte>{refus}</PageAlerte>}
+        <PageBouton onClick={onSigner} attente={envoi} icone={PenLine}>Signer le procès-verbal</PageBouton>
       </div>
     </div>
   );

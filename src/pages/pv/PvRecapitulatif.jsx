@@ -3,13 +3,13 @@
  * `etat` : signe · levee (la signature de la levée vient en `children`) · levee_signee.
  */
 import { useState } from 'react';
-import { Check, Download } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { downloadBlob } from '@/lib/utils';
 import { dateLongue, jourDeParis, donneesPdfPv } from '@/lib/pvReception';
 import { prenomLisible } from '@/lib/pagePublique';
 import { donneesLeveePourPage } from './pvPageApi';
-import { PvAlerte, PvBoutonSecondaire, PvFiche } from './pvUi';
+import { PageAlerte, PageBoutonSecondaire, PageCoche, PageFiche } from '../public/pageUi';
 
 /** Bouton de téléchargement : react-pdf, lourd, n'est chargé qu'au clic. */
 function BoutonPdf({ libelle, generer }) {
@@ -29,8 +29,8 @@ function BoutonPdf({ libelle, generer }) {
   };
   return (
     <>
-      <PvBoutonSecondaire onClick={cliquer} attente={attente} icone={Download}>{libelle}</PvBoutonSecondaire>
-      {erreur && <PvAlerte>{erreur}</PvAlerte>}
+      <PageBoutonSecondaire onClick={cliquer} attente={attente} icone={Download}>{libelle}</PageBoutonSecondaire>
+      {erreur && <PageAlerte>{erreur}</PageAlerte>}
     </>
   );
 }
@@ -79,9 +79,7 @@ export default function PvRecapitulatif({ pv, etat = 'signe', children }) {
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--pv-accent)] text-[color:var(--pv-sur-accent)]">
-          <Check className="h-6 w-6" strokeWidth={3} aria-hidden="true" />
-        </span>
+        <PageCoche />
         <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{TITRES[etat]}</h1>
         <p className="text-base leading-relaxed text-secondary-700">
           {etat === 'levee_signee' && pv.levee?.signed_at
@@ -92,7 +90,7 @@ export default function PvRecapitulatif({ pv, etat = 'signe', children }) {
       </div>
 
       {signature && (
-        <PvFiche
+        <PageFiche
           titre={pv.objet}
           lignes={[
             { libelle: 'Signé le', valeur: `${dateLongue(jourDeParis(signature.signed_at))} par ${signature.signataire_nom}` },
