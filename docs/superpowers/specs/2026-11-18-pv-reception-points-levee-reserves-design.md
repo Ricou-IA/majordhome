@@ -424,3 +424,21 @@ navigateur.
 signatures seuls en page 2) ; le PV de levée n'a pas de logo (logo du PV en dur) ; tout membre de
 l'organisation peut supprimer un PV archivé (décision d'Eric à prendre) ; les dépôts
 d'`InterventionDetail` restent refusés.
+
+## Suite du 2026-11-20 : page du client, PDF sur une page, réglages de l'organisation
+
+- **Page `/pv/:token` et `/rdv/:token` refaites** (habillage commun `src/pages/public/pageUi.jsx`, zone
+  de 1024 px, signature prise à chaque trait sans « Valider la signature »).
+- **PDF du PV sur une page**, signatures comprises : sans réserve et avec des réserves courtes, sur
+  les six gabarits ; au-delà, deux pages, les signatures passant avec les garanties. Deux des
+  limites ci-dessus sont levées : signatures seules en page 2, PV de levée sans logo.
+- **Logo, signataire et signature = réglages de l'organisation** (`logo_url`, `signatory_name`,
+  `signatory_role`, `signatory_signature_path`) sur les deux PV ; plus rien de propre à Mayer dans
+  les gabarits. Sur tablette, le technicien signe toujours lui-même.
+- **Edge `chantier-pv` version 3, déployée le 2026-11-20 sur le oui d'Eric** : transmet à la page
+  `signatory_name`, `signatory_role` et, pour un PV signé, `signature_url` (lien de 24 h vers l'image
+  du signataire, chemin vérifié sous le dossier de l'organisation). Refus éprouvés en production
+  après le déploiement (lien vide ou illisible : 400 `invalid_token` ; signature fausse : 401
+  `signature_mismatch`). **Non éprouvé** : le lien de signature lui-même, aucun PV n'étant signé en
+  ligne à cette date (deux préparés, zéro signé) ; à vérifier au premier PV signé, en téléchargeant
+  le PDF depuis la page du client.
