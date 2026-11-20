@@ -90,7 +90,7 @@ export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner 
           </div>
 
           {avecReserves && (
-            <div className="space-y-4 pt-2">
+            <div className="max-w-3xl space-y-4 pt-2">
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-secondary-700">
                   Vos réserves <span className="font-normal text-secondary-600">(à décrire)</span>
@@ -128,7 +128,7 @@ export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner 
             <ShieldCheck className="h-5 w-5 text-secondary-600" aria-hidden="true" />
             Vos garanties
           </h2>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-secondary-700 marker:text-secondary-400">
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-secondary-700 marker:text-secondary-400 lg:grid lg:grid-cols-3 lg:gap-x-10 lg:space-y-0">
             {pv.garanties.map((g) => <li key={g}>{g}</li>)}
           </ul>
         </section>
@@ -143,7 +143,7 @@ export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner 
       </PageEtape>
 
       <div className="space-y-4">
-        <p className="text-sm leading-relaxed text-secondary-600">
+        <p className="max-w-prose text-sm leading-relaxed text-secondary-600">
           En signant, vous reconnaissez avoir réceptionné les travaux dans les conditions décrites ci-dessus.
         </p>
         {refus && <PageAlerte>{refus}</PageAlerte>}

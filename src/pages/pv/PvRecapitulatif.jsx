@@ -28,17 +28,17 @@ function BoutonPdf({ libelle, generer }) {
     }
   };
   return (
-    <>
+    <div className="space-y-3">
       <PageBoutonSecondaire onClick={cliquer} attente={attente} icone={Download}>{libelle}</PageBoutonSecondaire>
       {erreur && <PageAlerte>{erreur}</PageAlerte>}
-    </>
+    </div>
   );
 }
 
 function ReponseInstallateur({ reserves }) {
   if (!reserves) return null;
   return (
-    <div className="space-y-2 rounded-2xl bg-secondary-100 p-5">
+    <div className="max-w-3xl space-y-2 rounded-2xl bg-secondary-100 p-5">
       <p className="text-base font-semibold">La réponse de votre installateur</p>
       {reserves.reponse && <p className="whitespace-pre-line text-base leading-relaxed text-secondary-800">{reserves.reponse}</p>}
       {reserves.echeance && (
@@ -81,7 +81,7 @@ export default function PvRecapitulatif({ pv, etat = 'signe', children }) {
       <div className="space-y-4">
         <PageCoche />
         <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{TITRES[etat]}</h1>
-        <p className="text-base leading-relaxed text-secondary-700">
+        <p className="max-w-prose text-base leading-relaxed text-secondary-700">
           {etat === 'levee_signee' && pv.levee?.signed_at
             ? `Constaté le ${dateLongue(jourDeParis(pv.levee.signed_at))} par ${pv.levee.signataire_nom}. `
             : ''}
@@ -113,7 +113,7 @@ export default function PvRecapitulatif({ pv, etat = 'signe', children }) {
         {etat === 'levee_signee' && signature && (
           <BoutonPdf libelle="Télécharger le procès-verbal de levée des réserves (PDF)" generer={genererLevee} />
         )}
-        <p className="text-sm leading-relaxed text-secondary-600">
+        <p className="max-w-prose text-sm leading-relaxed text-secondary-600">
           Document à conserver 10 ans : il fait courir les garanties légales de votre installation.
         </p>
       </div>

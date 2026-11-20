@@ -23,7 +23,7 @@ export function PageCoque({ nom, logo, couleur, telephone, attente = false, chil
     >
       <div className="h-1 bg-[color:var(--marque)]" aria-hidden="true" />
       <header className="border-b border-secondary-200 bg-white">
-        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between gap-3 px-4 sm:px-8">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4 sm:px-8">
           {attente ? (
             <div className="h-5 w-40 rounded bg-secondary-100" aria-hidden="true" />
           ) : (
@@ -46,8 +46,8 @@ export function PageCoque({ nom, logo, couleur, telephone, attente = false, chil
         </div>
       </header>
 
-      {/* Largeur d'une feuille A4, comme la page de signature du contrat d'entretien. */}
-      <main className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-8 sm:pt-10">
+      {/* Large sur ordinateur : les blocs se rangent en colonnes, les textes gardent une ligne lisible. */}
+      <main className="mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-8 sm:pt-10">
         {children}
         {telephone && (
           <footer className="mt-12 border-t border-secondary-200 pt-6 text-center text-sm text-secondary-600">
@@ -88,7 +88,7 @@ export function PageEtape({ numero, titre, aide, children }) {
           </span>
           <h2 className="text-lg font-semibold leading-snug">{titre}</h2>
         </div>
-        {aide && <p className="text-sm leading-relaxed text-secondary-600">{aide}</p>}
+        {aide && <p className="max-w-prose text-sm leading-relaxed text-secondary-600">{aide}</p>}
       </div>
       {children}
     </section>
@@ -106,11 +106,11 @@ export function PageFiche({ titre, lignes }) {
     <div className="rounded-2xl border border-secondary-200 bg-white p-5 shadow-sm sm:p-6">
       {titre && <p className="text-lg font-semibold leading-snug">{titre}</p>}
       {visibles.length > 0 && (
-        <dl className={`space-y-4 sm:grid sm:grid-cols-2 sm:gap-x-8 sm:gap-y-4 sm:space-y-0 ${titre ? 'mt-4 border-t border-secondary-100 pt-4' : ''}`}>
+        <dl className={`space-y-4 sm:grid sm:grid-cols-2 sm:gap-x-8 sm:gap-y-4 sm:space-y-0 lg:grid-cols-3 ${titre ? 'mt-4 border-t border-secondary-100 pt-4' : ''}`}>
           {visibles.map((l, i) => {
             const Icone = l.icone;
             return (
-              <div key={`${i}-${l.libelle || l.valeur}`} className={`flex items-start gap-3 ${l.multiligne ? 'sm:col-span-2' : ''}`}>
+              <div key={`${i}-${l.libelle || l.valeur}`} className={`flex items-start gap-3 ${l.multiligne ? 'sm:col-span-2 lg:col-span-3' : ''}`}>
                 {Icone && <Icone className="mt-0.5 h-5 w-5 shrink-0 text-secondary-400" aria-hidden="true" />}
                 <div className="min-w-0">
                   {l.libelle && <dt className="text-sm text-secondary-600">{l.libelle}</dt>}
@@ -132,7 +132,7 @@ export function PageBouton({ attente = false, libelleAttente = 'Enregistrement�
       type="button"
       disabled={attente}
       {...props}
-      className={`inline-flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl py-3 bg-[color:var(--marque)] px-5 text-base font-semibold text-[color:var(--marque-texte)] shadow-sm transition hover:brightness-95 active:brightness-90 disabled:opacity-60 ${FOCUS}`}
+      className={`inline-flex min-h-[56px] w-full items-center sm:w-auto sm:min-w-[20rem] justify-center gap-2 rounded-xl py-3 bg-[color:var(--marque)] px-5 text-base font-semibold text-[color:var(--marque-texte)] shadow-sm transition hover:brightness-95 active:brightness-90 disabled:opacity-60 ${FOCUS}`}
     >
       {attente
         ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -149,7 +149,7 @@ export function PageBoutonSecondaire({ attente = false, icone: Icone, children, 
       type="button"
       disabled={attente}
       {...props}
-      className={`inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl py-3 border border-secondary-300 bg-white px-5 text-base font-medium text-secondary-900 transition-colors hover:bg-secondary-100 disabled:opacity-60 ${FOCUS}`}
+      className={`inline-flex min-h-[52px] w-full items-center sm:w-auto sm:min-w-[16rem] justify-center gap-2 rounded-xl py-3 border border-secondary-300 bg-white px-5 text-base font-medium text-secondary-900 transition-colors hover:bg-secondary-100 disabled:opacity-60 ${FOCUS}`}
     >
       {attente
         ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -172,7 +172,7 @@ export function PageAlerte({ children }) {
 /** Écran de message (lien indisponible, PV pas encore prêt, signature enregistrée). */
 export function PageMessage({ icone: Icone, titre, children, action }) {
   return (
-    <section className="rounded-2xl border border-secondary-200 bg-white p-6 shadow-sm sm:p-8">
+    <section className="max-w-2xl rounded-2xl border border-secondary-200 bg-white p-6 shadow-sm sm:p-8">
       {Icone && (
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary-100 text-secondary-700">
           <Icone className="h-6 w-6" aria-hidden="true" />

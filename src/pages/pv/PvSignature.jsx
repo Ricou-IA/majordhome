@@ -53,7 +53,7 @@ export default function PvSignature({ nom, onNom, onSignature, disabled = false 
   };
 
   return (
-    <div className="space-y-5">
+    <div className="max-w-2xl space-y-5">
       <label className="block sm:max-w-md">
         <span className="mb-1.5 block text-sm font-medium text-secondary-700">Votre nom et prénom</span>
         <input

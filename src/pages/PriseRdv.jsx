@@ -182,7 +182,7 @@ export default function PriseRdv() {
             </PageTitre>
           </div>
           <PageFiche lignes={lignesRdv(offre.deja)} />
-          <p className="text-base leading-relaxed text-secondary-700">
+          <p className="max-w-prose text-base leading-relaxed text-secondary-700">
             L’heure exacte de passage vous sera confirmée par SMS. Pour le déplacer, appelez-nous.
           </p>
         </div>
@@ -209,7 +209,7 @@ export default function PriseRdv() {
             {parDate.map(([date, creneaux]) => (
               <li key={date}>
                 <h2 className="mb-3 text-base font-semibold">{majuscule(formatDateLongue(date))}</h2>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {creneaux.map((c) => (
                     <Creneau
                       key={c.id} creneau={c} actif={choisi?.id === c.id} disabled={etat === 'pose'}
@@ -222,8 +222,8 @@ export default function PriseRdv() {
           </ul>
 
           {choisi && (
-            <div className="sticky bottom-4 space-y-3 rounded-2xl border border-secondary-200 bg-white p-4 shadow-lg">
-              <p className="text-base">
+            <div className="sticky bottom-4 space-y-3 rounded-2xl border border-secondary-200 bg-white p-4 shadow-lg sm:flex sm:flex-wrap sm:items-center sm:gap-4 sm:space-y-0">
+              <p className="text-base sm:min-w-[14rem] sm:flex-1">
                 <span className="font-semibold">{majuscule(formatDateLongue(choisi.date))}, {LIBELLE_DEMI[choisi.demi].toLowerCase()}</span>
                 {choisi.technicien ? `, avec ${choisi.technicien}` : ''}
               </p>
@@ -231,7 +231,7 @@ export default function PriseRdv() {
               <button
                 type="button" disabled={etat === 'pose'}
                 onClick={() => { setChoisi(null); setEtat('choix'); }}
-                className="min-h-[44px] w-full rounded-xl text-sm font-medium text-secondary-800 hover:bg-secondary-100 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-900"
+                className="min-h-[44px] w-full rounded-xl px-3 text-sm font-medium sm:w-auto text-secondary-800 hover:bg-secondary-100 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-900"
               >
                 Choisir une autre demi-journée
               </button>
@@ -247,7 +247,7 @@ export default function PriseRdv() {
             <PageTitre titre="C’est noté, merci !">Votre entretien est enregistré.</PageTitre>
           </div>
           <PageFiche lignes={lignesRdv(resultat)} />
-          <p className="text-base leading-relaxed text-secondary-700">
+          <p className="max-w-prose text-base leading-relaxed text-secondary-700">
             L’heure exacte de passage vous sera envoyée par SMS quelques jours avant. Vous pouvez fermer cette page.
           </p>
         </div>

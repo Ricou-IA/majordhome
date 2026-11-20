@@ -25,7 +25,7 @@ export default function PvLevee({ client, entreprise, onSigner }) {
     <section className="space-y-5">
       <div className="space-y-2">
         <h2 className="text-lg font-semibold leading-snug">Levée de vos réserves</h2>
-        <p className="text-base leading-relaxed text-secondary-700">
+        <p className="max-w-prose text-base leading-relaxed text-secondary-700">
           En signant, vous confirmez que les réserves ci-dessus sont levées. Si quelque chose n’est pas réglé,
           ne signez pas :{' '}
           {entreprise?.phone ? (
@@ -40,7 +40,7 @@ export default function PvLevee({ client, entreprise, onSigner }) {
         disabled={envoi}
       />
 
-      <p className="text-sm leading-relaxed text-secondary-600">
+      <p className="max-w-prose text-sm leading-relaxed text-secondary-600">
         En signant, vous constatez que les réserves décrites ci-dessus ont été levées.
       </p>
       {refus && <PageAlerte>{refus}</PageAlerte>}
