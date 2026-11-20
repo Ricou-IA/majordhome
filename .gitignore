@@ -92,3 +92,6 @@ scripts/certificats/out/
 # Jeu d'essai FAB-DIS (regenerable : node scripts/fabdis/make-sample.mjs)
 docs/imports/fabdis-echantillon.xlsx
 fabdis-payload.json
+
+# Image de signature personnelle : ne se commite pas
+/signature-eric-pudebat.png
