@@ -3,11 +3,13 @@
  * `etat` : signe · levee (la signature de la levée vient en `children`) · levee_signee.
  */
 import { useState } from 'react';
-import { CheckCircle2, Download, Loader2 } from 'lucide-react';
+import { Check, Download } from 'lucide-react';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { downloadBlob } from '@/lib/utils';
 import { dateLongue, jourDeParis, donneesPdfPv } from '@/lib/pvReception';
+import { prenomLisible } from '@/lib/pagePublique';
 import { donneesLeveePourPage } from './pvPageApi';
+import { PvAlerte, PvBoutonSecondaire, PvFiche } from './pvUi';
 
 /** Bouton de téléchargement : react-pdf, lourd, n'est chargé qu'au clic. */
 function BoutonPdf({ libelle, generer }) {
@@ -27,14 +29,8 @@ function BoutonPdf({ libelle, generer }) {
   };
   return (
     <>
-      <button
-        type="button" onClick={cliquer} disabled={attente}
-        className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 rounded-lg border border-secondary-300 bg-white text-base font-medium text-secondary-800 hover:bg-secondary-100 disabled:opacity-60"
-      >
-        {attente ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
-        {libelle}
-      </button>
-      {erreur && <p className="text-sm text-amber-800">{erreur}</p>}
+      <PvBoutonSecondaire onClick={cliquer} attente={attente} icone={Download}>{libelle}</PvBoutonSecondaire>
+      {erreur && <PvAlerte>{erreur}</PvAlerte>}
     </>
   );
 }
@@ -42,11 +38,11 @@ function BoutonPdf({ libelle, generer }) {
 function ReponseInstallateur({ reserves }) {
   if (!reserves) return null;
   return (
-    <div className="rounded-lg border border-secondary-200 bg-white p-4 text-sm space-y-2">
-      <p className="font-semibold">La réponse de votre installateur</p>
-      {reserves.reponse && <p className="whitespace-pre-line">{reserves.reponse}</p>}
+    <div className="space-y-2 rounded-2xl bg-secondary-100 p-5">
+      <p className="text-base font-semibold">La réponse de votre installateur</p>
+      {reserves.reponse && <p className="whitespace-pre-line text-base leading-relaxed text-secondary-800">{reserves.reponse}</p>}
       {reserves.echeance && (
-        <p className="font-medium">Engagement : réserves levées avant le {dateLongue(reserves.echeance)}</p>
+        <p className="text-base font-medium">Engagement : réserves levées avant le {dateLongue(reserves.echeance)}</p>
       )}
     </div>
   );
@@ -61,6 +57,7 @@ const TITRES = {
 export default function PvRecapitulatif({ pv, etat = 'signe', children }) {
   const signature = pv.signature;
   const avecReserves = signature?.reception_type === 'avec_reserves';
+  const prenom = prenomLisible(pv.client?.prenom);
   const nomEntreprise = () => buildCompanyInfo(pv.entreprise).name;
 
   const genererPv = async () => {
@@ -80,49 +77,48 @@ export default function PvRecapitulatif({ pv, etat = 'signe', children }) {
   };
 
   return (
-    <section className="mt-8 space-y-4">
-      <div className="flex items-start gap-3">
-        <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-base font-semibold">{TITRES[etat]}</p>
-          <p className="text-sm text-secondary-600">
-            {etat === 'levee_signee' && pv.levee?.signed_at
-              ? `Constaté le ${dateLongue(jourDeParis(pv.levee.signed_at))} par ${pv.levee.signataire_nom}. `
-              : ''}
-            Merci{pv.client?.prenom ? ` ${pv.client.prenom}` : ''}. Nous en avons été informés.
-          </p>
-        </div>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--pv-accent)] text-[color:var(--pv-sur-accent)]">
+          <Check className="h-6 w-6" strokeWidth={3} aria-hidden="true" />
+        </span>
+        <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{TITRES[etat]}</h1>
+        <p className="text-base leading-relaxed text-secondary-700">
+          {etat === 'levee_signee' && pv.levee?.signed_at
+            ? `Constaté le ${dateLongue(jourDeParis(pv.levee.signed_at))} par ${pv.levee.signataire_nom}. `
+            : ''}
+          Merci{prenom ? ` ${prenom}` : ''}. Nous en avons été informés.
+        </p>
       </div>
 
       {signature && (
-        <dl className="rounded-lg border border-secondary-200 bg-white p-4 text-sm space-y-2">
-          <div><dt className="text-secondary-500">Travaux</dt><dd className="font-medium">{pv.objet}</dd></div>
-          <div><dt className="text-secondary-500">Signé le</dt><dd className="font-medium">{dateLongue(jourDeParis(signature.signed_at))} par {signature.signataire_nom}</dd></div>
-          <div>
-            <dt className="text-secondary-500">Réception</dt>
-            <dd className="font-medium">{avecReserves ? 'Avec réserves' : 'Sans réserve'}</dd>
-          </div>
-          {avecReserves && signature.reserves_nature && (
-            <div><dt className="text-secondary-500">Réserves signalées</dt><dd className="whitespace-pre-line">{signature.reserves_nature}</dd></div>
-          )}
-          {avecReserves && signature.reserves_travaux && (
-            <div><dt className="text-secondary-500">Travaux à exécuter</dt><dd className="whitespace-pre-line">{signature.reserves_travaux}</dd></div>
-          )}
-        </dl>
+        <PvFiche
+          titre={pv.objet}
+          lignes={[
+            { libelle: 'Signé le', valeur: `${dateLongue(jourDeParis(signature.signed_at))} par ${signature.signataire_nom}` },
+            { libelle: 'Réception', valeur: avecReserves ? 'Avec réserves' : 'Sans réserve' },
+            avecReserves && { libelle: 'Réserves signalées', valeur: signature.reserves_nature, multiligne: true },
+            avecReserves && { libelle: 'Travaux à exécuter', valeur: signature.reserves_travaux, multiligne: true },
+          ]}
+        />
       )}
 
       {avecReserves && <ReponseInstallateur reserves={pv.reserves} />}
       {etat === 'signe' && avecReserves && !pv.levee?.demandee && (
-        <p className="text-sm text-secondary-700">Nous revenons vers vous au sujet de vos réserves.</p>
+        <p className="text-base text-secondary-700">Nous revenons vers vous au sujet de vos réserves.</p>
       )}
 
       {children}
 
-      {signature && <BoutonPdf libelle="Télécharger mon procès-verbal (PDF)" generer={genererPv} />}
-      {etat === 'levee_signee' && signature && (
-        <BoutonPdf libelle="Télécharger le procès-verbal de levée des réserves (PDF)" generer={genererLevee} />
-      )}
-      <p className="text-xs text-secondary-500">Document à conserver 10 ans : il fait courir les garanties légales de votre installation.</p>
-    </section>
+      <div className="space-y-3">
+        {signature && <BoutonPdf libelle="Télécharger mon procès-verbal (PDF)" generer={genererPv} />}
+        {etat === 'levee_signee' && signature && (
+          <BoutonPdf libelle="Télécharger le procès-verbal de levée des réserves (PDF)" generer={genererLevee} />
+        )}
+        <p className="text-sm leading-relaxed text-secondary-600">
+          Document à conserver 10 ans : il fait courir les garanties légales de votre installation.
+        </p>
+      </div>
+    </div>
   );
 }

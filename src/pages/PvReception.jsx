@@ -19,36 +19,11 @@ import {
   validerReponsePv, normaliserReponsePv, validerReponseLevee, messagePv,
 } from '@/lib/pvReception';
 import { appelerEdge, etatDepuisPv } from './pv/pvPageApi';
+import { Clock, FileWarning, FileCheck2 } from 'lucide-react';
 import PvFormulaire from './pv/PvFormulaire';
 import PvRecapitulatif from './pv/PvRecapitulatif';
 import PvLevee from './pv/PvLevee';
-
-function Entete({ entreprise }) {
-  const couleur = entreprise?.accent_color || '#64748b';
-  return (
-    <header className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: couleur }}>
-      {entreprise?.logo_url ? (
-        <img src={entreprise.logo_url} alt="" className="h-10 w-auto object-contain" />
-      ) : (
-        <div className="h-10 w-10 rounded-full" style={{ backgroundColor: couleur }} />
-      )}
-      <div>
-        <p className="text-sm text-secondary-500">Réception des travaux</p>
-        <h1 className="text-lg font-semibold text-secondary-900">{entreprise?.brand_name || 'Votre installateur'}</h1>
-      </div>
-    </header>
-  );
-}
-
-function Pied({ entreprise }) {
-  if (!entreprise?.phone) return null;
-  return (
-    <footer className="mt-8 pt-4 border-t border-secondary-200 text-sm text-secondary-500">
-      Une question ? Appelez-nous au{' '}
-      <a href={`tel:${entreprise.phone.replace(/\s/g, '')}`} className="font-medium text-secondary-800 underline">{entreprise.phone}</a>.
-    </footer>
-  );
-}
+import { PvAttente, PvBoutonSecondaire, PvCoque, PvMessage } from './pv/pvUi';
 
 const REPONSE_VIERGE = {
   reception_type: null, reserves_nature: '', reserves_travaux: '', points_confirmes: [],
@@ -141,60 +116,44 @@ export default function PvReception() {
   const entreprise = pv?.entreprise;
 
   return (
-    <div className="min-h-screen bg-secondary-50 text-secondary-900">
-      <main className="max-w-md mx-auto p-4 sm:p-6">
-        <Entete entreprise={entreprise} />
+    <PvCoque entreprise={entreprise} attente={etat === 'chargement' && !pv}>
+      {etat === 'chargement' && <PvAttente />}
 
-        {etat === 'chargement' && (
-          <p className="mt-8 text-center text-secondary-500">Chargement de votre procès-verbal…</p>
-        )}
+      {etat === 'erreur' && (
+        <PvMessage
+          icone={FileWarning}
+          titre={messagePv(erreur, 'Ce procès-verbal est momentanément indisponible.')}
+          action={<PvBoutonSecondaire onClick={charger}>Réessayer</PvBoutonSecondaire>}
+        >
+          Contactez votre installateur : il vous renverra un lien.
+        </PvMessage>
+      )}
 
-        {etat === 'erreur' && (
-          <section className="mt-8 space-y-3">
-            <p className="text-base font-medium">{messagePv(erreur, 'Ce procès-verbal est momentanément indisponible.')}</p>
-            <p className="text-sm text-secondary-600">Contactez votre installateur : il vous renverra un lien.</p>
-            <button
-              type="button" onClick={charger}
-              className="w-full min-h-[48px] rounded-lg border border-secondary-300 bg-white text-base font-medium text-secondary-800 hover:bg-secondary-100"
-            >
-              Réessayer
-            </button>
-          </section>
-        )}
+      {etat === 'pas_pret' && (
+        <PvMessage icone={Clock} titre="Ce procès-verbal n’est pas encore prêt.">
+          Votre installateur vous renverra le lien dès qu’il le sera.
+        </PvMessage>
+      )}
 
-        {etat === 'pas_pret' && (
-          <section className="mt-8 space-y-3">
-            <p className="text-base font-medium">Ce procès-verbal n’est pas encore prêt.</p>
-            <p className="text-sm text-secondary-600">Votre installateur vous renverra le lien dès qu’il le sera.</p>
-          </section>
-        )}
+      {etat === 'enregistre' && (
+        <PvMessage
+          icone={FileCheck2}
+          titre="Votre signature est enregistrée."
+          action={<PvBoutonSecondaire onClick={charger}>Recharger</PvBoutonSecondaire>}
+        />
+      )}
 
-        {etat === 'enregistre' && (
-          <section className="mt-8 space-y-3">
-            <p className="text-base font-medium">Votre signature est enregistrée.</p>
-            <button
-              type="button" onClick={charger}
-              className="w-full min-h-[48px] rounded-lg border border-secondary-300 bg-white text-base font-medium text-secondary-800 hover:bg-secondary-100"
-            >
-              Recharger
-            </button>
-          </section>
-        )}
+      {(etat === 'signe' || etat === 'levee_signee') && pv && <PvRecapitulatif pv={pv} etat={etat} />}
 
-        {(etat === 'signe' || etat === 'levee_signee') && pv && <PvRecapitulatif pv={pv} etat={etat} />}
+      {etat === 'levee' && pv && (
+        <PvRecapitulatif pv={pv} etat="levee">
+          <PvLevee client={pv.client} entreprise={entreprise} onSigner={signerLevee} />
+        </PvRecapitulatif>
+      )}
 
-        {etat === 'levee' && pv && (
-          <PvRecapitulatif pv={pv} etat="levee">
-            <PvLevee client={pv.client} entreprise={entreprise} onSigner={signerLevee} />
-          </PvRecapitulatif>
-        )}
-
-        {(etat === 'formulaire' || etat === 'envoi') && pv && (
-          <PvFormulaire pv={pv} reponse={reponse} maj={maj} envoi={etat === 'envoi'} refus={refus} onSigner={signer} />
-        )}
-
-        <Pied entreprise={entreprise} />
-      </main>
-    </div>
+      {(etat === 'formulaire' || etat === 'envoi') && pv && (
+        <PvFormulaire pv={pv} reponse={reponse} maj={maj} envoi={etat === 'envoi'} refus={refus} onSigner={signer} />
+      )}
+    </PvCoque>
   );
 }

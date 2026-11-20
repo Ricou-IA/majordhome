@@ -1,132 +1,152 @@
 /**
- * PvFormulaire — le procès-verbal à lire et à signer, dans l'ordre : travaux et devis, ce que
- * déclare l'installateur, la décision, ce que le client confirme, les garanties, la signature.
+ * PvFormulaire — le procès-verbal à lire et à signer, en étapes numérotées : ce que déclare
+ * l'installateur, la décision, ce que le client confirme, la signature. Les travaux et le
+ * devis ouvrent la page, les garanties précèdent la signature.
  */
-import { CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
-import { CertificatSignaturePad } from '@apps/artisan/components/certificat/CertificatSignaturePad';
+import { CalendarDays, Check, FileText, MapPin, PenLine, ShieldCheck } from 'lucide-react';
 import { periodeDePose, dateLongue, ligneDevis } from '@/lib/pvReception';
+import { prenomLisible } from '@/lib/pagePublique';
 import PvDeclaration from './PvDeclaration';
 import PvPointsClient from './PvPointsClient';
+import PvSignature from './PvSignature';
+import { PvAlerte, PvBouton, PvEtape, PvFiche, PvTitre } from './pvUi';
 
 const CHOIX = [
   { valeur: 'sans_reserves', titre: 'Je réceptionne les travaux sans réserve', aide: 'Les travaux sont terminés et conformes.' },
   { valeur: 'avec_reserves', titre: 'Je réceptionne les travaux avec des réserves', aide: 'Des points restent à corriger : je les décris ci-dessous.' },
 ];
 
-const CHAMP = 'w-full px-3 py-2 border border-secondary-300 rounded-lg text-base bg-white';
+const ZONE = 'w-full rounded-xl border border-secondary-300 bg-white px-4 py-3 text-base text-secondary-900 placeholder:text-secondary-400 focus:border-secondary-900 focus:outline-none focus:ring-1 focus:ring-secondary-900';
+
+function Choix({ choix, actif, onChoisir }) {
+  return (
+    <label
+      className={`flex cursor-pointer items-start gap-4 rounded-2xl border-2 p-4 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-secondary-900 has-[:focus-visible]:ring-offset-2 ${
+        actif ? 'border-[color:var(--pv-accent)] bg-[color:var(--pv-doux)]' : 'border-secondary-200 bg-white hover:border-secondary-300'
+      }`}
+    >
+      <input type="radio" name="reception_type" className="sr-only" checked={actif} onChange={onChoisir} />
+      <span
+        aria-hidden="true"
+        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
+          actif ? 'border-[color:var(--pv-accent)] bg-[color:var(--pv-accent)] text-[color:var(--pv-sur-accent)]' : 'border-secondary-300 bg-white'
+        }`}
+      >
+        {actif && <Check className="h-4 w-4" strokeWidth={3} />}
+      </span>
+      <span>
+        <span className="block text-base font-semibold leading-snug">{choix.titre}</span>
+        <span className="mt-1 block text-sm text-secondary-700">{choix.aide}</span>
+      </span>
+    </label>
+  );
+}
 
 export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner }) {
   const c = pv.client || {};
+  const prenom = prenomLisible(c.prenom);
   const adresse = [c.adresse, [c.code_postal, c.ville].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   const pose = periodeDePose(pv.poses);
   const avecReserves = reponse.reception_type === 'avec_reserves';
+  const devis = (pv.devis || []).map((d) => ligneDevis(d.libelle, dateLongue(d.date))).filter(Boolean);
+
+  // Les étapes absentes (pas de déclaration, pas de point à confirmer) ne prennent pas de numéro.
+  let n = 0;
+  const numeroDeclaration = pv.declaration?.length ? (n += 1) : null;
+  const numeroDecision = (n += 1);
+  const numeroPoints = pv.points_client?.length ? (n += 1) : null;
+  const numeroSignature = (n += 1);
 
   return (
-    <section className="mt-6 space-y-6">
-      <div className="space-y-2">
-        <p className="text-base">Bonjour{c.prenom ? ` ${c.prenom}` : ''},</p>
-        <p className="text-base">
-          Votre installation est terminée. Merci de confirmer la réception des travaux : votre signature
-          fait courir les garanties.
-        </p>
+    <div className="space-y-10">
+      <div className="space-y-6">
+        <PvTitre surtitre="Réception des travaux" titre="Votre installation est terminée">
+          {prenom ? `Bonjour ${prenom}, merci` : 'Merci'} de confirmer la réception des travaux : votre signature fait
+          courir les garanties.
+        </PvTitre>
+        <PvFiche
+          titre={pv.objet}
+          lignes={[
+            { icone: CalendarDays, libelle: 'Travaux réalisés', valeur: pose },
+            { icone: MapPin, libelle: 'Adresse', valeur: adresse },
+            ...devis.map((texte) => ({ icone: FileText, valeur: texte })),
+          ]}
+        />
       </div>
 
-      <dl className="rounded-lg border border-secondary-200 bg-white p-4 text-sm space-y-2">
-        <div><dt className="text-secondary-500">Travaux</dt><dd className="font-medium">{pv.objet}</dd></div>
-        {pose && <div><dt className="text-secondary-500">Réalisés</dt><dd className="font-medium">{pose}</dd></div>}
-        {adresse && <div><dt className="text-secondary-500">Adresse</dt><dd className="font-medium">{adresse}</dd></div>}
-        {pv.devis?.map((d) => ligneDevis(d.libelle, dateLongue(d.date))).filter(Boolean).map((texte, i) => (
-          <div key={`${i}-${texte}`}><dd className="font-medium">{texte}</dd></div>
-        ))}
-      </dl>
+      <PvDeclaration numero={numeroDeclaration} declaration={pv.declaration} />
 
-      <PvDeclaration declaration={pv.declaration} />
-
-      <fieldset className="space-y-3" disabled={envoi}>
-        <legend className="text-sm font-semibold mb-1">Votre décision</legend>
-        {CHOIX.map((choix) => (
-          <label
-            key={choix.valeur}
-            className={`flex items-start gap-3 p-3 min-h-[48px] rounded-lg border bg-white cursor-pointer ${
-              reponse.reception_type === choix.valeur ? 'border-secondary-900 ring-1 ring-secondary-900' : 'border-secondary-300'
-            }`}
-          >
-            <input
-              type="radio" name="reception_type" className="mt-1 h-5 w-5 shrink-0"
-              checked={reponse.reception_type === choix.valeur}
-              onChange={() => maj({ reception_type: choix.valeur })}
+      <PvEtape numero={numeroDecision} titre="Votre décision">
+        <fieldset disabled={envoi} className="space-y-3 disabled:opacity-60">
+          <legend className="sr-only">Votre décision</legend>
+          {CHOIX.map((choix) => (
+            <Choix
+              key={choix.valeur} choix={choix}
+              actif={reponse.reception_type === choix.valeur}
+              onChoisir={() => maj({ reception_type: choix.valeur })}
             />
-            <span>
-              <span className="block text-base font-medium">{choix.titre}</span>
-              <span className="block text-sm text-secondary-600">{choix.aide}</span>
-            </span>
-          </label>
-        ))}
+          ))}
 
-        {avecReserves && (
-          <div className="space-y-3">
-            <label className="block">
-              <span className="block text-sm font-medium mb-1">Vos réserves <span className="text-red-600">*</span></span>
-              <textarea
-                rows={3} maxLength={2000} value={reponse.reserves_nature}
-                onChange={(e) => maj({ reserves_nature: e.target.value })}
-                placeholder="Décrivez ce qui ne va pas" className={CHAMP}
-              />
-            </label>
-            <label className="block">
-              <span className="block text-sm font-medium mb-1">Ce que vous attendez</span>
-              <textarea
-                rows={2} maxLength={2000} value={reponse.reserves_travaux}
-                onChange={(e) => maj({ reserves_travaux: e.target.value })}
-                placeholder="Travaux à reprendre ou à terminer (facultatif)" className={CHAMP}
-              />
-            </label>
-          </div>
-        )}
-      </fieldset>
+          {avecReserves && (
+            <div className="space-y-4 pt-2">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-secondary-700">
+                  Vos réserves <span className="font-normal text-secondary-600">(à décrire)</span>
+                </span>
+                <textarea
+                  rows={4} maxLength={2000} value={reponse.reserves_nature}
+                  onChange={(e) => maj({ reserves_nature: e.target.value })}
+                  placeholder="Décrivez ce qui ne va pas" className={ZONE}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-secondary-700">
+                  Ce que vous attendez <span className="font-normal text-secondary-600">(facultatif)</span>
+                </span>
+                <textarea
+                  rows={3} maxLength={2000} value={reponse.reserves_travaux}
+                  onChange={(e) => maj({ reserves_travaux: e.target.value })}
+                  placeholder="Travaux à reprendre ou à terminer" className={ZONE}
+                />
+              </label>
+            </div>
+          )}
+        </fieldset>
+      </PvEtape>
 
       <PvPointsClient
+        numero={numeroPoints}
         points={pv.points_client} confirmes={reponse.points_confirmes} disabled={envoi}
         onChange={(points_confirmes) => maj({ points_confirmes })}
       />
 
       {pv.garanties?.length > 0 && (
-        <section className="space-y-1">
-          <h2 className="text-sm font-semibold">Vos garanties</h2>
-          <ul className="list-disc pl-5 text-sm text-secondary-700 space-y-1">
+        <section className="rounded-2xl bg-secondary-100 p-5">
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <ShieldCheck className="h-5 w-5 text-secondary-600" aria-hidden="true" />
+            Vos garanties
+          </h2>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-secondary-700 marker:text-secondary-400">
             {pv.garanties.map((g) => <li key={g}>{g}</li>)}
           </ul>
         </section>
       )}
 
-      <CertificatSignaturePad
-        onSign={(image) => maj({ signature_png: image })}
-        onClear={() => maj({ signature_png: null })}
-        signataireNom={reponse.signataire_nom}
-        onSignataireNomChange={(nom) => maj({ signataire_nom: nom })}
-        existingSignature={reponse.signature_png}
-        isSaving={envoi}
-        nomLabel="Votre nom et prénom"
-        signatureLabel="Votre signature"
-        placeholder="Signez ici, au doigt"
-        disclaimerText="En signant, vous reconnaissez avoir réceptionné les travaux dans les conditions décrites ci-dessus."
-      />
+      <PvEtape numero={numeroSignature} titre="Votre signature">
+        <PvSignature
+          nom={reponse.signataire_nom} onNom={(nom) => maj({ signataire_nom: nom })}
+          onSignature={(image) => maj({ signature_png: image })}
+          disabled={envoi}
+        />
+      </PvEtape>
 
-      {refus && (
-        <p className="flex items-start gap-2 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3" role="alert">
-          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-          {refus}
+      <div className="space-y-4">
+        <p className="text-sm leading-relaxed text-secondary-600">
+          En signant, vous reconnaissez avoir réceptionné les travaux dans les conditions décrites ci-dessus.
         </p>
-      )}
-
-      <button
-        type="button" onClick={onSigner} disabled={envoi}
-        className="w-full min-h-[52px] inline-flex items-center justify-center gap-2 rounded-lg text-base font-semibold text-white disabled:opacity-60"
-        style={{ backgroundColor: pv.entreprise?.accent_color || '#334155' }}
-      >
-        {envoi ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
-        {envoi ? 'Enregistrement…' : 'Signer le procès-verbal'}
-      </button>
-    </section>
+        {refus && <PvAlerte>{refus}</PvAlerte>}
+        <PvBouton onClick={onSigner} attente={envoi} icone={PenLine}>Signer le procès-verbal</PvBouton>
+      </div>
+    </div>
   );
 }
