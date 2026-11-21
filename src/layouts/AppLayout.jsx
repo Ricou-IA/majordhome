@@ -44,19 +44,19 @@ const navigation = [
   { name: 'Clients',    href: '/clients',    icon: Users,           resource: 'clients' },
   { name: 'Territoire', href: '/territoire', icon: MapPin,          resource: 'territoire' },
   { name: 'Pipeline',   href: '/pipeline',   icon: Kanban,          resource: 'pipeline' },
-  { name: 'Webshop',    href: '/webshop',    icon: ShoppingCart,    resource: 'pipeline' },
+  { name: 'Webshop',    href: '/webshop',    icon: ShoppingCart,    resource: 'pipeline', module: 'webshop' },
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,        resource: 'chantiers' },
   { name: 'Contrats',   href: '/contrats',   icon: FileText,        resource: 'entretiens', module: 'entretiens' },
   { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens', module: 'entretiens' },
-  { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants' },
-  { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale' },
-  { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings' },
+  { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants', module: 'cedants' },
+  { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale', module: 'prospection' },
+  { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings', module: 'geogrid' },
   { name: 'Mailing',     href: '/mailing',     icon: Mail,          resource: 'settings' },
-  { name: 'Meta Ads',    href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads' },
+  { name: 'Meta Ads',    href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads', module: 'meta_ads' },
   { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator', module: 'solaire' },
   { name: 'Thermique',   href: '/thermique',   icon: Thermometer,   resource: 'thermal_study', module: 'thermique' },
-  // Dimensionnement clim : aide à la vente du socle, ouverte à qui voit les devis.
-  { name: 'Climatisation', href: '/clim',      icon: Snowflake,     resource: 'devis' },
+  // Dimensionnement clim : module activable, ouvert à qui voit les devis.
+  { name: 'Climatisation', href: '/clim',      icon: Snowflake,     resource: 'devis', module: 'climatisation' },
   // Tâches récurrentes : libellé = vocabulaire de l'org (« Maintenance », « Traçabilité »…).
   { name: 'Maintenance', href: '/maintenance', icon: ClipboardCheck, resource: 'maintenance', module: 'maintenance' },
   // Module PROVISOIRE : visible des membres Mayer tant que CHANTIER_GAILLAC_ACTIF (hors registre de droits)

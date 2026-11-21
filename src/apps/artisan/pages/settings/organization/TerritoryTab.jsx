@@ -1,6 +1,8 @@
 // Settings → Organisation → Territoire : siège sur la carte (départ des trajets), antennes
 // commerciales, visibilité locale (fiche Google Business, département principal pour GeoGrid).
 import { useMemo, useState } from 'react';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { moduleActif } from '@/lib/modules';
 import { toast } from 'sonner';
 import { ChevronDown, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { MAPBOX_CONFIG } from '@lib/mapbox';
@@ -85,6 +87,9 @@ function validate(state) {
 export default function TerritoryTab() {
   const { form: state, setForm: setState, initial, setInitial, isDirty, save, isSaving, isLoading } = useSettingsForm(deserialize);
   const [editingBranchIdx, setEditingBranchIdx] = useState(null);
+  // Les réglages de visibilité locale ne servent qu'au module GeoGrid : fermés avec lui.
+  const { settings: orgSettings } = useOrgSettings();
+  const geogridOuvert = moduleActif(orgSettings, 'geogrid');
 
   const errors = useMemo(() => validate(state), [state]);
   const isValid = Object.keys(errors).length === 0;
@@ -216,6 +221,7 @@ export default function TerritoryTab() {
           </button>
         </SettingsSection>
 
+        {geogridOuvert && (
         <SettingsSection
           title="Visibilité locale"
           optional
@@ -251,6 +257,7 @@ export default function TerritoryTab() {
             />
           </Field>
         </SettingsSection>
+        )}
       </SettingsSurface>
 
       <SaveBar

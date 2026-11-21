@@ -9,6 +9,8 @@
 import { Component } from 'react';
 import { Link } from 'react-router-dom';
 import { useDevisByLead } from '@hooks/useDevis';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { moduleActif } from '@/lib/modules';
 
 import { formatEuro } from '@/lib/utils';
 import { FileText, Plus, ChevronRight, Loader2, Send, Snowflake } from 'lucide-react';
@@ -44,6 +46,8 @@ class DevisErrorBoundary extends Component {
 // Composant interne
 function SectionDevisContent({ leadId, onCreateDevis, onOpenDevis, onSendDevis }) {
   const { quotes, isLoading, error } = useDevisByLead(leadId);
+  const { settings } = useOrgSettings();
+  const climOuverte = moduleActif(settings, 'climatisation');
   const hasUnsent = quotes?.some((q) => q.status === 'brouillon');
 
   return (
@@ -99,13 +103,15 @@ function SectionDevisContent({ leadId, onCreateDevis, onOpenDevis, onSendDevis }
           >
             <Plus className="w-4 h-4" /> Ajouter un devis
           </button>
-          {/* Dimensionnement clim (/clim?lead=) : le devis se crée depuis la page avec les lignes proposées */}
-          <Link
-            to={`/clim?lead=${leadId}`}
-            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            <Snowflake className="w-3.5 h-3.5" /> Dimensionner une climatisation
-          </Link>
+          {/* Dimensionnement clim (/clim?lead=), module Climatisation : le devis se crée depuis la page avec les lignes proposées */}
+          {climOuverte && (
+            <Link
+              to={`/clim?lead=${leadId}`}
+              className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <Snowflake className="w-3.5 h-3.5" /> Dimensionner une climatisation
+            </Link>
+          )}
         </div>
       )}
     </>

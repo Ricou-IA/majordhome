@@ -34,10 +34,25 @@ export const MODULES = [
       // L'expéditeur des e-mails sert à tous les modules qui écrivent (factures, e-mail du soir) :
       // socle, pas Communication.
       { key: 'emails', title: 'Emails', description: 'Expéditeur, adresse de réponse, domaine d\'envoi', icon: 'Mail', href: '/settings/emails', adminOnly: true, horsCrm: true },
-      { key: 'plan-comptable', title: 'Plan comptable', description: 'Les comptes de vente Pennylane utilisables dans Majord\'home', icon: 'BookOpen', href: '/settings/plan-comptable', adminOnly: true },
-      // Aide à la vente du socle (devis clim) : règles du dimensionnement, moteur src/lib/clim/.
+      { key: 'plan-comptable', title: 'Plan comptable', description: 'Les comptes de vente Pennylane utilisables dans Majord\'home', icon: 'BookOpen', href: '/settings/plan-comptable', adminOnly: true, si: 'pennylane' },
       { key: 'devis', title: 'Devis', description: 'Familles de devis, chapitres, mentions et affichage du document', icon: 'FileSignature', href: '/settings/devis', adminOnly: true },
+    ],
+  },
+  {
+    // Boutique en ligne : module activable depuis le 2026-11-21 (il était dans le socle).
+    key: 'webshop',
+    label: 'Webshop',
+    description: 'Commandes de la boutique en ligne, catalogue, livraisons.',
+    tiles: [
       { key: 'webshop', title: 'Webshop', description: 'Livraison palette, secteurs, colis, adresses de la boutique', icon: 'ShoppingCart', href: '/settings/webshop', adminOnly: true },
+    ],
+  },
+  {
+    // Dimensionnement d'une climatisation (moteur src/lib/clim/) : module activable depuis le 2026-11-21.
+    key: 'climatisation',
+    label: 'Climatisation',
+    description: "Dimensionnement d'une climatisation et devis proposé.",
+    tiles: [
       { key: 'clim', title: 'Climatisation', description: 'Règles de dimensionnement : W/m², expositions, vitrage, multi-split, liaisons', icon: 'Snowflake', href: '/settings/clim', adminOnly: true },
     ],
   },
@@ -105,6 +120,16 @@ export const CATALOGUE = [
   { key: 'communication', label: 'Communication', description: 'SMS et WhatsApp, envoi des factures par e-mail.', parDefaut: false, accueil: null },
   { key: 'solaire', label: 'Solaire', description: 'Simulateur photovoltaïque et dossiers PV.', parDefaut: true, accueil: '/solaire' },
   { key: 'thermique', label: 'Thermique', description: 'Études de déperditions et dimensionnement PAC.', parDefaut: true, accueil: '/thermique' },
+  // Sortis du socle le 2026-11-21 (ouverture d'une 2e entité) : fermés par défaut, ouverts par Baikal
+  // pour les organisations qui s'en servaient déjà. Ils s'appuient sur le CRM (pipeline, devis).
+  { key: 'webshop', label: 'Webshop', description: 'Commandes de la boutique en ligne, catalogue produits, tournées de livraison.', parDefaut: false, accueil: null },
+  { key: 'climatisation', label: 'Climatisation', description: "Dimensionnement d'une climatisation et devis proposé.", parDefaut: false, accueil: null },
+  // Écrans sortis du CRM le 2026-11-21 (Eric : « tout cela doit être en module »). Rien à régler dans un
+  // groupe à eux : les deux réglages de GeoGrid vivent dans Organisation → Territoire, affichés si le module est ouvert.
+  { key: 'cedants', label: 'Cédants', description: "Recherche d'entreprises à reprendre et suivi des dossiers.", parDefaut: false, accueil: null, sansReglage: true },
+  { key: 'prospection', label: 'Prospection', description: 'Recherche de prospects professionnels et suivi commercial.', parDefaut: false, accueil: null, sansReglage: true },
+  { key: 'geogrid', label: 'GeoGrid', description: 'Suivi du positionnement local sur Google Maps et Search Console.', parDefaut: false, accueil: null, sansReglage: true },
+  { key: 'meta_ads', label: 'Meta Ads', description: 'Suivi du retour des campagnes publicitaires Meta.', parDefaut: false, accueil: null, sansReglage: true },
   { key: 'maintenance', label: 'Tâches récurrentes', description: "Tâches récurrentes par unité, borne d'atelier, traçabilité, e-mail du soir.", parDefaut: false, accueil: '/maintenance' },
   // Lien MonsieurDPE (fiche client) : rien à régler, donc pas de groupe de Paramètres (`sansReglage`).
   { key: 'dpe', label: 'MonsieurDPE', description: 'DPE du client retrouvé depuis sa fiche et analyse complète du logement.', parDefaut: false, accueil: null, sansReglage: true },
@@ -179,7 +204,7 @@ export function accueilSansCrm(settings) {
 const ROUTES_PAR_MODULE = {
   socle: [
     'settings', 'settings/team', 'settings/permissions', 'settings/organization', 'settings/suppliers',
-    'settings/equipements', 'settings/emails', 'settings/pennylane', 'settings/plan-comptable', 'settings/clim', 'settings/devis', 'settings/webshop', 'profile',
+    'settings/equipements', 'settings/emails', 'settings/pennylane', 'settings/plan-comptable', 'settings/devis', 'profile',
   ],
   entretiens: [
     'contrats', 'entretiens', 'certificat/:interventionId', 'clients/:clientId/contrat/signer',
@@ -188,6 +213,12 @@ const ROUTES_PAR_MODULE = {
   communication: ['settings/sms', 'settings/telephonie'],
   solaire: ['solaire', 'solaire/autoconso', 'solaire/historique', 'settings/solaire'],
   thermique: ['thermique', 'thermique/historique', 'settings/thermique'],
+  webshop: ['webshop', 'settings/webshop'],
+  climatisation: ['clim', 'settings/clim'],
+  cedants: ['cedants'],
+  prospection: ['prospection'],
+  geogrid: ['geogrid'],
+  meta_ads: ['meta-ads'],
   maintenance: ['maintenance', 'settings/maintenance'],
 };
 const MODULE_PAR_ROUTE = new Map(
@@ -213,7 +244,14 @@ export function moduleDeRoute(chemin) {
  * Une tuile est visible pour l'org_admin ; une tuile `acces: { resource, action }` l'est aussi pour tout rôle qui a
  * ce droit (`can` = useCanAccess().can, absent ⇒ admin seul) ; une tuile sans `adminOnly` ni `acces` l'est pour tous.
  */
-function tuileVisible(t, { isOrgAdmin, can }) {
+/** Conditions `si` d'une tuile : un réglage qui ne sert à rien pour cette organisation ne s'affiche pas. */
+const CONDITIONS_TUILE = {
+  // Le plan comptable ne sert qu'à une organisation reliée à Pennylane (lien posé dans la tuile Facturation).
+  pennylane: (settings) => settings?.pennylane?.enabled === true,
+};
+
+function tuileVisible(t, { isOrgAdmin, can }, settings) {
+  if (t.si && CONDITIONS_TUILE[t.si]?.(settings) !== true) return false;
   if (isOrgAdmin) return true;
   if (t.acces) return typeof can === 'function' && can(t.acces.resource, t.acces.action) === true;
   return !t.adminOnly;
@@ -225,7 +263,7 @@ export function modulesVisibles(settings, { isOrgAdmin, can }) {
     .filter((m) => moduleActif(settings, m.key))
     .map((m) => ({
       ...m,
-      tiles: m.tiles.filter((t) => tuileVisible(t, { isOrgAdmin, can }) && (crm || m.key !== 'socle' || t.horsCrm)),
+      tiles: m.tiles.filter((t) => tuileVisible(t, { isOrgAdmin, can }, settings) && (crm || m.key !== 'socle' || t.horsCrm)),
     }))
     .filter((m) => m.tiles.length > 0);
 }

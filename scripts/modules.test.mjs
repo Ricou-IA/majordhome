@@ -98,7 +98,7 @@ test('modulesVisibles : la tuile Fournisseurs & catalogue suit le droit articles
 
 test('modulesEffectifs : état de chaque module du catalogue, défauts appliqués', () => {
   assert.deepEqual(modulesEffectifs({ modules: { maintenance: true, crm: false } }), {
-    crm: false, entretiens: true, communication: false, solaire: true, thermique: true, maintenance: true, dpe: false, assistant: false,
+    crm: false, entretiens: true, communication: false, solaire: true, thermique: true, webshop: false, climatisation: false, cedants: false, prospection: false, geogrid: false, meta_ads: false, maintenance: true, dpe: false, assistant: false,
   });
 });
 
@@ -108,7 +108,7 @@ test('validerModules : refuse objet vide, valeur non booléenne, clé hors catal
   assert.equal(validerModules(null).erreur, 'invalid_body');
   assert.equal(validerModules([true]).erreur, 'invalid_body');
   assert.equal(validerModules({ crm: 'false' }).erreur, 'invalid_body');
-  assert.deepEqual(validerModules({ crm: true, geogrid: true, socle: false }), { ok: false, erreur: 'unknown_module', inconnues: ['geogrid', 'socle'] });
+  assert.deepEqual(validerModules({ crm: true, inconnu: true, socle: false }), { ok: false, erreur: 'unknown_module', inconnues: ['inconnu', 'socle'] });
 });
 
 test('accueilSansCrm : premier module ouvert qui a un écran, sinon Paramètres', () => {
@@ -131,6 +131,42 @@ test('moduleDeRoute : chaque route de routes.jsx appartient au socle ou à un mo
   assert.equal(moduleDeRoute('settings/sms'), 'communication');
   assert.equal(moduleDeRoute('settings/emails'), 'socle');
   assert.equal(moduleDeRoute('maintenance'), 'maintenance');
+  assert.equal(moduleDeRoute('webshop'), 'webshop');
+  assert.equal(moduleDeRoute('settings/webshop'), 'webshop');
+  assert.equal(moduleDeRoute('clim'), 'climatisation');
+  assert.equal(moduleDeRoute('settings/clim'), 'climatisation');
+  assert.equal(moduleDeRoute('cedants'), 'cedants');
+  assert.equal(moduleDeRoute('prospection'), 'prospection');
+  assert.equal(moduleDeRoute('geogrid'), 'geogrid');
+  assert.equal(moduleDeRoute('meta-ads'), 'meta_ads');
+  assert.equal(moduleDeRoute('mailing'), 'crm', 'le mailing reste dans la base commune');
   assert.equal(moduleDeRoute('clients/:id'), 'crm');
   assert.equal(moduleDeRoute('route-future-non-declaree'), 'crm', 'par défaut une route appartient au CRM');
+});
+
+test('Webshop et Climatisation sont des modules : fermés sans drapeau, ouverts sur drapeau, hors du socle', () => {
+  assert.equal(moduleActif({}, 'webshop'), false);
+  assert.equal(moduleActif({}, 'climatisation'), false);
+  assert.equal(moduleActif({ modules: { webshop: true, climatisation: true } }, 'webshop'), true);
+  assert.equal(moduleActif({ modules: { webshop: true, climatisation: true } }, 'climatisation'), true);
+  const socle = MODULES.find((m) => m.key === 'socle').tiles.map((t) => t.key);
+  assert.ok(!socle.includes('webshop') && !socle.includes('clim'), 'les deux tuiles ne sont plus dans le socle');
+  const groupes = (settings) => modulesVisibles(settings, { isOrgAdmin: true }).map((m) => m.key);
+  assert.ok(!groupes({}).includes('webshop') && !groupes({}).includes('climatisation'));
+  assert.deepEqual(groupes({ modules: { webshop: true, climatisation: true } }).filter((k) => ['webshop', 'climatisation'].includes(k)), ['webshop', 'climatisation']);
+});
+
+test('Cédants, Prospection, GeoGrid et Meta Ads sont des modules fermés sans drapeau', () => {
+  for (const k of ['cedants', 'prospection', 'geogrid', 'meta_ads']) {
+    assert.equal(moduleActif({}, k), false, k);
+    assert.equal(moduleActif({ modules: { [k]: true } }, k), true, k);
+  }
+});
+
+test('une tuile « si » ne s’affiche que si son réglage sert : Plan comptable seulement avec Pennylane', () => {
+  const tuiles = (settings) => modulesVisibles(settings, { isOrgAdmin: true }).flatMap((m) => m.tiles.map((t) => t.key));
+  assert.ok(!tuiles({}).includes('plan-comptable'));
+  assert.ok(!tuiles({ pennylane: { enabled: false } }).includes('plan-comptable'));
+  assert.ok(tuiles({ pennylane: { enabled: true } }).includes('plan-comptable'));
+  assert.ok(tuiles({}).includes('pennylane'), 'la tuile Facturation, qui porte le lien Pennylane, reste visible');
 });
