@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resoudreExpediteur, domaineVerifie, lireAdresse, domaineDe, EXPEDITEUR_REFUS } from '../src/lib/expediteur.js';
+import { resoudreExpediteur, partieLocale, domaineVerifie, lireAdresse, domaineDe, EXPEDITEUR_REFUS } from '../src/lib/expediteur.js';
 
 const VERIFIE = {
   brand_name: 'Dupont Chauffage', from_email: 'contact@dupont.fr', reply_to: 'bureau@dupont.fr',
@@ -24,8 +24,8 @@ test('domaine vérifié : l’adresse de l’entreprise, quel que soit l’usage
 test('domaine non vérifié, e-mail individuel : adresse commune au nom de l’entreprise, réponse chez elle', () => {
   const r = resoudreExpediteur(NOUVELLE, { plateforme: PLATEFORME });
   assert.equal(r.mode, 'plateforme');
-  assert.equal(r.from, 'Cimaj <notifications@envoi.exemple.fr>');
-  assert.equal(r.fromEmail, 'notifications@envoi.exemple.fr');
+  assert.equal(r.from, 'Cimaj <cimaj@envoi.exemple.fr>', 'une adresse au nom de l’entreprise, sur le domaine commun');
+  assert.equal(r.fromEmail, 'cimaj@envoi.exemple.fr');
   assert.equal(r.replyTo, 'contact@cimaj.fr');
   assert.equal(r.contactEmail, 'contact@cimaj.fr');
 });
@@ -67,7 +67,18 @@ test('un nom ne peut pas forger un en-tête', () => {
   const r = resoudreExpediteur({ ...NOUVELLE, brand_name: 'Cimaj" <x@y.fr>\r\nBcc: z@y.fr' }, { plateforme: PLATEFORME });
   assert.ok(!/[\r\n"]/.test(r.from));
   assert.equal((r.from.match(/</g) || []).length, 1);
-  assert.ok(r.from.endsWith(`<${PLATEFORME}>`));
+  assert.match(r.fromEmail, /^[a-z0-9-]+@envoi\.exemple\.fr$/);
+});
+
+test('ce qui précède le « @ » vient du nom de l’entreprise, jamais d’une saisie libre', () => {
+  assert.equal(partieLocale('Habitat & Énergies'), 'habitat-energies');
+  assert.equal(partieLocale('  CIMAJ  '), 'cimaj');
+  assert.equal(partieLocale('---'), '');
+  assert.equal(partieLocale(null), '');
+  assert.ok(partieLocale('a'.repeat(80)).length <= 40);
+  // from_name ne compte pas : seul le nom de l'entreprise fait l'adresse.
+  const r = resoudreExpediteur({ from_name: 'Mayer', brand_name: 'Cimaj', from_email: 'c@cimaj.fr' }, { plateforme: PLATEFORME });
+  assert.equal(r.fromEmail, 'cimaj@envoi.exemple.fr');
 });
 
 test('lecture d’une adresse', () => {

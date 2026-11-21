@@ -46,6 +46,19 @@ export function enTete(nom, adresse) {
   return n ? `${n} <${adresse}>` : adresse;
 }
 
+/**
+ * Nom d'entreprise → ce qui précède le « @ » sur le domaine commun : minuscules, sans accents,
+ * lettres, chiffres et tirets (« Habitat & Énergies » → « habitat-energies »). '' si rien d'exploitable.
+ */
+export function partieLocale(nom) {
+  return texte(nom)
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 40)
+    .replace(/^-+|-+$/g, '');
+}
+
 /** Le domaine de l'adresse d'envoi de l'entreprise est-il vérifié ? */
 export function domaineVerifie(settings) {
   const s = settings ?? {};
@@ -82,7 +95,14 @@ export function resoudreExpediteur(settings, { usage = 'individuel', plateforme 
   if (usage === 'nombre') return refus('domaine_requis');
 
   const commune = lireAdresse(plateforme);
-  if (commune.adresse) return ok('plateforme', commune.adresse, fromName || commune.nom);
+  if (commune.adresse) {
+    // Chaque entreprise écrit depuis une adresse à son nom sur le domaine commun (cimaj@…) ; sans
+    // nom exploitable, l'adresse commune telle quelle. Jamais une saisie libre : elle permettrait
+    // d'écrire depuis une adresse qui semble être celle d'une autre entreprise.
+    const local = partieLocale(s.brand_name);
+    const adresse = local ? `${local}@${commune.adresse.split('@')[1]}` : commune.adresse;
+    return ok('plateforme', adresse, fromName || commune.nom);
+  }
   return ok('non_verifie', contactEmail, fromName);
 }
 
