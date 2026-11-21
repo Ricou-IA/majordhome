@@ -24,7 +24,7 @@ export const DEFAULT_AUTO_RDV_EMAIL = Object.freeze({
     '<a href="{{LIEN_RDV}}" style="background:{{ACCENT_COLOR}};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Choisir ma demi-journée</a>',
     '</p>',
     '<p>Nous vous confirmerons l’heure exacte de passage par SMS quelques jours avant. Si aucune demi-journée ne vous convient,',
-    ' appelez-nous au {{ORG_PHONE}} : nous trouverons une date ensemble.</p>',
+    ' répondez à cet e-mail : nous trouverons une date ensemble.</p>',
     '<p>À bientôt,<br>{{BRAND_NAME}}</p>',
   ].join(''),
   is_transactional: true,
@@ -37,7 +37,7 @@ export const DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL = Object.freeze({
   html_body: [
     '<p>Bonjour {{PRENOM}},</p>',
     '<p>C’est noté : votre entretien aura lieu le <strong>{{DATE_RDV}}, {{DEMI_JOURNEE}}</strong>, avec {{TECHNICIEN}}.</p>',
-    '<p>L’heure exacte de passage vous sera envoyée par SMS quelques jours avant. Pour tout changement, appelez-nous au {{ORG_PHONE}}.</p>',
+    '<p>L’heure exacte de passage vous sera envoyée par SMS quelques jours avant. Pour tout changement, répondez à cet e-mail.</p>',
     '<p>À bientôt,<br>{{BRAND_NAME}}</p>',
   ].join(''),
   is_transactional: true,

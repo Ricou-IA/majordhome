@@ -49,6 +49,6 @@ test('sélection : jamais deux fois, échecs plafonnés, désinscrits et sans e-
 test('le gabarit par défaut ne contient ni numéro ni adresse en dur', () => {
   const tout = DEFAULT_LEAD_WELCOME_EMAIL.subject + DEFAULT_LEAD_WELCOME_EMAIL.html_body;
   assert.doesNotMatch(tout, /\d{2} \d{2}|mayer/i);
-  assert.match(tout, /\{\{ORG_PHONE\}\}/);
+  assert.doesNotMatch(tout, /ORG_PHONE|ORG_WEBSITE_URL/, 'une coordonnée absente laisserait une phrase trouée');
   assert.equal(DEFAULT_LEAD_WELCOME_EMAIL.is_transactional, true);
 });

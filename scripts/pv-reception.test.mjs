@@ -212,5 +212,5 @@ test('gabarit d’e-mail de levée : clé, lien et transactionnel', () => {
   assert.equal(DEFAULT_PV_LEVEE_EMAIL.key, PV_LEVEE_TEMPLATE_KEY);
   assert.equal(PV_LEVEE_TEMPLATE_KEY, 'pv_levee_reserves');
   assert.equal(DEFAULT_PV_LEVEE_EMAIL.is_transactional, true);
-  for (const v of ['{{LIEN_PV}}', '{{PRENOM}}', '{{OBJET}}', '{{ACCENT_COLOR}}', '{{ORG_PHONE}}', '{{BRAND_NAME}}']) assert.ok(DEFAULT_PV_LEVEE_EMAIL.html_body.includes(v), v);
+  for (const v of ['{{LIEN_PV}}', '{{PRENOM}}', '{{OBJET}}', '{{ACCENT_COLOR}}', '{{BRAND_NAME}}']) assert.ok(DEFAULT_PV_LEVEE_EMAIL.html_body.includes(v), v);
 });

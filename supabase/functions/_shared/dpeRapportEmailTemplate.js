@@ -20,7 +20,7 @@ export const DEFAULT_DPE_RAPPORT_EMAIL = Object.freeze({
     '<p>Bonjour {{CLIENT_NAME}},</p>',
     '<p>Vous trouverez ci-joint l’analyse complète de votre logement, établie par MonsieurDPE à partir de votre diagnostic de performance énergétique (n° {{NUMERO_DPE}}, étiquette {{ETIQUETTE_DPE}}).</p>',
     '<p>Elle détaille où part la chaleur, les valeurs du diagnostic qui mériteraient d’être vérifiées et les travaux qui amélioreraient votre étiquette. Vous pouvez aussi la consulter en ligne : <a href="{{LIEN_RAPPORT}}">ouvrir l’analyse</a>.</p>',
-    '<p>Nous restons à votre disposition pour en parler, au {{ORG_PHONE}} ou par e-mail à {{ORG_EMAIL}}.</p>',
+    '<p>Nous restons à votre disposition pour en parler : répondez à cet e-mail.</p>',
     '<p>{{BRAND_NAME}}<br>{{ORG_ADDRESS}}, {{ORG_POSTAL_CODE}} {{ORG_CITY}}</p>',
   ].join('\n'),
   is_transactional: true,

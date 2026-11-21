@@ -37,7 +37,7 @@ export const DEFAULT_LEAD_WELCOME_EMAIL = Object.freeze({
   html_body: [
     '<p>Bonjour {{PRENOM}},</p>',
     '<p>Merci pour votre demande : elle est bien prise en compte. Un conseiller va vous recontacter très rapidement pour échanger sur votre projet.</p>',
-    '<p>En attendant, vous pouvez nous joindre au {{ORG_PHONE}} ou par e-mail à {{ORG_EMAIL}}, et découvrir nos réalisations sur <a href="{{ORG_WEBSITE_URL}}">notre site internet</a>.</p>',
+    '<p>En attendant, vous pouvez répondre à cet e-mail : votre message nous arrive directement.</p>',
     '<p>À très bientôt,<br>{{BRAND_NAME}}</p>',
   ].join(''),
   is_transactional: true,

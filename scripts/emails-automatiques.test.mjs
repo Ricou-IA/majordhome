@@ -88,6 +88,13 @@ test('un e-mail dont le module est fermé n’est pas présenté', () => {
     'l’accueil Facebook / Instagram ne s’affiche que pour une entreprise qui l’a allumé');
 });
 
+test('aucun texte par défaut ne dépend d’une coordonnée que l’entreprise peut ne pas avoir', () => {
+  for (const e of EMAILS_AUTOMATIQUES) {
+    assert.doesNotMatch(`${e.gabarit.subject} ${e.gabarit.html_body}`, /\{\{ORG_PHONE\}\}|\{\{ORG_WEBSITE_URL\}\}/,
+      `${e.gabarit.key} : sans téléphone ou sans site, la phrase resterait trouée (« Appelez-nous au . »)`);
+  }
+});
+
 test('essai : les codes de l’edge sont ceux du registre, et un code inconnu a un message', () => {
   const edge = lire('supabase', 'functions', 'email-essai', 'index.ts');
   const codes = new Set([...edge.matchAll(/refus\("([a-z_]+)"/g)].map((m) => m[1]));

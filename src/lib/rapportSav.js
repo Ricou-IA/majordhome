@@ -50,7 +50,7 @@ export const DEFAULT_RAPPORT_SAV_EMAIL = Object.freeze({
   html_body: [
     '<p>Bonjour {{CLIENT_NAME}},</p>',
     '<p>Vous trouverez ci-joint le rapport de notre intervention du {{DATE_INTERVENTION}} sur {{APPAREIL}}.</p>',
-    '<p>Nous restons à votre disposition pour toute question, au {{ORG_PHONE}} ou par e-mail à {{ORG_EMAIL}}.</p>',
+    '<p>Nous restons à votre disposition pour toute question : répondez à cet e-mail.</p>',
     '<p>{{BRAND_NAME}}<br>{{ORG_ADDRESS}}, {{ORG_POSTAL_CODE}} {{ORG_CITY}}</p>',
   ].join('\n'),
   is_transactional: true,

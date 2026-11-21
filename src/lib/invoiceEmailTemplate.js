@@ -20,7 +20,7 @@ export const DEFAULT_INVOICE_EMAIL = Object.freeze({
     '<p>Bonjour {{CLIENT_NAME}},</p>',
     '<p>Veuillez trouver ci-joint votre facture <strong>{{INVOICE_NUMBER}}</strong> du {{INVOICE_DATE}}, d’un montant de <strong>{{INVOICE_AMOUNT}}</strong>, relative à l’entretien de : {{EQUIPMENTS}}.</p>',
     '<p>Pièces jointes : {{ATTACHMENTS}}</p>',
-    '<p>Nous vous remercions de votre confiance et restons à votre disposition au {{ORG_PHONE}} ou par e-mail à {{ORG_EMAIL}}.</p>',
+    '<p>Nous vous remercions de votre confiance et restons à votre disposition : répondez à cet e-mail pour toute question.</p>',
     '<p>{{BRAND_NAME}}<br>{{ORG_ADDRESS}}, {{ORG_POSTAL_CODE}} {{ORG_CITY}}</p>',
   ].join('\n'),
   is_transactional: true,
