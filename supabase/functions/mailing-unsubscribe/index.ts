@@ -95,10 +95,11 @@ function pageNeutre(ok: boolean): Response {
   const texte = ok
     ? "Vous ne recevrez plus nos e-mails d'information. Vous pouvez fermer cette page."
     : "Ce lien n'est plus valable. Répondez à l'e-mail reçu pour demander votre désabonnement.";
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${titre}</title></head><body style="margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6f9;color:#1a1a1a"><main style="max-width:480px;margin:15vh auto;padding:32px;background:#fff;border-radius:12px"><h1 style="font-size:20px;margin:0 0 12px">${titre}</h1><p style="margin:0;line-height:1.5;color:#4a4a4a">${texte}</p></main></body></html>`;
-  return new Response(html, {
+  // Texte simple, pas de HTML : la plateforme sert toute réponse HTML d'une edge en `text/plain`
+  // (constaté le 2026-11-21), le navigateur afficherait le code de la page.
+  return new Response(`${titre}\n\n${texte}\n`, {
     status: ok ? 200 : 400,
-    headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+    headers: { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8" },
   });
 }
 
