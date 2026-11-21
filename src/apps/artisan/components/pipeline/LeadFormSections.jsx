@@ -630,6 +630,9 @@ export const SectionActions = ({
   currentStatus,
   onRequalifyEntretien,
   isRequalifying,
+  retour,
+  onReactiver,
+  perduParPennylane,
 }) => (
   <>
     {/* Action suivante (transitions) */}
@@ -697,9 +700,31 @@ export const SectionActions = ({
     )}
 
     {isFinal && (
-      <div className="mt-6 px-3 py-2.5 bg-gray-50 rounded-lg text-sm text-gray-500 italic flex items-center gap-2">
-        <Target className="h-4 w-4" />
-        {isWon ? 'Lead gagné — prêt à convertir en client' : 'Lead clôturé'}
+      <div className="mt-6 px-3 py-2.5 bg-gray-50 rounded-lg text-sm text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="italic flex items-center gap-2">
+          <Target className="h-4 w-4" />
+          {isWon ? 'Lead gagné — prêt à convertir en client' : 'Lead clôturé'}
+        </span>
+        {/* Un lead perdu se réactive : il reprend la place qu'il avait avant (src/lib/leadReactivation.js). */}
+        {isEditing && !isWon && retour && onReactiver && (
+          <button
+            type="button"
+            onClick={onReactiver}
+            disabled={isChangingStatus}
+            className="ml-auto px-4 py-2.5 rounded-lg text-sm font-medium not-italic min-h-[44px] bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 disabled:opacity-50"
+          >
+            {isChangingStatus
+              ? <Loader2 className="h-4 w-4 animate-spin inline mr-1" />
+              : <Undo2 className="h-4 w-4 inline mr-1" />}
+            Réactiver : retour en « {retour.label} »
+          </button>
+        )}
+        {isEditing && !isWon && perduParPennylane && (
+          <span className="basis-full not-italic text-xs text-gray-500">
+            Ce lead a un devis dans Pennylane : c’est l’état du devis qui le place. Un devis renvoyé ou rouvert dans
+            Pennylane le ramène dans le pipeline.
+          </span>
+        )}
       </div>
     )}
 

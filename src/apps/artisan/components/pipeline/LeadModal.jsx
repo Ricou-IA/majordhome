@@ -43,6 +43,7 @@ import { logger } from '@lib/logger';
 import { hasPhoneNumber } from '@/lib/phoneUtils';
 import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
+import { statutDeRetour } from '@/lib/leadReactivation';
 
 // Sous-composants extraits
 import { getAllowedNextStatuses } from './LeadStatusConfig';
@@ -409,6 +410,24 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         .filter((s) => !(hasLinkedPlQuotes && PL_DRIVEN_STATUSES.includes(s.label)))
     : [];
 
+  // Réactiver un lead perdu : retour à la place d'avant, lue dans l'historique. Sans objet quand un devis
+  // Pennylane place le lead (c'est l'état du devis qui décide, pas le statut).
+  const retour = isEditing && !hasLinkedPlQuotes
+    ? statutDeRetour({ statuses, statutActuelId: form.status_id, auditRows, activities })
+    : null;
+  const handleReactiver = async () => {
+    if (!retour || isChangingStatus) return;
+    try {
+      await updateLeadStatus(leadId, retour.id, userId);
+      toast.success(`Lead réactivé : revenu en « ${retour.label} »`);
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      logger.error('[LeadModal] réactivation:', err);
+      toast.error('Le lead n’a pas pu être réactivé');
+    }
+  };
+
   if (!isOpen) return null;
 
   // ========== RENDER ==========
@@ -545,6 +564,9 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 currentStatus={currentStatus}
                 onRequalifyEntretien={() => requalify()}
                 isRequalifying={isRequalifying}
+                retour={retour}
+                onReactiver={handleReactiver}
+                perduParPennylane={hasLinkedPlQuotes && isFinal && !isWon}
               />
             </>
           )}
