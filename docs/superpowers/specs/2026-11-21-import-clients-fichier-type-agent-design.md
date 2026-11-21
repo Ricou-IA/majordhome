@@ -140,8 +140,10 @@ par le client), notes internes, accepte les e-mails, accepte les SMS, ancien num
 - **Type de client absent** : société renseignée ⇒ `entreprise` (sinon la fiche s'affiche sous le nom
   du contact et ne se retrouve pas par la raison sociale, règle de `buildClientDisplayName`) ; sinon
   `particulier`.
-- **Accord e-mails / SMS** (proposition, à confirmer par Eric — § 13) : colonne absente ou cellule
-  vide ⇒ `true`, comme une fiche créée à la main ; « non », « 0 », « faux », « refus » ⇒ `false`.
+- **Accord e-mails / SMS** (décidé par Eric le 2026-11-21 : « oui, d'office ») : colonne absente ou
+  cellule vide ⇒ `true`, comme une fiche créée à la main ; « non », « 0 », « faux », « refus » ⇒
+  `false`. Les clients importés entrent donc dans la première campagne envoyée à la base clients, sauf
+  ceux que le fichier marque « non ».
 
 **Transformations, liste fermée** (une colonne peut en porter une) :
 
@@ -314,10 +316,6 @@ bouton « Retirer cet import ».
 
 ## 13. Choix faits sans Eric, à confirmer à la relecture
 
-- **Question ouverte — accord e-mails et SMS** : une fiche importée accepte e-mails et SMS d'office
-  (comme une fiche créée à la main), sauf si le fichier dit non dans les colonnes « Accepte les
-  e-mails » / « Accepte les SMS ». Conséquence : les clients importés entrent dans la première
-  campagne envoyée à la base clients. L'autre choix serait d'importer tout le monde à « non ».
 - Doublon fort (écarté par défaut) : téléphone, e-mail, ancien numéro, ou même nom + prénom dans le
   même code postal. Doublon faible (importé par défaut, signalé) : homonyme ailleurs, même nom dans le
   même code postal.
