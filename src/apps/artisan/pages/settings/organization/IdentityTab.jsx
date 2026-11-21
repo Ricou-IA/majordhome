@@ -15,6 +15,7 @@ import { lireImmatriculationBodacc } from '@/lib/organisation/bodaccClient';
 import { useLiaisonHesiasun } from '@hooks/useLiaisonHesiasun';
 import EntrepriseSearch from './components/EntrepriseSearch';
 import LiaisonHesiasun from './components/LiaisonHesiasun';
+import LogoUpload from './components/LogoUpload';
 import SignatureUpload from './components/SignatureUpload';
 import { useSettingsForm } from './components/useSettingsForm';
 import { Field, INPUT_CLASS, SaveBar, SettingsLoading, SettingsSection, SettingsSurface } from './components/layout';
@@ -259,6 +260,10 @@ export default function IdentityTab() {
             />
           </Field>
           </div>
+        </SettingsSection>
+
+        <SettingsSection title="Logo" description="En tête de vos devis, contrats, certificats et procès-verbaux, dans vos e-mails et sur les pages ouvertes à vos clients. Enregistré dès l’envoi.">
+          <LogoUpload orgId={organization?.id} onChange={envoyerApresEnregistrement} />
         </SettingsSection>
 
         <SettingsSection

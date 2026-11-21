@@ -221,7 +221,13 @@ export default function LiaisonHesiasun({ formulaireModifie }) {
                   </span>
                 </p>
               )}
-              {etat.erreur && (
+              {!etat.erreur && etat.logo_erreur && (
+                <p className="text-sm text-amber-800 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>L’identité est à jour dans HésiaSun, pas le logo. {messageLiaison(etat.logo_erreur)}</span>
+                </p>
+              )}
+              {(etat.erreur || (etat.logo_erreur && etat.logo_erreur !== 'logo_externe')) && (
                 <button type="button" onClick={() => envoyer('Identité envoyée à HésiaSun')} disabled={enCours || formulaireModifie} className={SECONDAIRE}>
                   {enCours && <Loader2 className="w-4 h-4 animate-spin" />}
                   Renvoyer

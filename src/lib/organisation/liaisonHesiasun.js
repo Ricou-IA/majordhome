@@ -31,6 +31,10 @@ export const CODES_LIAISON = {
   hesiasun_injoignable: 'HésiaSun ne répond pas pour l’instant.',
   hesiasun_refus: 'HésiaSun a refusé l’envoi.',
   ecriture_refusee: 'L’état de la liaison n’a pas pu être enregistré.',
+  logo_externe: 'Le logo affiché vient d’une adresse extérieure : téléversez-le ici pour qu’il parte aussi vers HésiaSun.',
+  logo_trop_lourd: 'Le logo dépasse 2 Mo : HésiaSun ne l’a pas pris.',
+  logo_format: 'HésiaSun n’accepte le logo qu’en PNG, JPG ou WebP.',
+  logo_illisible: 'Le logo n’a pas pu être relu dans Majord’home.',
   action_inconnue: 'Demande non reconnue.',
   service_injoignable: 'Le service de liaison ne répond pas.',
 };
@@ -62,6 +66,8 @@ const libelle = (cle) => CHAMPS_IDENTITE.find((c) => c.cle === cle)?.libelle || 
  * @property {Record<string,string>|null} erreur_champs
  * @property {boolean} en_attente         un envoi a échoué et doit être rejoué
  * @property {string|null} en_attente_depuis
+ * @property {string|null} logo_envoye     adresse du logo tel qu'il a été envoyé (null : aucun logo chez HésiaSun par nous)
+ * @property {string|null} logo_erreur     code du dernier échec d'envoi du logo
  */
 
 /**
@@ -83,6 +89,8 @@ export function lireEtatLiaison(settings) {
     erreur_champs: e.erreur_champs && typeof e.erreur_champs === 'object' ? e.erreur_champs : null,
     en_attente: e.en_attente === true,
     en_attente_depuis: typeof e.en_attente_depuis === 'string' ? e.en_attente_depuis : null,
+    logo_envoye: typeof e.logo_envoye === 'string' && e.logo_envoye ? e.logo_envoye : null,
+    logo_erreur: typeof e.logo_erreur === 'string' ? e.logo_erreur : null,
   };
 }
 
@@ -211,6 +219,75 @@ export function comparerIdentites(settings, identiteHesiasun) {
 export function identitePourReglages(identiteHesiasun) {
   const recu = identitePourEnvoi(identiteHesiasun || {}).identite;
   return Object.fromEntries(CHAMPS_IDENTITE.map((c) => [c.cle, formaterPourSaisie(c.cle, recu[c.cle])]));
+}
+
+// ─── Logo ─────────────────────────────────────────────────────────────────
+
+/** Compartiment public du logo de l'entreprise (migration 20261121_8). */
+export const COMPARTIMENT_LOGO = 'org-branding';
+export const LOGO_MAX_OCTETS = 2 * 1024 * 1024;
+/** Formats acceptés (pas de SVG : il peut porter du script). */
+export const LOGO_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+
+/**
+ * Chemin d'un nouveau logo dans le compartiment : un nom par téléversement, pour que l'adresse change
+ * (les e-mails et les navigateurs gardent l'ancienne image en mémoire).
+ * @param {string} orgId
+ * @param {string} ext          'png' | 'jpg' | 'webp'
+ * @param {number} horodatage   Date.now()
+ * @returns {string}
+ */
+export function cheminLogo(orgId, ext, horodatage) {
+  return `${orgId}/logo-${horodatage}.${ext}`;
+}
+
+/**
+ * Chemin, dans le compartiment, d'un logo hébergé par Majord'home pour CETTE organisation ; null pour toute
+ * autre adresse (site de l'entreprise, autre organisation, autre compartiment). C'est la seule adresse que
+ * l'edge accepte de relire : elle ne va jamais chercher une image à une adresse arbitraire.
+ * @param {unknown} logoUrl
+ * @param {{ baseStockage: string, orgId: string }} ctx  baseStockage = adresse du projet Supabase
+ * @returns {string|null}
+ */
+export function logoHeberge(logoUrl, { baseStockage, orgId }) {
+  if (typeof logoUrl !== 'string' || !baseStockage || !orgId) return null;
+  const prefixe = `${String(baseStockage).replace(/\/+$/, '')}/storage/v1/object/public/${COMPARTIMENT_LOGO}/`;
+  if (!logoUrl.startsWith(prefixe)) return null;
+  const chemin = logoUrl.slice(prefixe.length);
+  return new RegExp(`^${orgId}/logo-\\d{1,16}\\.(png|jpg|webp)$`).test(chemin) ? chemin : null;
+}
+
+/**
+ * Que faire du logo après un envoi d'identité réussi ?
+ * - `rien`     : déjà envoyé tel quel, ou aucun logo de part et d'autre ;
+ * - `envoyer`  : logo hébergé ici, différent du dernier envoyé ;
+ * - `retirer`  : plus de logo ici, alors qu'on en avait envoyé un ;
+ * - `externe`  : le logo vient d'une adresse extérieure, on ne l'envoie pas (on le dit).
+ * @param {Record<string, unknown>} settings
+ * @param {EtatLiaison} etat
+ * @param {{ baseStockage: string, orgId: string }} ctx
+ * @returns {{ geste: 'rien'|'envoyer'|'retirer'|'externe', chemin?: string, url?: string }}
+ */
+export function gesteLogo(settings, etat, ctx) {
+  const url = typeof settings?.logo_url === 'string' ? settings.logo_url.trim() : '';
+  if (!url) return { geste: etat?.logo_envoye ? 'retirer' : 'rien' };
+  const chemin = logoHeberge(url, ctx);
+  if (!chemin) return { geste: 'externe' };
+  return url === etat?.logo_envoye ? { geste: 'rien' } : { geste: 'envoyer', chemin, url };
+}
+
+/**
+ * Code d'un refus de logo par HésiaSun (422 avec `details.raison`), sinon le code ordinaire de la réponse.
+ * @param {number} statut
+ * @param {unknown} json
+ * @returns {string|null}  null si l'envoi est accepté
+ */
+export function codeReponseLogo(statut, json) {
+  const lu = lireReponseHesiasun(statut, json);
+  if (lu.ok) return null;
+  const raison = json && typeof json === 'object' ? json.error?.details?.raison : null;
+  if (statut === 422) return raison === 'logo_trop_lourd' || raison === 'logo_format' ? raison : 'logo_format';
+  return lu.code;
 }
 
 export { VERSION_IDENTITE };

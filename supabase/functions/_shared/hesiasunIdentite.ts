@@ -12,7 +12,11 @@
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import {
   CLE_COFFRE,
+  COMPARTIMENT_LOGO,
+  LOGO_MAX_OCTETS,
+  codeReponseLogo,
   corpsEnvoi,
+  gesteLogo,
   etatApresEnvoi,
   etatRompu,
   lireEtatLiaison,
@@ -59,6 +63,59 @@ export async function appelerHesiasun(
   } catch {
     return { statut: 0, json: null };
   }
+}
+
+/** Envoi d'une image (corps = les octets). Jamais d'exception : statut 0 quand rien ne répond. */
+async function appelerHesiasunImage(chemin: string, cle: string, octets: Uint8Array, type: string): Promise<{ statut: number; json: unknown }> {
+  const base = baseHesiasun();
+  if (!base) return { statut: 0, json: null };
+  try {
+    const res = await fetch(`${base}${chemin}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${cle}`, "Content-Type": type },
+      body: octets,
+      redirect: "manual",
+      signal: AbortSignal.timeout(DELAI_MS),
+    });
+    let json: unknown = null;
+    try { json = await res.json(); } catch { json = null; }
+    return { statut: res.status, json };
+  } catch {
+    return { statut: 0, json: null };
+  }
+}
+
+/**
+ * Aligne le logo de HésiaSun sur celui de Majord'home, après un envoi d'identité réussi. Le fichier est relu
+ * dans NOTRE compartiment (chemin validé par gesteLogo → logoHeberge), jamais à une adresse reçue.
+ * Rend les deux champs d'état à noter ; un échec de logo ne défait pas l'envoi de l'identité.
+ */
+async function alignerLogo(
+  admin: SupabaseClient,
+  orgId: string,
+  reglages: Record<string, unknown>,
+  etat: Etat,
+  cle: string,
+): Promise<{ logo_envoye: string | null; logo_erreur: string | null }> {
+  const inchange = { logo_envoye: etat.logo_envoye ?? null, logo_erreur: null };
+  const geste = gesteLogo(reglages, etat, { baseStockage: Deno.env.get("SUPABASE_URL") || "", orgId });
+  const liaison = `liaison_id=${encodeURIComponent(etat.liaison_id)}`;
+
+  if (geste.geste === "rien") return inchange;
+  if (geste.geste === "externe") return { ...inchange, logo_erreur: "logo_externe" };
+  if (geste.geste === "retirer") {
+    const lu = await appelerHesiasun("DELETE", `/organization/logo?${liaison}`, cle);
+    const code = codeReponseLogo(lu.statut, lu.json);
+    return code ? { ...inchange, logo_erreur: code } : { logo_envoye: null, logo_erreur: null };
+  }
+
+  const { data: fichier, error } = await admin.storage.from(COMPARTIMENT_LOGO).download(geste.chemin as string);
+  if (error || !fichier) return { ...inchange, logo_erreur: "logo_illisible" };
+  if (fichier.size > LOGO_MAX_OCTETS) return { ...inchange, logo_erreur: "logo_trop_lourd" };
+  const octets = new Uint8Array(await fichier.arrayBuffer());
+  const lu = await appelerHesiasunImage(`/organization/logo?${liaison}`, cle, octets, fichier.type || "application/octet-stream");
+  const code = codeReponseLogo(lu.statut, lu.json);
+  return code ? { ...inchange, logo_erreur: code } : { logo_envoye: geste.url as string, logo_erreur: null };
 }
 
 /** Réglages de l'organisation, relus en base. */
@@ -108,7 +165,9 @@ export async function pousserIdentite(admin: SupabaseClient, orgId: string): Pro
     const ecrit = await noter(admin, orgId, etatRompu(maintenant));
     return ecrit ? refus("liaison_rompue") : refus("ecriture_refusee");
   }
-  const suite = etatApresEnvoi(etat, resultat, maintenant);
+  let suite = etatApresEnvoi(etat, resultat, maintenant);
+  // Identité acceptée : le logo suit (un échec de logo se note, il ne défait pas l'envoi).
+  if (resultat.ok) suite = { ...suite, ...(await alignerLogo(admin, orgId, reglages, suite, cle)) };
   if (!(await noter(admin, orgId, suite))) return refus("ecriture_refusee");
   if (resultat.ok) return { ok: true, etat: suite, data: resultat.data };
   return refus(resultat.code, { champs: resultat.champs, etat: suite });

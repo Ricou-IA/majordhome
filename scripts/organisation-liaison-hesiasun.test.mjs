@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   CODES_LIAISON, DUREE_REJEU_MS, messageLiaison, lireEtatLiaison, ruptureConnue, corpsEnvoi, lireReponseHesiasun,
   etatApresEnvoi, etatRompu, aRejouer, comparerIdentites, identitePourReglages,
+  cheminLogo, logoHeberge, gesteLogo, codeReponseLogo,
 } from '../src/lib/organisation/liaisonHesiasun.js';
 
 const REGLAGES = {
@@ -14,7 +15,7 @@ const REGLAGES = {
   from_email: 'contact@exemple.fr',
 };
 const LIAISON = '11111111-1111-4111-8111-111111111111';
-const ETAT = { liaison_id: LIAISON, relie_le: '2026-11-21T10:00:00Z', entreprise: 'Atelier', ouverte: true, dernier_envoi_le: null, erreur: null, erreur_champs: null, en_attente: false, en_attente_depuis: null };
+const ETAT = { liaison_id: LIAISON, relie_le: '2026-11-21T10:00:00Z', entreprise: 'Atelier', ouverte: true, dernier_envoi_le: null, erreur: null, erreur_champs: null, en_attente: false, en_attente_depuis: null, logo_envoye: null, logo_erreur: null };
 
 test('chaque code rendu par l’edge a son message', () => {
   const edge = readFileSync(new URL('../supabase/functions/_shared/hesiasunIdentite.ts', import.meta.url), 'utf8')
@@ -86,6 +87,37 @@ test('rejeu automatique : 24 h, liaison ouverte seulement', () => {
   assert.equal(aRejouer({ ...attente, ouverte: false }, t0), false);
   assert.equal(aRejouer(ETAT, t0), false);
   assert.equal(aRejouer(null, t0), false);
+});
+
+test('logo : seule une image hébergée ici, pour cette organisation, se relit', () => {
+  const ORG = '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+  const ctx = { baseStockage: 'https://projet.supabase.co/', orgId: ORG };
+  const chemin = cheminLogo(ORG, 'png', 1795250000000);
+  assert.equal(chemin, `${ORG}/logo-1795250000000.png`);
+  const url = `https://projet.supabase.co/storage/v1/object/public/org-branding/${chemin}`;
+  assert.equal(logoHeberge(url, ctx), chemin);
+  for (const refuse of [
+    'https://www.exemple.fr/images/logo.png',
+    url.replace(ORG, '11111111-1111-4111-8111-111111111111'),
+    url.replace('org-branding', 'product-images'),
+    url.replace('projet.supabase.co', 'projet.supabase.co.exemple.fr'),
+    `${url}/../../autre.png`,
+    url.replace('.png', '.svg'),
+    `https://projet.supabase.co/storage/v1/object/public/org-branding/${ORG}/../${ORG}/logo-1.png`,
+    '', null, 42,
+  ]) assert.equal(logoHeberge(refuse, ctx), null, String(refuse));
+
+  assert.deepEqual(gesteLogo({}, ETAT, ctx), { geste: 'rien' });
+  assert.deepEqual(gesteLogo({ logo_url: url }, ETAT, ctx), { geste: 'envoyer', chemin, url });
+  assert.deepEqual(gesteLogo({ logo_url: url }, { ...ETAT, logo_envoye: url }, ctx), { geste: 'rien' });
+  assert.deepEqual(gesteLogo({ logo_url: '' }, { ...ETAT, logo_envoye: url }, ctx), { geste: 'retirer' });
+  assert.deepEqual(gesteLogo({ logo_url: 'https://www.exemple.fr/logo.png' }, ETAT, ctx), { geste: 'externe' });
+
+  assert.equal(codeReponseLogo(200, { data: { logo: true } }), null);
+  assert.equal(codeReponseLogo(422, { error: { details: { raison: 'logo_trop_lourd' } } }), 'logo_trop_lourd');
+  assert.equal(codeReponseLogo(422, { error: {} }), 'logo_format');
+  assert.equal(codeReponseLogo(409, { error: { details: { raison: 'liaison_rompue' } } }), 'liaison_rompue');
+  assert.equal(codeReponseLogo(0, null), 'hesiasun_injoignable');
 });
 
 test('comparaison au moment de relier, et reprise de l’identité HésiaSun', () => {

@@ -80,6 +80,17 @@ export const storageService = {
   },
 
   /**
+   * Adresse publique d'un fichier d'un compartiment PUBLIC (logo de l'entreprise). Aucun appel réseau.
+   * @param {string} bucket
+   * @param {string} path
+   * @returns {string|null}
+   */
+  getPublicUrl(bucket, path) {
+    if (!path) return null;
+    return supabase.storage.from(bucket).getPublicUrl(path).data?.publicUrl || null;
+  },
+
+  /**
    * Supprime un fichier d'un bucket
    * @param {string} bucket - Nom du bucket
    * @param {string} path - Chemin du fichier
