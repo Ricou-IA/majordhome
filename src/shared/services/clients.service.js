@@ -16,6 +16,7 @@ import { withErrorHandling, withErrorHandlingCount } from '@/lib/serviceHelpers'
 import { cleanPhone, formatPhoneForSearch } from '@/lib/phoneUtils';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { buildClientDuplicateProbe, matchClientDuplicates, phoneSearchPatterns } from '@/lib/clientDuplicateMatch';
+import { buildClientDisplayName } from '@/lib/clientDisplayName';
 import { equipmentsService } from '@services/equipments.service';
 
 // ============================================================================
@@ -31,27 +32,8 @@ export const CLIENT_CATEGORIES = [
   { value: 'public', label: 'Public', color: 'bg-teal-100 text-teal-700' },
 ];
 
-/**
- * Catégories pour lesquelles la raison sociale prime sur le nom du contact.
- * Les particuliers gardent NOM PRÉNOM : sur ces fiches le champ société est
- * souvent un nom de personne recopié, pas une entreprise.
- */
-const COMPANY_FIRST_CATEGORIES = ['entreprise', 'public'];
-
-/**
- * Construit le nom affiché d'un client.
- *
- * Source unique de la règle : une fiche entreprise/public dont la société est
- * renseignée s'affiche et se cherche sous sa raison sociale, pas sous le nom
- * de son contact (sinon la fiche est introuvable par le nom de la société).
- */
-export function buildClientDisplayName({ firstName, lastName, companyName, clientCategory } = {}) {
-  const company = (companyName || '').trim();
-  if (company && COMPANY_FIRST_CATEGORIES.includes(clientCategory)) {
-    return company.toUpperCase();
-  }
-  return `${(lastName || '').trim()} ${(firstName || '').trim()}`.trim().toUpperCase();
-}
+// Règle du nom affiché : src/lib/clientDisplayName.js (module pur), réexportée ici pour les appelants existants.
+export { buildClientDisplayName };
 
 /**
  * Types d'équipements — legacy (catégories simplifiées, utilisées par import Excel)
