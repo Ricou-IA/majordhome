@@ -24,6 +24,7 @@ import EtapeFichier from '@/apps/artisan/components/clients/import/EtapeFichier'
 import EtapeCorrespondance from '@/apps/artisan/components/clients/import/EtapeCorrespondance';
 import EtapeApercu from '@/apps/artisan/components/clients/import/EtapeApercu';
 import EtapeResultat from '@/apps/artisan/components/clients/import/EtapeResultat';
+import ImportsPrecedents from '@/apps/artisan/components/clients/import/ImportsPrecedents';
 
 const ETAPES = [
   { cle: 'fichier', libelle: 'Fichier' },
@@ -143,7 +144,7 @@ export default function ClientsImport() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {etat.etape === 'fichier' && (
           <EtapeFichier
             lecture={etat.lecture}
@@ -194,6 +195,7 @@ export default function ClientsImport() {
             onRetourApercu={actions.retourApercu}
           />
         )}
+        {run.etat !== 'en_cours' && <ImportsPrecedents orgId={orgId} />}
       </div>
     </div>
   );

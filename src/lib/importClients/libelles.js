@@ -36,3 +36,41 @@ export function phraseBilan(b) {
     + ` + ${pluriel(b.doublons_ecartes, 'doublon écarté', 'doublons écartés')}`
     + ` + ${pluriel(b.ecartees, 'écartée', 'écartées')}`;
 }
+
+const nombreFR = (n) => Number(n).toLocaleString('fr-FR');
+const MOTIF_CONSERVEES = 'a déjà un contrat, une intervention ou un e-mail envoyé';
+
+/**
+ * Texte de confirmation du retrait d'un import, construit sur l'aperçu.
+ * @param {{ retirables: number, conservees: number }} apercu
+ * @returns {string}
+ */
+export function texteRetrait({ retirables, conservees }) {
+  if (retirables > 0) {
+    const retrait = `${nombreFR(retirables)} ${retirables > 1 ? 'fiches seront retirées' : 'fiche sera retirée'}.`;
+    if (conservees <= 0) return retrait;
+    const reste = conservees > 1
+      ? `${nombreFR(conservees)} seront conservées : elles ont déjà un contrat, une intervention ou un e-mail envoyé.`
+      : `1 sera conservée : elle ${MOTIF_CONSERVEES}.`;
+    return `${retrait} ${reste}`;
+  }
+  if (conservees > 0) {
+    return conservees > 1
+      ? `Aucune fiche ne peut être retirée : les ${nombreFR(conservees)} fiches de cet import ont déjà un contrat, une intervention ou un e-mail envoyé.`
+      : `Aucune fiche ne peut être retirée : la fiche de cet import ${MOTIF_CONSERVEES}.`;
+  }
+  return 'Cet import ne contient plus aucune fiche.';
+}
+
+/**
+ * Texte du toast après un retrait.
+ * @param {{ retirees: number, conservees: number }} totaux
+ * @returns {string}
+ */
+export function texteRetraitFait({ retirees, conservees }) {
+  const retire = retirees > 0
+    ? `${nombreFR(retirees)} ${retirees > 1 ? 'fiches retirées' : 'fiche retirée'}`
+    : 'Aucune fiche retirée';
+  if (conservees <= 0) return retire;
+  return `${retire}, ${nombreFR(conservees)} ${conservees > 1 ? 'conservées' : 'conservée'}`;
+}

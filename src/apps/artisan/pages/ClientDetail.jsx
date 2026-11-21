@@ -388,6 +388,9 @@ export default function ClientDetail() {
               {client.client_number && !client.pennylane_account_number && (
                 <span className="text-xs font-mono text-secondary-400 mr-2">{client.client_number}</span>
               )}
+              {client.external_ref && (
+                <span className="text-xs text-secondary-400 mr-2" title="Numéro du client dans l'ancien logiciel">ancien n° {client.external_ref}</span>
+              )}
               {/* Ville de l'en-tête : un appui lance Waze vers l'adresse de la fiche, depuis n'importe quel onglet */}
               <LienWaze
                 address={client.address}

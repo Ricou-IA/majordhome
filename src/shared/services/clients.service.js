@@ -135,6 +135,7 @@ export const clientsService = {
             `phone.ilike.%${term}%`,
             `city.ilike.%${term}%`,
             `postal_code.ilike.%${term}%`,
+            `external_ref.ilike.%${term}%`,
           ];
           if (phoneSpaced && phoneSpaced !== term) {
             conditions.push(`phone.ilike.%${phoneSpaced}%`);
