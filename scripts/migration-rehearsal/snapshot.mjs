@@ -27,7 +27,7 @@ const TABLES = [
   { schema: 'core', table: 'organizations', columns: ['id', 'name', 'settings', 'created_at', 'updated_at'] },
   { schema: 'core', table: 'profiles', columns: null }, // toutes : public.profiles (vue regénérée) les référence toutes
   { schema: 'core', table: 'organization_members', columns: null },
-  { schema: 'core', table: 'projects', columns: ['id', 'org_id', 'name', 'status', 'identity'] },
+  { schema: 'core', table: 'projects', columns: ['id', 'org_id', 'name', 'status', 'identity', 'slug', 'created_by'] }, // slug / created_by : 20261121_13 (clients_import_batch crée le projet)
   { schema: 'majordhome', table: 'organizations', columns: null },
   { schema: 'majordhome', table: 'suppliers', columns: null, data: false }, // 20260929_1 : FK fum_composant_mapping
   { schema: 'majordhome', table: 'supplier_products', columns: null, data: false }, // 20260929_1 : FK fum_article_attrs + vue majordhome_fum_articles
@@ -45,7 +45,15 @@ const TABLES = [
   { schema: 'majordhome', table: 'team_members', columns: null },
   { schema: 'majordhome', table: 'commercials', columns: null }, // 20261005_1 : commercial_set_for_user (liste « Commercial assigné »)
   // auth_user_id : cité par les policies portail client (client_portal_select_own_*) des tables contracts/equipments/interventions
-  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived', 'address_complement', 'company_name', 'client_category', 'dpe_number'] }, // dpe_number : 20261112_2 (client_dpe_record tient le numéro de la fiche) // client_category : 20261021_1 (find_or_create_client crée la fiche) // address_complement / company_name : 20261011_1 (push identité PL) // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
+  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived', 'address_complement', 'company_name', 'client_category', 'dpe_number',
+    // 20261121_13 (import de clients) : colonnes des vues majordhome_clients / _all (recréées avec external_ref en fin),
+    // colonnes écrites par clients_import_batch, auto-références (parrain_id, owner_client_id) lues par le retrait,
+    // geocode_attempts / address_precision écrites par le trigger BEFORE UPDATE (TRIGGER_TABLES)
+    'country', 'housing_type', 'surface', 'floor_count', 'construction_year', 'dpe_rating', 'access_instructions', 'tags',
+    'is_reliable', 'import_source', 'notes', 'internal_notes', 'created_by', 'archived_at', 'siren', 'latitude', 'longitude',
+    'geocoded_at', 'owner_client_id', 'parrain_id', 'mail_optin', 'email_unsubscribed_at', 'email_unsubscribe_reason',
+    'geocode_attempts', 'address_precision'] },
+  { schema: 'majordhome', table: 'client_dpe', columns: null, data: false }, // 20261121_13 : une fiche importée qui n'a qu'une ligne client_dpe reste retirable // dpe_number : 20261112_2 (client_dpe_record tient le numéro de la fiche) // client_category : 20261021_1 (find_or_create_client crée la fiche) // address_complement / company_name : 20261011_1 (push identité PL) // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
   // 20261116_5 : lue par le trigger tr_equipments_check_model_org à CHAQUE écriture d'un équipement (PL/pgSQL
   // planifie toute la condition, même sans modèle) — sans elle, aucun INSERT d'équipement ne se répète
   { schema: 'majordhome', table: 'equipment_models', columns: null, data: false },
@@ -227,11 +235,17 @@ const FUNCTIONS = [
   'majordhome.client_identity_tokens(text[])',
   'majordhome.client_names_compatible(text[], text[])',
   'public.find_or_create_client(uuid, text, text, text, text, text, text, text, text, text, text, text, text, boolean)', // 20261021_1 : remplacée (rapprochement fort) ; signature prod relue le 2026-10-24 (14ᵉ paramètre boolean)
+  // 20261121_13 : fonctions des triggers de majordhome.clients (TRIGGER_TABLES) — l'écriture par lots passe par trg_audit_clients
+  'majordhome.reset_geocode_on_address_change()',
+  'majordhome.cascade_client_archive_to_contract()',
+  'majordhome.update_clients_updated_at()',
+  'majordhome.lead_commercial_meme_organisation()', // trigger leads posé par 20261121_9, en prod depuis le 2026-11-21 : sans elle le schéma ne charge plus
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
 const TRIGGER_TABLES = ['majordhome.equipments', 'majordhome.maintenance_visits', 'majordhome.contracts', 'majordhome.lead_pennylane_quotes', 'majordhome.role_permissions',
-  'majordhome.leads']; // 20261030_2 : le rattrapage désactive trigger_leads_updated_at et passe par l'audit
+  'majordhome.leads', // 20261030_2 : le rattrapage désactive trigger_leads_updated_at et passe par l'audit
+  'majordhome.clients']; // 20261121_13 : l'import de clients écrit et supprime des fiches (journal d'audit compris)
 
 const VIEWS = [
   'public.profiles', // cible des sous-requêtes « nom de l'auteur » des vues majordhome_* (interactions prospects…)
@@ -283,6 +297,8 @@ const VIEWS = [
   'public.majordhome_leads', // 20261030_1 : project_family_key en fin
   'public.majordhome_audit_log', // 20261116_5 : client_id en fin (CREATE OR REPLACE sur la vue telle qu'en prod)
   'public.majordhome_kanban_cards', // 20261117_2 : dates des devis en fin (après majordhome.lead_quote_stats, qu'elle lit)
+  'public.majordhome_clients', // 20261121_13 : external_ref en fin (CREATE OR REPLACE sur la vue telle qu'en prod)
+  'public.majordhome_clients_all',
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du

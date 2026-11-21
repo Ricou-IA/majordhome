@@ -192,7 +192,7 @@ BEGIN
   IF n_types <> 14 THEN RAISE EXCEPTION 'pricing_equipment_types attendu 14, trouvé % (type créé/supprimé en prod ? ré-aligner §3)', n_types; END IF;
 
   SELECT count(*) INTO n_membres FROM majordhome.team_members;
-  IF n_membres <> 8 THEN RAISE EXCEPTION 'team_members attendu 8, trouvé % (membre créé/supprimé en prod ? ré-aligner §3)', n_membres; END IF;
+  IF n_membres <> 11 THEN RAISE EXCEPTION 'team_members attendu 11, trouvé % (membre créé/supprimé en prod ? ré-aligner §3)', n_membres; END IF;
 
   SELECT count(*), count(*) FILTER (WHERE equipment_type_id IS NULL) INTO n_eq, n_sans_type FROM majordhome.equipments;
   SELECT count(*) INTO n_cert FROM majordhome.certificats;

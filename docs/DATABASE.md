@@ -105,11 +105,46 @@ Table principale des clients CRM. 3393 rows. RLS activé (4 policies).
 | `updated_at` | timestamptz | NO | now() | Trigger auto |
 | `is_archived` | boolean | NO | false | |
 | `archived_at` | timestamptz | YES | — | |
+| `import_id` | uuid | YES | — | FK → `majordhome.client_imports` (ON DELETE SET NULL) : import de fichier qui a créé la fiche (20261121_13) |
+| `import_line` | integer | YES | — | Ligne du fichier importé ; `(import_id, import_line)` unique (index partiel) : un lot renvoyé ne recrée rien |
+| `external_ref` | text | YES | — | Référence du client dans l'ancien logiciel ; index `(org_id, external_ref)` ; dernière colonne de `majordhome_clients` / `majordhome_clients_all` |
 
 **Index** : org_id, project_id (unique), client_category, postal_code, city, client_number (unique), email, phone, **GIN full-text search** (french: display_name + email + phone + city)
 
 **FK sortantes** : project_id → core.projects, org_id → core.organizations, created_by → core.profiles
 **FK entrantes** : client_activities.client_id → clients.id
+
+### majordhome.client_imports (2026-11-21, migration `20261121_13`)
+Un import de fichier clients venu d'un autre logiciel. RLS : une seule policy, SELECT pour un org_admin ACTIF de `org_id` ;
+aucune policy d'écriture, `authenticated` n'a que SELECT, `anon` rien ; `service_role` SELECT. Vue
+`public.majordhome_client_imports` (`security_invoker`, `created_by_name` = `core.profiles.full_name`).
+
+| Colonne | Type | Notes |
+|---------|------|-------|
+| `id` | uuid PK | |
+| `org_id` | uuid NOT NULL | FK → core.organizations |
+| `created_by` | uuid | auteur de l'import |
+| `created_at` | timestamptz | now() |
+| `file_name` | text NOT NULL | nom du fichier (255 car. max) |
+| `source_label` | text | logiciel d'origine ; recopié dans `clients.import_source` |
+| `mapping` | jsonb (tableau) | correspondance colonnes → champs validée à l'écran |
+| `counts` | jsonb (objet) | bilan, écrit au départ puis à la fin |
+| `status` | text | `en_cours` → `termine` → `retire` |
+| `removed_at` / `removed_by` | timestamptz / uuid | retrait complet |
+
+**Écriture = cinq RPC SECURITY DEFINER** (`authenticated` + `service_role`, jamais anon ni PUBLIC) :
+`clients_import_start(p_org_id, p_file_name, p_source_label, p_mapping, p_counts) → uuid` (org_admin actif de `p_org_id`) ;
+`clients_import_batch(p_import_id, p_rows) → { created, skipped }` (1 à 500 lignes, tout ou rien, liste fermée des
+colonnes, une ligne déjà écrite est comptée `skipped`, un projet `core.projects` par fiche, `identity.created_from =
+'import_clients'`) ; `clients_import_finish(p_import_id, p_counts)` ; `clients_import_removal_preview(p_import_id) →
+{ retirables, conservees }` ; `clients_import_remove(p_import_id, p_limit = 200) → { retirees, conservees, restantes }`
+(au plus `p_limit` fiches par appel, à rappeler tant que `restantes > 0` ; ne passe pas par `client_hard_delete`).
+Les quatre dernières dérivent l'organisation de l'import. Codes : `unauthenticated`, `org_admin_required` (42501),
+`import_not_found` (P0002), `import_closed`, `rows_invalid`, `row_invalid`, `file_name_required`.
+**Retirable** = fiche de l'import que rien ne référence : toute clé étrangère vers `majordhome.clients` ou vers son
+projet `core.projects`, lue dans `pg_constraint` à l'exécution (`majordhome.clients_import_retirables`, interne), sauf
+`clients.project_id` et `majordhome.client_dpe` (supprimée en cascade). Une fiche qui a un contrat, un lead, un RDV, une
+intervention… est conservée.
 
 ### majordhome.client_activities ⭐
 Timeline auto-alimentée. 3393 rows (1 event `client_created` par client migré). RLS activé (3 policies).
