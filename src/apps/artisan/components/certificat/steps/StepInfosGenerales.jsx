@@ -13,8 +13,6 @@ import {
   sectionsPourProfil,
 } from '../constants';
 
-// Certifications propres à Mayer Énergie (en dur)
-const CERTIFICATIONS_ENTREPRISE = ['QualiPAC', 'QualiBois'];
 
 export function StepInfosGenerales({ formData, onChange, client, technicians = [], canSelectTechnician = false, profil, referentiel }) {
   const config = sectionsPourProfil(profil);
@@ -62,7 +60,12 @@ export function StepInfosGenerales({ formData, onChange, client, technicians = [
         </FormField>
         <FormField label="Certifications">
           <div className="flex flex-wrap gap-2">
-            {CERTIFICATIONS_ENTREPRISE.map(cert => (
+            {(formData.technicien_certifications || []).length === 0 && (
+              <span className="text-sm text-secondary-500">
+                Aucune : à renseigner dans Paramètres → Organisation → Identité.
+              </span>
+            )}
+            {(formData.technicien_certifications || []).map(cert => (
               <span
                 key={cert}
                 className="px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white border border-blue-600"

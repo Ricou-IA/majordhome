@@ -1,6 +1,6 @@
 // ============================================================================
 // voice-extract-fieldreport — Extraction structurée d'un mémo vocal CVC
-// Phase 1 voice agent — Mayer Énergie
+// Phase 1 voice agent
 // ----------------------------------------------------------------------------
 // Input : { transcript, memo_type: 'rdv_terrain'|'reunion'|'note_libre', context? }
 // Output : { extraction, model, processing_time_ms }
@@ -62,10 +62,30 @@ const EQUIPMENT_TYPE_CODES = `
 // PROMPTS
 // ---------------------------------------------------------------------------
 
-function systemPromptRdvTerrain() {
-  return `Tu es un assistant qui aide un responsable d'exploitation Mayer Énergie (artisan CVC à Gaillac, Tarn) à structurer ses comptes-rendus de RDV terrain.
+/**
+ * Entreprise citée dans les consignes : nom et ville lus dans les réglages de l'organisation
+ * (`brand_name`, `city`). Sans organisation connue, une formule neutre — jamais une entreprise en dur.
+ */
+async function entrepriseDeLOrg(orgId: unknown): Promise<{ nom: string; lieu: string }> {
+  const neutre = { nom: "l'entreprise", lieu: "" };
+  if (typeof orgId !== "string" || !orgId) return neutre;
+  try {
+    const { data, error } = await getAdminClient()
+      .schema("core").from("organizations").select("name, settings").eq("id", orgId).maybeSingle();
+    if (error || !data) return neutre;
+    const s = (data.settings as Record<string, unknown> | null) ?? {};
+    const nom = String(s.brand_name || data.name || "").trim();
+    const ville = String(s.city || "").trim();
+    return { nom: nom || neutre.nom, lieu: ville ? ` à ${ville}` : "" };
+  } catch {
+    return neutre;
+  }
+}
 
-Mayer Énergie installe :
+function systemPromptRdvTerrain(e: { nom: string; lieu: string }) {
+  return `Tu es un assistant qui aide un responsable d'exploitation de ${e.nom} (artisan du bâtiment${e.lieu}) à structurer ses comptes-rendus de RDV terrain.
+
+Domaines d'intervention possibles :
 - Chauffage : poêles bois/granulés, chaudières, PAC air/eau
 - Climatisation : PAC air/air, gainables
 - Eau chaude : ballons thermodynamiques, solaire
@@ -149,8 +169,8 @@ RÈGLES :
 - confidence = "low" si transcript truncated/peu compréhensible, "medium" si plusieurs ambiguïtés, "high" si tout est clair`;
 }
 
-function systemPromptReunion() {
-  return `Tu es un assistant qui aide Mayer Énergie à structurer ses comptes-rendus de réunion (interne, fournisseur, partenaire). Tu extrais des informations strictement présentes dans le verbatim. Tu n'inventes JAMAIS rien. Réponds uniquement en JSON valide.`;
+function systemPromptReunion(e: { nom: string; lieu: string }) {
+  return `Tu es un assistant qui aide ${e.nom} à structurer ses comptes-rendus de réunion (interne, fournisseur, partenaire). Tu extrais des informations strictement présentes dans le verbatim. Tu n'inventes JAMAIS rien. Réponds uniquement en JSON valide.`;
 }
 
 function userPromptReunion(transcript: string, durationSeconds?: number) {
@@ -198,8 +218,8 @@ RÈGLES :
 - Les actions doivent être assignables (un nom de responsable si possible)`;
 }
 
-function systemPromptNoteLibre() {
-  return `Tu es un assistant qui structure une note vocale libre Mayer Énergie. Tu extrais ce qui est dit, sans inventer. Réponds uniquement en JSON valide.`;
+function systemPromptNoteLibre(e: { nom: string; lieu: string }) {
+  return `Tu es un assistant qui structure une note vocale libre de ${e.nom}. Tu extrais ce qui est dit, sans inventer. Réponds uniquement en JSON valide.`;
 }
 
 function userPromptNoteLibre(transcript: string, durationSeconds?: number) {
@@ -453,15 +473,16 @@ Deno.serve(async (req: Request) => {
 
     let systemPrompt: string;
     let userPrompt: string;
+    const entreprise = await entrepriseDeLOrg(org_id);
 
     if (type === "reunion") {
-      systemPrompt = systemPromptReunion();
+      systemPrompt = systemPromptReunion(entreprise);
       userPrompt = userPromptReunion(transcript, duration_seconds);
     } else if (type === "note_libre") {
-      systemPrompt = systemPromptNoteLibre();
+      systemPrompt = systemPromptNoteLibre(entreprise);
       userPrompt = userPromptNoteLibre(transcript, duration_seconds);
     } else {
-      systemPrompt = systemPromptRdvTerrain();
+      systemPrompt = systemPromptRdvTerrain(entreprise);
       userPrompt = userPromptRdvTerrain(transcript, duration_seconds);
     }
 

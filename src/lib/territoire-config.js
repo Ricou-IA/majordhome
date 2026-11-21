@@ -3,30 +3,39 @@
  * Configuration des centres territoriaux et paramètres isochrones
  */
 
+// Paramètres du calcul des zones, communs à toutes les organisations. Les CENTRES (siège, antennes)
+// ne sont pas ici : ils se saisissent dans Paramètres → Organisation → Territoire
+// (`settings.territoire_centers`, 1er = siège).
 export const TERRITOIRE_CONFIG = {
-  centers: {
-    gaillac: {
-      lng: 1.8898,
-      lat: 43.9119,
-      label: 'Gaillac',
-      description: 'Siège Mayer Énergie',
-      color: '#f97316', // orange-500
-      emoji: '🏢',
-    },
-    pechbonnieu: {
-      lng: 1.4561,
-      lat: 43.7111,
-      label: 'Pechbonnieu',
-      description: 'Michel Rieutord — Commercial',
-      color: '#ef4444', // red-500
-      emoji: '📍',
-    },
-  },
   isochroneMinutes: 60,
-  departements: ['31', '81', '82'],
+  // Contours des codes postaux connus (partage fin d'une zone commune entre siège et antenne).
+  // Ailleurs, le partage se fait par les isochrones seules.
   postalCodesUrl: '/data/codes-postaux-31-81-82.geojson',
   matrixBatchSize: 23, // 23 sources + 2 destinations = 25 coords (Mapbox max)
 };
+
+/**
+ * Centres exploitables d'une organisation, dans l'ordre des réglages (le 1er est le siège) :
+ * seuls ceux qui ont des coordonnées. Chaque entrée porte sa clé.
+ * @param {Object|null|undefined} centers - `settings.territoire_centers`
+ * @returns {Array<{ key: string, lat: number, lng: number, label?: string, color?: string }>}
+ */
+export function centresValides(centers) {
+  if (!centers || typeof centers !== 'object') return [];
+  return Object.entries(centers)
+    .filter(([, c]) => c && Number.isFinite(c.lat) && Number.isFinite(c.lng))
+    .map(([key, c]) => ({ ...c, key }));
+}
+
+/**
+ * Empreinte des centres (clé, position, ordre) : change dès qu'un centre est ajouté, retiré ou
+ * déplacé. Chaîne vide = aucun centre exploitable.
+ * @param {Object|null|undefined} centers
+ * @returns {string}
+ */
+export function empreinteCentres(centers) {
+  return centresValides(centers).map((c) => `${c.key}:${c.lat},${c.lng}`).join('|');
+}
 
 /**
  * P0.19 — Multi-tenant : retourne les centres territoriaux depuis les settings
@@ -35,7 +44,7 @@ export const TERRITOIRE_CONFIG = {
  * Pas de fallback Mayer : si l'org n'a pas configuré ses centres, on retourne
  * un objet vide. Le composant TerritoireMap n'affiche alors aucune zone
  * (et aucun marker de centre). Évite la fuite cross-org où Cimaj voyait les
- * zones Gaillac/Pechbonnieu de Mayer (bug 2026-05-21).
+ * zones d'une autre entreprise (bug 2026-05-21).
  *
  * Mayer a ses centres backfillés dans `core.organizations.settings.territoire_centers`
  * depuis la migration P0.13.
@@ -76,7 +85,7 @@ export const CONTRACT_COLOR = '#8b5cf6'; // violet-500
  * de temps de trajet (zoneDetection, ChantierModal "X min · Y km depuis Z").
  *
  * Heuristique : 1ᵉʳ centre dans `settings.territoire_centers` (en pratique,
- * le siège est listé en 1ᵉʳ pour Mayer = "gaillac"). Si pas de centres
+ * le siège est listé en 1ᵉʳ). Si pas de centres
  * configurés, retourne null → l'UI doit cacher l'affichage "depuis X".
  *
  * @param {Object|null} settings - core.organizations.settings

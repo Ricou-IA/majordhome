@@ -9,15 +9,15 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as turf from '@turf/turf';
-import { TERRITOIRE_CONFIG, getTerritoireCenters } from '@/lib/territoire-config';
+import { TERRITOIRE_CONFIG, getTerritoireCenters, centresValides, empreinteCentres } from '@/lib/territoire-config';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { logger } from '@lib/logger';
 
 // P1.9 — clés localStorage suffixées par orgId pour éviter fuite cross-org
 // au switch d'organisation (multi-tenant futur).
-const CACHE_KEY_BASE = 'territoire-zones-v8';
-const CACHE_TS_KEY_BASE = 'territoire-zones-v8-at';
+const CACHE_KEY_BASE = 'territoire-zones-v9';
+const CACHE_TS_KEY_BASE = 'territoire-zones-v9-at';
 const buildCacheKey = (orgId) => `${CACHE_KEY_BASE}:${orgId || 'noorg'}`;
 const buildCacheTsKey = (orgId) => `${CACHE_TS_KEY_BASE}:${orgId || 'noorg'}`;
 const CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 jours
@@ -78,7 +78,7 @@ async function fetchPostalCodeContours() {
 
 /**
  * Appelle l'API Mapbox Matrix pour obtenir les temps de trajet
- * de N origines vers 2 destinations (Gaillac + Pechbonnieu)
+ * de N origines vers 2 destinations (siège + antenne)
  *
  * @param {number[][]} origins - [[lng, lat], ...] centroides des CP
  * @param {number[][]} destinations - [[lng, lat], [lng, lat]] les 2 centres
@@ -115,7 +115,7 @@ async function fetchDrivingTimesMatrix(origins, destinations, token) {
       const data = await res.json();
       if (data.durations) {
         for (const row of data.durations) {
-          allDurations.push(row); // [tempsVersGaillac, tempsVersPechbonnieu]
+          allDurations.push(row); // [tempsVersSiege, tempsVersAntenne]
         }
       } else {
         batch.forEach(() => allDurations.push([null, null]));
@@ -205,9 +205,9 @@ function cleanupZone(zone, clipTo) {
  * Découpe la zone d'overlap en utilisant les contours des codes postaux.
  * Chaque CP est assigné au centre le plus rapide en temps de trajet.
  *
- * @returns {{ zoneP: Feature|null }} - Zone Pechbonnieu (l'appelant calcule G = isoG - zoneP)
+ * @returns {{ zoneP: Feature|null }} - Zone de l'antenne (l'appelant calcule siège = isoG - zoneP)
  */
-async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, centers, token) {
+async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, siege, antenne, token) {
   // 1. Charger les contours CP
   const cpData = await fetchPostalCodeContours();
   if (!cpData || !cpData.features.length) {
@@ -237,31 +237,31 @@ async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, centers, to
     return { zoneP: clippedIsoP };
   }
 
-  // 3. Temps de trajet centroïde → Gaillac vs Pechbonnieu
+  // 3. Temps de trajet centroïde → siège vs antenne
   const centroids = overlapCPs.map(cp => cp.centroid);
   const destinations = [
-    [centers.gaillac.lng, centers.gaillac.lat],
-    [centers.pechbonnieu.lng, centers.pechbonnieu.lat],
+    [siege.lng, siege.lat],
+    [antenne.lng, antenne.lat],
   ];
 
   const durations = await fetchDrivingTimesMatrix(centroids, destinations, token);
 
   // 4. Assigner chaque CP au centre le plus rapide
-  const pechbonnieuCPs = [];
+  const cpsAntenne = [];
 
   for (let i = 0; i < overlapCPs.length; i++) {
     const timeToG = durations[i]?.[0] ?? Infinity;
     const timeToP = durations[i]?.[1] ?? Infinity;
 
     if (timeToP < timeToG) {
-      pechbonnieuCPs.push(overlapCPs[i]);
+      cpsAntenne.push(overlapCPs[i]);
     }
-    // Égalité ou erreur → Gaillac (siège, défaut)
+    // Égalité ou erreur → siège (défaut)
   }
 
 
-  // 5. Construire la zone Pechbonnieu = exclusive P + CPs assignés à P
-  // Zone exclusive Pechbonnieu = clippedIsoP - overlap
+  // 5. Construire la zone de l'antenne = exclusive P + CPs assignés à P
+  // Zone exclusive de l'antenne = clippedIsoP - overlap
   let exclusiveP = null;
   try {
     exclusiveP = turf.difference(turf.featureCollection([clippedIsoP, overlap]));
@@ -269,10 +269,10 @@ async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, centers, to
     // Pas de zone exclusive (100% overlap)
   }
 
-  // Union de toutes les parts Pechbonnieu
+  // Union de toutes les parts de l'antenne
   const pParts = [
     exclusiveP,
-    ...pechbonnieuCPs.map(cp => cp.clipped),
+    ...cpsAntenne.map(cp => cp.clipped),
   ].filter(Boolean);
 
   let zoneP = null;
@@ -289,7 +289,7 @@ async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, centers, to
         }
       }, null);
     } catch (e) {
-      logger.warn('[useMapZones] Union zone Pechbonnieu échouée:', e);
+      logger.warn('[useMapZones] Union de la zone antenne échouée:', e);
       zoneP = pParts[0];
     }
   }
@@ -307,89 +307,91 @@ async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, centers, to
 }
 
 /**
- * Calcule les zones territoire Gaillac/Pechbonnieu
- * v2 : découpage par codes postaux au lieu de la bissectrice
+ * Zone d'une antenne face au siège : son isochrone, bornée à celle du siège, la partie commune
+ * étant partagée code postal par code postal (le centre le plus rapide en voiture prend le CP).
+ * Hors des départements dont on a les contours, repli géométrique : l'antenne garde son isochrone.
+ */
+async function zoneDAntenne(isoSiege, isoAntenne, siege, antenne, token) {
+  let clipped = null;
+  try {
+    clipped = turf.intersect(turf.featureCollection([isoAntenne, isoSiege]));
+  } catch (e) {
+    logger.warn('[useMapZones] Clip antenne / siège échoué:', e);
+    clipped = isoAntenne;
+  }
+  if (!clipped) return null; // l'antenne est hors de portée du siège : pas de zone commune à partager
+
+  try {
+    const { zoneP } = await splitOverlapByPostalCodes(clipped, isoSiege, clipped, siege, antenne, token);
+    return cleanupZone(zoneP, isoSiege) || zoneP;
+  } catch (e) {
+    logger.warn('[useMapZones] Découpe CP échouée, repli géométrique:', e);
+    return clipped;
+  }
+}
+
+/**
+ * Calcule les zones du territoire à partir des centres des réglages de l'organisation
+ * (`settings.territoire_centers`) : le 1er est le siège, les suivants des antennes.
+ *   - siège seul : sa zone est son isochrone ;
+ *   - antennes : chacune prend sa part (dans l'ordre des réglages, sans recouvrir une antenne
+ *     déjà servie), le siège garde le reste de son isochrone.
+ *
+ * @returns {Promise<{ zones: Object<string, Feature>, ordre: string[], zone_principale: Feature, metadata: Object }|null>}
  */
 async function calculateZones(token, centers) {
   const { isochroneMinutes } = TERRITOIRE_CONFIG;
-  if (!centers || !centers.gaillac || !centers.pechbonnieu) {
-    // P0.19 — pas de centres pour l'org → pas de zones à calculer
-    return null;
-  }
+  const entrees = centresValides(centers);
+  if (entrees.length === 0) return null;
+  const [siege, ...antennes] = entrees;
 
-  // 1. Récupérer les deux isochrones en parallèle
-  let [isoG, isoP] = await Promise.all([
-    fetchIsochrone(centers.gaillac.lng, centers.gaillac.lat, isochroneMinutes, token),
-    fetchIsochrone(centers.pechbonnieu.lng, centers.pechbonnieu.lat, isochroneMinutes, token),
-  ]);
+  // 1. Isochrones de tous les centres, en parallèle (cercle approximatif si l'API ne répond pas)
+  let usedFallback = false;
+  const isos = (await Promise.all(
+    entrees.map((c) => fetchIsochrone(c.lng, c.lat, isochroneMinutes, token)),
+  )).map((iso, i) => {
+    if (iso) return iso;
+    usedFallback = true;
+    return createFallbackCircle(entrees[i].lng, entrees[i].lat, isochroneMinutes);
+  });
+  const isoSiege = isos[0];
 
-  const usedFallback = !isoG || !isoP;
-  if (!isoG) {
-    isoG = createFallbackCircle(centers.gaillac.lng, centers.gaillac.lat, isochroneMinutes);
-  }
-  if (!isoP) {
-    isoP = createFallbackCircle(centers.pechbonnieu.lng, centers.pechbonnieu.lat, isochroneMinutes);
-  }
-
-  // 2. Clipper l'isochrone Pechbonnieu à la zone principale (Gaillac)
-  let clippedIsoP = null;
-  try {
-    clippedIsoP = turf.intersect(turf.featureCollection([isoP, isoG]));
-  } catch (e) {
-    logger.warn('[useMapZones] Clip isoP à isoG échoué:', e);
-    clippedIsoP = isoP; // fallback
-  }
-
-  // 3. Calculer l'overlap entre isoG et clippedIsoP
-  let overlap = null;
-  try {
-    overlap = turf.intersect(turf.featureCollection([isoG, clippedIsoP]));
-  } catch (e) {
-    logger.warn('[useMapZones] Calcul overlap échoué:', e);
-  }
-
-  // 4. Découper l'overlap par codes postaux
-  let zoneGaillac = null;
-  let zonePechbonnieu = null;
-
-  if (overlap && clippedIsoP) {
-    try {
-      const { zoneP } = await splitOverlapByPostalCodes(
-        overlap, isoG, clippedIsoP, centers, token,
-      );
-
-      // 5. Nettoyer Pechbonnieu d'abord (fusion des CP en un seul polygone)
-      zonePechbonnieu = cleanupZone(zoneP, isoG) || zoneP;
-
-      // 6. Gaillac = isoG - Pechbonnieu nettoyé → contour propre automatiquement
-      if (zonePechbonnieu) {
-        try {
-          zoneGaillac = turf.difference(turf.featureCollection([isoG, zonePechbonnieu]));
-        } catch (e) {
-          logger.warn('[useMapZones] diff isoG - zoneP échoué:', e);
-          zoneGaillac = isoG;
-        }
-      } else {
-        zoneGaillac = isoG;
-      }
-    } catch (e) {
-      logger.warn('[useMapZones] Découpe CP échouée, fallback géométrique:', e);
-      zonePechbonnieu = clippedIsoP;
+  // 2. Chaque antenne prend sa part, sans recouvrir celles déjà attribuées
+  const zones = {};
+  let prises = null;
+  for (let i = 0; i < antennes.length; i++) {
+    let zone = await zoneDAntenne(isoSiege, isos[i + 1], siege, antennes[i], token);
+    if (zone && prises) {
       try {
-        zoneGaillac = turf.difference(turf.featureCollection([isoG, clippedIsoP]));
-      } catch {
-        zoneGaillac = isoG;
+        zone = turf.difference(turf.featureCollection([zone, prises]));
+      } catch (e) {
+        logger.warn('[useMapZones] Retrait des antennes précédentes échoué:', e);
       }
     }
-  } else {
-    zoneGaillac = isoG;
-    zonePechbonnieu = clippedIsoP;
+    if (!zone) continue;
+    zones[antennes[i].key] = zone;
+    try {
+      prises = prises ? turf.union(turf.featureCollection([prises, zone])) : zone;
+    } catch (e) {
+      logger.warn('[useMapZones] Union des antennes échouée:', e);
+    }
   }
 
+  // 3. Le siège garde le reste de son isochrone
+  let zoneSiege = isoSiege;
+  if (prises) {
+    try {
+      zoneSiege = turf.difference(turf.featureCollection([isoSiege, prises])) || isoSiege;
+    } catch (e) {
+      logger.warn('[useMapZones] Zone du siège : différence échouée:', e);
+    }
+  }
+  zones[siege.key] = zoneSiege;
+
   return {
-    zone_gaillac: zoneGaillac,
-    zone_pechbonnieu: zonePechbonnieu,
-    zone_principale: isoG, // Pour l'outline pointillé
+    zones,
+    ordre: entrees.map((c) => c.key),
+    zone_principale: isoSiege, // Pour l'outline pointillé
     metadata: {
       computed_at: new Date().toISOString(),
       isochrone_minutes: isochroneMinutes,
@@ -407,11 +409,13 @@ export function useMapZones(mapboxToken) {
   const orgId = organization?.id;
   const cacheKey = buildCacheKey(orgId);
   const cacheTsKey = buildCacheTsKey(orgId);
-  // P0.19 — centres territoriaux depuis settings org (fallback Mayer si non défini,
-  // mais le composant TerritoireMap gère le cas où orgCenters est vide ou ne
-  // matche pas la convention gaillac/pechbonnieu attendue par calculateZones).
+  // Centres du territoire = réglages de l'organisation (Paramètres → Organisation → Territoire).
+  // Aucun centre ⇒ aucune zone : la carte montre seulement les points.
   const { settings: orgSettings } = useOrgSettings();
   const orgCenters = useMemo(() => getTerritoireCenters(orgSettings), [orgSettings]);
+  // Empreinte des centres : un siège déplacé ou une antenne ajoutée invalide le cache du navigateur.
+  const empreinte = useMemo(() => empreinteCentres(orgCenters), [orgCenters]);
+  const aDesCentres = empreinte !== '';
 
   const [zones, setZones] = useState(null);
   const [isLoading, setLoading] = useState(true);
@@ -424,9 +428,8 @@ export function useMapZones(mapboxToken) {
       return;
     }
 
-    // Si l'org n'a pas les centres gaillac/pechbonnieu attendus, on ne calcule
-    // pas (zones = null, map affichera juste les points CRM sans overlay).
-    if (!orgCenters?.gaillac || !orgCenters?.pechbonnieu) {
+    // Pas de centre dans les réglages : pas de zone (la carte affiche les points seuls).
+    if (!aDesCentres) {
       setZones(null);
       setLoading(false);
       return;
@@ -437,9 +440,12 @@ export function useMapZones(mapboxToken) {
       const cached = localStorage.getItem(cacheKey);
       const cachedAt = localStorage.getItem(cacheTsKey);
       if (cached && cachedAt && Date.now() - Number(cachedAt) < CACHE_TTL) {
-        setZones(JSON.parse(cached));
-        setLoading(false);
-        return;
+        const enCache = JSON.parse(cached);
+        if (enCache?.metadata?.centres === empreinte) {
+          setZones(enCache);
+          setLoading(false);
+          return;
+        }
       }
     } catch {
       // Cache invalide, on recalcule
@@ -448,6 +454,7 @@ export function useMapZones(mapboxToken) {
     // Calculer les zones
     calculateZones(mapboxToken, orgCenters)
       .then(data => {
+        if (data) data.metadata.centres = empreinte;
         setZones(data);
         try {
           if (data) {
@@ -463,7 +470,7 @@ export function useMapZones(mapboxToken) {
         setError(e.message);
       })
       .finally(() => setLoading(false));
-  }, [mapboxToken, cacheKey, cacheTsKey, orgCenters]);
+  }, [mapboxToken, cacheKey, cacheTsKey, orgCenters, empreinte, aDesCentres]);
 
   const invalidate = useCallback(() => {
     localStorage.removeItem(cacheKey);
@@ -471,9 +478,10 @@ export function useMapZones(mapboxToken) {
     setLoading(true);
     setError(null);
 
-    if (mapboxToken && orgCenters?.gaillac && orgCenters?.pechbonnieu) {
+    if (mapboxToken && aDesCentres) {
       calculateZones(mapboxToken, orgCenters)
         .then(data => {
+          if (data) data.metadata.centres = empreinte;
           setZones(data);
           if (data) {
             localStorage.setItem(cacheKey, JSON.stringify(data));
@@ -486,7 +494,7 @@ export function useMapZones(mapboxToken) {
       setZones(null);
       setLoading(false);
     }
-  }, [mapboxToken, cacheKey, cacheTsKey, orgCenters]);
+  }, [mapboxToken, cacheKey, cacheTsKey, orgCenters, empreinte, aDesCentres]);
 
   return { zones, isLoading, error, invalidate };
 }

@@ -253,11 +253,6 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  // Choix du site : priorite a la propriete de domaine mayer-energie.fr
-  let chosen = sites.find((s) => s.siteUrl === "sc-domain:mayer-energie.fr");
-  if (!chosen) chosen = sites.find((s) => s.siteUrl.includes("mayer-energie"));
-  if (!chosen) chosen = sites[0];
-
   // Stocke dans core.organizations.settings
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -270,6 +265,14 @@ Deno.serve(async (req: Request) => {
 
   if (readErr) return htmlError(`Lecture org echouee : ${readErr.message}`, 500);
   if (!orgRow) return htmlError("Organisation introuvable.", 404);
+
+  // Choix du site : la propriete Search Console du site de l'organisation (reglage `website_url`),
+  // propriete de domaine d'abord ; a defaut, le premier site accessible avec ce compte Google.
+  const domaineOrg = String(((orgRow.settings as Record<string, unknown>) ?? {}).website_url ?? "")
+    .toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+  let chosen = domaineOrg ? sites.find((s) => s.siteUrl === `sc-domain:${domaineOrg}`) : undefined;
+  if (!chosen && domaineOrg) chosen = sites.find((s) => s.siteUrl.toLowerCase().includes(domaineOrg));
+  if (!chosen) chosen = sites[0];
 
   const newSettings = {
     ...((orgRow.settings as Record<string, unknown>) ?? {}),

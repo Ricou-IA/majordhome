@@ -2,7 +2,7 @@
  * CertificatPDF.jsx - Certificat d'Entretien & Ramonage
  * ============================================================================
  * Template PDF A4 compact (1 page) avec @react-pdf/renderer.
- * Palette Mayer Énergie : bleu #1B4F72, orange #E67E22.
+ * Palette : bleu #1B4F72, orange #E67E22.
  * ============================================================================
  */
 /* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
@@ -22,7 +22,8 @@ import {
   sectionsPourProfil,
   getNettoyageItems,
 } from './constants';
-import logoMayer from '@/assets/logo-mayer.png';
+import { buildCompanyInfo } from '@/lib/orgBranding';
+import { fetchAsDataUrl } from '@/lib/imageDataUrl';
 
 // ============================================================================
 // COULEURS
@@ -50,7 +51,8 @@ const s = StyleSheet.create({
   header: { flexDirection: 'column', alignItems: 'center', marginBottom: 10, borderBottom: `2px solid ${C.bleu}`, paddingBottom: 6 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
   headerCenter: { alignItems: 'center', marginTop: 4 },
-  logo: { width: 50, height: 50 },
+  logo: { height: 50, maxWidth: 140, objectFit: 'contain' },
+  logoVide: { width: 50, height: 50 },
   title: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: C.bleu, textAlign: 'center' },
   subtitle: { fontSize: 8, color: C.gris, marginTop: 2, textAlign: 'center' },
   reference: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.orange },
@@ -110,15 +112,18 @@ function Field({ label, value }) {
 // DOCUMENT PDF
 // ============================================================================
 
-// P0.13/P0.14 multi-tenant — Fallback Mayer si pas de company en prop.
-const DEFAULT_COMPANY_HEADER = 'MAYER ENERGIE';
-const DEFAULT_COMPANY_FOOTER = 'Mayer Energie - SASU SIRET 100 288 224 00015 - Gaillac (81600) - RGE QualiPAC, QualiBois';
-
-function CertificatDocument({ data, company }) {
-  const companyHeader = company ? (company.legalName || company.name || DEFAULT_COMPANY_HEADER) : DEFAULT_COMPANY_HEADER;
-  const companyFooter = company
-    ? `${company.name} - ${company.legalForm || 'SASU'} SIRET ${company.siret} - ${company.city} (${company.postalCode}) - RGE ${(company.rgeCertifications || []).join(', ')}`
-    : DEFAULT_COMPANY_FOOTER;
+// Identité, logo et certifications = réglages de l'organisation (`buildCompanyInfo(settings)`),
+// passés par l'appelant. Aucune entreprise en dur : une mention non renseignée n'est pas imprimée.
+function CertificatDocument({ data, company, logoSrc }) {
+  const org = company || buildCompanyInfo(null);
+  const companyHeader = org.legalName || org.name;
+  const rge = (org.rgeCertifications || []).filter(Boolean);
+  const companyFooter = [
+    org.name,
+    [org.legalForm, org.siret ? `SIRET ${org.siret}` : ''].filter(Boolean).join(' '),
+    org.city ? `${org.city}${org.postalCode ? ` (${org.postalCode})` : ''}` : '',
+    rge.length ? `RGE ${rge.join(', ')}` : '',
+  ].filter(Boolean).join(' - ');
   // `profil` et `equipement_type_label` sont posés par l'appelant (wizard) depuis
   // le référentiel de l'org : le PDF ne connaît ni l'enum ni les catégories.
   const config = sectionsPourProfil(data.profil);
@@ -154,7 +159,7 @@ function CertificatDocument({ data, company }) {
         {/* EN-TETE */}
         <View style={s.header}>
           <View style={s.headerTop}>
-            <Image src={logoMayer} style={s.logo} />
+            {logoSrc ? <Image src={logoSrc} style={s.logo} /> : <View style={s.logoVide} />}
             <View style={{ alignItems: 'flex-end' }}>
               {data.reference ? <Text style={s.reference}>{data.reference}</Text> : null}
               <Text style={s.subtitle}>{data.date_intervention || ' '}</Text>
@@ -334,7 +339,9 @@ function CertificatDocument({ data, company }) {
 // ============================================================================
 
 export async function generatePdfBlob(data, company) {
-  const blob = await pdf(<CertificatDocument data={data} company={company} />).toBlob();
+  // Logo de l'organisation (réglage `logo_url`) ; absent ou injoignable ⇒ pas de logo.
+  const logoSrc = await fetchAsDataUrl(company?.logoUrl);
+  const blob = await pdf(<CertificatDocument data={data} company={company} logoSrc={logoSrc} />).toBlob();
   return blob;
 }
 

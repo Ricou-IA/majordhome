@@ -20,29 +20,16 @@ import {
   pdf,
 } from '@react-pdf/renderer';
 
-// Logo Mayer Énergie (PNG base64)
-import { LOGO_BASE64 } from './logo-base64';
+import { buildCompanyInfo, buildLegalFooter, formatFullAddress } from '@/lib/orgBranding';
+import { fetchAsDataUrl } from '@/lib/imageDataUrl';
 
 // ============================================================================
 // CONSTANTES
 // ============================================================================
 
-// P0.13/P0.14 multi-tenant — Fallback Mayer si pas de company en prop.
-// Le caller doit passer `company` issu de buildCompanyInfo(useOrgSettings().settings).
-const DEFAULT_COMPANY = {
-  name: 'Mayer Energie',
-  legalName: 'MAYER ENERGIE',
-  legalForm: 'SAS à associé unique',
-  capital: '6 000',
-  rcs: '100 288 224 R.C.S. Albi',
-  address: '26 Rue des Pyrénées – 81600 Gaillac',
-  phone: '05 63 33 23 14',
-  email: 'contact@mayer-energie.fr',
-  domain: 'mayer-energie.fr',
-  assurance: 'Couvert par une assurance responsabilité civile professionnelle',
-};
-
-const DEFAULT_LEGAL_FOOTER = `${DEFAULT_COMPANY.legalName} — ${DEFAULT_COMPANY.legalForm}, capital ${DEFAULT_COMPANY.capital} € — ${DEFAULT_COMPANY.rcs} — ${DEFAULT_COMPANY.address} — ${DEFAULT_COMPANY.email}`;
+// Identité et logo = réglages de l'organisation (`buildCompanyInfo(settings)`, `logo_url`),
+// passés par l'appelant. Aucune entreprise en dur : un réglage absent laisse la mention vide.
+const ASSURANCE_PAR_DEFAUT = 'Couvert par une assurance responsabilité civile professionnelle';
 
 // ============================================================================
 // COULEURS
@@ -106,7 +93,8 @@ const s = StyleSheet.create({
     borderBottomColor: C.orange,
     borderBottomStyle: 'solid',
   },
-  logo: { height: 90, marginTop: -10, marginBottom: -10 },
+  logo: { height: 90, marginTop: -10, marginBottom: -10, objectFit: 'contain' },
+  logoTexte: { fontSize: 16, fontFamily: 'Helvetica-Bold', maxWidth: 240 },
   headerRight: { alignItems: 'flex-end' },
   title: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: C.noir },
   titleCGV: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: C.noir },
@@ -317,27 +305,30 @@ const fmtDate = (d) => {
 // DOCUMENT
 // ============================================================================
 
-function ContractDocument({ data, company }) {
-  // Si `company` est fourni (depuis buildCompanyInfo), mapper vers le format local
-  // attendu (address joint + assurance au lieu de insurance) pour ne pas casser
-  // les références internes.
-  const COMPANY = company
-    ? {
-        name: company.name,
-        legalName: company.legalName,
-        legalForm: company.legalForm,
-        capital: company.capital,
-        rcs: company.rcs,
-        address: `${company.address} – ${company.postalCode} ${company.city}`,
-        phone: company.phone,
-        email: company.email,
-        domain: company.domain,
-        assurance: company.insurance,
-      }
-    : DEFAULT_COMPANY;
-  const LEGAL_FOOTER = company
-    ? `${COMPANY.legalName} — ${COMPANY.legalForm}, capital ${COMPANY.capital} € — ${COMPANY.rcs} — ${COMPANY.address} — ${COMPANY.email}`
-    : DEFAULT_LEGAL_FOOTER;
+function ContractDocument({ data, company, logoSrc }) {
+  // `company` vient de buildCompanyInfo(settings) ; absent, on retombe sur l'identité neutre.
+  const org = company || buildCompanyInfo(null);
+  const COMPANY = {
+    name: org.name,
+    legalName: org.legalName || org.name,
+    legalForm: org.legalForm,
+    capital: org.capital,
+    rcs: org.rcs,
+    address: formatFullAddress(org),
+    phone: org.phone,
+    email: org.email,
+    domain: org.domain,
+    assurance: org.insurance || ASSURANCE_PAR_DEFAUT,
+  };
+  const LEGAL_FOOTER = buildLegalFooter({ ...org, legalName: COMPANY.legalName });
+  // Lignes du bloc « Le prestataire » : une mention non renseignée n'imprime pas de ligne vide.
+  const prestataireLignes = [
+    [COMPANY.legalForm, COMPANY.capital ? `capital ${COMPANY.capital} €` : ''].filter(Boolean).join(', '),
+    COMPANY.address,
+    COMPANY.rcs,
+    COMPANY.phone ? `Tél : ${COMPANY.phone}` : '',
+    COMPANY.email ? `Email : ${COMPANY.email}` : '',
+  ].filter(Boolean).join('\n');
   const {
     contractNumber,
     clientName,
@@ -371,7 +362,7 @@ function ContractDocument({ data, company }) {
         {/* HEADER */}
         <View style={s.header}>
           <View>
-            <Image src={LOGO_BASE64} style={s.logo} />
+            {logoSrc ? <Image src={logoSrc} style={s.logo} /> : <Text style={s.logoTexte}>{COMPANY.name}</Text>}
           </View>
           <View style={s.headerRight}>
             <Text style={s.title}>CONTRAT D&apos;ENTRETIEN</Text>
@@ -404,13 +395,7 @@ function ContractDocument({ data, company }) {
           <View style={s.party}>
             <Text style={s.partyLabel}>Le prestataire</Text>
             <Text style={s.partyName}>{COMPANY.legalName}</Text>
-            <Text style={s.partyDetail}>
-              {COMPANY.legalForm}, capital {COMPANY.capital} €{'\n'}
-              {COMPANY.address}{'\n'}
-              {COMPANY.rcs}{'\n'}
-              Tél : {COMPANY.phone}{'\n'}
-              Email : {COMPANY.email}
-            </Text>
+            <Text style={s.partyDetail}>{prestataireLignes}</Text>
           </View>
           {/* Client */}
           <View style={s.party}>
@@ -487,7 +472,9 @@ function ContractDocument({ data, company }) {
         <View style={s.notes}>
           <Text>
             * Les tarifs mentionnés sont à titre indicatif pour l&apos;année en cours.
-            Pour les années suivantes, consulter les tarifs actualisés sur {COMPANY.domain}.
+            {COMPANY.domain
+              ? ` Pour les années suivantes, consulter les tarifs actualisés sur ${COMPANY.domain}.`
+              : ' Pour les années suivantes, les tarifs actualisés sont communiqués sur demande.'}
           </Text>
           <Text>
             * Dégressivité : -10% sur le total pour 2 équipements, -15% pour 3 et plus.
@@ -537,7 +524,7 @@ function ContractDocument({ data, company }) {
         {/* HEADER */}
         <View style={s.headerCGV}>
           <View>
-            <Image src={LOGO_BASE64} style={s.logo} />
+            {logoSrc ? <Image src={logoSrc} style={s.logo} /> : <Text style={s.logoTexte}>{COMPANY.name}</Text>}
           </View>
           <View style={s.headerRight}>
             <Text style={s.titleCGV}>CONDITIONS GÉNÉRALES</Text>
@@ -649,6 +636,8 @@ function ContractDocument({ data, company }) {
  * @returns {Promise<Blob>}
  */
 export async function generateContractPdfBlob(data, company) {
-  const blob = await pdf(<ContractDocument data={data} company={company} />).toBlob();
+  // Logo de l'organisation (réglage `logo_url`) ; absent ou injoignable ⇒ le nom à la place.
+  const logoSrc = await fetchAsDataUrl(company?.logoUrl);
+  const blob = await pdf(<ContractDocument data={data} company={company} logoSrc={logoSrc} />).toBlob();
   return blob;
 }

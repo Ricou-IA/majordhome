@@ -229,13 +229,13 @@ async function loadOrgBranding(orgId: string): Promise<OrgBranding> {
     .schema("core").from("organizations")
     .select("settings").eq("id", orgId).maybeSingle();
   const s = ((org?.settings as Record<string, unknown> | null) ?? {}) as Record<string, string>;
-  const contactEmail = s.from_email || s.reply_to || "contact@mayer-energie.fr";
+  const contactEmail = s.from_email || s.reply_to || "";
   return {
     fromName: s.from_name || s.brand_name || "Majord'home",
     fromEmail: s.from_email || contactEmail,
     replyTo: s.reply_to || contactEmail,
     brandName: s.brand_name || "Majord'home",
-    websiteUrl: s.website_url || "https://www.mayer-energie.fr",
+    websiteUrl: s.website_url || "",
     pelletsOfferUrl: s.pellets_offer_url || null,
     contactEmail,
     phone: s.phone || "",
@@ -367,7 +367,7 @@ function buildPelletsLink(
   campaignName: string,
   branding: OrgBranding,
 ): string {
-  const baseUrl = branding.pelletsOfferUrl || `${branding.websiteUrl}/offre-pellets`;
+  const baseUrl = branding.pelletsOfferUrl || (branding.websiteUrl ? `${branding.websiteUrl}/offre-pellets` : "");
   const campaignSlug = String(campaignName || "custom")
     .toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
   const utm = `utm_source=emailing&utm_campaign=${encodeURIComponent(campaignSlug)}&utm_medium=email`;
@@ -502,6 +502,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const branding = await loadOrgBranding(orgId);
+    // Pas d'adresse d'expédition dans les réglages de l'organisation ⇒ rien ne part
+    // (jamais l'adresse d'une autre entreprise à la place).
+    if (!branding.fromEmail) return jsonResponse({ error: "no_from_email" }, 409);
 
     // v12 — cap par invocation pour rester sous le wall-clock edge (~150 s).
     // Les destinataires non traités restent éligibles : l'exclusion campagne

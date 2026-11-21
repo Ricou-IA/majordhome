@@ -361,6 +361,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           form.address?.trim() || null,
           form.postal_code?.trim() || null,
           form.city?.trim() || null,
+          orgId,
         ).catch(() => {});
       }
 

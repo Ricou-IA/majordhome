@@ -183,6 +183,15 @@ export function CertificatWizard({
     }
   }, [assignedTechnician]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Certifications de l'entreprise (Paramètres → Organisation) sur un nouveau certificat ──
+  const certificationsOrg = orgSettings?.rge_certifications;
+  useEffect(() => {
+    if (existingCertificat || !Array.isArray(certificationsOrg) || certificationsOrg.length === 0) return;
+    setFormData((prev) => (prev.technicien_certifications?.length
+      ? prev
+      : { ...prev, technicien_certifications: certificationsOrg }));
+  }, [certificationsOrg, existingCertificat]);
+
   // ── Profil de certificat (gabarit) depuis la catégorie ; code inconnu → générique, affiché ──
   const profil = referentiel.profilParCode(formData.equipement_type);
   const codeInconnu = !!formData.equipement_type && !referentielLoading && !referentiel.codeConnu(formData.equipement_type);

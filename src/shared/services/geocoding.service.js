@@ -430,34 +430,20 @@ async function geocodeLeadAddress(address, postalCode, city) {
 }
 
 /**
- * Détecte la zone commerciale (gaillac/pechbonnieu) à partir de coordonnées
- * Utilise les polygones zones cachés dans localStorage par useMapZones
+ * Détecte la zone commerciale d'un point : la clé du centre (réglages de l'organisation,
+ * `settings.territoire_centers`) dont la zone contient le point. Lit les polygones calculés par
+ * useMapZones et gardés dans le navigateur, sous une clé propre à l'organisation.
  *
- * P1.9 — clé localStorage suffixée par orgId. Si orgId n'est pas fourni,
- * fallback : itère sur les clés `territoire-zones-v8:*` du localStorage
- * et prend la première (cas mono-org Mayer aujourd'hui).
+ * Sans `orgId`, ou sans zones en cache pour cette organisation : `null` (jamais les zones d'une autre).
  *
  * @param {number} lat
  * @param {number} lng
- * @param {string} [orgId] - UUID de l'org pour lookup ciblé du cache
- * @returns {'gaillac' | 'pechbonnieu' | null}
+ * @param {string} orgId - organisation (core) du lead
+ * @returns {string|null} clé du centre, ou null
  */
 function detectLeadZone(lat, lng, orgId) {
   try {
-    let cached = null;
-    if (orgId) {
-      cached = localStorage.getItem(`territoire-zones-v8:${orgId}`);
-    }
-    if (!cached) {
-      // Fallback : chercher la première clé territoire-zones-v8:* présente
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('territoire-zones-v8:')) {
-          cached = localStorage.getItem(k);
-          if (cached) break;
-        }
-      }
-    }
+    const cached = orgId ? localStorage.getItem(`territoire-zones-v9:${orgId}`) : null;
     if (!cached) {
       logger.warn('[geocoding] Zones non disponibles en cache — zone non détectée');
       return null;
@@ -465,15 +451,13 @@ function detectLeadZone(lat, lng, orgId) {
 
     const zones = JSON.parse(cached);
     const point = turf.point([lng, lat]);
+    const [siege, ...antennes] = zones.ordre || [];
 
-    // Vérifier Pechbonnieu en premier (plus petite, plus spécifique)
-    if (zones.zone_pechbonnieu && turf.booleanPointInPolygon(point, zones.zone_pechbonnieu)) {
-      return 'pechbonnieu';
+    // Les antennes d'abord (plus petites, plus spécifiques), le siège ensuite
+    for (const key of [...antennes, siege]) {
+      const zone = key ? zones.zones?.[key] : null;
+      if (zone && turf.booleanPointInPolygon(point, zone)) return key;
     }
-    if (zones.zone_gaillac && turf.booleanPointInPolygon(point, zones.zone_gaillac)) {
-      return 'gaillac';
-    }
-
     return null;
   } catch (error) {
     logger.error('[geocoding] Erreur detectLeadZone:', error);
@@ -515,7 +499,7 @@ const _commercialZoneCache = {};
 
 /**
  * Résout le commercial assigné à une zone depuis la table majordhome.commercials
- * @param {string} zone - Nom de zone ('gaillac', 'pechbonnieu', etc.)
+ * @param {string} zone - Clé du centre (réglages de l'organisation)
  * @returns {{ id: string, full_name: string } | null}
  */
 async function resolveCommercialByZone(zone) {
@@ -550,8 +534,9 @@ async function resolveCommercialByZone(zone) {
  * @param {string|null} address
  * @param {string|null} postalCode
  * @param {string|null} city
+ * @param {string} [orgId] - organisation (core) du lead : ses zones, pas celles d'une autre
  */
-export async function geocodeAndAssignLead(leadId, address, postalCode, city) {
+export async function geocodeAndAssignLead(leadId, address, postalCode, city, orgId) {
   // 1. Géocoder
   const coords = await geocodeLeadAddress(address, postalCode, city);
   if (!coords) {
@@ -559,7 +544,7 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city) {
   }
 
   // 2. Détecter zone
-  const zone = detectLeadZone(coords.lat, coords.lng);
+  const zone = detectLeadZone(coords.lat, coords.lng, orgId);
 
   // 3. Mettre à jour coordonnées + zone
   await updateLeadCoordinates(leadId, coords.lat, coords.lng, zone);
@@ -601,7 +586,7 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city) {
  * @param {function} onProgress - Callback (processed, total)
  * @returns {{ success: number, failed: number, assigned: number }}
  */
-export async function batchGeocodeLeads(leads, onProgress) {
+export async function batchGeocodeLeads(leads, onProgress, orgId) {
   const results = { success: 0, failed: 0, assigned: 0 };
   const DELAY_MS = 200; // Rate limit API adresse.data.gouv.fr
 
@@ -622,7 +607,7 @@ export async function batchGeocodeLeads(leads, onProgress) {
       }
 
       // 2. Détecter zone
-      const zone = detectLeadZone(coords.lat, coords.lng);
+      const zone = detectLeadZone(coords.lat, coords.lng, orgId);
 
       // 3. Mettre à jour coordonnées + zone
       const { success } = await updateLeadCoordinates(lead.id, coords.lat, coords.lng, zone);

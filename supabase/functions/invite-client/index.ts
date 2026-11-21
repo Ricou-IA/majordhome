@@ -3,7 +3,7 @@
 // ============================================================================
 //
 // Crée un compte client avec mot de passe temporaire et envoie un email
-// d'invitation brandé Mayer Energie via Resend.
+// d'invitation aux couleurs de l'organisation du client via Resend.
 //
 // Flow :
 //   1. Vérifie le JWT artisan + membership org
@@ -25,15 +25,11 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 
-// P0.15 — Fallback Mayer si pas de settings org chargées. Le multi-tenant
-// charge core.organizations.settings au runtime (cf. plus bas).
+// Identité de l'expéditeur = réglages de l'organisation du client (core.organizations.settings),
+// chargés plus bas. Aucune valeur d'une entreprise par défaut : sans adresse d'expédition,
+// l'invitation est refusée (`no_from_email`) avant toute création de compte.
 const DEFAULT_PORTAL_URL = "https://majordhome.vercel.app";
-const DEFAULT_FROM_EMAIL = "Mayer Energie <contact@mayer-energie.fr>";
-const DEFAULT_BRAND_NAME = "Mayer Energie";
-const DEFAULT_LOGO_URL = "https://www.mayer-energie.fr/images/logo-email.png";
-const DEFAULT_PHONE = "05 63 33 23 14";
-const DEFAULT_LOCATION = "Gaillac (81)";
-const DEFAULT_CONTACT_EMAIL = "contact@mayer-energie.fr";
+const DEFAULT_BRAND_NAME = "Votre entreprise";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -81,7 +77,7 @@ function buildInviteEmail(
 <tr><td align="center">
 <table width="580" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
 <tr><td style="background:linear-gradient(135deg,#1e3a5f 0%,#2d5a8e 100%);padding:28px 40px;text-align:center;">
-<img src="${logoUrl}" alt="${brandName}" width="180" style="display:block;margin:0 auto 12px;max-width:180px;height:auto;" />
+${logoUrl ? `<img src="${logoUrl}" alt="${brandName}" width="180" style="display:block;margin:0 auto 12px;max-width:180px;height:auto;" />` : `<p style="margin:0 0 12px;color:#ffffff;font-size:22px;font-weight:700;">${brandName}</p>`}
 <p style="margin:0;color:rgba(255,255,255,0.7);font-size:13px;">Espace Client</p>
 </td></tr>
 <tr><td style="padding:36px 40px 20px;">
@@ -115,7 +111,7 @@ function buildInviteEmail(
 </td></tr>
 <tr><td style="background-color:#f8f9fb;padding:24px 40px;text-align:center;border-top:1px solid #eee;">
 <p style="margin:0 0 4px;color:#888;font-size:12px;">${brandName}</p>
-<p style="margin:0;color:#aaa;font-size:11px;">${location} \u00b7 ${phone} \u00b7 ${contactEmail}</p>
+<p style="margin:0;color:#aaa;font-size:11px;">${[location, phone, contactEmail].filter(Boolean).join(" \u00b7 ")}</p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -181,18 +177,18 @@ Deno.serve(async (req: Request) => {
     const orgSettings = (org?.settings as Record<string, string | null> | null) || {};
     const brandName = orgSettings.brand_name || org?.name || DEFAULT_BRAND_NAME;
     const fromName = orgSettings.from_name || brandName;
-    const fromEmail = orgSettings.from_email
-      ? `${fromName} <${orgSettings.from_email}>`
-      : DEFAULT_FROM_EMAIL;
+    if (!orgSettings.from_email)
+      return jsonResponse({ error: "no_from_email" }, 409);
+    const fromEmail = `${fromName} <${orgSettings.from_email}>`;
     const portalUrl = orgSettings.portal_url || DEFAULT_PORTAL_URL;
-    const logoUrl = orgSettings.logo_url || DEFAULT_LOGO_URL;
-    const orgPhone = orgSettings.phone || DEFAULT_PHONE;
+    const logoUrl = orgSettings.logo_url || "";
+    const orgPhone = orgSettings.phone || "";
     const orgCity = orgSettings.city;
     const orgPostalCode = orgSettings.postal_code;
     const location = orgCity && orgPostalCode
       ? `${orgCity} (${orgPostalCode.toString().slice(0, 2)})`
-      : DEFAULT_LOCATION;
-    const contactEmail = orgSettings.from_email || DEFAULT_CONTACT_EMAIL;
+      : "";
+    const contactEmail = orgSettings.reply_to || orgSettings.from_email;
 
     const displayName =
       [client.first_name, client.last_name].filter(Boolean).join(" ") ||
@@ -266,7 +262,7 @@ Deno.serve(async (req: Request) => {
           to: client.email,
           subject: `Votre espace client ${brandName} est pret`,
           html: emailHtml,
-          reply_to: "contact@mayer-energie.fr",
+          reply_to: contactEmail,
         }),
       });
       const resendResult = await resendRes.json();

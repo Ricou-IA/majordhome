@@ -1,8 +1,8 @@
 // ============================================================================
-// Mailing Unsubscribe Handler — Mayer Mailing
+// Mailing Unsubscribe Handler
 // ============================================================================
 // 2 canaux :
-//   GET  ?token=xxx → redirect vers mayer-energie.fr/desabonnement?unsub=ok
+//   GET  ?token=xxx → redirect vers la page de désabonnement de l'organisation (?unsub=ok), sinon page neutre
 //   POST ?token=xxx → JSON response (appel depuis la page Next.js + RFC 8058)
 // ============================================================================
 
@@ -86,8 +86,21 @@ async function applyUnsubscribe(payload: TokenPayload, reason: string) {
 }
 
 // P0.16 — Multi-tenant : charger l'URL de landing depuis settings org du destinataire.
-// Fallback Mayer si payload absent ou org settings non configurées.
-const DEFAULT_LANDING_URL = "https://www.mayer-energie.fr/desabonnement";
+// Sans page de désabonnement réglée (`settings.unsubscribe_landing_url`) ou sans destinataire
+// identifiable : une page neutre servie ici, jamais le site d'une autre entreprise.
+const DEFAULT_LANDING_URL = "";
+
+function pageNeutre(ok: boolean): Response {
+  const titre = ok ? "Vous êtes désabonné" : "Lien de désabonnement invalide";
+  const texte = ok
+    ? "Vous ne recevrez plus nos e-mails d'information. Vous pouvez fermer cette page."
+    : "Ce lien n'est plus valable. Répondez à l'e-mail reçu pour demander votre désabonnement.";
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${titre}</title></head><body style="margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6f9;color:#1a1a1a"><main style="max-width:480px;margin:15vh auto;padding:32px;background:#fff;border-radius:12px"><h1 style="font-size:20px;margin:0 0 12px">${titre}</h1><p style="margin:0;line-height:1.5;color:#4a4a4a">${texte}</p></main></body></html>`;
+  return new Response(html, {
+    status: ok ? 200 : 400,
+    headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+  });
+}
 
 async function getUnsubscribeLandingUrl(payload: TokenPayload | null): Promise<string> {
   if (!payload) return DEFAULT_LANDING_URL;
@@ -146,9 +159,10 @@ Deno.serve(async (req: Request) => {
     if (req.method === "GET") {
       const landingUrl = await getUnsubscribeLandingUrl(verif.payload || null);
       if (!verif.ok || !verif.payload) {
-        return Response.redirect(landingUrl, 302);
+        return landingUrl ? Response.redirect(landingUrl, 302) : pageNeutre(false);
       }
       await applyUnsubscribe(verif.payload, "user_request");
+      if (!landingUrl) return pageNeutre(true);
       const sep = landingUrl.includes("?") ? "&" : "?";
       return Response.redirect(`${landingUrl}${sep}unsub=ok`, 302);
     }
@@ -166,9 +180,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "method_not_allowed" }, 405);
   } catch (err) {
     console.error("[mailing-unsubscribe] Unhandled:", err);
-    if (req.method === "GET") {
-      return Response.redirect(DEFAULT_LANDING_URL, 302);
-    }
+    if (req.method === "GET") return pageNeutre(false);
     return jsonResponse({ error: "internal_error" }, 500);
   }
 });

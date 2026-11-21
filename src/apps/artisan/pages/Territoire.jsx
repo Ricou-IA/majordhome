@@ -119,7 +119,8 @@ export default function Territoire() {
 
       const results = await geocodingService.batchGeocodeLeads(
         result.data,
-        (current, total) => setLeadBatchProgress({ current, total })
+        (current, total) => setLeadBatchProgress({ current, total }),
+        orgId,
       );
 
       const parts = [`${results.success} géocodés`];

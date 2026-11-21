@@ -220,7 +220,8 @@ export function getEmptyFormData() {
     // Technicien
     technicien_id: null,
     technicien_nom: '',
-    technicien_certifications: ['QualiPAC', 'QualiBois'],
+    // Certifications de l'entreprise : posées par l'assistant depuis les réglages de l'organisation.
+    technicien_certifications: [],
     technicien_num_fgaz: '',
 
     // Données entretien

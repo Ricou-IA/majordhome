@@ -3,7 +3,7 @@
  * Carte interactive Mapbox affichant les zones territoire et points CRM
  *
  * Fonctionnalités :
- * - Zones isochrones Gaillac / Pechbonnieu (fill + outline)
+ * - Zones isochrones des centres de l'organisation (fill + outline)
  * - Points CRM clusterisés par type (client, contrat, lead)
  * - Popup détaillé au clic sur un point
  * - Panneau de filtres flottant
@@ -48,6 +48,10 @@ export default function TerritoireMap({
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  // Couches, sources et écouteurs des zones posés sur la carte (retirés avant chaque nouveau tracé)
+  const zoneLayersRef = useRef([]);
+  const zoneSourcesRef = useRef([]);
+  const zoneHandlersRef = useRef([]);
 
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState(null);
@@ -173,7 +177,7 @@ export default function TerritoireMap({
         font-size: 16px;
         cursor: pointer;
       `;
-      el.textContent = center.emoji;
+      el.textContent = center.emoji || '📍';
 
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([center.lng, center.lat])
@@ -181,8 +185,8 @@ export default function TerritoireMap({
           new mapboxgl.Popup({ offset: 25, closeButton: false })
             .setHTML(`
               <div style="padding: 8px;">
-                <p style="font-weight: 600; font-size: 14px; margin: 0 0 4px;">${center.label}</p>
-                <p style="font-size: 12px; color: #6b7280; margin: 0;">${center.description}</p>
+                <p style="font-weight: 600; font-size: 14px; margin: 0 0 4px;">${center.label || ''}</p>
+                <p style="font-size: 12px; color: #6b7280; margin: 0;">${center.description || ''}</p>
               </div>
             `)
         )
@@ -200,25 +204,24 @@ export default function TerritoireMap({
     if (!mapLoaded || !mapRef.current) return;
     const map = mapRef.current;
 
-    // Nettoyer les anciennes couches
-    ['zone-principale-line', 'zone-gaillac-fill', 'zone-gaillac-line', 'zone-pechbonnieu-fill', 'zone-pechbonnieu-line'].forEach(id => {
-      if (map.getLayer(id)) map.removeLayer(id);
-    });
-    ['zone-principale', 'zone-gaillac', 'zone-pechbonnieu'].forEach(id => {
-      if (map.getSource(id)) map.removeSource(id);
-    });
+    // Nettoyer les couches posées au passage précédent (les centres peuvent avoir changé)
+    zoneHandlersRef.current.forEach(({ layerId, type, handler }) => map.off(type, layerId, handler));
+    zoneHandlersRef.current = [];
+    zoneLayersRef.current.forEach((id) => { if (map.getLayer(id)) map.removeLayer(id); });
+    zoneSourcesRef.current.forEach((id) => { if (map.getSource(id)) map.removeSource(id); });
+    zoneLayersRef.current = [];
+    zoneSourcesRef.current = [];
 
     if (!zones || !showZones || !hasOrgCenters) return;
 
-    const centers = orgCenters;
+    const poserSource = (id, data) => { map.addSource(id, { type: 'geojson', data }); zoneSourcesRef.current.push(id); };
+    const poserCouche = (couche) => { map.addLayer(couche); zoneLayersRef.current.push(couche.id); };
+    const ecouter = (type, layerId, handler) => { map.on(type, layerId, handler); zoneHandlersRef.current.push({ layerId, type, handler }); };
 
     // Zone principale (outline pointillé — périmètre global d'intervention)
     if (zones.zone_principale) {
-      map.addSource('zone-principale', {
-        type: 'geojson',
-        data: zones.zone_principale,
-      });
-      map.addLayer({
+      poserSource('zone-principale', zones.zone_principale);
+      poserCouche({
         id: 'zone-principale-line',
         type: 'line',
         source: 'zone-principale',
@@ -231,74 +234,28 @@ export default function TerritoireMap({
       });
     }
 
-    // Zone Gaillac
-    if (zones.zone_gaillac) {
-      map.addSource('zone-gaillac', {
-        type: 'geojson',
-        data: zones.zone_gaillac,
-      });
-      map.addLayer({
-        id: 'zone-gaillac-fill',
+    // Une zone par centre des réglages (siège puis antennes), à la couleur du centre
+    (zones.ordre || []).forEach((key) => {
+      const zone = zones.zones?.[key];
+      if (!zone) return;
+      const couleur = orgCenters[key]?.color || '#64748b';
+      const source = `zone-centre-${key}`;
+      poserSource(source, zone);
+      poserCouche({
+        id: `${source}-fill`,
         type: 'fill',
-        source: 'zone-gaillac',
-        paint: {
-          'fill-color': centers.gaillac.color,
-          'fill-opacity': 0.12,
-        },
+        source,
+        paint: { 'fill-color': couleur, 'fill-opacity': 0.12 },
       });
-      map.addLayer({
-        id: 'zone-gaillac-line',
+      poserCouche({
+        id: `${source}-line`,
         type: 'line',
-        source: 'zone-gaillac',
-        paint: {
-          'line-color': centers.gaillac.color,
-          'line-width': 2.5,
-          'line-opacity': 0.7,
-        },
+        source,
+        paint: { 'line-color': couleur, 'line-width': 2.5, 'line-opacity': 0.7 },
       });
-    }
-
-    // Zone Pechbonnieu
-    if (zones.zone_pechbonnieu) {
-      map.addSource('zone-pechbonnieu', {
-        type: 'geojson',
-        data: zones.zone_pechbonnieu,
-      });
-      map.addLayer({
-        id: 'zone-pechbonnieu-fill',
-        type: 'fill',
-        source: 'zone-pechbonnieu',
-        paint: {
-          'fill-color': centers.pechbonnieu.color,
-          'fill-opacity': 0.12,
-        },
-      });
-      map.addLayer({
-        id: 'zone-pechbonnieu-line',
-        type: 'line',
-        source: 'zone-pechbonnieu',
-        paint: {
-          'line-color': centers.pechbonnieu.color,
-          'line-width': 2.5,
-          'line-opacity': 0.7,
-        },
-      });
-    }
-
-    // Click sur zone
-    ['zone-gaillac-fill', 'zone-pechbonnieu-fill'].forEach(layerId => {
-      if (map.getLayer(layerId)) {
-        map.on('click', layerId, () => {
-          const zone = layerId.includes('gaillac') ? 'gaillac' : 'pechbonnieu';
-          onZoneClick?.(zone);
-        });
-        map.on('mouseenter', layerId, () => {
-          map.getCanvas().style.cursor = 'pointer';
-        });
-        map.on('mouseleave', layerId, () => {
-          map.getCanvas().style.cursor = '';
-        });
-      }
+      ecouter('click', `${source}-fill`, () => onZoneClick?.(key));
+      ecouter('mouseenter', `${source}-fill`, () => { map.getCanvas().style.cursor = 'pointer'; });
+      ecouter('mouseleave', `${source}-fill`, () => { map.getCanvas().style.cursor = ''; });
     });
   }, [mapLoaded, zones, showZones, onZoneClick, orgCenters, hasOrgCenters]);
 
