@@ -93,7 +93,10 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
   const [clientMode, setClientMode] = useState('search');
   const [selectedClient, setSelectedClient] = useState(null);
   const [newClientData, setNewClientData] = useState(INITIAL_CLIENT_DATA);
-  const [contractData, setContractData] = useState(INITIAL_CONTRACT_DATA);
+  // Mois de maintenance proposé par l'appelant (depuis un chantier : le mois du PV de réception).
+  // Proposé seulement : le champ reste modifiable.
+  const moisPropose = contractDefaults?.maintenanceMonth || '';
+  const [contractData, setContractData] = useState({ ...INITIAL_CONTRACT_DATA, maintenanceMonth: moisPropose });
   const [duplicateAcknowledged, setDuplicateAcknowledged] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -164,7 +167,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
         setSelectedClient(null);
       }
       setNewClientData(INITIAL_CLIENT_DATA);
-      setContractData(INITIAL_CONTRACT_DATA);
+      setContractData({ ...INITIAL_CONTRACT_DATA, maintenanceMonth: moisPropose });
       setDuplicateAcknowledged(false);
       setSearchQuery('');
       clearSearch();

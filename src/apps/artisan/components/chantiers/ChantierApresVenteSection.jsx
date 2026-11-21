@@ -17,7 +17,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useChantiersApresVente, useDemanderAvisPose } from '@hooks/useChantiers';
 import { contractsService } from '@services/contracts.service';
 import {
-  reperesApresVente, blocageAvis, messageAvisEnvoye, messageAvisRefuse,
+  reperesApresVente, blocageAvis, messageAvisEnvoye, messageAvisRefuse, moisDuPv,
 } from '@/lib/chantierApresVente';
 import { CreateContractModal } from '../entretiens/CreateContractModal';
 
@@ -142,7 +142,8 @@ export function ChantierApresVenteSection({ chantier, onUpdated, peutAgir = true
           }}
           preSelectedClient={clientForContract}
           preSelectedEquipmentTypeId={chantier.equipment_type_id || null}
-          contractDefaults={{ status: 'pending', workflowStatus: 'nouveau', source: 'chantier' }}
+          // Mois de maintenance proposé = mois du PV de réception (anniversaire de l'installation).
+          contractDefaults={{ status: 'pending', workflowStatus: 'nouveau', source: 'chantier', maintenanceMonth: moisDuPv(chantier) }}
         />
       )}
     </div>

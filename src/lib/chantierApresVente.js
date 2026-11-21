@@ -58,6 +58,21 @@ export function contratsParClient(lignes) {
  * @property {string} titre     l'état en toutes lettres (infobulle, fiche)
  */
 
+/**
+ * Mois anniversaire de l'installation, proposé comme « mois de maintenance » du contrat
+ * d'entretien : le mois où le PV de réception a été signé (heure de Paris). Un PV signé sur
+ * tablette, ou une réception validée sans PV, n'a pas d'horodatage : c'est alors le mois de la
+ * réception (`realized_date`). Rien de connu ⇒ `null`, le champ reste à choisir.
+ * @param {{ pv_signed_at?: string|null, realized_date?: string|null }|null|undefined} chantier
+ * @returns {number|null} 1 à 12
+ */
+export function moisDuPv(chantier) {
+  const jour = (chantier?.pv_signed_at && jourDeParis(chantier.pv_signed_at)) || String(chantier?.realized_date ?? '');
+  const m = /^\d{4}-(\d{2})-\d{2}/.exec(jour);
+  const mois = m ? Number(m[1]) : NaN;
+  return mois >= 1 && mois <= 12 ? mois : null;
+}
+
 /** PV de réception : archivé ou signé en ligne = fait ; envoyé au client = en cours. */
 export function reperePv(chantier) {
   const signe = Boolean(chantier?.pv_reception_path || chantier?.pv_signed_at);

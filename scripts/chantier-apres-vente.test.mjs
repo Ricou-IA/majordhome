@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   enApresVente, etatContrat, contratsParClient, reperePv, reperesApresVente, blocageAvis, CAMPAGNE_AVIS_POSE,
-  messageAvisEnvoye, messageAvisRefuse, suiteDesReserves, reponseReservesNonEnregistree,
+  messageAvisEnvoye, messageAvisRefuse, suiteDesReserves, reponseReservesNonEnregistree, moisDuPv,
 } from '../src/lib/chantierApresVente.js';
 import { getSmsCampaign } from '../src/lib/smsCampaigns.js';
 
@@ -142,4 +142,20 @@ test('suite des réserves : sans réserves, sans signature en ligne, ou PV table
   assert.equal(suiteDesReserves({ pv_signed_at: 'x', pv_avec_reserves: false }, { reception_type: 'sans_reserves' }), 'aucune');
   assert.equal(suiteDesReserves({ pv_avec_reserves: true, pv_reception_path: 'p' }, { reception_type: 'avec_reserves' }), 'aucune');
   assert.equal(suiteDesReserves(null, { reception_type: 'avec_reserves' }), 'aucune');
+});
+
+test('moisDuPv — le mois où le PV a été signé, à l’heure de Paris', () => {
+  assert.equal(moisDuPv({ pv_signed_at: '2026-11-20T22:45:00Z' }), 11);
+  // 31 octobre à 23 h 30 UTC = 1er novembre à Paris : c'est novembre.
+  assert.equal(moisDuPv({ pv_signed_at: '2026-10-31T23:30:00Z' }), 11);
+  // La signature en ligne prime sur la date de réception.
+  assert.equal(moisDuPv({ pv_signed_at: '2026-03-02T09:00:00Z', realized_date: '2026-02-27' }), 3);
+});
+
+test('moisDuPv — sans signature en ligne : le mois de la réception, sinon rien', () => {
+  assert.equal(moisDuPv({ pv_reception_path: 'o/pv/x.pdf', realized_date: '2026-09-23' }), 9);
+  assert.equal(moisDuPv({ realized_date: '2026-01-05' }), 1);
+  assert.equal(moisDuPv({ pv_signed_at: null, realized_date: null }), null);
+  assert.equal(moisDuPv({ pv_signed_at: 'pas une date' }), null);
+  assert.equal(moisDuPv(null), null);
 });

@@ -139,6 +139,8 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   const isTechnicien = effectiveRole === 'technicien';
   const isOwner = chantier.assigned_user_id === user?.id;
   const canEditChantier = canEditAll || isOwner;
+  // Réceptionné ou facturé : le chantier est terminé (Eric 2026-11-21 : appros et planification n'ont plus de sens).
+  const receptionne = enApresVente(chantier);
 
   // Technicien : seulement planification → réalisé
   const allTransitions = CHANTIER_TRANSITIONS[chantier.chantier_status] || [];
@@ -325,8 +327,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
             )}
           </div>
 
-          {/* Section réception marchandise (devis Pennylane ligne par ligne) */}
-          {!isTechnicien && (
+          {/* Section réception marchandise (devis Pennylane ligne par ligne).
+              Chantier réceptionné : plus rien à commander ni à recevoir, la section disparaît. */}
+          {!isTechnicien && !receptionne && (
             <>
               <ChantierReceptionSection
                 chantier={chantier}
@@ -339,15 +342,18 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
           )}
           </>)}
 
-          {/* Section installation (Bloc B stage 4 : jours = appointments `installation`) */}
+          {/* Section installation (Bloc B stage 4 : jours = appointments `installation`).
+              Chantier réceptionné : on ne planifie plus ; les jours de pose restent lisibles, sans geste. */}
+          {(!receptionne || installAppointments.length > 0) && (
             <ChantierInterventionSection
               appointments={installAppointments}
               plannedOrder={plannedOrder}
               onSchedule={() => setShowScheduler(true)}
               onDeleteAppointment={handleDeleteInstallAppointment}
               provisoire={poseProvisoire(chantier)}
-              disabled={!canEditChantier}
+              disabled={!canEditChantier || receptionne}
             />
+          )}
 
           {/* PV de réception — visible dès que la pose est planifiée */}
           {['planification', 'realise', 'facture'].includes(chantier.chantier_status) && (
