@@ -23,6 +23,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -128,6 +129,17 @@ export default function Planning() {
     calendarRef, moveAppointment, ouvrirCreation, ouvrirEdition,
   });
   const nouveauRdv = useCallback(() => ouvrirCreation(creneauParDefaut()), [ouvrirCreation]);
+
+  // Création directe (?nouveau=1, menu « Créer ») : ouvre la fenêtre de RDV puis retire
+  // le paramètre, pour qu'un rechargement ne la rouvre pas.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('nouveau') !== '1') return;
+    if (canCreateAppointment) nouveauRdv();
+    const next = new URLSearchParams(searchParams);
+    next.delete('nouveau');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, canCreateAppointment, nouveauRdv]);
 
   // Charge de la plage visible : état de chaque journée de technicien, lignes sous
   // l'en-tête du jour, CA HT programmé (règles : src/lib/planningCharge.js et

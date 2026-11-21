@@ -367,6 +367,15 @@ export function Clients() {
     setShowCreateModal(true);
   }, []);
 
+  // Création directe (?new=1, menu « Créer ») : ouvre la fenêtre puis retire le paramètre.
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    if (canCreateClient) setShowCreateModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, canCreateClient]);
+
   // Callback après création réussie : naviguer vers la fiche client
   const handleClientCreated = useCallback((newClient) => {
     setShowCreateModal(false);

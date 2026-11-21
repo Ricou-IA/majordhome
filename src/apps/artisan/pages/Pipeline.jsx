@@ -65,6 +65,18 @@ export default function Pipeline() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  // Ouverture directe d'un lead (?lead=<id>) : recherche globale, mémo vocal. Même
+  // principe : la fiche s'ouvre, le paramètre est retiré de l'URL.
+  useEffect(() => {
+    const leadId = searchParams.get('lead');
+    if (!leadId) return;
+    setSelectedLeadId(leadId);
+    setModalOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('lead');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   // Handlers modale
   const handleLeadClick = (lead, options) => {
     setSelectedLeadId(lead.id);

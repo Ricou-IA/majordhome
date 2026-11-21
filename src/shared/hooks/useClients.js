@@ -453,7 +453,7 @@ export function useClientSearch(orgId, { debounceMs = 300, minChars = 2 } = {}) 
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, debounceMs);
 
-  const { data: results, isLoading: searching } = useQuery({
+  const { data: results, isLoading: searching, error } = useQuery({
     queryKey: clientKeys.search(orgId, debouncedQuery),
     queryFn: async () => {
       const { data, error } = await clientsService.searchClients(orgId, debouncedQuery);
@@ -473,6 +473,8 @@ export function useClientSearch(orgId, { debounceMs = 300, minChars = 2 } = {}) 
     query,
     results: results || [],
     searching,
+    // Recherche en échec : à dire à l'écran, des résultats vides ne veulent pas dire « personne ».
+    error: error || null,
     search,
     clear,
   };

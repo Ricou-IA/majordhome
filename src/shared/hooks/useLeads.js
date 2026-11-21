@@ -466,7 +466,7 @@ export function useLeadSearch(orgId, { debounceMs = 300, minChars = 2, statusIds
     return () => clearTimeout(timer);
   }, [query, debounceMs]);
 
-  const { data: results, isLoading: searching } = useQuery({
+  const { data: results, isLoading: searching, error } = useQuery({
     queryKey: leadKeys.search(orgId, debouncedQuery, statusIds),
     queryFn: async () => {
       const { data, error } = await leadsService.searchLeads(orgId, debouncedQuery, 10, statusIds);
@@ -487,6 +487,8 @@ export function useLeadSearch(orgId, { debounceMs = 300, minChars = 2, statusIds
     query,
     results: results || [],
     searching,
+    // Recherche en échec : à dire à l'écran, des résultats vides ne veulent pas dire « personne ».
+    error: error || null,
     search,
     clear,
   };

@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { moduleActif, peutOuvrirParametres } from '@/lib/modules';
 import { grouperMenu, etatDuGroupe, lirePreferencesMenu } from '@/lib/menuGroupes';
+import { actionsCreer } from '@/lib/rechercheGlobale';
+import { RechercheGlobale } from '@components/navigation/RechercheGlobale';
+import { MenuCreer } from '@components/navigation/MenuCreer';
 import { vocabulaire } from '@/lib/maintenance/vocabulaire';
 import { AppUpdateWatcher } from '@components/AppUpdateWatcher';
 import {
@@ -33,6 +36,7 @@ import {
   Snowflake,
   ClipboardList,
   ChevronDown,
+  Search,
 } from 'lucide-react';
 import { chantierGaillacVisible } from '@apps/chantier-gaillac/config';
 
@@ -111,6 +115,33 @@ export default function AppLayout() {
   const cleReplisMenu = user?.id ? `menu-groupes:${user.id}` : null;
   const [replisMenu, setReplisMenu] = useState(() => lireReplisMenu(cleReplisMenu));
 
+  // Recherche globale (Ctrl K ou ⌘ K, bouton du menu) et menu « Créer ». Clients, leads et
+  // RDV appartiennent au CRM : une entreprise sans ce module ne cherche que des pages.
+  const [rechercheOuverte, setRechercheOuverte] = useState(false);
+  const crmActif = moduleActif(orgSettings, 'crm');
+  const pagesDuMenu = [
+    ...groupesDuMenu.flatMap((groupe) => groupe.items).map((item) => ({
+      name: item.module === 'maintenance' ? vocabulaire(orgSettings).module : item.name,
+      href: item.href,
+    })),
+    ...(peutOuvrirReglages ? [{ name: 'Paramètres', href: '/settings' }] : []),
+  ];
+  const creations = actionsCreer({
+    rdv: crmActif && can('planning', 'create'),
+    lead: crmActif && can('pipeline', 'create'),
+    client: crmActif && can('clients', 'create'),
+  });
+  useEffect(() => {
+    const surTouche = (e) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setRechercheOuverte(true);
+      }
+    };
+    window.addEventListener('keydown', surTouche);
+    return () => window.removeEventListener('keydown', surTouche);
+  }, []);
+
   // ===========================================================================
   // HANDLERS
   // ===========================================================================
@@ -123,6 +154,12 @@ export default function AppLayout() {
     } catch {
       // Stockage indisponible (navigation privée) : le choix vaut pour cette visite.
     }
+  };
+
+  const ouvrirRecherche = () => {
+    setSidebarOpen(false);
+    setUserMenuOpen(false);
+    setRechercheOuverte(true);
   };
 
   const handleSignOut = async () => {
@@ -205,6 +242,20 @@ export default function AppLayout() {
           </div>
         </div>
       )}
+
+      {/* Recherche (Ctrl K) et création rapide, d'où que l'on soit */}
+      <div className="flex items-center gap-2 px-4 pt-4">
+        <button
+          type="button"
+          onClick={ouvrirRecherche}
+          title="Rechercher un client, un lead, une page (Ctrl K)"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-secondary-800 px-3 py-2.5 lg:py-2 text-sm text-secondary-300 hover:bg-secondary-700 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary-500"
+        >
+          <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="truncate">Rechercher</span>
+        </button>
+        <MenuCreer actions={creations} onNaviguer={closeSidebar} />
+      </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 overflow-y-auto">
@@ -377,7 +428,7 @@ export default function AppLayout() {
             affiché en permanence (lg, tablettes comprises), il n'a plus rien à porter — le
             profil est au pied du menu — et la page gagne sa hauteur. */}
         <header className="sticky top-0 z-30 bg-white border-b border-secondary-200 lg:hidden">
-          <div className="flex items-center h-14 px-3 sm:px-6">
+          <div className="flex items-center justify-between h-14 px-3 sm:px-6">
             {/* Menu burger mobile */}
             <button
               onClick={() => setSidebarOpen(true)}
@@ -387,6 +438,13 @@ export default function AppLayout() {
             >
               <Menu className="w-6 h-6" />
             </button>
+            <button
+              onClick={ouvrirRecherche}
+              aria-label="Rechercher un client, un lead, une page"
+              className="h-11 w-11 -mr-1 flex items-center justify-center rounded-lg text-secondary-600 hover:bg-secondary-100"
+            >
+              <Search className="w-6 h-6" />
+            </button>
           </div>
         </header>
 
@@ -395,6 +453,16 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {rechercheOuverte && (
+        <RechercheGlobale
+          orgId={organization?.id}
+          peutChercherClients={crmActif && can('clients', 'view')}
+          peutChercherLeads={crmActif && can('pipeline', 'view')}
+          pages={pagesDuMenu}
+          onClose={() => setRechercheOuverte(false)}
+        />
+      )}
 
       {/* Nouvelle version déployée : bouton « Mettre à jour », rechargement au changement de page */}
       <AppUpdateWatcher />
