@@ -8,6 +8,7 @@ const COMPLETE = {
   address: '26 rue des Pyrénées', postal_code: '81600', city: 'Gaillac', phone: '05 63 33 23 14',
   logo_url: 'https://exemple.fr/logo.png', from_email: 'contact@exemple.fr',
   territoire_centers: { siege: { label: 'Siège', lat: 43.9, lng: 1.9 } },
+  devis: { familles: [{ key: 'vmc', actif: true }, { key: 'autre', actif: true }] },
 };
 const fait = (s) => Object.fromEntries(etapesDeDemarrage(s).map((e) => [e.cle, e.fait]));
 
@@ -35,4 +36,9 @@ test('l’adresse d’envoi n’est proposée qu’avec le module Communication'
   const ferme = etapesDeDemarrage({ ...COMPLETE, from_email: '', modules: { communication: false } });
   assert.equal(ouvert.find((e) => e.cle === 'expediteur')?.fait, false);
   assert.equal(ferme.find((e) => e.cle === 'expediteur'), undefined);
+});
+
+test('« Autre » seul ne compte pas comme une activité renseignée', () => {
+  assert.equal(fait({ ...COMPLETE, devis: { familles: [{ key: 'autre', actif: true }] } }).activite, false);
+  assert.equal(fait(COMPLETE).activite, true);
 });

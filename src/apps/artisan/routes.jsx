@@ -29,7 +29,7 @@ const PricingSettings = lazy(() => import('./pages/settings/PricingSettings'));
 const OrganizationSettings = lazy(() => import('./pages/settings/OrganizationSettings'));
 const SolaireSettings = lazy(() => import('./pages/settings/SolaireSettings'));
 const ThermiqueSettings = lazy(() => import('./pages/settings/ThermiqueSettings'));
-const EquipementsSettings = lazy(() => import('./pages/settings/EquipementsSettings'));
+const ActiviteSettings = lazy(() => import('./pages/settings/ActiviteSettings'));
 const TourneesSettings = lazy(() => import('./pages/settings/TourneesSettings'));
 const FumisterieSettings = lazy(() => import('./pages/settings/FumisterieSettings'));
 const EmailsSettings = lazy(() => import('./pages/settings/EmailsSettings'));
@@ -79,7 +79,6 @@ const MaintenanceSettings = lazy(() => import('./pages/settings/MaintenanceSetti
 const ClimDimensionnement = lazy(() => import('@apps/clim/pages/Dimensionnement'));
 const ClimSettings = lazy(() => import('./pages/settings/ClimSettings'));
 const DevisSettings = lazy(() => import('./pages/settings/DevisSettings'));
-const TypesProjetSettings = lazy(() => import('./pages/settings/TypesProjetSettings'));
 const WebshopSettings = lazy(() => import('./pages/settings/WebshopSettings'));
 
 // Thermique (étude de déperditions)
@@ -389,12 +388,21 @@ export const artisanRoutes = [
     ),
   },
   {
-    path: 'settings/equipements',
+    path: 'settings/activite',
     element: (
       <SuspenseWrapper>
         <RouteGuard resource="settings">
-          <EquipementsSettings />
+          <ActiviteSettings />
         </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/equipements',
+    element: (
+      <SuspenseWrapper>
+        {/* ancienne adresse : les équipements vivent dans Mon activité */}
+        <Navigate to="/settings/activite?tab=categories" replace />
       </SuspenseWrapper>
     ),
   },
@@ -432,9 +440,8 @@ export const artisanRoutes = [
     path: 'settings/projets',
     element: (
       <SuspenseWrapper>
-        <RouteGuard resource="settings">
-          <TypesProjetSettings />
-        </RouteGuard>
+        {/* ancienne adresse : les types de projet vivent dans Mon activité */}
+        <Navigate to="/settings/activite?tab=projets" replace />
       </SuspenseWrapper>
     ),
   },

@@ -5,7 +5,7 @@
  * Options / Durées d'entretien. Toutes les écritures passent par `pricingService`
  * + RLS policies org_id.
  * Le référentiel des types (catégories, types : code, libellé) est un réglage du
- * SOCLE, dans Settings → Équipements (EquipementsSettings.jsx) — regroupement par
+ * SOCLE, dans Settings → Mon activité (ActiviteSettings.jsx) — regroupement par
  * module du 2026-09-13. Ici on ne fait que VALORISER ces types : prix par zone,
  * remises, options, et durées/saisonnalité d'entretien (pricing/DureesTab.jsx).
  * ============================================================================
