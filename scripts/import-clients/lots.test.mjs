@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TAILLE_LOT, TAILLE_LOT_RETRAIT, decouperEnLots, messageErreurImport, executerLots,
+  TAILLE_LOT, TAILLE_LOT_RETRAIT, decouperEnLots, messageErreurImport, executerLots, lireReponseRetrait,
 } from '../../src/lib/importClients/lots.js';
 
 test('découpe en lots sans perdre ni dupliquer', () => {
@@ -64,4 +64,12 @@ test('le troisième lot échoue puis reprise depuis lui', async () => {
   });
   assert.deepEqual(vus, [2, 3, 4]);
   assert.deepEqual(r2, { created: 0, skipped: 3, faits: 3, prochain: 5, erreur: null });
+});
+
+test('réponse de retrait : valide lue, nulle ou incomplète rejetée', () => {
+  assert.deepEqual(lireReponseRetrait({ retirees: 100, conservees: 2, restantes: 5 }), { retirees: 100, conservees: 2, restantes: 5 });
+  assert.deepEqual(lireReponseRetrait({ retirees: 0, restantes: 0 }), { retirees: 0, conservees: 0, restantes: 0 });
+  assert.throws(() => lireReponseRetrait(null), /n'est pas confirmé/);
+  assert.throws(() => lireReponseRetrait({ retirees: 3 }), /n'est pas confirmé/);
+  assert.throws(() => lireReponseRetrait({ restantes: 3 }), /n'est pas confirmé/);
 });

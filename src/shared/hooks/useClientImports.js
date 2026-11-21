@@ -16,7 +16,7 @@ import { clientImportsService } from '@services/clientImports.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { clientKeys, clientImportKeys } from '@hooks/cacheKeys';
 import { bilan as bilanImport, lignesPourEcriture } from '@/lib/importClients/controles';
-import { decouperEnLots, executerLots, messageErreurImport } from '@/lib/importClients/lots';
+import { decouperEnLots, executerLots, messageErreurImport, lireReponseRetrait } from '@/lib/importClients/lots';
 
 /** Imports de l'entreprise, du plus récent au plus ancien. */
 export function useClientImports(orgId) {
@@ -29,7 +29,8 @@ export function useClientImports(orgId) {
 
 /**
  * Clients non archivés pour détecter les doublons. `clients` reste `undefined` tant que la liste est inconnue,
- * y compris quand la lecture a échoué : l'écran ferme l'import dans les deux cas (jamais une liste partielle).
+ * y compris quand la lecture a échoué ou qu'un rechargement est en cours : l'écran ferme l'import dans ces cas
+ * (jamais une liste partielle ou périmée).
  */
 export function useExistingClientsForImport(orgId, { enabled = true } = {}) {
   const query = useQuery({
@@ -37,8 +38,13 @@ export function useExistingClientsForImport(orgId, { enabled = true } = {}) {
     queryFn: () => unwrapResult(clientImportsService.loadExistingClients(orgId)),
     enabled: !!orgId && enabled,
     staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
-  return { clients: query.data, isLoading: query.isLoading, error: query.error };
+  // Liste « complète et à jour » seulement après un succès et sans rechargement en cours.
+  const clients = query.isSuccess && !query.isFetching ? query.data : undefined;
+  return { clients, isLoading: query.isFetching, error: query.error, refetch: query.refetch };
 }
 
 /** Combien de fiches de l'import se retirent, combien sont conservées. */
@@ -63,12 +69,12 @@ export function useRemoveClientImport(orgId) {
       let retirees = 0;
       let conservees = 0;
       for (;;) {
-        const lot = await unwrapResult(clientImportsService.removeBatch(importId));
-        retirees += lot?.retirees ?? 0;
-        conservees = lot?.conservees ?? conservees;
-        const restantes = lot?.restantes ?? 0;
+        const lot = lireReponseRetrait(await unwrapResult(clientImportsService.removeBatch(importId)));
+        retirees += lot.retirees;
+        conservees = lot.conservees;
+        const restantes = lot.restantes;
         if (restantes === 0) return { retirees, conservees };
-        if ((lot?.retirees ?? 0) === 0) {
+        if (lot.retirees === 0) {
           throw new Error(`Le retrait n'avance plus : ${restantes} fiches restent à retirer.`);
         }
       }
@@ -100,14 +106,20 @@ export function useClientImportRun(orgId) {
     setEtat(valeur);
   };
 
-  const interrompre = (e) => {
-    setErreur(messageErreurImport(e));
-    changerEtat('interrompu');
+  const invalider = (orgDuPlan) => {
+    queryClient.invalidateQueries({ queryKey: clientKeys.all(orgDuPlan) });
+    queryClient.invalidateQueries({ queryKey: clientImportKeys.all(orgDuPlan) });
   };
 
-  // Envoie les lots restants puis clôt ; reprend là où le plan s'est arrêté.
-  const executer = async () => {
-    const plan = planRef.current;
+  // Des fiches ont pu être créées avant l'arrêt : les caches se rechargent aussi.
+  const interrompre = (e, plan) => {
+    setErreur(messageErreurImport(e));
+    changerEtat('interrompu');
+    invalider(plan.orgId);
+  };
+
+  // Envoie les lots restants puis clôt ; reprend là où le plan s'est arrêté. Tout passe par l'org du plan.
+  const executer = async (plan) => {
     if (!plan.lotsEnvoyes) {
       const r = await executerLots({
         lots: plan.lots,
@@ -122,7 +134,7 @@ export function useClientImportRun(orgId) {
         },
       });
       plan.prochain = r.prochain;
-      if (r.erreur) return interrompre(r.erreur);
+      if (r.erreur) return interrompre(r.erreur, plan);
       plan.lotsEnvoyes = true;
     }
     const final = {
@@ -134,46 +146,59 @@ export function useClientImportRun(orgId) {
     try {
       await unwrapResult(clientImportsService.finishImport({ importId: plan.importId, counts: final }));
     } catch (e) {
-      return interrompre(e);
+      return interrompre(e, plan);
     }
     setBilan({ ...final, prevues: plan.total });
     changerEtat('termine');
-    queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
-    queryClient.invalidateQueries({ queryKey: clientImportKeys.all(orgId) });
+    invalider(plan.orgId);
   };
 
   const lancer = useCallback(async ({ fileName, sourceLabel, mapping, classees, choix }) => {
-    if (etatRef.current === 'en_cours') return;
+    if (etatRef.current === 'en_cours' || etatRef.current === 'interrompu') return;
     changerEtat('en_cours');
     setErreur(null);
     setBilan(null);
-    const rows = lignesPourEcriture(classees, choix);
-    const counts = bilanImport(classees, choix);
-    setProgression({ faits: 0, total: rows.length });
-    let importId;
+    let plan = null;
     try {
-      importId = await unwrapResult(clientImportsService.startImport({ orgId, fileName, sourceLabel, mapping, counts }));
-      if (!importId) throw new Error('La base n\'a pas rendu d\'identifiant d\'import.');
+      const rows = lignesPourEcriture(classees, choix);
+      const counts = bilanImport(classees, choix);
+      if (rows.length === 0) {
+        setErreur('Aucune fiche à importer.');
+        changerEtat('repos');
+        return;
+      }
+      setProgression({ faits: 0, total: rows.length });
+      const importId = await unwrapResult(clientImportsService.startImport({ orgId, fileName, sourceLabel, mapping, counts }));
+      if (!importId) throw new Error("La base n'a pas rendu d'identifiant d'import.");
+      plan = {
+        orgId, importId, counts, total: rows.length, lots: decouperEnLots(rows),
+        prochain: 0, created: 0, skipped: 0, lotsEnvoyes: false,
+      };
+      planRef.current = plan;
+      await executer(plan);
     } catch (e) {
-      setErreur(messageErreurImport(e));
-      changerEtat('repos');
-      return;
+      // Avant l'ouverture de l'import : rien à reprendre ; après : reprise possible.
+      if (plan) interrompre(e, plan);
+      else {
+        setErreur(messageErreurImport(e));
+        changerEtat('repos');
+      }
     }
-    planRef.current = {
-      importId, counts, total: rows.length, lots: decouperEnLots(rows),
-      prochain: 0, created: 0, skipped: 0, lotsEnvoyes: false,
-    };
-    await executer();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId]);
 
   const reprendre = useCallback(async () => {
-    if (etatRef.current !== 'interrompu' || !planRef.current) return;
+    const plan = planRef.current;
+    if (etatRef.current !== 'interrompu' || !plan) return;
     changerEtat('en_cours');
     setErreur(null);
-    await executer();
+    try {
+      await executer(plan);
+    } catch (e) {
+      interrompre(e, plan);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId]);
+  }, []);
 
   return { etat, progression, bilan, erreur, lancer, reprendre };
 }

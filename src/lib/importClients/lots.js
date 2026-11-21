@@ -42,7 +42,7 @@ export function messageErreurImport(error) {
   const message = error?.message;
   if (!message) return 'Erreur inconnue';
   for (const code of Object.keys(MESSAGES)) {
-    if (new RegExp(`(?<![A-Za-z0-9_])${code}(?![A-Za-z0-9_])`).test(message)) return MESSAGES[code];
+    if (new RegExp(`\\b${code}\\b`).test(message)) return MESSAGES[code];
   }
   return message;
 }
@@ -70,4 +70,17 @@ export async function executerLots({ lots, depuis, envoyer }) {
     prochain += 1;
   }
   return { created, skipped, faits: created + skipped, prochain, erreur: null };
+}
+
+/**
+ * Lit la réponse d'un appel de retrait. Une réponse nulle ou sans nombres `retirees` / `restantes` n'est PAS un
+ * succès : le retrait n'est pas confirmé, on rejette plutôt que de conclure « rien à retirer ».
+ * @param {{ retirees?: number, conservees?: number, restantes?: number } | null | undefined} lot
+ * @returns {{ retirees: number, conservees: number, restantes: number }}
+ */
+export function lireReponseRetrait(lot) {
+  if (!lot || !Number.isFinite(lot.retirees) || !Number.isFinite(lot.restantes)) {
+    throw new Error("Réponse inattendue de la base : le retrait n'est pas confirmé.");
+  }
+  return { retirees: lot.retirees, conservees: Number.isFinite(lot.conservees) ? lot.conservees : 0, restantes: lot.restantes };
 }
