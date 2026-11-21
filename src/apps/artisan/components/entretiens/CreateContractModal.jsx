@@ -34,6 +34,7 @@ import { Step1Client } from './ContractStepClient';
 import { Step2Equipment } from './ContractStepEquipment';
 import { Step3Contract } from './ContractStepSummary';
 import { ContractModalFooter } from './ContractModalFooter';
+import { EnvoiPropositionDOffice } from './EnvoiProposition';
 import { logger } from '@lib/logger';
 import { emailsValides } from '@/lib/emailUtils';
 
@@ -82,7 +83,7 @@ const StepIndicator = ({ current, total }) => (
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedClient = null, preSelectedEquipmentTypeId = null, contractDefaults = null, submitLabel = null }) {
+export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedClient = null, preSelectedEquipmentTypeId = null, contractDefaults = null }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const userId = user?.id;
@@ -99,6 +100,10 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
   const [contractData, setContractData] = useState({ ...INITIAL_CONTRACT_DATA, maintenanceMonth: moisPropose });
   const [duplicateAcknowledged, setDuplicateAcknowledged] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  // Création en cours, puis envoi de la proposition : la fenêtre reste ouverte jusqu'au bout.
+  const [soumission, setSoumission] = useState(false);
+  const [envoi, setEnvoi] = useState(null); // { clientId } une fois la proposition créée
+  const isProposal = contractDefaults?.status === 'pending';
 
   // ========== Hooks ==========
   const { results: searchResults, searching, search: performSearch, clear: clearSearch } = useClientSearch(orgId, {
@@ -264,8 +269,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
 
   // ========== Submit ==========
 
-  const handleSubmit = useCallback(async () => {
-    if (isCreating) return;
+  const creer = useCallback(async (envoyerEnsuite) => {
 
     const params = {
       orgId,
@@ -338,15 +342,39 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
     queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
     queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
 
+    // Proposition à envoyer : l'envoi prend la suite, la fenêtre se ferme quand il a fini.
+    if (envoyerEnsuite && contractId && resolvedClientId) {
+      setEnvoi({ clientId: resolvedClientId });
+      return;
+    }
+
     const isPending = contractDefaults?.status === 'pending';
     toast.success(isPending ? 'Proposition créée — visible dans Pipeline Contrats' : 'Contrat créé avec succès');
     onClose();
     onSuccess?.();
-  }, [isCreating, orgId, userId, calculator, contractPricing, recensedLines, contractData, clientMode, selectedClient, newClientData, createContractWithClient, contractDefaults, onClose, onSuccess, queryClient]);
+  }, [orgId, userId, calculator, contractPricing, recensedLines, contractData, clientMode, selectedClient, newClientData, createContractWithClient, contractDefaults, onClose, onSuccess, queryClient]);
+
+  // « Créer » ou « Envoyer la proposition » : un seul passage à la fois, du clic jusqu'au bout.
+  const handleSubmit = async (suite) => {
+    if (isCreating || soumission || envoi) return;
+    setSoumission(true);
+    try {
+      await creer(suite === 'envoyer');
+    } finally {
+      setSoumission(false);
+    }
+  };
 
   // ========== Render ==========
 
+  // PDF de la proposition (bibliothèque lourde, chargée à la demande) : pris d'avance à la dernière étape.
+  useEffect(() => {
+    if (isOpen && isProposal && step === 2) import('@apps/artisan/components/contrat/ContractPDF').catch(() => {});
+  }, [isOpen, isProposal, step]);
+
   if (!isOpen) return null;
+  // Pendant l'envoi, on ne ferme pas : il s'arrêterait en route sans rien dire.
+  const fermer = envoi ? undefined : onClose;
 
   const modalWidth = step === 1 ? 'max-w-2xl' : 'max-w-lg';
 
@@ -355,7 +383,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50 z-40 transition-opacity"
-        onClick={onClose}
+        onClick={fermer}
       />
 
       {/* Modale centrée */}
@@ -368,14 +396,15 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                {contractDefaults?.status === 'pending' ? 'Proposition de contrat' : 'Nouveau contrat'}
+                {isProposal ? 'Proposition de contrat' : 'Nouveau contrat'}
               </h2>
               <StepIndicator current={step} total={preSelectedClient ? 2 : 3} />
             </div>
             <button
               type="button"
-              onClick={onClose}
-              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              onClick={fermer}
+              disabled={Boolean(envoi)}
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-40"
             >
               <X className="w-5 h-5" />
             </button>
@@ -444,13 +473,22 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
             canGoToStep1={!!canGoToStep1}
             canGoToStep2={canGoToStep2}
             total={contractLines.length > 0 ? contractPricing.total : null}
-            isCreating={isCreating}
-            isProposal={contractDefaults?.status === 'pending'}
-            submitLabel={submitLabel}
+            isCreating={isCreating || soumission}
+            isProposal={isProposal}
+            isSending={Boolean(envoi)}
             onStep={setStep}
             onClose={onClose}
-            onSubmit={handleSubmit}
+            onSubmit={() => handleSubmit('creer')}
+            onSubmitAndSend={() => handleSubmit('envoyer')}
           />
+
+          {envoi && (
+            <EnvoiPropositionDOffice
+              clientId={envoi.clientId}
+              orgId={orgId}
+              onFini={() => { onClose(); onSuccess?.(); }}
+            />
+          )}
         </div>
       </div>
     </>
