@@ -148,3 +148,37 @@ export function plagesVoisines({ vue, startDate, endDate } = {}) {
   }
   return [];
 }
+
+// Grille horaire affichée par défaut ; elle ne s'étend que pour montrer un RDV
+// posé plus tôt ou plus tard (Eric, 2026-11-21).
+const GRILLE_DEBUT_MINUTES = 7 * 60 + 30;
+const GRILLE_FIN_MINUTES = 18 * 60;
+const PAS_GRILLE_MINUTES = 30;
+
+const heureDeGrille = (minutes) => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}:00`;
+const minutesDuJour = (iso) => {
+  const m = /T(\d{2}):(\d{2})/.exec(iso || '');
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+
+/**
+ * Bornes de la grille horaire : 7 h 30 → 18 h, élargies à la demi-heure près pour
+ * que tout RDV affiché soit visible en entier. Les bandes de tolérance (events de
+ * fond) n'élargissent rien. Un RDV sans heure de fin compte pour une heure.
+ * @param {Array<{ start?: string, end?: (string|null), display?: string }>} events
+ *   blocs du calendrier (`start` / `end` = `YYYY-MM-DDTHH:MM[:SS]`)
+ * @returns {{ slotMinTime: string, slotMaxTime: string }}
+ */
+export function bornesDeGrille(events = []) {
+  let debut = GRILLE_DEBUT_MINUTES;
+  let fin = GRILLE_FIN_MINUTES;
+  for (const e of events) {
+    if (e.display === 'background') continue;
+    const d = minutesDuJour(e.start);
+    if (d === null) continue;
+    const f = minutesDuJour(e.end) ?? d + DUREE_PAR_DEFAUT_MINUTES;
+    debut = Math.min(debut, Math.floor(d / PAS_GRILLE_MINUTES) * PAS_GRILLE_MINUTES);
+    fin = Math.max(fin, Math.ceil(Math.max(f, d + 1) / PAS_GRILLE_MINUTES) * PAS_GRILLE_MINUTES);
+  }
+  return { slotMinTime: heureDeGrille(Math.max(0, debut)), slotMaxTime: heureDeGrille(Math.min(24 * 60, fin)) };
+}

@@ -40,7 +40,7 @@ import { usePlanningCharge } from '@hooks/usePlanningCharge';
 import { usePlanningJournee } from '@hooks/usePlanningJournee';
 import { usePlanningImpression } from '@hooks/usePlanningImpression';
 import { useDeviceClass } from '@hooks/useDeviceClass';
-import { creneauParDefaut } from '@/lib/planningGestes';
+import { creneauParDefaut, bornesDeGrille } from '@/lib/planningGestes';
 import { cssDesCouloirs } from '@/lib/planningCouloirs';
 import { FeuilleDeRoutePanel } from '@/apps/artisan/components/planning/FeuilleDeRoutePanel';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
@@ -202,6 +202,8 @@ export default function Planning() {
   // Une colonne par personne dans chaque jour : les places calculées par useAppointments
   // (lib/planningCouloirs.js) sont imposées au cadre de chaque bloc par ces règles.
   const cssCouloirs = useMemo(() => cssDesCouloirs(events), [events]);
+  // Grille de 7 h 30 à 18 h, élargie seulement si un RDV affiché en sort.
+  const grille = useMemo(() => bornesDeGrille(events), [events]);
 
   // Recherche client : clic sur un de ses RDV → le calendrier va à sa date ; ses RDV sont surlignés.
   const handlePickSearchedAppointment = useCallback((appt) => allerAuJour(appt.scheduled_date), [allerAuJour]);
@@ -298,8 +300,8 @@ export default function Planning() {
             // Dates et heures
             firstDay={1}
             weekends={false}
-            slotMinTime="07:00:00"
-            slotMaxTime="20:00:00"
+            slotMinTime={grille.slotMinTime}
+            slotMaxTime={grille.slotMaxTime}
             slotDuration="00:30:00"
             slotLabelInterval="01:00:00"
             slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
