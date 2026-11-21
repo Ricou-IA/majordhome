@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Copy, Eye, Loader2, X, Sparkles, Zap, Fil
 import { Button } from '@components/ui/button';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { buildCompanyInfo } from '@/lib/orgBranding';
+import { buildCompanyInfo, formatFullAddress } from '@/lib/orgBranding';
 import { useMailSegments } from '@hooks/useMailSegments';
 import { formatResourcesForPrompt, getResources } from './resources';
 
@@ -386,7 +386,7 @@ function StepBrief({ form, update }) {
               value={form.subject}
               onChange={(e) => update({ subject: e.target.value })}
               className={inputClass}
-              placeholder="Ex : Vos nouveautés Mayer Énergie de mai"
+              placeholder="Ex : Nos nouveautés du mois de mai"
             />
           </Field>
           <Field label="Preheader" hint="Texte de preview affiché dans l'inbox (~100 caractères)">
@@ -629,7 +629,7 @@ function buildJsonPayload(form) {
 
 function buildPrompt(form, company, resourcesCatalog) {
   const campaignKey = form.key || slugifyKey(form.label);
-  const brandName = company?.name || 'Mayer Énergie';
+  const brandName = company?.name || 'Votre entreprise';
   const lines = [];
   lines.push(`Tu es un générateur d'emails HTML pour ${brandName}.`);
   lines.push(`Génère un email HTML complet (de <!DOCTYPE html> à </html>) suivant le template "Mail I — Base réutilisable" de ${brandName}.`);
@@ -664,12 +664,15 @@ function buildPrompt(form, company, resourcesCatalog) {
   lines.push('- **Offre du mois** : carte orange #fff7ed (bordure #fed7aa). Titre avec 🎁, description, CTA bouton orange #ea580c. À utiliser quand le brief parle d\'une offre commerciale, promo, remise, partenariat tarifaire.');
   lines.push('- **News / Nouveauté** : carte grise #f8f9fa (bordure #e9ecef). Titre avec 🆕, description, lien optionnel. À utiliser pour annonce (nouveau service, recrutement, partenariat, événement).');
   lines.push('- **Conseil** : liseré bleu 4px #1E4D8C à gauche. Titre avec 💡, intro contexte, 2-4 points à puces, conclusion. À utiliser pour conseil pratique, info réglementaire, astuce saisonnière.');
-  const contactUrl = company?.websiteUrl ? `${company.websiteUrl}/contact` : 'https://www.mayer-energie.fr/contact';
-  const orgPhone = company?.phone || '05 63 33 23 14';
-  const orgEmail = company?.email || 'contact@mayer-energie.fr';
-  const orgWebsite = company?.websiteUrl ? company.websiteUrl.replace(/^https?:\/\//, '') : 'www.mayer-energie.fr';
-  const orgFullAddress = company ? `${company.address} – ${company.postalCode} ${company.city}` : '26 Route des Pyrénées – 81600 Gaillac';
-  const orgRge = (company?.rgeCertifications || ['QualiPAC', 'QualiBois']).join(' · ');
+  // Rien d'une autre entreprise par défaut : un réglage absent s'écrit « à renseigner » dans la consigne,
+  // l'utilisateur le voit et le complète dans Paramètres → Organisation.
+  const A_RENSEIGNER = '(à renseigner dans Paramètres → Organisation)';
+  const contactUrl = company?.websiteUrl ? `${company.websiteUrl}/contact` : A_RENSEIGNER;
+  const orgPhone = company?.phone || A_RENSEIGNER;
+  const orgEmail = company?.email || A_RENSEIGNER;
+  const orgWebsite = company?.websiteUrl ? company.websiteUrl.replace(/^https?:\/\//, '') : A_RENSEIGNER;
+  const orgFullAddress = (company ? formatFullAddress(company) : '') || A_RENSEIGNER;
+  const orgRge = (company?.rgeCertifications || []).join(' · ') || 'aucune';
   lines.push(`- **CTA contact** : carte bleue #eff6ff (bordure #bfdbfe). Titre "🏠 Un projet en cours ?", accroche, bouton bleu #1E4D8C "👉 Je contacte ${brandName}" → \`${contactUrl}?utm_source=emailing&utm_campaign=${campaignKey}&utm_medium=email\` + téléphone ${orgPhone} sous le bouton. À utiliser presque systématiquement en dernier bloc pour inviter au contact.`);
   lines.push('');
   lines.push('## Contraintes techniques (obligatoires)');

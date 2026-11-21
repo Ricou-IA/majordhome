@@ -373,7 +373,7 @@ export default function ContractSign() {
         {/* Titre contrat — orange Mayer */}
         <div className="bg-[#F97316] text-white px-6 py-4">
           <h2 className="text-lg font-bold">Contrat d’entretien annuel</h2>
-          <p className="text-sm text-orange-100">Mayer Énergie — Entretien & Maintenance CVC</p>
+          <p className="text-sm text-orange-100">{company.name} — Entretien & Maintenance</p>
         </div>
 
         <div className="p-6 space-y-6">
@@ -497,7 +497,7 @@ export default function ContractSign() {
                 résiliable avec 30 jours de préavis.
               </p>
               <p>
-                <strong className="text-gray-700">Obligations :</strong> Mayer Énergie s’engage à effectuer l’entretien dans les
+                <strong className="text-gray-700">Obligations :</strong> {company.name} s’engage à effectuer l’entretien dans les
                 règles de l’art et à délivrer une attestation. Le client s’engage à permettre l’accès aux installations.
               </p>
             </div>

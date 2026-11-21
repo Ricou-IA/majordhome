@@ -205,8 +205,8 @@ function EmptyState({ range }) {
         <span className="font-medium">{range.startDate} → {range.endDate}</span>.
       </p>
       <p className="mt-3 text-sm text-secondary-600 max-w-md mx-auto">
-        Vérifie que le workflow N8N <strong>« Mayer - Meta Ads Insights (Daily) »</strong> est activé
-        et a fait au moins un run, ou lance un backfill manuel.
+        Aucune statistique Meta Ads n&apos;a encore été reçue pour cette entreprise sur la période :
+        la remontée quotidienne n&apos;est pas branchée, ou n&apos;a pas encore tourné.
       </p>
       <a
         href="https://business.facebook.com/"

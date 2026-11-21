@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
-import logoMayer from '@/assets/logo-mayer.png';
 import { logger } from '@lib/logger';
 
 // =============================================================================
-// PAGE LOGIN — Design unifié Mayer Energie
+// PAGE LOGIN — commune à toutes les entreprises : avant la connexion on ne sait
+// pas laquelle arrive, donc ni logo ni nom d'une entreprise ici.
 // =============================================================================
 
 export default function Login() {
@@ -98,16 +98,14 @@ export default function Login() {
             }}
           />
           <div className="relative z-10 flex flex-col items-center text-center">
-            <img
-              src={logoMayer}
-              alt="Mayer Energie"
-              className="w-[260px] h-auto mb-6"
-            />
+            <p className="text-4xl font-bold tracking-tight text-gray-900 mb-6">
+              Majord&apos;home
+            </p>
             <p className="text-lg font-semibold text-gray-700">
-              Votre confort,
+              Clients, planning, devis, chantiers :
             </p>
             <p className="text-lg font-semibold text-primary-600">
-              toute l&apos;année
+              toute l&apos;entreprise au même endroit
             </p>
           </div>
         </div>
@@ -115,11 +113,9 @@ export default function Login() {
         {/* Partie droite — Formulaire */}
         <div className="md:w-1/2 flex-1 px-6 py-8 md:p-12 flex flex-col justify-center pb-[max(2rem,env(safe-area-inset-bottom))]">
           {/* Logo compact (téléphone uniquement) */}
-          <img
-            src={logoMayer}
-            alt="Mayer Energie"
-            className="md:hidden w-[160px] h-auto mb-8 self-center"
-          />
+          <p className="md:hidden text-3xl font-bold tracking-tight text-gray-900 mb-8 self-center">
+            Majord&apos;home
+          </p>
 
           <div className="mb-6 md:mb-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-1 md:mb-2">
@@ -225,19 +221,9 @@ export default function Login() {
           <div className="mt-6 md:mt-8 text-center">
             <p className="text-sm text-gray-500">
               {isClientLogin ? (
-                <>
-                  Pas encore de compte ?{' '}
-                  <a
-                    href="https://www.mayer-energie.fr/contact"
-                    className="text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    Contactez-nous
-                  </a>
-                </>
+                <>Pas encore de compte ? Contactez votre installateur.</>
               ) : (
-                <>
-                  Espace réservé aux collaborateurs Mayer Energie.
-                </>
+                <>Espace réservé aux collaborateurs.</>
               )}
             </p>
           </div>

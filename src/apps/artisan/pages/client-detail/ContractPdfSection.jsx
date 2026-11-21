@@ -279,7 +279,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
         .replaceAll('{{EQUIP_RECAP}}', equipRecap)
         .replaceAll('{{TOTAL_AMOUNT}}', totalStr)
         .replaceAll('{{PDF_URL}}', pdfUrl);
-      const subject = template.subject || `Votre proposition de contrat d'entretien — Mayer Énergie`;
+      const subject = template.subject || `Votre proposition de contrat d'entretien — ${company.name}`;
 
       // 6. Envoi via edge function mailing-send (P0.8 V2)
       // Le SQL n'est plus accepté du client : l'edge appelle la RPC

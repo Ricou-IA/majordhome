@@ -238,7 +238,7 @@ export default function PvReceptionSign() {
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <div className="bg-[#F97316] text-white px-6 py-4">
           <h2 className="text-lg font-bold">Procès-verbal de Réception</h2>
-          <p className="text-sm text-orange-100">Mayer Énergie — Réception des travaux</p>
+          <p className="text-sm text-orange-100">{company.name} — Réception des travaux</p>
         </div>
 
         <div className="p-6 space-y-6">

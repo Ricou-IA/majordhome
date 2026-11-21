@@ -6,7 +6,7 @@ import { useGeoGridQuota } from '@hooks/useGeoGrid';
 import { fetchCommunes, filterByPopulation, centroidOf } from './communesService';
 
 const DEFAULT_CONFIG = {
-  businessName: 'Mayer Energie',
+  businessName: '',
   placeId: '',
   keyword: 'climatisation',
   radiusKm: 5,

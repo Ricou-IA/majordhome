@@ -298,7 +298,9 @@ export function getResources(settings) {
   if (custom && typeof custom === 'object' && Object.keys(custom).length > 0) {
     return custom;
   }
-  return RESOURCES;
+  // Pas de catalogue par défaut : celui de ce fichier est celui de Mayer Énergie, rangé dans ses réglages
+  // (`settings.mailing_resources`, 2026-11-21). Une entreprise sans catalogue n'en propose aucun.
+  return {};
 }
 
 /**

@@ -101,7 +101,7 @@ function NotConnectedView({ orgId, onConnect, isConnecting }) {
       </h2>
       <p className="text-sm text-secondary-600 mb-6 max-w-md mx-auto">
         Recupere automatiquement les positions, impressions et clics de
-        <span className="font-medium"> mayer-energie.fr</span> dans Google Search.
+        <span className="font-medium"> votre site</span> dans Google Search.
         Complementaire au scan GeoGrid (positions Maps).
       </p>
 
@@ -116,7 +116,7 @@ function NotConnectedView({ orgId, onConnect, isConnecting }) {
         </li>
         <li className="flex gap-2">
           <span className="text-primary-600">•</span>
-          <span>Croisement avec ta liste Mayer SEO 2026 pour suivi cible</span>
+          <span>Croisement avec ta liste de mots-cles pour suivi cible</span>
         </li>
       </ul>
 
@@ -156,7 +156,8 @@ function ConnectedView({ orgId, status }) {
   const { data: keywordLists = [] } = useKeywordLists(orgId);
 
   const mayerList = useMemo(
-    () => keywordLists.find((l) => l.name === 'Mayer SEO 2026'),
+    // Liste suivie : celle de Mayer par son nom historique, sinon la première liste de l'entreprise.
+    () => keywordLists.find((l) => l.name === 'Mayer SEO 2026') ?? keywordLists[0],
     [keywordLists],
   );
   const mayerKeywords = useMemo(
@@ -417,7 +418,7 @@ function PeriodAndFilters({
           className="rounded border-secondary-300"
         />
         <Star className="w-3.5 h-3.5 text-amber-500" />
-        Liste Mayer SEO 2026 uniquement
+        Ma liste de mots-clés uniquement
         <span className="text-secondary-400">({mayerListKwCount} kw)</span>
       </label>
     </div>
@@ -490,7 +491,7 @@ function MetricsTable({ rows, loading, totalRows }) {
               <th className="text-right px-2 py-2 font-medium">Clics</th>
               <th className="text-right px-2 py-2 font-medium">CTR</th>
               <th className="text-right px-2 py-2 font-medium">Position moy.</th>
-              <th className="text-center px-2 py-2 font-medium">Mayer SEO</th>
+              <th className="text-center px-2 py-2 font-medium">Ma liste</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-secondary-100">

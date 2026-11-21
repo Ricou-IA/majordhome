@@ -243,15 +243,15 @@ export default function BenchmarkResultTable({ benchmark }) {
                     {groupBy === 'none' && (
                       <th className="text-left px-3 py-2 font-medium w-32">Famille</th>
                     )}
-                    <th className="text-left px-3 py-2 font-medium w-32" title="Nb de points où Mayer ressort en position 1-3">
+                    <th className="text-left px-3 py-2 font-medium w-32" title="Nb de points où l'entreprise ressort en position 1-3">
                       <div>Top 3</div>
                       <div className="text-[10px] font-normal opacity-60 normal-case">points / % couvert</div>
                     </th>
-                    <th className="text-left px-3 py-2 font-medium w-32" title="Nb de points où Mayer ressort dans les 10 premiers résultats">
+                    <th className="text-left px-3 py-2 font-medium w-32" title="Nb de points où l'entreprise ressort dans les 10 premiers résultats">
                       <div>Top 10</div>
                       <div className="text-[10px] font-normal opacity-60 normal-case">points / % couvert</div>
                     </th>
-                    <th className="text-left px-3 py-2 font-medium w-32" title="Nb de points où Mayer apparaît dans les 20 premiers résultats Google Maps">
+                    <th className="text-left px-3 py-2 font-medium w-32" title="Nb de points où l'entreprise apparaît dans les 20 premiers résultats Google Maps">
                       <div>Visibilité totale</div>
                       <div className="text-[10px] font-normal opacity-60 normal-case">trouvé sur 25 / % couvert</div>
                     </th>

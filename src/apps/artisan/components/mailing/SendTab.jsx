@@ -110,7 +110,7 @@ export default function SendTab() {
     // Substitutions alignées avec l'edge mailing-send pour que la preview reflète
     // le rendu final reçu par les destinataires (squelette + placeholders).
     const s = orgSettings;
-    const contactEmail = s.from_email || s.reply_to || 'contact@mayer-energie.fr';
+    const contactEmail = s.from_email || s.reply_to || '';
     const replacements = {
       '{{SALUTATION}}': 'Bonjour Jean Dupont,',
       '{{CLIENT_NAME}}': 'Jean Dupont',
