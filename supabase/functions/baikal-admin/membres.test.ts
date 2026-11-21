@@ -113,7 +113,6 @@ Deno.test("création complète : compte, profil, adhésion alignée, planning", 
     "core.organizations.select": { data: { id: ORG } },
     "auth.createUser": { data: { user: { id: ID } } },
     "core.organization_members.select": { data: { id: "adhesion-1" } },
-    "majordhome.organizations.select": { data: { id: "org-metier" } },
     "rpc.team_member_ensure_for_user": { data: "tm-1" },
     "rpc.baikal_membres": { data: LISTE },
   });
@@ -125,7 +124,6 @@ Deno.test("création complète : compte, profil, adhésion alignée, planning", 
     "core.organization_members.select",
     "core.organization_members.update.valeurs",
     "core.organization_members.update",
-    "majordhome.organizations.select",
     "rpc.team_member_ensure_for_user",
     "rpc.baikal_membres",
   ]);
@@ -145,15 +143,34 @@ Deno.test("création complète : compte, profil, adhésion alignée, planning", 
   });
 });
 
-Deno.test("organisation sans planning : pas de ressource planning", async () => {
+Deno.test("organisation sans planning : la création aboutit quand même", async () => {
+  const f = faux({
+    "core.organizations.select": { data: { id: ORG } },
+    "auth.createUser": { data: { user: { id: ID } } },
+    "rpc.team_member_ensure_for_user": { error: { message: "org majordhome introuvable pour core_org x" } },
+    "rpc.baikal_membres": { data: LISTE },
+  });
+  assertEquals(await siteMembres(f.client).creer!(DEMANDE), MEMBRE);
+  assertEquals(f.cles().includes("core.organization_members.insert"), true);
+});
+
+Deno.test("le schéma métier n'est jamais lu par l'API : il n'y est pas exposé", async () => {
   const f = faux({
     "core.organizations.select": { data: { id: ORG } },
     "auth.createUser": { data: { user: { id: ID } } },
     "rpc.baikal_membres": { data: LISTE },
   });
   await siteMembres(f.client).creer!(DEMANDE);
-  assertEquals(f.cles().includes("core.organization_members.insert"), true);
-  assertEquals(f.cles().includes("rpc.team_member_ensure_for_user"), false);
+  assertEquals(f.cles().some((c) => c.startsWith("majordhome.")), false);
+});
+
+Deno.test("ressource planning en échec pour une autre raison : la création échoue fort", async () => {
+  const f = faux({
+    "core.organizations.select": { data: { id: ORG } },
+    "auth.createUser": { data: { user: { id: ID } } },
+    "rpc.team_member_ensure_for_user": { error: { message: "permission denied" } },
+  });
+  await assertRejects(() => siteMembres(f.client).creer!(DEMANDE), Error, "ressource planning: permission denied");
 });
 
 Deno.test("organisation d'une autre app : org_inconnue, rien n'est créé", async () => {

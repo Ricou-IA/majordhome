@@ -143,17 +143,17 @@ export function siteMembres(admin: SupabaseClient): SiteMembres {
         });
     exiger("adhésion", adhesionError);
 
-    // 4. Ressource planning, pour une organisation qui a le planning (une org
-    //    sans ligne majordhome.organizations n'en a pas : rien à poser).
-    const { data: orgMetier, error: metierError } = await admin
-      .schema("majordhome").from("organizations").select("id").eq("core_org_id", d.org_id).maybeSingle();
-    exiger("organisation métier", metierError);
-    if (orgMetier) {
-      const { error: planningError } = await admin.rpc("team_member_ensure_for_user", {
-        p_core_org_id: d.org_id,
-        p_user_id: userId,
-        p_color: null,
-      });
+    // 4. Ressource planning. Une organisation sans ligne majordhome.organizations
+    //    n'a pas de planning : la RPC le dit (P0002 « org majordhome introuvable »)
+    //    et il n'y a alors rien à poser. Le schéma `majordhome` n'est pas exposé
+    //    à l'API : pas de lecture directe possible depuis ici (vécu 2026-11-21,
+    //    « Invalid schema: majordhome » après compte, profil et adhésion créés).
+    const { error: planningError } = await admin.rpc("team_member_ensure_for_user", {
+      p_core_org_id: d.org_id,
+      p_user_id: userId,
+      p_color: null,
+    });
+    if (planningError && !/org majordhome introuvable/i.test(planningError.message)) {
       exiger("ressource planning", planningError);
     }
 
