@@ -11,12 +11,13 @@
  * ============================================================================
  */
 
+import { useState } from 'react';
 import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
 import { BanAddressInput } from '@/apps/artisan/components/shared/BanAddressInput';
 import {
   Search, PenLine, Unlink, Link2, X,
   Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, ChevronDown, CalendarDays,
-  ArrowRightLeft, Target, Loader2, Wrench, Undo2,
+  Target, Loader2, Wrench, Undo2,
   FileText, ChevronRight, Plus, Info,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -417,25 +418,29 @@ export const SectionPipeline = ({
       </div>
     </FormField>
 
-    <FormField label="Équipement (parc d'entretien)" className="mt-3">
-      <div className="relative">
-        <select
-          value={form.equipment_type_id}
-          onChange={(e) => setField('equipment_type_id', e.target.value)}
-          className={selectClass}
-        >
-          <option value="">—</option>
-          {groupedEquipmentTypes.map((groupe) => (
-            <optgroup key={groupe.category?.id ?? 'sans-categorie'} label={groupe.label}>
-              {groupe.types.map((type) => (
-                <option key={type.id} value={type.id}>{type.label}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-      </div>
-    </FormField>
+    {/* Sert au chantier (gabarit du PV, proposition de contrat), aux segments de mailing et à la fiche
+        technique : affiché seulement si l'organisation a des types d'équipement. */}
+    {groupedEquipmentTypes.length > 0 && (
+      <FormField label="Équipement (parc d'entretien)" className="mt-3">
+        <div className="relative">
+          <select
+            value={form.equipment_type_id}
+            onChange={(e) => setField('equipment_type_id', e.target.value)}
+            className={selectClass}
+          >
+            <option value="">—</option>
+            {groupedEquipmentTypes.map((groupe) => (
+              <optgroup key={groupe.category?.id ?? 'sans-categorie'} label={groupe.label}>
+                {groupe.types.map((type) => (
+                  <option key={type.id} value={type.id}>{type.label}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+        </div>
+      </FormField>
+    )}
 
     {canAssign && (
       <FormField label="Commercial assigné" className="mt-3">
@@ -634,104 +639,104 @@ export const SectionActions = ({
   retour,
   onReactiver,
   perduParPennylane,
-}) => (
-  <>
-    {/* Action suivante (transitions) */}
-    {isEditing && (allowedNext.length > 0 || (onRequalifyEntretien && currentStatus?.label === 'Nouveau')) && (
-      <>
-        <SectionTitle>Action suivante</SectionTitle>
-        <div className="flex flex-wrap gap-2">
-          {[...allowedNext]
-            // Ordre d'affichage : avancées d'abord, puis régression, puis Perdu (exit).
-            .sort((a, b) => {
-              const rank = (s) =>
-                s.label === 'Perdu' ? 2 : (currentStatus && s.display_order < currentStatus.display_order ? 1 : 0);
-              return rank(a) - rank(b) || a.display_order - b.display_order;
-            })
-            .map((status) => {
-            const isPerdu = status.label === 'Perdu';
-            // Régression = retour à un statut antérieur (ex. RDV planifié → Contacté
-            // après annulation de RDV) → style neutre + icône retour, pour le distinguer
-            // visuellement des avancées (boutons pleins colorés).
-            const isRegression = !isPerdu && currentStatus && status.display_order < currentStatus.display_order;
-            return (
-              <button
-                key={status.id}
-                type="button"
-                onClick={() => handleStatusChange(status.id)}
-                disabled={isChangingStatus}
-                className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]
-                  ${isPerdu
-                    ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
-                    : isRegression
-                    ? 'bg-slate-50 text-slate-700 border border-slate-300 hover:bg-slate-100'
-                    : 'text-white hover:opacity-90'
-                  }`}
-                style={(isPerdu || isRegression) ? {} : { backgroundColor: status.color }}
-              >
-                {isChangingStatus ? (
-                  <Loader2 className="h-4 w-4 animate-spin inline mr-1" />
-                ) : isRegression ? (
-                  <Undo2 className="h-4 w-4 inline mr-1" />
-                ) : (
-                  <ArrowRightLeft className="h-4 w-4 inline mr-1" />
-                )}
-                {status.label}
-              </button>
-            );
-          })}
+}) => {
+  const versEntretien = !!onRequalifyEntretien && currentStatus?.label === 'Nouveau';
+  const transitions = isEditing && (allowedNext.length > 0 || versEntretien);
+  if (!transitions && !isFinal) return null;
+  // Boutons sur UNE ligne, juste au-dessus du pied de la fiche (Eric 2026-11-21) : ils se partagent la largeur.
+  const bouton = 'flex-1 min-w-0 px-2 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors min-h-[40px] disabled:opacity-50';
 
-          {onRequalifyEntretien && currentStatus?.label === 'Nouveau' && (
+  return (
+    <div className="border-t bg-white px-6 pt-2.5 pb-2.5">
+      {transitions && (
+        <>
+          <p className="text-[11px] font-bold text-secondary-400 uppercase tracking-widest mb-1.5">Action suivante</p>
+          <div className="flex gap-1.5">
+            {[...allowedNext]
+              // Ordre d'affichage : avancées d'abord, puis régression, puis Perdu (exit).
+              .sort((a, b) => {
+                const rank = (s) =>
+                  s.label === 'Perdu' ? 2 : (currentStatus && s.display_order < currentStatus.display_order ? 1 : 0);
+                return rank(a) - rank(b) || a.display_order - b.display_order;
+              })
+              .map((status) => {
+                const isPerdu = status.label === 'Perdu';
+                // Régression = retour à un statut antérieur (ex. RDV planifié → Contacté après annulation de RDV) :
+                // style neutre + icône retour, pour le distinguer des avancées (boutons pleins colorés).
+                const isRegression = !isPerdu && currentStatus && status.display_order < currentStatus.display_order;
+                return (
+                  <button
+                    key={status.id}
+                    type="button"
+                    onClick={() => handleStatusChange(status.id)}
+                    disabled={isChangingStatus}
+                    className={`${bouton} ${isPerdu
+                      ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+                      : isRegression
+                      ? 'bg-slate-50 text-slate-700 border border-slate-300 hover:bg-slate-100'
+                      : 'text-white hover:opacity-90'
+                    }`}
+                    style={(isPerdu || isRegression) ? {} : { backgroundColor: status.color }}
+                  >
+                    {isChangingStatus ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin inline mr-1" />
+                    ) : isRegression ? (
+                      <Undo2 className="h-3.5 w-3.5 inline mr-1" />
+                    ) : null}
+                    {status.label}
+                  </button>
+                );
+              })}
+
+            {versEntretien && (
+              <button
+                type="button"
+                onClick={onRequalifyEntretien}
+                disabled={isRequalifying}
+                title="Requalifier ce lead en entretien"
+                className={`${bouton} bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100`}
+              >
+                {isRequalifying
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin inline mr-1" />
+                  : <Wrench className="h-3.5 w-3.5 inline mr-1" />}
+                Entretien
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {isFinal && (
+        <div className="text-sm text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="italic flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            {isWon ? 'Lead gagné — prêt à convertir en client' : 'Lead clôturé'}
+          </span>
+          {/* Un lead perdu se réactive : il reprend la place qu'il avait avant (src/lib/leadReactivation.js). */}
+          {isEditing && !isWon && retour && onReactiver && (
             <button
               type="button"
-              onClick={onRequalifyEntretien}
-              disabled={isRequalifying}
-              className="px-4 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px] bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
+              onClick={onReactiver}
+              disabled={isChangingStatus}
+              className="ml-auto px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap min-h-[40px] bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 disabled:opacity-50"
             >
-              {isRequalifying ? (
-                <Loader2 className="h-4 w-4 animate-spin inline mr-1" />
-              ) : (
-                <Wrench className="h-4 w-4 inline mr-1" />
-              )}
-              → Entretien
+              {isChangingStatus
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin inline mr-1" />
+                : <Undo2 className="h-3.5 w-3.5 inline mr-1" />}
+              Réactiver : retour en « {retour.label} »
             </button>
           )}
+          {isEditing && !isWon && perduParPennylane && (
+            <span className="basis-full text-xs text-gray-500">
+              Ce lead a un devis dans Pennylane : c’est l’état du devis qui le place. Un devis renvoyé ou rouvert dans
+              Pennylane le ramène dans le pipeline.
+            </span>
+          )}
         </div>
-      </>
-    )}
-
-    {isFinal && (
-      <div className="mt-6 px-3 py-2.5 bg-gray-50 rounded-lg text-sm text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="italic flex items-center gap-2">
-          <Target className="h-4 w-4" />
-          {isWon ? 'Lead gagné — prêt à convertir en client' : 'Lead clôturé'}
-        </span>
-        {/* Un lead perdu se réactive : il reprend la place qu'il avait avant (src/lib/leadReactivation.js). */}
-        {isEditing && !isWon && retour && onReactiver && (
-          <button
-            type="button"
-            onClick={onReactiver}
-            disabled={isChangingStatus}
-            className="ml-auto px-4 py-2.5 rounded-lg text-sm font-medium not-italic min-h-[44px] bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 disabled:opacity-50"
-          >
-            {isChangingStatus
-              ? <Loader2 className="h-4 w-4 animate-spin inline mr-1" />
-              : <Undo2 className="h-4 w-4 inline mr-1" />}
-            Réactiver : retour en « {retour.label} »
-          </button>
-        )}
-        {isEditing && !isWon && perduParPennylane && (
-          <span className="basis-full not-italic text-xs text-gray-500">
-            Ce lead a un devis dans Pennylane : c’est l’état du devis qui le place. Un devis renvoyé ou rouvert dans
-            Pennylane le ramène dans le pipeline.
-          </span>
-        )}
-      </div>
-    )}
-
-    {/* Bloc "Actions" supprimé — conversion auto lors de l'acceptation du devis */}
-  </>
-);
+      )}
+    </div>
+  );
+};
 
 // ============================================================================
 // NOTES + TIMELINE
@@ -751,6 +756,7 @@ export const SectionNotes = ({
   const { visit } = useTechnicalVisit(isEditing ? leadId : null);
   const ficheStatus = computeVisitStatus(visit);
   const ficheConfig = FICHE_STATUS_CONFIG[ficheStatus];
+  const [historiqueOuvert, setHistoriqueOuvert] = useState(false);
 
   return (
     <>
@@ -795,14 +801,27 @@ export const SectionNotes = ({
         rows={3}
       />
 
+      {/* Historique replié par défaut : on lit la fiche sans lui, on l'ouvre pour voir ce qui s'est passé. */}
       {isEditing && (
         <>
-          <SectionTitle>Historique</SectionTitle>
-          <LeadActivityTimeline
-            entries={timelineEntries}
-            isLoading={loadingActivities}
-            disabled
-          />
+          <button
+            type="button"
+            onClick={() => setHistoriqueOuvert((v) => !v)}
+            aria-expanded={historiqueOuvert}
+            className="w-full flex items-center justify-between mt-8 pt-4 border-t border-secondary-200 text-xs font-bold text-secondary-400 uppercase tracking-widest hover:text-secondary-600"
+          >
+            <span>Historique{!loadingActivities && timelineEntries.length > 0 ? ` (${timelineEntries.length})` : ''}</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${historiqueOuvert ? 'rotate-180' : ''}`} />
+          </button>
+          {historiqueOuvert && (
+            <div className="mt-3">
+              <LeadActivityTimeline
+                entries={timelineEntries}
+                isLoading={loadingActivities}
+                disabled
+              />
+            </div>
+          )}
         </>
       )}
     </>

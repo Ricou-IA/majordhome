@@ -2,7 +2,7 @@
  * LeadModal.jsx - Majord'home Artisan
  * ============================================================================
  * Slide-over droite pour créer ou éditer un lead.
- * Sections : Contact, Pipeline, Action suivante, Notes + Timeline
+ * Sections : Contact, Pipeline, Notes + Historique replié ; « Action suivante » au-dessus du pied
  *
  * Sous-modules extraits :
  *   ./LeadStatusConfig.js         — ALLOWED_TRANSITIONS, getAllowedNextStatuses, LOST_REASONS
@@ -116,7 +116,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const pennylaneActive = usePennylaneEnabled();
   const {
     createLead, updateLead, updateLeadStatus, convertLead, addNote, deleteLead, hardDeleteLead,
-    isCreating, isUpdating, isChangingStatus, isConverting, isAddingNote, isHardDeleting,
+    isCreating, isUpdating, isChangingStatus, isAddingNote, isHardDeleting,
   } = useLeadMutations();
   // Envoi des devis MDH (flux hors Pennylane) : mutation qui rejette sur refus et
   // invalide le cache devis — un appel direct au service masquerait le refus.
@@ -142,7 +142,6 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     return '';
   }, [commercials, userId, effectiveRole]);
 
-  const [showConvertConfirm, setShowConvertConfirm] = useState(false);
   const {
     linkedClient, setLinkedClient, showClientDropdown, setShowClientDropdown,
     editClientMode, setEditClientMode, showLinkSearch, setShowLinkSearch,
@@ -208,7 +207,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     pendingQuoteStatusId, setPendingQuoteStatusId, quoteLoading,
     showQuoteCandidates, setShowQuoteCandidates, showMarkWon, setShowMarkWon,
     handleStatusChange, handleConfirmScheduling, handleVtPosee, handleConfirmContact,
-    handleConfirmQuote, handleSendDevis, handleLogCall, handleLogFollowup, handleConvert,
+    handleConfirmQuote, handleSendDevis, handleLogCall, handleLogFollowup,
   } = useLeadStatusTransitions({
     leadId, isEditing, orgId, userId, form, setForm, statuses, linkedClientId: linkedClient?.id,
     pennylaneActive, linkedQuotes, persistForm,
@@ -555,29 +554,27 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                   />
                 }
               />
-
-              <SectionActions
-                isEditing={isEditing}
-                allowedNext={allowedNext}
-                isChangingStatus={isChangingStatus}
-                handleStatusChange={handleStatusChange}
-                isFinal={isFinal}
-                isWon={isWon}
-                lead={lead}
-                showConvertConfirm={showConvertConfirm}
-                setShowConvertConfirm={setShowConvertConfirm}
-                handleConvert={handleConvert}
-                isConverting={isConverting}
-                currentStatus={currentStatus}
-                onRequalifyEntretien={() => requalify()}
-                isRequalifying={isRequalifying}
-                retour={retour}
-                onReactiver={handleReactiver}
-                perduParPennylane={hasLinkedPlQuotes && isFinal && !isWon}
-              />
             </>
           )}
         </div>
+
+        {/* Action suivante : toujours visible, juste au-dessus du pied (plus en bas du défilement) */}
+        {!pendingRdvStatusId && !loadingLead && (
+          <SectionActions
+            isEditing={isEditing}
+            allowedNext={allowedNext}
+            isChangingStatus={isChangingStatus}
+            handleStatusChange={handleStatusChange}
+            isFinal={isFinal}
+            isWon={isWon}
+            currentStatus={currentStatus}
+            onRequalifyEntretien={() => requalify()}
+            isRequalifying={isRequalifying}
+            retour={retour}
+            onReactiver={handleReactiver}
+            perduParPennylane={hasLinkedPlQuotes && isFinal && !isWon}
+          />
+        )}
 
         {/* Footer sticky — masqué en mode planification RDV */}
         {!pendingRdvStatusId && (
