@@ -46,7 +46,7 @@ test('repère contrat : libellé et geste selon l’état de la proposition', ()
   assert.deepEqual(
     [repere([]).action, repere([{ status: 'pending', workflow_status: 'nouveau' }]).action,
       repere([{ status: 'pending', workflow_status: 'proposal_sent' }]).action, repere([{ status: 'active' }]).action],
-    ['proposer', 'envoyer', 'renvoyer', null],
+    ['proposer', 'envoyer', null, null],
   );
   assert.match(repere([{ status: 'pending', workflow_status: 'nouveau' }]).titre, /pas encore envoyée/);
   assert.equal(repere([{ status: 'pending', workflow_status: 'nouveau' }]).etat, 'attention');

@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { HeartHandshake, MessageSquare, ScrollText, Receipt, Loader2, Check, Send } from 'lucide-react';
+import { HeartHandshake, MessageSquare, ScrollText, Receipt, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,7 +20,7 @@ import {
   reperesApresVente, blocageAvis, messageAvisEnvoye, messageAvisRefuse, moisDuPv,
 } from '@/lib/chantierApresVente';
 import { CreateContractModal } from '../entretiens/CreateContractModal';
-import { PropositionContratDialog } from './PropositionContratDialog';
+import { BoutonEnvoiProposition } from './BoutonEnvoiProposition';
 
 function Ligne({ Icone, titre, etat, fait, children }) {
   return (
@@ -51,7 +51,8 @@ export function ChantierApresVenteSection({ chantier, onUpdated, peutAgir = true
   const [showContractModal, setShowContractModal] = useState(false);
   const [clientForContract, setClientForContract] = useState(null);
   const [loadingContract, setLoadingContract] = useState(false);
-  const [showProposition, setShowProposition] = useState(false);
+  // La proposition vient d'être créée d'ici : elle part au client sans autre geste.
+  const [envoiDOffice, setEnvoiDOffice] = useState(false);
 
   const reperes = Object.fromEntries(reperesApresVente(chantier, listes).map((r) => [r.cle, r]));
   const avisBloque = blocageAvis(chantier, listes.avis);
@@ -122,36 +123,30 @@ export function ChantierApresVenteSection({ chantier, onUpdated, peutAgir = true
         </Ligne>
 
         <Ligne Icone={ScrollText} titre="Contrat d'entretien" etat={reperes.contrat.titre} fait={reperes.contrat.etat === 'fait'}>
-          {peutAgir && reperes.contrat.action === 'proposer' && (
+          {peutAgir && reperes.contrat.action === 'proposer' && !envoiDOffice && (
             <button type="button" onClick={handleProposeContract} disabled={loadingContract} className={BOUTON}>
               {loadingContract ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScrollText className="w-3.5 h-3.5" />}
               Proposer un contrat
             </button>
           )}
-          {/* Créer la proposition n'envoie rien : l'envoi est un geste à part, le même que sur la fiche client. */}
-          {peutAgir && ['envoyer', 'renvoyer'].includes(reperes.contrat.action) && chantier.client_id && (
-            <button type="button" onClick={() => setShowProposition(true)} className={BOUTON}>
-              <Send className="w-3.5 h-3.5" />
-              {reperes.contrat.action === 'envoyer' ? 'Envoyer la proposition' : 'Renvoyer la proposition'}
-            </button>
+          {/* Créée d'ici, la proposition part d'office ; le bouton reste si elle n'est pas partie
+              (envoi en échec, client sans e-mail, proposition créée ailleurs). */}
+          {peutAgir && chantier.client_id && (envoiDOffice || reperes.contrat.action === 'envoyer') && (
+            <BoutonEnvoiProposition
+              clientId={chantier.client_id}
+              orgId={orgId}
+              auto={envoiDOffice}
+              className={BOUTON}
+              onEnvoye={() => {
+                queryClient.invalidateQueries({ queryKey: chantierKeys.apresVente(orgId) });
+                onUpdated?.();
+              }}
+            />
           )}
         </Ligne>
 
         <Ligne Icone={Receipt} titre="Facturation" etat={reperes.facture.titre} fait={reperes.facture.etat === 'fait'} />
       </div>
-
-      {showProposition && (
-        <PropositionContratDialog
-          clientId={chantier.client_id}
-          orgId={orgId}
-          onClose={() => {
-            setShowProposition(false);
-            // La proposition a pu partir ou être signée : le repère se relit.
-            queryClient.invalidateQueries({ queryKey: chantierKeys.apresVente(orgId) });
-            onUpdated?.();
-          }}
-        />
-      )}
 
       {showContractModal && (
         <CreateContractModal
@@ -159,6 +154,7 @@ export function ChantierApresVenteSection({ chantier, onUpdated, peutAgir = true
           onClose={() => setShowContractModal(false)}
           onSuccess={() => {
             setShowContractModal(false);
+            setEnvoiDOffice(true);
             queryClient.invalidateQueries({ queryKey: chantierKeys.apresVente(orgId) });
             onUpdated?.();
           }}
@@ -166,6 +162,7 @@ export function ChantierApresVenteSection({ chantier, onUpdated, peutAgir = true
           preSelectedEquipmentTypeId={chantier.equipment_type_id || null}
           // Mois de maintenance proposé = mois du PV de réception (anniversaire de l'installation).
           contractDefaults={{ status: 'pending', workflowStatus: 'nouveau', source: 'chantier', maintenanceMonth: moisDuPv(chantier) }}
+          submitLabel="Créer et envoyer la proposition"
         />
       )}
     </div>

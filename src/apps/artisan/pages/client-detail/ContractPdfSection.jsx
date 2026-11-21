@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { FileText, Download, Loader2, PenTool, Printer, Upload, CheckCircle2, Send, Mail, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -6,20 +6,9 @@ import { formatDateFR, formatEuro } from '@/lib/utils';
 import { toast } from 'sonner';
 import { storageService } from '@services/storage.service';
 import { contractsService } from '@services/contracts.service';
-import { mailCampaignsService } from '@services/mailCampaigns.service';
 import { contractKeys } from '@hooks/cacheKeys';
-import { useContractEquipments } from '@hooks/useContracts';
-import { usePricingData, useContractLineOverrides } from '@hooks/usePricing';
-import { useContractZone } from '@hooks/useContractZone';
-import {
-  calculateLineTotal,
-  calculateContractTotal,
-  buildContractPresentation,
-} from '@services/pricing.service';
+import { useContractProposal } from '@hooks/useContractProposal';
 import { generateContractPdfBlob } from '@apps/artisan/components/contrat/ContractPDF';
-import { useOrgSettings } from '@hooks/useOrgSettings';
-import { buildCompanyInfo } from '@/lib/orgBranding';
-import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@lib/logger';
 
 const ACCEPTED_FILE_TYPES = '.pdf,.jpg,.jpeg,.png';
@@ -29,115 +18,15 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
-  const { settings } = useOrgSettings();
-  const company = useMemo(() => buildCompanyInfo(settings), [settings]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [showSendConfirm, setShowSendConfirm] = useState(false);
 
-  // Données pour la génération PDF sans signature
-  const { equipments } = useContractEquipments(contract?.id);
-  const { zones, rates, discounts, equipmentTypes } = usePricingData();
-  const { overrides } = useContractLineOverrides(contract?.id);
-
-  // Zone tarifaire : stockée → Mapbox (temps trajet) → fallback CP dept → défaut
-  const { activeZone } = useContractZone(client, contract, zones);
-
-  const rateIndex = useMemo(() => {
-    if (!rates) return {};
-    const idx = {};
-    for (const r of rates) {
-      const zId = r.zone_id || r.zone?.id;
-      const etId = r.equipment_type_id || r.equipment_type?.id;
-      if (zId && etId) idx[`${zId}_${etId}`] = r;
-    }
-    return idx;
-  }, [rates]);
-
-  const equipTypeMap = useMemo(() => {
-    const map = {};
-    for (const et of equipmentTypes || []) map[et.id] = et;
-    return map;
-  }, [equipmentTypes]);
-
-  const zoneSupplement = parseFloat(activeZone?.supplement || 0);
-
-  const computedPricing = useMemo(() => {
-    if (!equipments?.length || !activeZone) return null;
-    const items = equipments.map((eq) => {
-      const etId = eq.equipment_type_id;
-      const rate = etId ? rateIndex[`${activeZone.id}_${etId}`] || null : null;
-      const equipType = etId ? equipTypeMap[etId] || null : null;
-      const unitCount = eq.unit_count || 1;
-      // Prix forcé par ligne (override) → substitue le prix grille ; dégressivité appliquée en aval.
-      const ov = overrides?.[eq.id];
-      const lineTotal = ov != null ? ov : calculateLineTotal(rate, equipType, unitCount, zoneSupplement);
-      const refParts = [
-        eq.brand,
-        eq.model,
-        eq.installation_year,
-        eq.installation_type === 'ventouse' ? 'Pose ventouse' : eq.installation_type === 'verticale' ? 'Pose verticale' : null,
-        unitCount > 1 && equipType?.unit_label ? `${unitCount} ${equipType.unit_label}s` : null,
-      ].filter(Boolean);
-      return {
-        equipmentTypeId: etId,
-        label: equipType?.label || 'Équipement',
-        reference: refParts.length > 0 ? refParts.join(' · ') : null,
-        quantity: unitCount,
-        basePrice: rate ? parseFloat(rate.price) : 0,
-        lineTotal,
-      };
-    });
-    const totals = calculateContractTotal(items, discounts, contract?.exceptional_discount);
-    return { items, ...totals };
-  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement, overrides, contract?.exceptional_discount]);
-
-  // Montant facturable : priorité au montant forcé (admin), sinon calculé, sinon DB
-  const billableTotal = useMemo(() => {
-    const forcedAmount = contract?.amount_forced ? parseFloat(contract.amount) : null;
-    if (forcedAmount != null && !isNaN(forcedAmount)) return forcedAmount;
-    return computedPricing?.total || parseFloat(contract?.amount) || 0;
-  }, [contract, computedPricing]);
-
-  // Helper : construire les données PDF (réutilisé par impression + envoi).
-  // La présentation tarifaire (lignes + remises) est dérivée du montant facturé via
-  // buildContractPresentation : montant forcé (à la baisse comme à la hausse) → prix
-  // d'articles ramenés au prorata, aucune remise affichée (le montant forcé est le prix,
-  // Eric 2026-11-16). La somme des lignes retombe toujours sur le total.
-  const buildPdfData = useCallback(() => {
-    const forcedAmount = contract?.amount_forced ? parseFloat(contract.amount) : null;
-    const computedTotal = computedPricing?.total || 0;
-    const billable = forcedAmount != null && !isNaN(forcedAmount)
-      ? forcedAmount
-      : (computedTotal || parseFloat(contract?.amount) || 0);
-
-    const presentation = buildContractPresentation(computedPricing, billable);
-
-    return {
-      contractNumber: contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`,
-      startDate: new Date().toISOString(),
-      maintenanceMonth: contract.maintenance_month,
-      clientName: client?.display_name || [client?.first_name, client?.last_name].filter(Boolean).join(' ') || '-',
-      clientAddress: client?.address || '-',
-      clientPostalCode: client?.postal_code || '',
-      clientCity: client?.city || '',
-      clientPhone: client?.phone || '-',
-      clientEmail: client?.email || '-',
-      equipmentLines: presentation.equipmentLines,
-      subtotal: presentation.subtotal,
-      discountPercent: presentation.discountPercent,
-      discountAmount: presentation.discountAmount,
-      exceptionalDiscountAmount: presentation.exceptionalDiscountAmount,
-      total: presentation.total,
-      zoneName: activeZone?.label || '-',
-      notes: contract.notes || null,
-      signatureBase64: null,
-      signataireNom: null,
-      signedAt: null,
-    };
-  }, [contract, client, computedPricing, activeZone]);
+  // Chiffrage, données du PDF et envoi de la proposition : une seule définition, partagée avec
+  // la fiche d'un chantier (useContractProposal).
+  const { company, billableTotal, buildPdfData, envoyerProposition } = useContractProposal({ contract, client, clientId, orgId });
 
   // Télécharger le PDF signé existant
   const handleDownload = useCallback(async () => {
@@ -227,104 +116,22 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     }
   }, [contract, client, orgId, isUploading, queryClient]);
 
-  // Envoyer la proposition par email via N8N/Resend
+  // Envoyer la proposition par e-mail (PDF, e-mail, passage en « Proposition envoyée »).
   const handleSendProposal = useCallback(async () => {
     if (!contract || !client?.email || isSending) return;
     setIsSending(true);
     setShowSendConfirm(false);
     try {
-      // 1. Générer le PDF
-      const pdfData = buildPdfData();
-      const blob = await generateContractPdfBlob(pdfData, company);
-
-      // 2. Upload vers Supabase Storage — préfixe org_id obligatoire (P0.0.7 storage RLS)
-      const contractNum = contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`;
-      const storagePath = `${orgId}/Proposition_${contractNum}.pdf`;
-
-      const { path: uploadedPath, error: uploadError } = await storageService.uploadFile(
-        'contracts',
-        storagePath,
-        blob,
-        { upsert: true, contentType: 'application/pdf' }
-      );
-      if (uploadError) throw uploadError;
-
-      // 3. URL signée 7 jours
-      const { url: pdfUrl, error: urlError } = await storageService.getSignedUrl(
-        'contracts',
-        uploadedPath || storagePath,
-        604800
-      );
-      if (urlError || !pdfUrl) throw urlError || new Error('Impossible de générer le lien PDF');
-
-      // 4. Construire le récap équipements pour l'email
-      const equipRecap = (computedPricing?.items || [])
-        .map(item => `${item.label}${item.reference ? ` (${item.reference})` : ''}`)
-        .join(', ') || 'Vos équipements';
-      const totalStr = formatEuro(billableTotal);
-
-      // 5. Charger le template depuis mail_campaigns (éditable via l'onglet Éditeur)
-      const { data: template, error: templateError } = await mailCampaignsService.getByKey(orgId, 'proposition_contrat');
-      if (templateError || !template) {
-        throw new Error("Template 'proposition_contrat' introuvable — vérifie l'onglet Mailing > Éditeur");
-      }
-
-      const requiredPlaceholders = ['{{EQUIP_RECAP}}', '{{TOTAL_AMOUNT}}', '{{PDF_URL}}'];
-      const missing = requiredPlaceholders.filter((p) => !template.html_body?.includes(p));
-      if (missing.length > 0) {
-        logger.warn('[ContractPdfSection] Placeholders manquants dans le template:', missing);
-      }
-
-      const htmlBody = (template.html_body || '')
-        .replaceAll('{{EQUIP_RECAP}}', equipRecap)
-        .replaceAll('{{TOTAL_AMOUNT}}', totalStr)
-        .replaceAll('{{PDF_URL}}', pdfUrl);
-      const subject = template.subject || `Votre proposition de contrat d'entretien — ${company.name}`;
-
-      // 6. Envoi via edge function mailing-send (P0.8 V2)
-      // Le SQL n'est plus accepté du client : l'edge appelle la RPC
-      // `mail_fetch_recipients(client_id)` qui inclut check membership multi-tenant.
-      const { data: sendData, error: sendError } = await supabase.functions.invoke('mailing-send', {
-        body: {
-          mode: 'single',
-          client_id: clientId,
-          subject,
-          html_body: htmlBody,
-          campaign_name: 'Proposition Contrat',
-        },
-      });
-      if (sendError) throw sendError;
-      if (sendData?.success === false) {
-        throw new Error(sendData?.error || 'Envoi proposition échoué');
-      }
-
-      // 7. Marquer workflow_status = proposal_sent (le statut contractuel reste inchangé).
-      // L'email est parti : un refus ici ne doit PAS passer par le catch (« Erreur lors
-      // de l'envoi » inciterait à renvoyer la proposition au client). Le service
-      // renvoie `{ data, error }` sans throw → on lit `error` et on le dit tel quel.
-      let statusMarked = true;
-      if (!contract.workflow_status || contract.workflow_status === 'nouveau') {
-        const { error: statusError } = await contractsService.updateContract(contract.id, { workflow_status: 'proposal_sent' });
-        if (statusError) {
-          logger.error('[ContractPdfSection] workflow_status proposal_sent refusé:', statusError);
-          statusMarked = false;
-        } else {
-          queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
-        }
-      }
-
-      if (statusMarked) {
-        toast.success(`Proposition envoyée à ${client.email}`);
-      } else {
-        toast.warning(`Proposition envoyée à ${client.email}, mais le contrat n’a pas pu être marqué « proposition envoyée »`);
-      }
+      const { envoyeA, marque } = await envoyerProposition();
+      if (marque) toast.success(`Proposition envoyée à ${envoyeA}`);
+      else toast.warning(`Proposition envoyée à ${envoyeA}, mais le contrat n’a pas pu être marqué « proposition envoyée »`);
     } catch (err) {
       logger.error('[ContractPdfSection] send proposal error:', err);
       toast.error(`Erreur lors de l'envoi : ${err.message || 'Erreur inconnue'}`);
     } finally {
       setIsSending(false);
     }
-  }, [contract, client, clientId, orgId, computedPricing, billableTotal, isSending, buildPdfData, queryClient, company]);
+  }, [contract, client, isSending, envoyerProposition]);
 
   const isSigned = !!contract.signed_at;
   const hasPdf = !!contract.contract_pdf_path;

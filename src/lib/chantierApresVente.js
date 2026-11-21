@@ -61,7 +61,7 @@ export function contratsParClient(lignes) {
  * @property {string} libelle   texte court de la pastille
  * @property {'fait'|'en_cours'|'attention'|'a_faire'|'inconnu'} etat
  * @property {string} titre     l'état en toutes lettres (infobulle, fiche)
- * @property {'proposer'|'envoyer'|'renvoyer'|null} [action] repère contrat : le geste que la fiche propose
+ * @property {'proposer'|'envoyer'|null} [action] repère contrat : le geste que la fiche propose
  */
 
 /**
@@ -145,8 +145,8 @@ export function reperesApresVente(chantier, { contrats, avis } = {}) {
   else {
     const etat = etatContrat(clientId ? contrats.get(clientId) : null);
     if (etat === 'actif') repereContrat = { etat: 'fait', titre: 'Contrat d\'entretien en cours', action: null };
-    else if (etat === 'envoye') repereContrat = { etat: 'en_cours', titre: 'Proposition envoyée au client, pas encore signée', action: 'renvoyer' };
-    // Créer la proposition n'envoie rien : tant qu'elle n'est pas partie, il reste un geste à faire.
+    else if (etat === 'envoye') repereContrat = { etat: 'en_cours', titre: 'Proposition envoyée au client, pas encore signée', action: null };
+    // Une proposition pas encore partie (envoi d'office en échec, créée ailleurs) : il reste un geste à faire.
     else if (etat === 'propose') repereContrat = { etat: 'attention', titre: 'Proposition créée, pas encore envoyée au client', action: 'envoyer' };
     else repereContrat = { etat: 'a_faire', titre: 'Pas de contrat d\'entretien', action: 'proposer' };
   }

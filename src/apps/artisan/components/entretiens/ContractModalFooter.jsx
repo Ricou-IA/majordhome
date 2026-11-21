@@ -21,12 +21,13 @@ const PRIMARY = 'inline-flex items-center gap-2 px-5 py-2 bg-blue-600 text-white
  * @param {number|null} props.total - total annuel à afficher à l'étape équipements (null = rien)
  * @param {boolean} props.isCreating
  * @param {boolean} props.isProposal - contrat `pending` (proposition)
+ * @param {string|null} [props.submitLabel] - libellé du bouton final quand la création enchaîne autre chose (envoi)
  * @param {(step: number) => void} props.onStep
  * @param {() => void} props.onClose
  * @param {() => void} props.onSubmit
  */
 export function ContractModalFooter({
-  step, hasPreSelectedClient, canGoToStep1, canGoToStep2, total, isCreating, isProposal, onStep, onClose, onSubmit,
+  step, hasPreSelectedClient, canGoToStep1, canGoToStep2, total, isCreating, isProposal, submitLabel = null, onStep, onClose, onSubmit,
 }) {
   return (
     <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
@@ -73,7 +74,7 @@ export function ContractModalFooter({
             ) : (
               <>
                 <FileText className="w-4 h-4" />
-                {isProposal ? 'Créer la proposition' : 'Créer le contrat'}
+                {submitLabel || (isProposal ? 'Créer la proposition' : 'Créer le contrat')}
               </>
             )}
           </button>

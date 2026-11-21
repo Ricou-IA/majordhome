@@ -82,7 +82,7 @@ const StepIndicator = ({ current, total }) => (
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedClient = null, preSelectedEquipmentTypeId = null, contractDefaults = null }) {
+export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedClient = null, preSelectedEquipmentTypeId = null, contractDefaults = null, submitLabel = null }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const userId = user?.id;
@@ -446,6 +446,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
             total={contractLines.length > 0 ? contractPricing.total : null}
             isCreating={isCreating}
             isProposal={contractDefaults?.status === 'pending'}
+            submitLabel={submitLabel}
             onStep={setStep}
             onClose={onClose}
             onSubmit={handleSubmit}
