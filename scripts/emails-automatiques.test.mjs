@@ -83,7 +83,9 @@ test('un e-mail dont le module est fermé n’est pas présenté', () => {
   assert.ok(sansDpe.includes('pv_reception'));
   const rienDOuvert = emailsAffiches(() => false);
   assert.ok(rienDOuvert.length > 0 && rienDOuvert.every((e) => e.module === null));
-  assert.equal(emailsAffiches(() => true).length, EMAILS_AUTOMATIQUES.length);
+  assert.equal(emailsAffiches(() => true, { accueilMetaActif: true }).length, EMAILS_AUTOMATIQUES.length);
+  assert.ok(!emailsAffiches(() => true).some((e) => e.interrupteur === 'lead_welcome_email'),
+    'l’accueil Facebook / Instagram ne s’affiche que pour une entreprise qui l’a allumé');
 });
 
 test('essai : les codes de l’edge sont ceux du registre, et un code inconnu a un message', () => {

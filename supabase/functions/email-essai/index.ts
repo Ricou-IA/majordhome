@@ -10,7 +10,7 @@
 //   - verify_jwt:true + requireOrgMembership(org_admin) + module Communication.
 //   - Le destinataire n'est JAMAIS reçu : c'est l'adresse de réponse de l'entreprise, relue en base
 //     (l'adresse d'un compte peut n'être qu'un identifiant sans boîte, Eric 2026-11-21).
-//   - La clé doit être au registre : pas de texte arbitraire, pas d'autre clé
+//   - La clé doit être au registre (e-mail automatique ou séquence) : pas de texte arbitraire, pas d'autre clé
 //     de `mail_campaigns`.
 //   - Rien n'est écrit en base (ni mailing_logs : ce n'est pas un envoi client).
 //
@@ -25,7 +25,7 @@ import {
   orgBranding, brandingReplacements, wrapWithSkeleton, applyPlaceholders, sendResendEmail,
 } from "../_shared/mail.ts";
 import { chargerTexteEmail } from "../_shared/texteEmail.ts";
-import { emailAutomatique } from "../_shared/emailsAutomatiques.js";
+import { emailOuSequence } from "../_shared/emailsAutomatiques.js";
 import { moduleActif } from "../_shared/modules.js";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
   const refus = (code: string, detail: string | null = null) => jsonResponse({ data: null, error: code, detail }, 200, req);
 
   try {
-    const entree = emailAutomatique(String(body.cle || "").trim());
+    const entree = emailOuSequence(String(body.cle || "").trim());
     if (!entree) return refus("email_inconnu");
     const cle = entree.gabarit.key;
 

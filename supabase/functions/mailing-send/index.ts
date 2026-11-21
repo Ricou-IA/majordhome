@@ -21,6 +21,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { resoudreExpediteur } from "../_shared/expediteur.js";
+import { estSequence } from "../_shared/sequencesEmails.js";
+import { wrapWithSkeleton, orgBranding } from "../_shared/mail.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -224,6 +226,8 @@ type OrgBranding = {
   emailTagline: string;
   logoUrl: string;
   emailSkeleton: string | null;
+  /** Réglages bruts de l'organisation (habillage neutre). */
+  reglages: Record<string, unknown>;
 };
 
 // `usage` : un envoi à un segment part du domaine vérifié de l'entreprise, jamais de l'adresse commune
@@ -254,13 +258,18 @@ async function loadOrgBranding(orgId: string, usage: "individuel" | "nombre"): P
     emailTagline: s.email_tagline || "",
     logoUrl: s.logo_url || "",
     emailSkeleton: s.email_skeleton_html || null,
+    reglages: s,
   };
 }
 
+// Habillage de l'entreprise, à défaut l'habillage neutre commun (`_shared/mail.ts`) : un texte sans
+// habillage ne part plus nu. Un HTML déjà complet est laissé tel quel.
 function wrapInSkeleton(body: string, branding: OrgBranding): string {
-  if (!branding.emailSkeleton) return body;
   if (/<!doctype/i.test(body) || /<html[\s>]/i.test(body)) return body;
-  return branding.emailSkeleton.replace("{{EMAIL_BODY}}", body);
+  if (branding.emailSkeleton && branding.emailSkeleton.includes("{{EMAIL_BODY}}")) {
+    return branding.emailSkeleton.replace("{{EMAIL_BODY}}", body);
+  }
+  return wrapWithSkeleton(orgBranding(branding.reglages), body);
 }
 
 function applyPlaceholders(text: string, replacements: Record<string, string>): string {
@@ -456,6 +465,9 @@ Deno.serve(async (req: Request) => {
   const htmlBody = String(payload.html_body || "");
   const campaignName = String(payload.campaign_name || "custom");
   const testEmail = payload.test_email ? String(payload.test_email).trim() : null;
+  // Seul le planificateur (appel de service) peut dire qu'un envoi est une séquence : un utilisateur
+  // ne peut pas faire passer une campagne vers toute sa base pour un e-mail individuel.
+  const sequence = auth.isServiceRole && estSequence(payload.campaign_key ? String(payload.campaign_key) : null);
 
   if (!subject) return jsonResponse({ error: "subject required" }, 400);
   if (!htmlBody) return jsonResponse({ error: "html_body required" }, 400);
@@ -508,7 +520,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const branding = await loadOrgBranding(orgId, mode === "bulk" && !testEmail ? "nombre" : "individuel");
+    const branding = await loadOrgBranding(orgId, mode === "bulk" && !testEmail && !sequence ? "nombre" : "individuel");
     // Pas d'adresse dans les réglages de l'organisation, ou envoi en nombre sans domaine vérifié ⇒
     // rien ne part (jamais l'adresse d'une autre entreprise à la place).
     if (branding.refus || !branding.fromEmail) {

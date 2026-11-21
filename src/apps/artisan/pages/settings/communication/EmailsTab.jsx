@@ -17,6 +17,8 @@ import { phraseEtatEnvoi } from '@/lib/expediteur';
 import ResendDomainSection from './ResendDomainSection';
 import EmailAutoLigne from './EmailAutoLigne';
 import AccueilLeadMetaSection from './AccueilLeadMetaSection';
+import SequencesSection from './SequencesSection';
+import { leadWelcomeSettings } from '@/lib/leadWelcomeEmail';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -121,7 +123,7 @@ export default function EmailsTab() {
               Chaque e-mail part avec un texte par défaut tant que vous ne l&apos;avez pas modifié. Un essai arrive à
               l&apos;adresse enregistrée ci-dessus, celle qui reçoit les réponses.
             </p>
-            {emailsAffiches((cle) => moduleActif(settings, cle)).map((email) => (
+            {emailsAffiches((cle) => moduleActif(settings, cle), { accueilMetaActif: leadWelcomeSettings(settings).enabled }).map((email) => (
               email.interrupteur === 'lead_welcome_email'
                 ? <AccueilLeadMetaSection key={email.gabarit.key} orgId={orgId} />
                 : (
@@ -136,6 +138,8 @@ export default function EmailsTab() {
             ))}
           </section>
         )}
+
+        {communicationActive && <SequencesSection orgId={orgId} />}
 
         <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">
           <button

@@ -24,6 +24,7 @@ import { DEFAULT_RAPPORT_SAV_EMAIL } from './rapportSav.js';
 import { DEFAULT_DPE_RAPPORT_EMAIL } from './dpeRapportEmailTemplate.js';
 import { DEFAULT_LEAD_WELCOME_EMAIL } from './leadWelcomeEmail.js';
 import { DEFAULT_PROPOSITION_CONTRAT_EMAIL, DEFAULT_CONTRAT_SIGNE_EMAIL } from './contratEmailTemplates.js';
+import { sequenceEmail } from './sequencesEmails.js';
 
 /**
  * Variables de l'entreprise, remplies pour tout e-mail (`brandingReplacements` de `_shared/mail.ts` :
@@ -130,6 +131,16 @@ export function emailAutomatique(cle) {
 }
 
 /**
+ * Un e-mail du registre OU une séquence (`sequencesEmails.js`) : tous deux ont un texte par défaut
+ * (`gabarit`) et des valeurs d'essai (`exemple`).
+ * @param {string} cle
+ * @returns {{ gabarit: Readonly<GabaritEmail>, exemple: Readonly<Record<string, string>> } | null}
+ */
+export function emailOuSequence(cle) {
+  return emailAutomatique(cle) ?? sequenceEmail(cle);
+}
+
+/**
  * Texte qui part : celui de l'entreprise s'il a un objet ET un corps, sinon le défaut du registre.
  * `null` seulement pour une clé hors registre sans ligne exploitable (l'appelant refuse l'envoi).
  * @param {{ subject?: string | null, html_body?: string | null } | null | undefined} ligne ligne NON archivée
@@ -141,17 +152,21 @@ export function texteEffectif(ligne, cle) {
   const subject = String(ligne?.subject ?? '').trim();
   const corps = String(ligne?.html_body ?? '');
   if (subject && corps.trim()) return { subject, html_body: corps, source: 'entreprise' };
-  const defaut = emailAutomatique(cle)?.gabarit;
+  const defaut = emailOuSequence(cle)?.gabarit;
   return defaut ? { subject: defaut.subject, html_body: defaut.html_body, source: 'defaut' } : null;
 }
 
 /**
  * E-mails à présenter à une entreprise : ceux dont le module est ouvert.
  * @param {(cleModule: string) => boolean} moduleOuvert ex. `(m) => moduleActif(settings, m)`
+ * @param {{ accueilMetaActif?: boolean }} [options]
  * @returns {ReadonlyArray<Readonly<EmailAutomatique>>}
  */
-export function emailsAffiches(moduleOuvert) {
-  return EMAILS_AUTOMATIQUES.filter((e) => !e.module || moduleOuvert(e.module));
+export function emailsAffiches(moduleOuvert, { accueilMetaActif = false } = {}) {
+  return EMAILS_AUTOMATIQUES.filter((e) => (!e.module || moduleOuvert(e.module))
+    // L'accueil propre aux publicités Facebook / Instagram est remplacé par la séquence « Accueillir un
+    // nouveau prospect » (toutes origines) : il ne reste affiché que pour une entreprise qui l'a allumé.
+    && (e.interrupteur !== 'lead_welcome_email' || accueilMetaActif));
 }
 
 /**

@@ -109,6 +109,8 @@ Deno.serve(async (req: Request) => {
           subject: c.subject,
           html_body: c.html_body,
           campaign_name: c.campaign_label,
+          // Une séquence (e-mail à un prospect) peut partir de l'adresse commune : mailing-send en juge par la clé.
+          campaign_key: c.campaign_key,
         }),
       });
       const rawText = await resp.text();
