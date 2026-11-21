@@ -443,9 +443,11 @@ export default function Entretiens() {
           <TabsTrigger value="contrats" className="gap-2 data-[state=active]:bg-white">
             <List className="h-4 w-4" />
             Contrats
-            {totalCount > 0 && (
+            {/* Tous les contrats non archivés, quel que soit le filtre de la liste : compté sur
+                la liste filtrée, l'onglet affichait le même chiffre que « Clos » dès qu'on l'ouvrait. */}
+            {contractStats?.totalContracts > 0 && (
               <span className="ml-1 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-                {totalCount}
+                {contractStats.totalContracts}
               </span>
             )}
           </TabsTrigger>

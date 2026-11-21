@@ -97,6 +97,16 @@ export default function SendTab() {
     orgId,
     enabled: !!segment && !!orgId,
   });
+  // Taille du segment sans tenir compte de la campagne (le chiffre de l'onglet Segments) :
+  // l'écart avec le compteur ci-dessus = ceux qui ont déjà reçu cette campagne.
+  const { data: tailleSegment } = useSegmentCount({
+    filters: segment?.filters,
+    orgId,
+    enabled: !!segment && !!orgId,
+  });
+  const dejaServis = Number.isFinite(recipientCount) && Number.isFinite(tailleSegment)
+    ? tailleSegment - recipientCount
+    : 0;
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [sending, setSending] = useState(false);
@@ -284,6 +294,7 @@ export default function SendTab() {
                   ) : recipientCount !== null && recipientCount !== undefined ? (
                     <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-100 text-primary-700">
                       {recipientCount} destinataire{recipientCount > 1 ? 's' : ''}
+                      {dejaServis > 0 ? ` sur ${tailleSegment}` : ''}
                     </span>
                   ) : null}
                 </label>
@@ -307,6 +318,11 @@ export default function SendTab() {
                     </optgroup>
                   )}
                 </select>
+                {dejaServis > 0 && (
+                  <p className="mt-1 text-xs text-secondary-500">
+                    {dejaServis.toLocaleString('fr-FR')} {dejaServis > 1 ? 'ont' : 'a'} déjà reçu cette campagne et ne {dejaServis > 1 ? 'la recevront' : 'la recevra'} pas de nouveau.
+                  </p>
+                )}
               </div>
             </div>
 

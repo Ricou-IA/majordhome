@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   SlidersHorizontal,
   Building2,
+  Landmark,
   Archive,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -147,6 +148,7 @@ const StatCard = ({ icon: Icon, label, value, color = 'blue', onClick, active = 
     green: 'bg-green-100 text-green-600',
     amber: 'bg-amber-100 text-amber-600',
     purple: 'bg-purple-100 text-purple-600',
+    teal: 'bg-teal-100 text-teal-600',
     red: 'bg-red-100 text-red-600',
   };
 
@@ -155,6 +157,7 @@ const StatCard = ({ icon: Icon, label, value, color = 'blue', onClick, active = 
     green: 'border-green-500 ring-1 ring-green-200',
     amber: 'border-amber-500 ring-1 ring-amber-200',
     purple: 'border-purple-500 ring-1 ring-purple-200',
+    teal: 'border-teal-500 ring-1 ring-teal-200',
     red: 'border-red-500 ring-1 ring-red-200',
   };
 
@@ -186,6 +189,7 @@ const STAT_CARD_LABELS = {
   contracts: 'Aucun client avec contrat actif',
   particuliers: 'Aucun client particulier',
   entreprises: 'Aucune entreprise',
+  publics: 'Aucun client du secteur public',
 };
 
 const EmptyState = ({ hasFilters, onClearFilters, onAddClient, activeStatCard }) => {
@@ -331,6 +335,9 @@ export function Clients() {
       case 'entreprises':
         setFilters({ ...base, clientCategory: 'entreprise' });
         break;
+      case 'publics':
+        setFilters({ ...base, clientCategory: 'public' });
+        break;
       case 'archived':
         setFilters({ ...base, onlyArchived: true });
         break;
@@ -431,6 +438,9 @@ export function Clients() {
         case 'entreprises':
           setFilters({ ...baseFilters, clientCategory: 'entreprise' });
           break;
+        case 'publics':
+          setFilters({ ...baseFilters, clientCategory: 'public' });
+          break;
         case 'archived':
           setFilters({ ...baseFilters, onlyArchived: true });
           break;
@@ -486,7 +496,7 @@ export function Clients() {
 
           {/* Stats */}
           {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+            <div className={`grid grid-cols-2 gap-4 mt-6 ${stats.publics > 0 ? 'md:grid-cols-3 xl:grid-cols-6' : 'md:grid-cols-5'}`}>
               <StatCard
                 icon={Users}
                 label="Total clients"
@@ -519,6 +529,17 @@ export function Clients() {
                 onClick={() => handleStatCardClick('entreprises')}
                 active={activeStatCard === 'entreprises'}
               />
+              {/* Affichée seulement s'il y en a : les cartes par catégorie retombent sur le total. */}
+              {stats.publics > 0 && (
+                <StatCard
+                  icon={Landmark}
+                  label="Secteur public"
+                  value={stats.publics}
+                  color="teal"
+                  onClick={() => handleStatCardClick('publics')}
+                  active={activeStatCard === 'publics'}
+                />
+              )}
               <StatCard
                 icon={Archive}
                 label="Archivés"

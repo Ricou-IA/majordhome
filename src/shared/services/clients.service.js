@@ -708,7 +708,7 @@ export const clientsService = {
       if (!orgId) throw new Error('[clientsService] orgId est requis');
 
       // Requêtes count en parallèle (pas de limit, juste les comptages)
-      const [totalResult, contractResult, particulierResult, entrepriseResult, archivedResult] = await Promise.all([
+      const [totalResult, contractResult, particulierResult, entrepriseResult, publicResult, archivedResult] = await Promise.all([
         // Total clients non archivés
         supabase
           .from('majordhome_clients')
@@ -740,6 +740,14 @@ export const clientsService = {
           .eq('is_archived', false)
           .eq('client_category', 'entreprise'),
 
+        // Secteur public (mairies, collectivités) : sans lui, particuliers + entreprises ≠ total
+        supabase
+          .from('majordhome_clients')
+          .select('*', { count: 'exact', head: true })
+          .eq('org_id', orgId)
+          .eq('is_archived', false)
+          .eq('client_category', 'public'),
+
         // Archivés
         supabase
           .from('majordhome_clients')
@@ -755,6 +763,7 @@ export const clientsService = {
         active_contracts: contractResult.count || 0,
         particuliers: particulierResult.count || 0,
         entreprises: entrepriseResult.count || 0,
+        publics: publicResult.count || 0,
         archived: archivedResult.count || 0,
       };
     }, 'clients.getClientStats');

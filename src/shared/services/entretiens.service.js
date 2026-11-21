@@ -19,7 +19,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@/lib/logger';
-import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { escapePostgrestSearchTerm, fetchAllPages } from '@/lib/postgrestUtils';
 import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.service';
 import { clusterSectorsByProximity } from '@/lib/sectorClustering';
 import { normaliserSecteur } from '@/lib/tournee/secteurs';
@@ -421,15 +421,16 @@ export const entretiensService = {
     try {
 
       // Tous les contrats de l'org SAUF archivés (vue enrichie avec current_year_visit_status)
-      const { data: contracts, error: contractsError } = await supabase
+      // Lecture en entier : sans pagination, le serveur coupe à 1 000 lignes sans le dire
+      // (841 contrats chez Mayer le 2026-11-22) et tous les compteurs seraient faux.
+      const allContracts = await fetchAllPages((from, to) => supabase
         .from('majordhome_contracts')
         .select('id, status, frequency, amount, current_year_visit_status')
         .eq('org_id', orgId)
-        .neq('status', 'archived');
+        .neq('status', 'archived')
+        .order('id')
+        .range(from, to));
 
-      if (contractsError) throw contractsError;
-
-      const allContracts = contracts || [];
       const activeContracts = allContracts.filter((c) => c.status === 'active');
       const cancelledContracts = allContracts.filter((c) => c.status === 'cancelled');
 
