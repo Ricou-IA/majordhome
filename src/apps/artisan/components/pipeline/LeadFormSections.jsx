@@ -372,6 +372,7 @@ export const SectionPipeline = ({
   commercials,
   groupedEquipmentTypes,
   projectFamilies = [],
+  projectFamilyOff = null,
   canAssign = true,
 }) => (
   <>
@@ -409,7 +410,7 @@ export const SectionPipeline = ({
             <option key={f.key} value={f.key}>{f.label}</option>
           ))}
           {form.project_family_key && !projectFamilies.some((f) => f.key === form.project_family_key) && (
-            <option value={form.project_family_key}>{form.project_family_key} (famille désactivée)</option>
+            <option value={form.project_family_key}>{projectFamilyOff?.label || form.project_family_key} (type désactivé)</option>
           )}
         </select>
         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />

@@ -38,10 +38,10 @@ test('buildDevisConfig : surcharge org, familles invalides ignorées, clés déd
     document: { titre: ' ', validite_jours: 999, intro: 'Bonjour' },
     affichage: { references: false },
   } });
-  assert.equal(c.familles.length, 1);
+  assert.equal(c.familles.filter((f) => !f.catalogue).length, 1);
   assert.deepEqual(c.familles[0], {
     key: 'pompe_a_chaleur', label: 'Pompe à chaleur', actif: true, categories: ['chauffage'], tva: 10,
-    chapitres: [{ titre: 'PAC', type: 'equipement' }, { titre: 'POSE', type: 'main_oeuvre' }], sections: ['PAC', 'POSE'],
+    chapitres: [{ titre: 'PAC', type: 'equipement' }, { titre: 'POSE', type: 'main_oeuvre' }], sections: ['PAC', 'POSE'], catalogue: false,
   });
   assert.equal(c.document.titre, 'DEVIS');
   assert.equal(c.document.validite_jours, 30);

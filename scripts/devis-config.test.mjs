@@ -8,6 +8,9 @@ import {
   typeChapitre, tvaFamille, validerDevisConfig, tauxTvaLigne, tvaDesLignes, tvaDuDevis, nouvelleFamille,
 } from '../src/lib/devisConfig.js';
 
+// Entreprise qui a activé tous les types proposés (le cas de Mayer).
+const TOUT_ACTIF = { devis: { familles: DEFAULT_FAMILLES } };
+
 test('les catégories photovoltaique et borne_recharge font partie des catégories produit du picker', () => {
   assert.ok(CATEGORIES_PRODUIT.includes('photovoltaique'));
   assert.ok(CATEGORIES_PRODUIT.includes('borne_recharge'), 'catégorie posée par le fournisseur ECOSTAL (autre session, 2026-10-24)');
@@ -23,7 +26,7 @@ test('famille Borne de recharge par défaut : catégorie borne_recharge seule, q
   assert.deepEqual([...f.sections], ['ÉQUIPEMENT', 'OPTIONS', 'SÉCURITÉ ET ACCESSOIRES', 'POSE ET MISE EN SERVICE']);
   assert.deepEqual(f.chapitres.map((c) => c.type), ['equipement', 'option', 'stock', 'main_oeuvre']);
   assert.equal(DEFAULT_FAMILLES[i - 1].key, 'photovoltaique');
-  const config = buildDevisConfig({});
+  const config = buildDevisConfig(TOUT_ACTIF);
   assert.deepEqual(categoriesPourSection(config, 'ÉQUIPEMENT', 'borne_recharge'), ['borne_recharge']);
 });
 
@@ -49,7 +52,7 @@ test('rétro-compatibilité : une famille enregistrée avec `categorie` (texte) 
 });
 
 test('categoriesPourSection : les catégories de la famille, ou celle du nom de section, ou aucune (tous)', () => {
-  const config = buildDevisConfig({});
+  const config = buildDevisConfig(TOUT_ACTIF);
   assert.deepEqual(categoriesPourSection(config, 'PANNEAUX', 'photovoltaique'), ['photovoltaique', 'batterie']);
   assert.deepEqual(categoriesPourSection(config, 'FUMISTERIE', 'poele_granules'), ['fumisterie']);
   assert.deepEqual(categoriesPourSection(config, 'MAIN D\'ŒUVRE', 'autre'), []);
@@ -71,13 +74,16 @@ test('la famille Batterie par défaut : catégorie batterie, quatre chapitres d\
 });
 
 test('une org sans réglage reçoit la famille Batterie', () => {
-  const config = buildDevisConfig({});
+  const config = buildDevisConfig(TOUT_ACTIF);
   assert.ok(config.familles.some((f) => f.key === 'batterie'));
 });
 
 test('une liste de familles enregistrée prime : la famille Batterie ne s\'y ajoute pas toute seule', () => {
   const config = buildDevisConfig({ devis: { familles: [{ key: 'x', label: 'X', actif: true, categorie: null, sections: ['A'] }] } });
-  assert.deepEqual(config.familles.map((f) => f.key), ['x']);
+  assert.equal(config.familles[0].key, 'x', 'le type enregistré reste en tête');
+  assert.deepEqual(config.familles.filter((f) => !f.catalogue).map((f) => f.key), ['x']);
+  const batterie = config.familles.find((f) => f.key === 'batterie');
+  assert.equal(batterie.actif, false, 'proposée, pas activée d’office');
 });
 
 // --- Chapitres typés et TVA de famille (2026-10-25, décisions d'Eric) ---
@@ -126,7 +132,7 @@ test('typeChapitre : type du chapitre de la famille (insensible à la casse), si
 });
 
 test('TVA de famille : défaut 5,5 % poêles et PAC, 10 % sinon ; valeur enregistrée hors liste ⇒ défaut', () => {
-  const config = buildDevisConfig({});
+  const config = buildDevisConfig(TOUT_ACTIF);
   assert.equal(tvaFamille(config, 'poele_granules'), 5.5);
   assert.equal(tvaFamille(config, 'Chauffage/PAC'), 5.5);
   assert.equal(tvaFamille(config, 'borne_recharge'), 10);
@@ -142,7 +148,7 @@ test('TVA de famille : défaut 5,5 % poêles et PAC, 10 % sinon ; valeur enregis
 });
 
 test('validation : type de chapitre inconnu et TVA hors liste refusés', () => {
-  const base = buildDevisConfig({});
+  const base = buildDevisConfig(TOUT_ACTIF);
   const mauvais = { ...base, familles: [{ key: 'x', label: 'X', actif: true, categories: [], tva: 7, chapitres: [{ titre: 'A', type: 'bidule' }], sections: ['A'] }] };
   const r = validerDevisConfig(mauvais);
   assert.equal(r.ok, false);
@@ -172,7 +178,7 @@ test('défauts : familles hors pose (SAV, entretien, pièces), tout le catalogue
     assert.ok(!f.sections.some((s) => /POSE/.test(s)), key);
   }
   assert.equal(DEFAULT_FAMILLES.at(-1).key, 'autre', '« Autre » reste en dernier');
-  assert.equal(familleDuLead(buildDevisConfig({}), { project_family_key: 'sav' }), 'Dépannage / SAV');
+  assert.equal(familleDuLead(buildDevisConfig(TOUT_ACTIF), { project_family_key: 'sav' }), 'Dépannage / SAV');
 });
 
 test("tauxTvaLigne : 0 % reste 0 % (autoliquidation), illisible ⇒ 20 %", () => {
@@ -187,7 +193,7 @@ test("tauxTvaLigne : 0 % reste 0 % (autoliquidation), illisible ⇒ 20 %", () =>
 });
 
 test("tvaDuDevis : taux majoritaire des lignes (0 compris), sinon choix fait sur un devis vide, sinon celui de la famille", () => {
-  const config = buildDevisConfig({});
+  const config = buildDevisConfig(TOUT_ACTIF);
   const lignes = [{ line_type: "section_title", tva_rate: 0 }, { tva_rate: 20 }, { tva_rate: 20 }, { tva_rate: 5.5 }];
   assert.equal(tvaDesLignes(lignes), 20);
   assert.equal(tvaDesLignes([{ tva_rate: 0 }]), 0);
@@ -200,19 +206,19 @@ test("tvaDuDevis : taux majoritaire des lignes (0 compris), sinon choix fait sur
 
 test("nouvelleFamille : chapitres typés et TVA posés, la configuration est valide sans autre geste", () => {
   const f = nouvelleFamille(11);
-  assert.equal(f.label, "Nouvelle famille 11");
+  assert.equal(f.label, "Nouveau type 11");
   assert.ok(/^famille_/.test(f.key));
   assert.deepEqual(f.chapitres.map((c) => c.type), ["libre", "main_oeuvre"]);
   assert.deepEqual(f.sections, f.chapitres.map((c) => c.titre));
   assert.equal(f.tva, 10);
   const familles = [...DEFAULT_FAMILLES.map((x) => ({ ...x, chapitres: x.chapitres.map((c) => ({ ...c })) })), f];
   const v = validerDevisConfig({ familles });
-  assert.deepEqual(v.erreurs.filter((e) => e.startsWith("Nouvelle famille 11")), []);
+  assert.deepEqual(v.erreurs.filter((e) => e.startsWith("Nouveau type 11")), []);
 });
 
 test('familleDepuisEquipement : l\'équipement concerné du lead présélectionne la famille de devis (libellé de famille active)', async () => {
   const { familleDepuisEquipement } = await import('../src/lib/devisConfig.js');
-  const config = buildDevisConfig({});
+  const config = buildDevisConfig(TOUT_ACTIF);
   assert.equal(familleDepuisEquipement(config, 'Borne de Recharge'), 'Borne de recharge');
   assert.equal(familleDepuisEquipement(config, 'Poêle à granulés'), 'Poêle à Granulé');
   assert.equal(familleDepuisEquipement(config, 'Poêle à bois ou Insert'), 'Poêle à Bois');
@@ -231,7 +237,7 @@ test('familleDepuisEquipement : l\'équipement concerné du lead présélectionn
 
 test('familleDuLead : le « Projet » commercial du lead prime, le libellé d\'équipement n\'est qu\'un repli', async () => {
   const { familleDuLead } = await import('../src/lib/devisConfig.js');
-  const config = buildDevisConfig({});
+  const config = buildDevisConfig(TOUT_ACTIF);
   // le projet décide, même si l'équipement d'entretien dirait autre chose
   assert.equal(familleDuLead(config, { project_family_key: 'borne_recharge', equipment_type_label: 'Poêle à granulés' }), 'Borne de recharge');
   assert.equal(familleDuLead(config, { project_family_key: 'autre', equipment_type_label: 'Travaux Électricité' }), 'Autre');
@@ -243,4 +249,57 @@ test('familleDuLead : le « Projet » commercial du lead prime, le libellé d\'�
   const sansBorne = buildDevisConfig({ devis: { familles: [{ key: 'autre', label: 'Autre', actif: true, categories: [], sections: ['A'] }, { key: 'borne_recharge', label: 'Borne', actif: false, categories: [], sections: ['A'] }] } });
   assert.equal(familleDuLead(sansBorne, { project_family_key: 'borne_recharge' }), null, 'famille désactivée, pas d\'équipement : rien');
   assert.equal(familleDuLead(config, null), null);
+});
+
+// --- Types de projet par entreprise (Eric 2026-11-21) ---
+
+test('une entreprise sans réglage : tous les types proposés sont là, seul « Autre » est actif', async () => {
+  const { famillesActives } = await import('../src/lib/devisConfig.js');
+  const config = buildDevisConfig({});
+  assert.deepEqual(config.familles.map((f) => f.key), DEFAULT_FAMILLES.map((f) => f.key));
+  assert.deepEqual(famillesActives(config).map((f) => f.key), ['autre']);
+  assert.ok(config.familles.every((f) => f.catalogue === true));
+  assert.equal(validerDevisConfig(config).ok, true, 'un devis reste possible dès le premier jour');
+});
+
+test('types proposés et types libres : la clé décide, un type proposé manquant revient inactif', async () => {
+  const { estFamilleCatalogue } = await import('../src/lib/devisConfig.js');
+  assert.equal(estFamilleCatalogue('poele_granules'), true);
+  assert.equal(estFamilleCatalogue('famille_abc'), false);
+  const config = buildDevisConfig({ devis: { familles: [
+    { key: 'climatisation', label: 'Climatisation', actif: true, categories: ['climatisation'], sections: ['A'] },
+    { key: 'piscine', label: 'Piscine', actif: true, categories: [], sections: ['A'] },
+  ] } });
+  assert.deepEqual(config.familles.slice(0, 2).map((f) => [f.key, f.catalogue, f.actif]), [['climatisation', true, true], ['piscine', false, true]]);
+  const poele = config.familles.find((f) => f.key === 'poele_granules');
+  assert.equal(poele.actif, false);
+  assert.equal(config.familles.filter((f) => f.key === 'climatisation').length, 1, 'jamais en double');
+  assert.equal(config.familles.find((f) => f.key === 'autre').actif, false, '« Autre » n’est activé d’office que sans aucun réglage');
+});
+
+test('un type proposé reste lisible une fois désactivé (leads et devis existants)', async () => {
+  const { familleDe, famillesActives } = await import('../src/lib/devisConfig.js');
+  const config = buildDevisConfig({ devis: { familles: [{ key: 'autre', label: 'Autre', actif: true, categories: [], sections: ['A'] }] } });
+  assert.equal(familleDe(config, 'poele_bois').label, 'Poêle à Bois');
+  assert.equal(familleDe(config, 'Poêle à Bois').key, 'poele_bois');
+  assert.ok(!famillesActives(config).some((f) => f.key === 'poele_bois'));
+});
+
+test('outil d’un type : porté par le type proposé, lié à un module ou inclus ; un type libre n’en a pas', async () => {
+  const { outilDeFamille } = await import('../src/lib/devisConfig.js');
+  assert.equal(outilDeFamille('climatisation').module, 'climatisation');
+  assert.equal(outilDeFamille('poele_granules').module, null);
+  assert.equal(outilDeFamille('poele_bois').libelle, outilDeFamille('poele_granules').libelle);
+  assert.equal(outilDeFamille('piscine'), null);
+  assert.equal(outilDeFamille('autre'), null);
+});
+
+test('un type libre ne double pas un type proposé : il faut activer celui-ci', () => {
+  const base = buildDevisConfig({});
+  const doublon = { ...base, familles: [...base.familles, { key: 'famille_x1', label: 'climatisation', actif: true, categories: [], tva: 10, chapitres: [{ titre: 'A', type: 'libre' }], sections: ['A'] }] };
+  const v = validerDevisConfig(doublon);
+  assert.equal(v.ok, false);
+  assert.ok(v.erreurs.some((e) => /Climatisation.*activez-le/.test(e)), v.erreurs.join(' | '));
+  const autreNom = { ...base, familles: [...base.familles, { key: 'famille_x2', label: 'Piscine', actif: true, categories: [], tva: 10, chapitres: [{ titre: 'A', type: 'libre' }], sections: ['A'] }] };
+  assert.equal(validerDevisConfig(autreNom).ok, true);
 });

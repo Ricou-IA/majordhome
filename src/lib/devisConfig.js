@@ -1,8 +1,15 @@
 // src/lib/devisConfig.js
 // Paramétrage des devis par org — module PUR (aucun import). Valeurs org : core.organizations.settings.devis
 // (Settings → Socle → Devis). ⚠ org_update_settings merge niveau 1 → toujours sauver l'objet `devis` COMPLET.
-// Spec : docs/superpowers/specs/2026-10-06-parametrage-devis-modele-document-design.md. Les défauts sont le
-// comportement codé en dur avant le 2026-10-06 : une org sans réglage ne voit rien changer.
+// Spec : docs/superpowers/specs/2026-10-06-parametrage-devis-modele-document-design.md.
+//
+// TYPES DE PROJET (Eric 2026-11-21) — la liste « Projet » du lead et « Famille » du devis est la même :
+//   - types PROPOSÉS (`DEFAULT_FAMILLES`, le catalogue) : définis ici, l'entreprise les ACTIVE. Leur clé est fixe,
+//     c'est sur elle que s'appuient les outils (métré de fumisterie, dimensionnement de climatisation) et la piste
+//     d'audit ; ils ne se suppriment pas. N'importe quelle entreprise peut les activer : c'est l'OUTIL qui dépend
+//     d'un module, pas le type (`outilDeFamille`) — sinon elle recréerait « Climatisation » à la main ;
+//   - types LIBRES : ajoutés par l'entreprise, sans outil, pour le simple suivi.
+// Une entreprise sans réglage part du catalogue avec le seul type « Autre » actif (plus les 13 types de Mayer).
 
 export const DEFAULT_CONDITIONS = `- Devis valable pour la durée indiquée ci-dessus.
 - Acompte de 30% à la commande, solde à la réception des travaux.
@@ -73,6 +80,38 @@ export const DEFAULT_FAMILLES = Object.freeze([
   familleDefaut('pieces', 'Pièces détachées', [], [['PIÈCES', 'libre']]),
   familleDefaut('autre', 'Autre', [], [['PRESTATIONS', 'libre'], ['MAIN D\'ŒUVRE', 'main_oeuvre']]),
 ]);
+
+const CLES_CATALOGUE = new Set(DEFAULT_FAMILLES.map((f) => f.key));
+/** Type toujours actif pour une entreprise qui n'a rien réglé : il faut au moins un type pour créer un devis. */
+const CLE_TYPE_DE_BASE = 'autre';
+
+/**
+ * Le type est-il un type PROPOSÉ (catalogue) ? Sinon c'est un type libre, ajouté par l'entreprise.
+ * @param {string} key
+ * @returns {boolean}
+ */
+export function estFamilleCatalogue(key) {
+  return CLES_CATALOGUE.has(key);
+}
+
+/**
+ * Outils attachés à un type proposé, et module qui ouvre chacun (`null` = inclus dans la base). Le type reste
+ * activable sans le module : seul l'outil se ferme.
+ */
+const OUTILS_PAR_FAMILLE = Object.freeze({
+  poele_granules: Object.freeze({ libelle: 'Métré de fumisterie assisté', module: null }),
+  poele_bois: Object.freeze({ libelle: 'Métré de fumisterie assisté', module: null }),
+  climatisation: Object.freeze({ libelle: 'Dimensionnement de la climatisation', module: 'climatisation' }),
+});
+
+/**
+ * Outil d'un type de projet, ou null (type libre, ou type proposé sans outil).
+ * @param {string} key
+ * @returns {{ libelle: string, module: string|null }|null}
+ */
+export function outilDeFamille(key) {
+  return OUTILS_PAR_FAMILLE[key] || null;
+}
 
 const sansAccent = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/œ/gi, 'oe').toLowerCase();
 
@@ -153,7 +192,7 @@ function normaliserFamille(f, i) {
   const chapitres = normaliserChapitres(f);
   return {
     key, label, actif: bool(f.actif, true), categories: normaliserCategories(f), tva: normaliserTva(f.tva, key),
-    chapitres, sections: chapitres.map((c) => c.titre),
+    chapitres, sections: chapitres.map((c) => c.titre), catalogue: CLES_CATALOGUE.has(key),
   };
 }
 
@@ -182,9 +221,16 @@ export function buildDevisConfig(settings) {
   const D = DEFAULTS_DEVIS;
   const validite = Number(d.validite_jours);
   return {
-    familles: familles.length ? familles : DEFAULT_FAMILLES.map((f) => ({
-      ...f, categories: [...f.categories], chapitres: f.chapitres.map((c) => ({ ...c })), sections: [...f.sections],
-    })),
+    // Types enregistrés par l'entreprise, puis les types proposés qu'elle n'a pas encore : inactifs, prêts à être
+    // activés (un type ajouté au catalogue arrive ainsi chez tout le monde sans rien écraser). Sans aucun réglage :
+    // le catalogue, « Autre » seul actif.
+    familles: [
+      ...familles,
+      ...DEFAULT_FAMILLES.filter((f) => !vues.has(f.key)).map((f) => ({
+        ...f, actif: familles.length === 0 && f.key === CLE_TYPE_DE_BASE, catalogue: true,
+        categories: [...f.categories], chapitres: f.chapitres.map((c) => ({ ...c })), sections: [...f.sections],
+      })),
+    ],
     document: {
       titre: texte(d.titre, D.document.titre).trim() || D.document.titre,
       intro: texte(d.intro, D.document.intro),
@@ -335,8 +381,8 @@ export function tvaDuDevis({ forcee = null, lines, config, famille }) {
 export function nouvelleFamille(n) {
   const chapitres = [{ titre: 'PRESTATIONS', type: 'libre' }, { titre: 'MAIN D\'ŒUVRE', type: 'main_oeuvre' }];
   return {
-    key: `famille_${Date.now().toString(36)}`, label: `Nouvelle famille ${n}`, actif: true, categories: [], tva: TVA_DEFAUT,
-    chapitres, sections: chapitres.map((c) => c.titre),
+    key: `famille_${Date.now().toString(36)}`, label: `Nouveau type ${n}`, actif: true, categories: [], tva: TVA_DEFAUT,
+    chapitres, sections: chapitres.map((c) => c.titre), catalogue: false,
   };
 }
 
@@ -362,10 +408,14 @@ export function categoriesPourSection(config, sectionName, keyOuLabel) {
 export function validerDevisConfig(config) {
   const erreurs = [];
   const familles = Array.isArray(config?.familles) ? config.familles : [];
-  if (!familles.some((f) => f?.actif)) erreurs.push('au moins une famille active');
+  if (!familles.some((f) => f?.actif)) erreurs.push('au moins un type de projet actif');
   const keys = new Set();
+  const proposes = new Map(DEFAULT_FAMILLES.map((f) => [sansAccent(f.label).trim(), f]));
   familles.forEach((f, i) => {
     const nom = f?.label?.trim() || `famille ${i + 1}`;
+    // Un type libre ne double pas un type proposé : il faut activer celui-ci (il porte l'outil et l'historique).
+    const jumeau = f?.key && !CLES_CATALOGUE.has(f.key) ? proposes.get(sansAccent(f?.label).trim()) : null;
+    if (jumeau) erreurs.push(`« ${jumeau.label} » existe déjà dans les types proposés : activez-le plutôt que de le recréer`);
     if (!f?.label?.trim()) erreurs.push(`famille ${i + 1} : libellé manquant`);
     if (!f?.key) erreurs.push(`${nom} : clé manquante`);
     if (f?.key && keys.has(f.key)) erreurs.push(`${nom} : clé en double`);

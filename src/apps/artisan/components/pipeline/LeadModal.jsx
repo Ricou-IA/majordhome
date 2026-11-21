@@ -36,7 +36,7 @@ import { buildAuditEntry, mergeTimeline } from '@/lib/auditTrail';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { buildDevisConfig, famillesActives } from '@/lib/devisConfig.js';
+import { buildDevisConfig, famillesActives, familleDe } from '@/lib/devisConfig.js';
 import { supabase } from '@/lib/supabaseClient';
 import { leadsService } from '@services/leads.service';
 import { logger } from '@lib/logger';
@@ -387,7 +387,13 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     [referentiel, equipmentTypes],
   );
   // « Projet » = familles de devis actives de l'org (liste commerciale, découplée du référentiel d'entretien)
-  const projectFamilies = useMemo(() => famillesActives(buildDevisConfig(orgSettings)), [orgSettings]);
+  const devisConfig = useMemo(() => buildDevisConfig(orgSettings), [orgSettings]);
+  const projectFamilies = useMemo(() => famillesActives(devisConfig), [devisConfig]);
+  // Type du lead désactivé depuis : il reste lisible sur la fiche, par son nom.
+  const projectFamilyOff = useMemo(() => {
+    const f = familleDe(devisConfig, form.project_family_key);
+    return f && !f.actif ? f : null;
+  }, [devisConfig, form.project_family_key]);
 
   const currentStatus = statuses.find((s) => s.id === form.status_id);
   const isWon = currentStatus?.is_won === true;
@@ -503,6 +509,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 commercials={commercials}
                 groupedEquipmentTypes={groupedEquipmentTypes}
                 projectFamilies={projectFamilies}
+                projectFamilyOff={projectFamilyOff}
                 pendingRdvStatusId={pendingRdvStatusId}
                 setPendingRdvStatusId={setPendingRdvStatusId}
                 lead={lead}

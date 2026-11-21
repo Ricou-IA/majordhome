@@ -3,7 +3,9 @@
 // squelette (titres de chapitre) de chacune. Édition pure d'état : la validation est dans devisConfig.js.
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
-import { CATEGORIES_PRODUIT, TYPES_CHAPITRE, TAUX_TVA, slugFamille, typeChapitreDeduit, nouvelleFamille } from '@/lib/devisConfig.js';
+import { CATEGORIES_PRODUIT, TYPES_CHAPITRE, TAUX_TVA, slugFamille, typeChapitreDeduit, nouvelleFamille, estFamilleCatalogue, outilDeFamille } from '@/lib/devisConfig.js';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { moduleActif } from '@/lib/modules';
 
 const INPUT = 'w-full px-2.5 py-1.5 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
 const TYPE_LABELS = { equipement: 'Équipement (catégorie de la famille)', option: 'Options (catégorie de la famille)', stock: 'Matériel stocké (toutes familles)', main_oeuvre: 'Main d’œuvre', libre: 'Libre (tout le catalogue)', fumisterie: 'Fumisterie (métré assisté)' };
@@ -22,6 +24,15 @@ const chapitresDe = (f) => (Array.isArray(f.chapitres) ? f.chapitres : (f.sectio
 
 export default function FamillesEditor({ familles, onChange }) {
   const [ouverte, setOuverte] = useState(null);
+  const { settings } = useOrgSettings();
+  // Mention de l'outil d'un type proposé : disponible, ou lié à un module que l'entreprise n'a pas.
+  const mentionOutil = (key) => {
+    const outil = outilDeFamille(key);
+    if (!outil) return null;
+    return outil.module && !moduleActif(settings, outil.module)
+      ? `${outil.libelle} : avec le module correspondant`
+      : outil.libelle;
+  };
   const set = (i, patch) => onChange(familles.map((f, j) => (j === i ? { ...f, ...patch } : f)));
   const setChapitres = (i, chapitres) => set(i, { chapitres, sections: chapitres.map((c) => c.titre) });
   const ajouter = () => {
@@ -33,14 +44,21 @@ export default function FamillesEditor({ familles, onChange }) {
 
   return (
     <div className="space-y-2">
+      <p className="text-xs text-secondary-500">
+        Les types proposés s’activent d’une coche ; ceux qui portent un outil le gardent. Un type que vous ajoutez
+        sert au suivi des leads et des devis, sans outil.
+      </p>
       {familles.map((f, i) => {
         const open = ouverte === i;
+        const propose = estFamilleCatalogue(f.key);
+        const outil = mentionOutil(f.key);
         return (
           <div key={f.key} className={`rounded-lg border ${f.actif ? 'border-secondary-200' : 'border-dashed border-secondary-300 opacity-70'}`}>
             <div className="flex items-center gap-2 px-3 py-2">
               <button type="button" onClick={() => setOuverte(open ? null : i)} className="flex items-center gap-2 flex-1 text-left text-sm font-medium text-secondary-800" aria-expanded={open}>
                 {open ? <ChevronDown className="w-4 h-4 text-secondary-400" /> : <ChevronRight className="w-4 h-4 text-secondary-400" />}
                 <span>{f.label || <em className="text-secondary-400">sans nom</em>}</span>
+                <span className="text-xs font-normal text-secondary-500">{f.actif ? '' : '· non proposé '}{propose ? '· type proposé' : '· ajouté par vous'}{outil ? ` · ${outil}` : ''}</span>
                 <span className="text-xs text-secondary-400 font-normal">· {chapitresDe(f).length} chapitre{chapitresDe(f).length > 1 ? 's' : ''} · TVA {String(f.tva ?? 10).replace('.', ',')} %{f.categories?.length ? ` · ${f.categories.map((c) => CATEGORIE_LABELS[c] || c).join(' + ')}` : ''}{f.actif ? '' : ' · masquée'}</span>
               </button>
               <button type="button" onClick={() => onChange(deplacer(familles, i, -1))} disabled={i === 0} className="p-1 text-secondary-400 hover:text-secondary-700 disabled:opacity-30" aria-label="Monter"><ArrowUp className="w-3.5 h-3.5" /></button>
@@ -50,7 +68,7 @@ export default function FamillesEditor({ familles, onChange }) {
               <div className="px-3 pb-3 space-y-3 border-t border-secondary-100 pt-3">
                 <div className="grid sm:grid-cols-2 gap-3">
                   <label className="block text-xs text-secondary-600">Libellé
-                    <input value={f.label} onChange={(e) => set(i, { label: e.target.value, key: f.key.startsWith('famille_') && /^famille_[a-z0-9]+$/.test(f.key) ? (slugFamille(e.target.value) || f.key) : f.key })} className={`${INPUT} mt-1`} />
+                    <input value={f.label} onChange={(e) => set(i, { label: e.target.value, key: f.key.startsWith('famille_') && /^famille_[a-z0-9]+$/.test(f.key) ? (slugFamille(e.target.value) || f.key) : f.key })} disabled={propose} title={propose ? 'Le nom d’un type proposé est fixe : les outils et l’historique s’y rattachent' : undefined} className={`${INPUT} mt-1 disabled:bg-secondary-50 disabled:text-secondary-500`} />
                   </label>
                   <div className="block text-xs text-secondary-600">Catégories des chapitres Équipement et Options <span className="text-secondary-400">(aucune = tout le catalogue)</span>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
@@ -89,8 +107,10 @@ export default function FamillesEditor({ familles, onChange }) {
                   <button type="button" onClick={() => setChapitres(i, [...chapitresDe(f), { titre: '', type: 'equipement' }])} className="mt-1.5 text-xs text-primary-700 hover:underline flex items-center gap-1"><Plus className="w-3 h-3" /> Ajouter un chapitre</button>
                 </div>
                 <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.actif} onChange={(e) => set(i, { actif: e.target.checked })} /> Proposée dans « Nouveau devis »</label>
-                  <button type="button" onClick={() => retirer(i)} className="text-xs text-secondary-500 hover:text-red-600 flex items-center gap-1"><Trash2 className="w-3.5 h-3.5" /> Supprimer la famille</button>
+                  <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={f.actif} onChange={(e) => set(i, { actif: e.target.checked })} /> Proposé dans les leads et les devis</label>
+                  {propose
+                    ? <span className="text-xs text-secondary-400">Type proposé : il se désactive, il ne se supprime pas.</span>
+                    : <button type="button" onClick={() => retirer(i)} className="text-xs text-secondary-500 hover:text-red-600 flex items-center gap-1"><Trash2 className="w-3.5 h-3.5" /> Supprimer ce type</button>}
                 </div>
                 <p className="text-xs text-secondary-400">Les devis et devis types déjà créés gardent leur famille par son libellé : renommer une famille ne les détache pas, la supprimer les laisse orphelins.</p>
               </div>
@@ -98,7 +118,7 @@ export default function FamillesEditor({ familles, onChange }) {
           </div>
         );
       })}
-      <button type="button" onClick={ajouter} className="btn-secondary text-sm flex items-center gap-2"><Plus className="w-4 h-4" /> Ajouter une famille</button>
+      <button type="button" onClick={ajouter} className="btn-secondary text-sm flex items-center gap-2"><Plus className="w-4 h-4" /> Ajouter un type de projet</button>
     </div>
   );
 }
