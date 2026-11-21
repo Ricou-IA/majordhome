@@ -1,8 +1,9 @@
 # E-mails d'une nouvelle entreprise : expéditeur par défaut, textes sans clic, séquences prêtes à activer
 
 Date : 2026-11-21 · Statut : principe validé par Eric. Adresse de plateforme provisoire retenue :
-`envoi.confer-sas.fr` (le nom commercial n'est pas choisi). Tranche 2 codée le 2026-11-21, edges
-non déployées ; tranches 1, 3 et 4 à faire.
+`envoi.confer-sas.fr` (le nom commercial n'est pas choisi). Tranche 2 en production le 2026-11-21
+(neuf edges déployées sur le oui d'Eric, migration `20261121_10` appliquée ; aucun envoi réel
+essayé) ; tranches 1, 3 et 4 à faire.
 
 ## 1. Objectif
 
