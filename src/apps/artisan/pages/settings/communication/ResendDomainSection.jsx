@@ -18,6 +18,7 @@ import { Loader2, Copy, Check, RefreshCw, ShieldCheck, AlertTriangle, Globe } fr
 import { supabase } from '@lib/supabaseClient';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
+import { messageriePublique } from '@/lib/expediteur';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-1';
 const HINT_CLASS = 'text-xs text-secondary-500';
@@ -178,6 +179,8 @@ export default function ResendDomainSection() {
   const meta = statusMeta(status);
   const isVerified = status === 'verified';
   const isConfigured = !!data?.id;
+  // hotmail.fr, gmail.com… : un domaine que l'entreprise ne possède pas ne se configure pas.
+  const publique = messageriePublique(fromEmail);
 
   return (
     <div className="card space-y-4">
@@ -186,7 +189,7 @@ export default function ResendDomainSection() {
           <Globe className="w-4 h-4 text-secondary-400" />
           <h3 className={SECTION_TITLE + ' mb-0'}>Envoyer depuis votre propre domaine</h3>
         </div>
-        {domain && (
+        {domain && !publique && (
           <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${meta.cls}`}>
             {meta.label}
           </span>
@@ -197,6 +200,13 @@ export default function ResendDomainSection() {
         <p className={HINT_CLASS}>
           Facultatif. Enregistrez d&apos;abord <strong>votre adresse e-mail</strong> ci-dessus : son
           domaine pourra ensuite être vérifié ici.
+        </p>
+      ) : publique ? (
+        <p className={HINT_CLASS}>
+          Facultatif. Votre adresse est une adresse de messagerie (<span className="font-mono">@{domain}</span>) :
+          vos e-mails individuels partent déjà, à votre nom. Pour envoyer depuis votre propre nom de domaine, et
+          pour les envois en nombre (campagnes, relances), il faut une adresse à ce nom de domaine
+          (contact@votre-entreprise.fr) : enregistrez-la ci-dessus, la configuration sera proposée ici.
         </p>
       ) : (
         <>

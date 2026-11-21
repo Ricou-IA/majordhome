@@ -59,6 +59,19 @@ export function partieLocale(nom) {
     .replace(/^-+|-+$/g, '');
 }
 
+// Messageries grand public : l'entreprise n'en possède pas le domaine, elle ne pourra jamais le vérifier.
+const MESSAGERIES = new Set([
+  'gmail.com', 'googlemail.com', 'hotmail.fr', 'hotmail.com', 'outlook.fr', 'outlook.com', 'live.fr', 'live.com',
+  'msn.com', 'yahoo.fr', 'yahoo.com', 'ymail.com', 'orange.fr', 'wanadoo.fr', 'free.fr', 'sfr.fr', 'neuf.fr',
+  'laposte.net', 'bbox.fr', 'numericable.fr', 'aliceadsl.fr', 'club-internet.fr', 'icloud.com', 'me.com', 'mac.com',
+  'gmx.fr', 'gmx.com', 'protonmail.com', 'proton.me', 'aol.com',
+]);
+
+/** L'adresse est-elle celle d'une messagerie grand public (domaine qui n'appartient pas à l'entreprise) ? */
+export function messageriePublique(adresse) {
+  return MESSAGERIES.has(domaineDe(adresse));
+}
+
 /** Le domaine de l'adresse d'envoi de l'entreprise est-il vérifié ? */
 export function domaineVerifie(settings) {
   const s = settings ?? {};
@@ -116,7 +129,7 @@ export function phraseEtatEnvoi(settings) {
   if (r.mode === 'domaine') return `Vos e-mails partent de ${r.fromEmail}.`;
   const nom = r.fromName ? `de la part de ${r.fromName}` : 'à votre nom';
   return `Vos e-mails individuels (factures, rendez-vous, documents) partent ${nom}, depuis l’adresse d’envoi commune ; `
-    + `les réponses arrivent à ${r.replyTo}. Les envois en nombre demandent votre propre domaine (ci-dessous).`;
+    + `les réponses arrivent à ${r.replyTo}. Les envois en nombre demandent votre propre nom de domaine (ci-dessous).`;
 }
 
 /** Ce que l'écran dit d'un refus. */

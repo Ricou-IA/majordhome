@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resoudreExpediteur, partieLocale, domaineVerifie, lireAdresse, domaineDe, EXPEDITEUR_REFUS } from '../src/lib/expediteur.js';
+import { messageriePublique, resoudreExpediteur, partieLocale, domaineVerifie, lireAdresse, domaineDe, EXPEDITEUR_REFUS } from '../src/lib/expediteur.js';
 
 const VERIFIE = {
   brand_name: 'Dupont Chauffage', from_email: 'contact@dupont.fr', reply_to: 'bureau@dupont.fr',
@@ -87,6 +87,13 @@ test('lecture d’une adresse', () => {
   assert.deepEqual(lireAdresse('rien'), { nom: '', adresse: '' });
   assert.equal(domaineDe('a@B.fr'), 'b.fr');
   assert.equal(domaineDe('a@b'), '');
+});
+
+test('une messagerie grand public n’est pas un domaine à configurer', () => {
+  assert.equal(messageriePublique('jean@Hotmail.fr'), true);
+  assert.equal(messageriePublique('jean@gmail.com'), true);
+  assert.equal(messageriePublique('contact@dupont.fr'), false);
+  assert.equal(messageriePublique(''), false);
 });
 
 test('chaque refus a son message', () => {
