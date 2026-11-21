@@ -151,6 +151,22 @@ premier envoi, pas six mois plus tard.
   (une lecture seule d'écran ne suffit pas).
 - La clé d'API désigne l'organisation : l'entrée n'accepte aucun identifiant d'organisation dans la requête.
 
+**État du lot 2 au 2026-11-21 : écrit et commité en local dans HésiaSun (`7482789`), non poussé.** Écarts avec
+ce qui précède, constatés en construisant :
+- **Une migration est nécessaire** (`20261121_0049_api_keys_portee_organisation.sql`) : `api_keys.scopes` porte
+  une contrainte qui n'acceptait que trois portées. À appliquer avant tout push de HésiaSun.
+- **TVA** : un envoi dont la TVA ne correspond pas au SIRET est refusé, 409 `tva_incoherente` (TVA vide acceptée).
+- **Défaire la liaison** : `DELETE /api/v1/organization/liaison?liaison_id=…` (paramètre d'adresse, pas de corps).
+- **Refus** : tous en 409 `conflict` avec la raison dans `error.details.raison` ; un champ mal formé en 422 avec
+  le détail par champ dans `error.details`.
+- **Forme enregistrée par HésiaSun** : SIRET et TVA sans espaces (son schéma), téléphone par paires.
+- **E-mail, logo et signature** restent modifiables dans HésiaSun sous gestion extérieure.
+- Les trois entrées ne sont pas décomptées du quota : elles fonctionnent quel que soit le plan.
+- Limite connue : la lecture seule est tenue par l'écran et par l'action d'enregistrement ; la règle de base de
+  données de HésiaSun laisse toujours un administrateur écrire sa ligne d'organisation par un autre chemin.
+- Copie des règles : `npm run sync:identite` (Majord'home) écrit `identite-partagee.js` dans HésiaSun,
+  `-- --check` échoue si elle diffère.
+
 ### 5.4 Côté Majord'home (lot 3)
 
 **Relier.** Paramètres → Organisation → Identité, bloc « HésiaSun » (org_admin). L'administrateur colle une
@@ -182,7 +198,7 @@ actions fermées : `relier`, `pousser`, `delier`, `etat`.
   `org_secret_read`, appelle `PUT /organization`. Succès ⇒ `dernier_envoi_le`, `erreur` et `en_attente` vidés.
   Échec ⇒ `erreur` = code, `en_attente = true`. `liaison_rompue` ⇒ la liaison est défaite côté Majord'home
   (clé retirée du coffre, `settings.hesiasun` vidé sauf une mention « rompue depuis HésiaSun le … »).
-- `delier` : `DELETE /organization/liaison`, puis clé retirée et état vidé, même si HésiaSun ne répond pas
+- `delier` : `DELETE /organization/liaison?liaison_id=…`, puis clé retirée et état vidé, même si HésiaSun ne répond pas
   (le dire).
 - Réponses `{ data, error }` où `error` est un CODE ; table codes ↔ messages dans le module pur, testée dans
   les deux sens (convention de `dpe-lien` et `sav-report-send`).
