@@ -171,17 +171,17 @@ export default function MapControls({
         </button>
       </div>
 
-      {/* Stats */}
+      {/* Stats : les CLIENTS seulement (les leads ne sont pas comptés ici) */}
       {stats && (
         <div className="px-4 py-3 border-t border-secondary-100 bg-secondary-50">
           <div className="grid grid-cols-2 gap-2 text-center">
             <div>
-              <p className="text-lg font-bold text-secondary-800">{stats.geocoded}</p>
-              <p className="text-xs text-secondary-500">Géocodés</p>
+              <p className="text-lg font-bold text-secondary-800">{stats.geocoded} / {stats.total}</p>
+              <p className="text-xs text-secondary-500">Clients géocodés</p>
             </div>
             <div>
               <p className="text-lg font-bold text-secondary-800">{stats.coverage}%</p>
-              <p className="text-xs text-secondary-500">Couverture</p>
+              <p className="text-xs text-secondary-500">des clients</p>
             </div>
           </div>
           {stats.notGeocoded > 0 && (
