@@ -288,7 +288,7 @@ test('un type proposé reste lisible une fois désactivé (leads et devis exista
 test('outil d’un type : porté par le type proposé, lié à un module ou inclus ; un type libre n’en a pas', async () => {
   const { outilDeFamille } = await import('../src/lib/devisConfig.js');
   assert.equal(outilDeFamille('climatisation').module, 'climatisation');
-  assert.equal(outilDeFamille('poele_granules').module, null);
+  assert.equal(outilDeFamille('poele_granules').module, 'fumisterie');
   assert.equal(outilDeFamille('poele_bois').libelle, outilDeFamille('poele_granules').libelle);
   assert.equal(outilDeFamille('piscine'), null);
   assert.equal(outilDeFamille('autre'), null);

@@ -98,7 +98,7 @@ test('modulesVisibles : la tuile Fournisseurs & catalogue suit le droit articles
 
 test('modulesEffectifs : état de chaque module du catalogue, défauts appliqués', () => {
   assert.deepEqual(modulesEffectifs({ modules: { maintenance: true, crm: false } }), {
-    crm: false, entretiens: true, communication: false, solaire: true, thermique: true, webshop: false, climatisation: false, cedants: false, prospection: false, geogrid: false, meta_ads: false, maintenance: true, dpe: false, assistant: false,
+    crm: false, entretiens: true, communication: false, solaire: true, thermique: true, webshop: false, climatisation: false, fumisterie: false, cedants: false, prospection: false, geogrid: false, meta_ads: false, maintenance: true, dpe: false, assistant: false,
   });
 });
 
@@ -135,6 +135,7 @@ test('moduleDeRoute : chaque route de routes.jsx appartient au socle ou à un mo
   assert.equal(moduleDeRoute('settings/webshop'), 'webshop');
   assert.equal(moduleDeRoute('clim'), 'climatisation');
   assert.equal(moduleDeRoute('settings/clim'), 'climatisation');
+  assert.equal(moduleDeRoute('settings/fumisterie'), 'fumisterie');
   assert.equal(moduleDeRoute('cedants'), 'cedants');
   assert.equal(moduleDeRoute('prospection'), 'prospection');
   assert.equal(moduleDeRoute('geogrid'), 'geogrid');

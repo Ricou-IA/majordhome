@@ -38,6 +38,8 @@ import DevisProductPicker from './DevisProductPicker';
 import { SectionBlock, ListeLignes } from './DevisSectionBlock';
 import ArticleDrawer from '../../pages/settings/catalogue/ArticleDrawer';
 import MetreFumisterie from './metre/MetreFumisterie';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { moduleActif } from '@/lib/modules';
 import ImportOffreDevisModal from './ImportOffreDevisModal';
 import { Plus, Package, BookmarkPlus } from 'lucide-react';
 
@@ -53,6 +55,9 @@ const AUCUN_COMPTE = new Map();
 export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig, importOffreOuvert = false, onFermerImportOffre, articles = AUCUN_ARTICLE }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, categories, type }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
+  // Métré assisté = module Fumisterie : sans lui le chapitre reste un chapitre ordinaire (saisie et catalogue).
+  const { settings: orgSettings } = useOrgSettings();
+  const metreOuvert = moduleActif(orgSettings, 'fumisterie');
   // TVA du devis DÉRIVÉE à chaque rendu (tvaDuDevis) : les lignes chiffrées font foi (devis repris, devis type chargé) ;
   // le choix mémorisé ne sert que tant que le devis n'a aucune ligne chiffrée ; changer de famille l'oublie.
   const [tvaChoisie, setTvaChoisie] = useState(null);
@@ -330,7 +335,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
                               onAddProducts={handleAddProductsToSection}
                               onAddLabor={addLaborToSection}
                               onAddFreeform={addFreeformToSection}
-                              onMetre={setMetreForSection}
+                              onMetre={metreOuvert ? setMetreForSection : undefined}
                               marquesParItem={marquesParItem}
                               nbParItem={nbParItem}
                               onMarque={changerMarque}

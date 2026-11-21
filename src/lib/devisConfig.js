@@ -99,8 +99,8 @@ export function estFamilleCatalogue(key) {
  * activable sans le module : seul l'outil se ferme.
  */
 const OUTILS_PAR_FAMILLE = Object.freeze({
-  poele_granules: Object.freeze({ libelle: 'Métré de fumisterie assisté', module: null }),
-  poele_bois: Object.freeze({ libelle: 'Métré de fumisterie assisté', module: null }),
+  poele_granules: Object.freeze({ libelle: 'Métré de fumisterie assisté', module: 'fumisterie' }),
+  poele_bois: Object.freeze({ libelle: 'Métré de fumisterie assisté', module: 'fumisterie' }),
   climatisation: Object.freeze({ libelle: 'Dimensionnement de la climatisation', module: 'climatisation' }),
 });
 

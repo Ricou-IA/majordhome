@@ -64,6 +64,14 @@ export const MODULES = [
     tiles: [
       { key: 'pricing', title: 'Tarification', description: 'Zones, grille de prix, remises, options, durées d\'entretien', icon: 'Calculator', href: '/settings/pricing', adminOnly: true },
       { key: 'tournees', title: 'Tournées', description: 'Horizons, pauses, souplesse des RDV, figeage des journées', icon: 'Route', href: '/settings/tournees', adminOnly: true },
+    ],
+  },
+  {
+    // Métré de fumisterie assisté (devis des poêles) : module activable depuis le 2026-11-21 (Eric : option payante).
+    key: 'fumisterie',
+    label: 'Fumisterie',
+    description: 'Métré assisté des conduits dans les devis de poêle.',
+    tiles: [
       { key: 'fumisterie', title: 'Fumisterie', description: 'Finition par défaut, longueurs d\'éléments, fixations, règle de zone 1', icon: 'Flame', href: '/settings/fumisterie', adminOnly: true },
     ],
   },
@@ -125,6 +133,7 @@ export const CATALOGUE = [
   // pour les organisations qui s'en servaient déjà. Ils s'appuient sur le CRM (pipeline, devis).
   { key: 'webshop', label: 'Webshop', description: 'Commandes de la boutique en ligne, catalogue produits, tournées de livraison.', parDefaut: false, accueil: null },
   { key: 'climatisation', label: 'Climatisation', description: "Dimensionnement d'une climatisation et devis proposé.", parDefaut: false, accueil: null },
+  { key: 'fumisterie', label: 'Fumisterie', description: 'Métré assisté des conduits de fumée dans les devis de poêle.', parDefaut: false, accueil: null },
   // Écrans sortis du CRM le 2026-11-21 (Eric : « tout cela doit être en module »). Rien à régler dans un
   // groupe à eux : les deux réglages de GeoGrid vivent dans Organisation → Territoire, affichés si le module est ouvert.
   { key: 'cedants', label: 'Cédants', description: "Recherche d'entreprises à reprendre et suivi des dossiers.", parDefaut: false, accueil: null, sansReglage: true },
@@ -209,13 +218,14 @@ const ROUTES_PAR_MODULE = {
   ],
   entretiens: [
     'contrats', 'entretiens', 'certificat/:interventionId', 'clients/:clientId/contrat/signer',
-    'settings/pricing', 'settings/tournees', 'settings/fumisterie',
+    'settings/pricing', 'settings/tournees',
   ],
   communication: ['settings/sms', 'settings/telephonie'],
   solaire: ['solaire', 'solaire/autoconso', 'solaire/historique', 'settings/solaire'],
   thermique: ['thermique', 'thermique/historique', 'settings/thermique'],
   webshop: ['webshop', 'settings/webshop'],
   climatisation: ['clim', 'settings/clim'],
+  fumisterie: ['settings/fumisterie'],
   cedants: ['cedants'],
   prospection: ['prospection'],
   geogrid: ['geogrid'],
