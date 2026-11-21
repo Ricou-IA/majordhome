@@ -74,7 +74,19 @@ export function buildPersonColorMaps({ members = [], commercials = [] } = {}) {
  */
 export function resolveAppointmentColor(appt, maps) {
   if (appt?.target_invoiced === true) return INVOICED_EVENT_COLOR;
-  const { colorByProfile, techProfileById, comProfileById } = maps;
+  const profile = proprietaireDuRdv(appt, maps);
+  return (profile && maps.colorByProfile.get(profile)) || FALLBACK_PERSON_COLOR;
+}
+
+/**
+ * Personne (clé de profil) qui porte un RDV : celle dont il prend la couleur et le
+ * couloir (planningCouloirs.js). null si personne n'est résolu.
+ * @param {Object} appt { appointment_type, technician_ids[], assigned_commercial_id }
+ * @param {Object} maps issu de buildPersonColorMaps
+ * @returns {string|null}
+ */
+export function proprietaireDuRdv(appt, maps) {
+  const { techProfileById, comProfileById } = maps;
   const techId = appt?.technician_ids?.[0];
   const techProfile = techId ? techProfileById.get(techId) : null;
   // assigned_commercial_id porte un commercials.id (VT prise depuis le pipeline) OU un
@@ -83,8 +95,7 @@ export function resolveAppointmentColor(appt, maps) {
   const comProfile = comId ? (comProfileById.get(comId) || techProfileById.get(comId) || null) : null;
   // VT/agence : on préfère le commercial ; sinon (intervention/autre) le technicien.
   const preferCom = COMMERCIAL_TYPES.includes(appt?.appointment_type);
-  const profile = preferCom ? (comProfile || techProfile) : (techProfile || comProfile);
-  return (profile && colorByProfile.get(profile)) || FALLBACK_PERSON_COLOR;
+  return (preferCom ? (comProfile || techProfile) : (techProfile || comProfile)) || null;
 }
 
 /**
@@ -98,7 +109,8 @@ export function resolveAppointmentColor(appt, maps) {
  * - Sinon (0-1 technicien, ou RDV commercial) → 1 bloc unique (couleur du propriétaire).
  * `idSuffix` rend l'event FullCalendar unique par bloc ; l'id réel du RDV reste dans
  * extendedProps (cf. toCalendarEvent) pour le drag/resize/clic.
- * @returns {Array<{ color: string, idSuffix: (string|null) }>}
+ * `personne` = clé de profil de qui porte le bloc (son couloir dans la grille).
+ * @returns {Array<{ color: string, idSuffix: (string|null), personne: (string|null) }>}
  */
 export function expandAppointmentBlocks(appt, maps, selectedRecordIds) {
   const invoiced = appt?.target_invoiced === true;
@@ -113,9 +125,10 @@ export function expandAppointmentBlocks(appt, maps, selectedRecordIds) {
         ? INVOICED_EVENT_COLOR
         : (maps.colorByProfile.get(maps.techProfileById.get(techId)) || FALLBACK_PERSON_COLOR),
       idSuffix: techId,
+      personne: maps.techProfileById.get(techId) || null,
     }));
   }
-  return [{ color: resolveAppointmentColor(appt, maps), idSuffix: null }];
+  return [{ color: resolveAppointmentColor(appt, maps), idSuffix: null, personne: proprietaireDuRdv(appt, maps) }];
 }
 
 /**

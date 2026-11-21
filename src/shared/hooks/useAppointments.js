@@ -23,6 +23,7 @@ import { construireReglages } from '@/lib/tournee/reglages.js';
 import { poseProvisoire } from '@/lib/installOrder';
 import { useLeadCommercials } from '@hooks/useLeads';
 import { planningQueries, dependancesDesRdv } from '@hooks/planningQueries';
+import { ordreDesCouloirs, placerEnCouloirs, classeDeCouloir, minutesDe } from '@/lib/planningCouloirs';
 import {
   buildPersonColorMaps, buildTeamList, expandAppointmentBlocks, estAdaptable, fenetreDe,
   matchesKindFilter, matchesMemberFilter,
@@ -137,7 +138,9 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     const aujourdhui = new Date().toLocaleDateString('fr-CA'); // YYYY-MM-DD, fuseau local
     const chantierById = new Map((chantierOrders || []).map((c) => [c.id, c]));
     const quotedLeadSet = new Set(quotedLeadIds || []);
-    return enriched
+    // Blocs à ranger en couloirs par personne (planningCouloirs.js).
+    const aPlacer = [];
+    const blocsDuCalendrier = enriched
       .filter((a) => matchesKindFilter(a, filters.kinds) && matchesMemberFilter(a, selectedRecordIds))
       .flatMap((a) => {
         const adaptable = estAdaptable(a, reglages.souplesse_defaut_minutes, { aujourdhui });
@@ -145,9 +148,13 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
         const provisoire = a.appointment_type === 'installation'
           && poseProvisoire(chantierById.get(a.chantier_id));
         const devisFait = a.appointment_type === 'rdv_technical' && quotedLeadSet.has(a.lead_id);
-        const blocs = expandAppointmentBlocks(a, colorMaps, selectedRecordIds).map((b) =>
-          appointmentsService.toCalendarEvent(a, { color: b.color, idSuffix: b.idSuffix, adaptable, provisoire, devisFait })
-        );
+        const debut = minutesDe(a.scheduled_start);
+        const fin = minutesDe(a.scheduled_end) ?? (debut ?? 0) + 60;
+        const blocs = expandAppointmentBlocks(a, colorMaps, selectedRecordIds).map((b) => {
+          const event = appointmentsService.toCalendarEvent(a, { color: b.color, idSuffix: b.idSuffix, adaptable, provisoire, devisFait });
+          if (debut !== null) aPlacer.push({ id: event.id, jour: a.scheduled_date, debut, fin, personne: b.personne });
+          return event;
+        });
         if (!filters.showTolerance || !adaptable || !a.scheduled_start) return blocs;
         // Bande de tolérance : « on voit toujours des blocs » — le RDV reste à son
         // heure provisoire, la bande montre jusqu'où il peut glisser. Événement de
@@ -161,11 +168,20 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
           display: 'background',
           backgroundColor: blocs[0]?.backgroundColor,
           classNames: ['mdh-flex-band'],
+          bandOf: blocs[0]?.id,
           extendedProps: { id: a.id, band: true },
         });
         return blocs;
       });
-  }, [appointments, enriched, chantierOrders, quotedLeadIds, filters.kinds, filters.showTolerance, selectedRecordIds, colorMaps, reglages]);
+
+    // Une colonne par personne dans chaque jour, toujours dans le même ordre ; la bande
+    // de tolérance suit le premier bloc de son RDV.
+    const places = placerEnCouloirs(aPlacer, ordreDesCouloirs(teamList));
+    return blocsDuCalendrier.map((e) => {
+      const place = places.get(e.id) || (e.extendedProps?.band ? places.get(e.bandOf) : null);
+      return place ? { ...e, classNames: [...(e.classNames || []), classeDeCouloir(place)] } : e;
+    });
+  }, [appointments, enriched, chantierOrders, quotedLeadIds, filters.kinds, filters.showTolerance, selectedRecordIds, colorMaps, teamList, reglages]);
 
   // Mutation : créer un RDV
   const createMutation = useMutation({

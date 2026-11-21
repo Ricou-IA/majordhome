@@ -22,7 +22,7 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -41,6 +41,7 @@ import { usePlanningJournee } from '@hooks/usePlanningJournee';
 import { usePlanningImpression } from '@hooks/usePlanningImpression';
 import { useDeviceClass } from '@hooks/useDeviceClass';
 import { creneauParDefaut } from '@/lib/planningGestes';
+import { cssDesCouloirs } from '@/lib/planningCouloirs';
 import { FeuilleDeRoutePanel } from '@/apps/artisan/components/planning/FeuilleDeRoutePanel';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { CalendarToolbar } from '@/apps/artisan/components/planning/CalendarToolbar';
@@ -198,6 +199,10 @@ export default function Planning() {
     events,
   });
 
+  // Une colonne par personne dans chaque jour : les places calculées par useAppointments
+  // (lib/planningCouloirs.js) sont imposées au cadre de chaque bloc par ces règles.
+  const cssCouloirs = useMemo(() => cssDesCouloirs(events), [events]);
+
   // Recherche client : clic sur un de ses RDV → le calendrier va à sa date ; ses RDV sont surlignés.
   const handlePickSearchedAppointment = useCallback((appt) => allerAuJour(appt.scheduled_date), [allerAuJour]);
   const eventClassNames = useCallback(
@@ -280,6 +285,7 @@ export default function Planning() {
           className="fc-wrapper"
           style={hauteurEnTete && currentView !== 'dayGridMonth' ? { '--mdh-head-h': `${hauteurEnTete}px` } : undefined}
         >
+          {cssCouloirs && <style>{cssCouloirs}</style>}
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
