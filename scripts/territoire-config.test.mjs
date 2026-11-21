@@ -66,3 +66,23 @@ test('empreinteCentres : l\'étendue recalcule les zones, l\'étendue par défau
   assert.notEqual(empreinteCentres(deuxCentres, 30), empreinteCentres(deuxCentres, 45));
   assert.equal(empreinteCentres(null, 30), '');
 });
+
+test('dureeDuCentre : l\'étendue du centre, sinon le repli ; l\'empreinte suit chaque centre', async () => {
+  const { dureeDuCentre } = await import('../src/lib/territoire-config.js');
+  assert.equal(dureeDuCentre({ minutes: 20 }), 20);
+  assert.equal(dureeDuCentre({ minutes: '45' }, 30), 45);
+  assert.equal(dureeDuCentre({}, 30), 30);
+  assert.equal(dureeDuCentre({ minutes: 90 }, 30), 30);
+  assert.equal(dureeDuCentre(null), 60);
+
+  const base = empreinteCentres(deuxCentres);
+  const antenneCourte = { ...deuxCentres, antenne: { ...deuxCentres.antenne, minutes: 20 } };
+  assert.notEqual(empreinteCentres(antenneCourte), base);
+  // un centre à une heure explicite = l'empreinte d'avant le réglage
+  assert.equal(empreinteCentres({ ...deuxCentres, siege: { ...deuxCentres.siege, minutes: 60 } }), base);
+  // l'étendue propre d'un centre prime sur le repli commun
+  assert.equal(
+    empreinteCentres({ siege: { ...deuxCentres.siege, minutes: 60 }, antenne: { ...deuxCentres.antenne, minutes: 60 } }, 30),
+    base,
+  );
+});

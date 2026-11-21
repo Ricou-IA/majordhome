@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as turf from '@turf/turf';
-import { TERRITOIRE_CONFIG, getTerritoireCenters, centresValides, empreinteCentres, dureeTerritoire } from '@/lib/territoire-config';
+import { TERRITOIRE_CONFIG, getTerritoireCenters, centresValides, empreinteCentres, dureeTerritoire, dureeDuCentre } from '@/lib/territoire-config';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { logger } from '@lib/logger';
@@ -339,19 +339,22 @@ async function zoneDAntenne(isoSiege, isoAntenne, siege, antenne, token) {
  *
  * @returns {Promise<{ zones: Object<string, Feature>, ordre: string[], zone_principale: Feature, metadata: Object }|null>}
  */
-async function calculateZones(token, centers, isochroneMinutes = TERRITOIRE_CONFIG.isochroneMinutes) {
+async function calculateZones(token, centers, minutesParDefaut = TERRITOIRE_CONFIG.isochroneMinutes) {
   const entrees = centresValides(centers);
   if (entrees.length === 0) return null;
   const [siege, ...antennes] = entrees;
+  // Chaque centre a son étendue (minutes de voiture autour de lui)
+  const durees = entrees.map((c) => dureeDuCentre(c, minutesParDefaut));
+  const isochroneMinutes = durees[0];
 
   // 1. Isochrones de tous les centres, en parallèle (cercle approximatif si l'API ne répond pas)
   let usedFallback = false;
   const isos = (await Promise.all(
-    entrees.map((c) => fetchIsochrone(c.lng, c.lat, isochroneMinutes, token)),
+    entrees.map((c, i) => fetchIsochrone(c.lng, c.lat, durees[i], token)),
   )).map((iso, i) => {
     if (iso) return iso;
     usedFallback = true;
-    return createFallbackCircle(entrees[i].lng, entrees[i].lat, isochroneMinutes);
+    return createFallbackCircle(entrees[i].lng, entrees[i].lat, durees[i]);
   });
   const isoSiege = isos[0];
 
@@ -413,7 +416,7 @@ export function useMapZones(mapboxToken) {
   const { settings: orgSettings } = useOrgSettings();
   const orgCenters = useMemo(() => getTerritoireCenters(orgSettings), [orgSettings]);
   // Empreinte des centres : un siège déplacé ou une antenne ajoutée invalide le cache du navigateur.
-  // Étendue du territoire (minutes de voiture) : réglage de l'organisation, lui aussi dans l'empreinte.
+  // Étendue de chaque centre (minutes de voiture), comprise dans l'empreinte ; `minutes` = repli commun.
   const minutes = dureeTerritoire(orgSettings);
   const empreinte = useMemo(() => empreinteCentres(orgCenters, minutes), [orgCenters, minutes]);
   const aDesCentres = empreinte !== '';

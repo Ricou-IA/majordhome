@@ -1,4 +1,4 @@
-// Settings → Organisation → Territoire : siège sur la carte (départ des trajets), étendue du territoire, antennes
+// Settings → Organisation → Territoire : siège sur la carte (départ des trajets), antennes (chacun avec l'étendue de sa zone),
 // commerciales, visibilité locale (fiche Google Business, département principal pour GeoGrid).
 import { useMemo, useState } from 'react';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -6,7 +6,7 @@ import { moduleActif } from '@/lib/modules';
 import { toast } from 'sonner';
 import { ChevronDown, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { MAPBOX_CONFIG } from '@lib/mapbox';
-import { DUREES_TERRITOIRE, dureeTerritoire } from '@/lib/territoire-config';
+import { dureeTerritoire, dureeDuCentre } from '@/lib/territoire-config';
 import CenterEditor from './components/CenterEditor';
 import DepartmentSelect from './components/DepartmentSelect';
 import { useSettingsForm } from './components/useSettingsForm';
@@ -38,9 +38,8 @@ function defaultBranch() {
 function deserialize(settings) {
   const centers = settings?.territoire_centers;
   const empty = {
-    headquarters: defaultCenter(),
+    headquarters: { ...defaultCenter(), minutes: dureeTerritoire(settings) },
     branches: [],
-    territoire_minutes: dureeTerritoire(settings),
     google_place_id: settings?.google_place_id || '',
     geogrid_target_department: settings?.geogrid_target_department || '',
   };
@@ -50,9 +49,9 @@ function deserialize(settings) {
   const [, hq] = entries[0];
   const branches = entries.slice(1).map(([, c]) => c);
   return {
-    headquarters: { ...defaultCenter(), ...hq },
-    branches: branches.map((b) => ({ ...defaultBranch(), ...b })),
-    territoire_minutes: dureeTerritoire(settings),
+    // Étendue : celle du centre, sinon l'ancienne étendue commune (repli), sinon une heure
+    headquarters: { ...defaultCenter(), ...hq, minutes: dureeDuCentre(hq, dureeTerritoire(settings)) },
+    branches: branches.map((b) => ({ ...defaultBranch(), ...b, minutes: dureeDuCentre(b, dureeTerritoire(settings)) })),
     google_place_id: settings?.google_place_id || '',
     geogrid_target_department: settings?.geogrid_target_department || '',
   };
@@ -106,7 +105,6 @@ export default function TerritoryTab() {
     try {
       await save({
         territoire_centers: serializeTerritoireCenters(state.headquarters, state.branches),
-        territoire_minutes: state.territoire_minutes,
         google_place_id: state.google_place_id || null,
         geogrid_target_department: state.geogrid_target_department || null,
       });
@@ -143,7 +141,8 @@ export default function TerritoryTab() {
 
   const addBranch = () => {
     setEditingBranchIdx(state.branches.length);
-    setState((s) => ({ ...s, branches: [...s.branches, defaultBranch()] }));
+    // Une nouvelle antenne part de l'étendue du siège
+    setState((s) => ({ ...s, branches: [...s.branches, { ...defaultBranch(), minutes: dureeDuCentre(s.headquarters) }] }));
   };
 
   const updateBranch = (idx, updated) => {
@@ -162,7 +161,7 @@ export default function TerritoryTab() {
       <SettingsSurface colonnes>
         <SettingsSection
           title="Siège sur la carte"
-          description="Point de départ des trajets et des tournées, centre de la carte du territoire."
+          description="Point de départ des trajets et des tournées, centre de la carte du territoire. Son étendue délimite le territoire."
         >
           <CenterEditor value={state.headquarters} onChange={(hq) => patch({ headquarters: hq })} />
           {(errors.hq_label || errors.hq_coords) && (
@@ -171,29 +170,9 @@ export default function TerritoryTab() {
         </SettingsSection>
 
         <SettingsSection
-          title="Étendue du territoire"
-          description="Jusqu’où vous vous déplacez : la zone dessinée sur la carte, qui sert aussi à attribuer un lead au commercial de sa zone."
-        >
-          <Field
-            label="Temps de trajet en voiture depuis le siège"
-            hint="La zone suit les routes : elle s’étire le long des axes rapides. Chaque antenne a la même étendue autour d’elle."
-          >
-            <select
-              value={state.territoire_minutes}
-              onChange={(e) => patch({ territoire_minutes: Number(e.target.value) })}
-              className={INPUT_CLASS}
-            >
-              {DUREES_TERRITOIRE.map((m) => (
-                <option key={m} value={m}>{m === 60 ? '1 heure' : `${m} minutes`}</option>
-              ))}
-            </select>
-          </Field>
-        </SettingsSection>
-
-        <SettingsSection
           title="Antennes commerciales"
           optional
-          description="Pour un commercial basé ailleurs qu’au siège : ses trajets partent de son antenne."
+          description="Pour un commercial basé ailleurs qu’au siège : ses trajets partent de son antenne. Sa zone est prise dans le territoire du siège."
         >
           {state.branches.length > 0 && (
             <ul className="rounded-lg border border-secondary-200 divide-y divide-secondary-100">

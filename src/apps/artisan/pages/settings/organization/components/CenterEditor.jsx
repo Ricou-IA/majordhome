@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MapPin } from 'lucide-react';
 import AddressSearch from './AddressSearch';
 import { Field, INPUT_CLASS } from './layout';
+import { DUREES_TERRITOIRE, dureeDuCentre } from '@/lib/territoire-config';
 
 const COLOR_PRESETS = [
   { value: '#f97316', name: 'Orange' },
@@ -19,7 +20,7 @@ const EMOJI_PRESETS = ['🏢', '🏠', '🏭', '⚡', '📍'];
  * Géré en controlled mode : le parent passe `value` et reçoit `onChange`.
  *
  * @param {Object} props
- * @param {Object} props.value - { label, lat, lng, color, emoji }
+ * @param {Object} props.value - { label, lat, lng, color, emoji, minutes } (minutes = étendue de la zone)
  * @param {Function} props.onChange - (newCenter) => void
  * @param {string} [props.labelHint] - texte d'aide sous "Nom"
  * @param {boolean} [props.disabled]
@@ -93,6 +94,22 @@ export default function CenterEditor({ value, onChange, labelHint, disabled = fa
           </Field>
         </div>
       )}
+
+      <Field
+        label="Étendue de la zone"
+        hint="Temps de trajet en voiture autour de ce point. La zone suit les routes : elle s’étire le long des axes rapides."
+      >
+        <select
+          value={dureeDuCentre(value)}
+          onChange={(e) => update({ minutes: Number(e.target.value) })}
+          disabled={disabled}
+          className={`${INPUT_CLASS} sm:max-w-xs`}
+        >
+          {DUREES_TERRITOIRE.map((m) => (
+            <option key={m} value={m}>{m === 60 ? '1 heure' : `${m} minutes`}</option>
+          ))}
+        </select>
+      </Field>
 
       <div className="flex flex-wrap gap-x-10 gap-y-4">
         <Field label="Couleur du repère">

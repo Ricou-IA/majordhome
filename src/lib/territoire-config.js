@@ -7,8 +7,8 @@
 // ne sont pas ici : ils se saisissent dans Paramètres → Organisation → Territoire
 // (`settings.territoire_centers`, 1er = siège).
 export const TERRITOIRE_CONFIG = {
-  // Étendue par défaut ; chaque organisation règle la sienne (`settings.territoire_minutes`,
-  // Paramètres → Organisation → Territoire), lue par `dureeTerritoire`.
+  // Étendue par défaut d'un centre ; chaque centre (siège, antenne) règle la sienne
+  // (`territoire_centers[clé].minutes`, Paramètres → Organisation → Territoire), lue par `dureeDuCentre`.
   isochroneMinutes: 60,
   // Contours des codes postaux connus (partage fin d'une zone commune entre siège et antenne).
   // Ailleurs, le partage se fait par les isochrones seules.
@@ -33,8 +33,9 @@ export function centresValides(centers) {
 export const DUREES_TERRITOIRE = Object.freeze([15, 20, 30, 45, 60]);
 
 /**
- * Étendue du territoire d'une organisation, en minutes de voiture : `settings.territoire_minutes`
- * s'il est une des durées proposées, sinon la valeur par défaut.
+ * Étendue commune de l'organisation, en minutes de voiture : `settings.territoire_minutes` s'il est
+ * une des durées proposées, sinon la valeur par défaut. Ne sert plus que de repli à un centre qui
+ * n'a pas sa propre étendue (réglage écrit le 2026-11-21, avant l'étendue par centre).
  * @param {Object|null|undefined} settings - core.organizations.settings
  * @returns {number}
  */
@@ -44,17 +45,30 @@ export function dureeTerritoire(settings) {
 }
 
 /**
- * Empreinte du territoire (clé, position, ordre des centres, étendue) : change dès qu'un centre est
- * ajouté, retiré ou déplacé, ou que l'étendue change. Chaîne vide = aucun centre exploitable.
+ * Étendue d'un centre (siège ou antenne), en minutes de voiture autour de lui : la sienne
+ * (`centre.minutes`) si elle est une des durées proposées, sinon le repli.
+ * @param {{ minutes?: number|string }|null|undefined} centre
+ * @param {number} [repli] - étendue commune (dureeTerritoire)
+ * @returns {number}
+ */
+export function dureeDuCentre(centre, repli = TERRITOIRE_CONFIG.isochroneMinutes) {
+  const minutes = Number(centre?.minutes);
+  return DUREES_TERRITOIRE.includes(minutes) ? minutes : repli;
+}
+
+/**
+ * Empreinte du territoire (clé, position, ordre et étendue des centres) : change dès qu'un centre
+ * est ajouté, retiré ou déplacé, ou que son étendue change. Chaîne vide = aucun centre exploitable.
  * L'étendue par défaut n'est pas écrite : les zones déjà calculées restent valables.
  * @param {Object|null|undefined} centers
- * @param {number} [minutes] - étendue (dureeTerritoire)
+ * @param {number} [repli] - étendue commune (dureeTerritoire)
  * @returns {string}
  */
-export function empreinteCentres(centers, minutes = TERRITOIRE_CONFIG.isochroneMinutes) {
-  const base = centresValides(centers).map((c) => `${c.key}:${c.lat},${c.lng}`).join('|');
-  if (!base || minutes === TERRITOIRE_CONFIG.isochroneMinutes) return base;
-  return `${base}@${minutes}`;
+export function empreinteCentres(centers, repli = TERRITOIRE_CONFIG.isochroneMinutes) {
+  return centresValides(centers).map((c) => {
+    const minutes = dureeDuCentre(c, repli);
+    return `${c.key}:${c.lat},${c.lng}${minutes === TERRITOIRE_CONFIG.isochroneMinutes ? '' : `@${minutes}`}`;
+  }).join('|');
 }
 
 /**
