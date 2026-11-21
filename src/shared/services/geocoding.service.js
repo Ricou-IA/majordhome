@@ -515,32 +515,37 @@ async function updateLeadCoordinates(leadId, lat, lng, zone) {
   }
 }
 
-// Cache module-level pour les commerciaux par zone (ne change pas en session)
+// Cache des commerciaux par zone, PAR ORGANISATION (clé `${orgId}:${zone}`) : deux entreprises
+// peuvent avoir une zone de même nom, et un compte peut être membre des deux.
 const _commercialZoneCache = {};
 
 /**
- * Résout le commercial assigné à une zone depuis la table majordhome.commercials
+ * Commercial actif d'une zone, dans l'organisation du lead et elle seule.
+ * Sans organisation, ou si plusieurs commerciaux portent la zone : aucun (on n'attribue pas au hasard).
  * @param {string} zone - Clé du centre (réglages de l'organisation)
- * @returns {{ id: string, full_name: string } | null}
+ * @param {string} orgId - organisation (core) du lead
+ * @returns {Promise<{ id: string, full_name: string } | null>}
  */
-async function resolveCommercialByZone(zone) {
-  if (!zone) return null;
-  if (_commercialZoneCache[zone]) return _commercialZoneCache[zone];
+async function resolveCommercialByZone(zone, orgId) {
+  if (!zone || !orgId) return null;
+  const cle = `${orgId}:${zone}`;
+  if (_commercialZoneCache[cle]) return _commercialZoneCache[cle];
 
   try {
     const { data, error } = await supabase
       .from('majordhome_commercials')
       .select('id, full_name')
+      .eq('org_id', orgId)
       .eq('zone', zone)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
-      logger.warn('[geocoding] Aucun commercial actif pour la zone:', zone);
+      logger.warn('[geocoding] Aucun commercial actif (ou plusieurs) pour la zone:', zone);
       return null;
     }
 
-    _commercialZoneCache[zone] = data;
+    _commercialZoneCache[cle] = data;
     return data;
   } catch (error) {
     logger.error('[geocoding] Erreur resolveCommercialByZone:', error);
@@ -572,7 +577,7 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city, or
 
   // 4. Auto-assigner commercial si zone détectée (depuis table commercials) — jamais hors zone
   if (zone && zone !== ZONE_HORS) {
-    const commercial = await resolveCommercialByZone(zone);
+    const commercial = await resolveCommercialByZone(zone, orgId);
 
     if (commercial) {
       try {
@@ -581,7 +586,11 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city, or
           .from('majordhome_leads')
           .select('assigned_user_id')
           .eq('id', leadId)
-          .single();
+          .eq('org_id', orgId)
+          .maybeSingle();
+
+        // Lead introuvable dans cette organisation : on n'écrit rien
+        if (!lead) return;
 
         if (!lead?.assigned_user_id) {
           await supabase.rpc('update_majordhome_lead', {
@@ -641,7 +650,7 @@ export async function batchGeocodeLeads(leads, onProgress, orgId) {
 
       // 4. Auto-assigner commercial si zone détectée (depuis table commercials) — jamais hors zone
       if (zone && zone !== ZONE_HORS) {
-        const commercial = await resolveCommercialByZone(zone);
+        const commercial = await resolveCommercialByZone(zone, orgId);
 
         if (commercial && !lead.assigned_user_id) {
           try {
