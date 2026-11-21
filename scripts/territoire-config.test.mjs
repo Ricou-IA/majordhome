@@ -47,3 +47,22 @@ test('aucun centre par défaut : une organisation sans réglage n\'hérite de ce
   assert.deepEqual(getTerritoireCenters({ territoire_centers: {} }), {});
   assert.equal(getOrgHeadquarters({}), null);
 });
+
+test('dureeTerritoire : le réglage de l\'organisation s\'il est proposé, sinon une heure', async () => {
+  const { dureeTerritoire, DUREES_TERRITOIRE } = await import('../src/lib/territoire-config.js');
+  assert.equal(dureeTerritoire(null), 60);
+  assert.equal(dureeTerritoire({}), 60);
+  assert.equal(dureeTerritoire({ territoire_minutes: 30 }), 30);
+  assert.equal(dureeTerritoire({ territoire_minutes: '45' }), 45);
+  assert.equal(dureeTerritoire({ territoire_minutes: 90 }), 60); // au-delà du maximum de l'API
+  assert.equal(dureeTerritoire({ territoire_minutes: 0 }), 60);
+  assert.ok(DUREES_TERRITOIRE.every((m) => m <= 60));
+});
+
+test('empreinteCentres : l\'étendue recalcule les zones, l\'étendue par défaut garde celles déjà calculées', () => {
+  const base = empreinteCentres(deuxCentres);
+  assert.equal(empreinteCentres(deuxCentres, 60), base);
+  assert.notEqual(empreinteCentres(deuxCentres, 30), base);
+  assert.notEqual(empreinteCentres(deuxCentres, 30), empreinteCentres(deuxCentres, 45));
+  assert.equal(empreinteCentres(null, 30), '');
+});

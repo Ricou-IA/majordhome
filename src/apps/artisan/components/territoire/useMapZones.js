@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as turf from '@turf/turf';
-import { TERRITOIRE_CONFIG, getTerritoireCenters, centresValides, empreinteCentres } from '@/lib/territoire-config';
+import { TERRITOIRE_CONFIG, getTerritoireCenters, centresValides, empreinteCentres, dureeTerritoire } from '@/lib/territoire-config';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { logger } from '@lib/logger';
@@ -339,8 +339,7 @@ async function zoneDAntenne(isoSiege, isoAntenne, siege, antenne, token) {
  *
  * @returns {Promise<{ zones: Object<string, Feature>, ordre: string[], zone_principale: Feature, metadata: Object }|null>}
  */
-async function calculateZones(token, centers) {
-  const { isochroneMinutes } = TERRITOIRE_CONFIG;
+async function calculateZones(token, centers, isochroneMinutes = TERRITOIRE_CONFIG.isochroneMinutes) {
   const entrees = centresValides(centers);
   if (entrees.length === 0) return null;
   const [siege, ...antennes] = entrees;
@@ -414,7 +413,9 @@ export function useMapZones(mapboxToken) {
   const { settings: orgSettings } = useOrgSettings();
   const orgCenters = useMemo(() => getTerritoireCenters(orgSettings), [orgSettings]);
   // Empreinte des centres : un siège déplacé ou une antenne ajoutée invalide le cache du navigateur.
-  const empreinte = useMemo(() => empreinteCentres(orgCenters), [orgCenters]);
+  // Étendue du territoire (minutes de voiture) : réglage de l'organisation, lui aussi dans l'empreinte.
+  const minutes = dureeTerritoire(orgSettings);
+  const empreinte = useMemo(() => empreinteCentres(orgCenters, minutes), [orgCenters, minutes]);
   const aDesCentres = empreinte !== '';
 
   const [zones, setZones] = useState(null);
@@ -452,7 +453,7 @@ export function useMapZones(mapboxToken) {
     }
 
     // Calculer les zones
-    calculateZones(mapboxToken, orgCenters)
+    calculateZones(mapboxToken, orgCenters, minutes)
       .then(data => {
         if (data) data.metadata.centres = empreinte;
         setZones(data);
@@ -470,7 +471,7 @@ export function useMapZones(mapboxToken) {
         setError(e.message);
       })
       .finally(() => setLoading(false));
-  }, [mapboxToken, cacheKey, cacheTsKey, orgCenters, empreinte, aDesCentres]);
+  }, [mapboxToken, cacheKey, cacheTsKey, orgCenters, minutes, empreinte, aDesCentres]);
 
   const invalidate = useCallback(() => {
     localStorage.removeItem(cacheKey);
@@ -479,7 +480,7 @@ export function useMapZones(mapboxToken) {
     setError(null);
 
     if (mapboxToken && aDesCentres) {
-      calculateZones(mapboxToken, orgCenters)
+      calculateZones(mapboxToken, orgCenters, minutes)
         .then(data => {
           if (data) data.metadata.centres = empreinte;
           setZones(data);
@@ -494,7 +495,7 @@ export function useMapZones(mapboxToken) {
       setZones(null);
       setLoading(false);
     }
-  }, [mapboxToken, cacheKey, cacheTsKey, orgCenters, empreinte, aDesCentres]);
+  }, [mapboxToken, cacheKey, cacheTsKey, orgCenters, minutes, empreinte, aDesCentres]);
 
   return { zones, isLoading, error, invalidate };
 }

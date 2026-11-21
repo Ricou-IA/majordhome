@@ -7,6 +7,8 @@
 // ne sont pas ici : ils se saisissent dans Paramètres → Organisation → Territoire
 // (`settings.territoire_centers`, 1er = siège).
 export const TERRITOIRE_CONFIG = {
+  // Étendue par défaut ; chaque organisation règle la sienne (`settings.territoire_minutes`,
+  // Paramètres → Organisation → Territoire), lue par `dureeTerritoire`.
   isochroneMinutes: 60,
   // Contours des codes postaux connus (partage fin d'une zone commune entre siège et antenne).
   // Ailleurs, le partage se fait par les isochrones seules.
@@ -27,14 +29,32 @@ export function centresValides(centers) {
     .map(([key, c]) => ({ ...c, key }));
 }
 
+/** Étendues proposées, en minutes de voiture depuis un centre (60 = maximum de l'API d'isochrones). */
+export const DUREES_TERRITOIRE = Object.freeze([15, 20, 30, 45, 60]);
+
 /**
- * Empreinte des centres (clé, position, ordre) : change dès qu'un centre est ajouté, retiré ou
- * déplacé. Chaîne vide = aucun centre exploitable.
+ * Étendue du territoire d'une organisation, en minutes de voiture : `settings.territoire_minutes`
+ * s'il est une des durées proposées, sinon la valeur par défaut.
+ * @param {Object|null|undefined} settings - core.organizations.settings
+ * @returns {number}
+ */
+export function dureeTerritoire(settings) {
+  const minutes = Number(settings?.territoire_minutes);
+  return DUREES_TERRITOIRE.includes(minutes) ? minutes : TERRITOIRE_CONFIG.isochroneMinutes;
+}
+
+/**
+ * Empreinte du territoire (clé, position, ordre des centres, étendue) : change dès qu'un centre est
+ * ajouté, retiré ou déplacé, ou que l'étendue change. Chaîne vide = aucun centre exploitable.
+ * L'étendue par défaut n'est pas écrite : les zones déjà calculées restent valables.
  * @param {Object|null|undefined} centers
+ * @param {number} [minutes] - étendue (dureeTerritoire)
  * @returns {string}
  */
-export function empreinteCentres(centers) {
-  return centresValides(centers).map((c) => `${c.key}:${c.lat},${c.lng}`).join('|');
+export function empreinteCentres(centers, minutes = TERRITOIRE_CONFIG.isochroneMinutes) {
+  const base = centresValides(centers).map((c) => `${c.key}:${c.lat},${c.lng}`).join('|');
+  if (!base || minutes === TERRITOIRE_CONFIG.isochroneMinutes) return base;
+  return `${base}@${minutes}`;
 }
 
 /**
