@@ -586,3 +586,11 @@ export const savPieceKeys = {
   all: (orgId) => ['sav-pieces', orgId],
   byCard: (orgId, interventionId) => [...savPieceKeys.all(orgId), 'card', interventionId],
 };
+
+// --- Imports de clients (fichier d'un autre logiciel) ---
+export const clientImportKeys = {
+  all: (orgId) => ['client-imports', orgId],
+  list: (orgId) => [...clientImportKeys.all(orgId), 'list'],
+  existants: (orgId) => [...clientImportKeys.all(orgId), 'existants'],
+  apercuRetrait: (orgId, importId) => [...clientImportKeys.all(orgId), 'retrait', importId],
+};
