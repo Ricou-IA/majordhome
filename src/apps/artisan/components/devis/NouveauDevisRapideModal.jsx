@@ -1,8 +1,11 @@
 // src/apps/artisan/components/devis/NouveauDevisRapideModal.jsx
 // « Nouveau devis » depuis le Kanban (demande d'Eric, 2026-10-25 : raccourcir le process). Deux temps :
-//   1. fiche courte du client (nom, contact, adresse, commercial, source, projet — leadRapide.js), puis filet
-//      anti-doublon (même filet que la fiche lead : leadsService.findPotentialDuplicates) → faire le devis sur la
-//      carte existante, ou créer quand même ; le lead naît en « Nouveau » ;
+//   1. le client : recherche d'un client existant (même recherche que la fiche lead : useLeadClientLinking +
+//      SectionClientLinking, Majord'home et Pennylane) — le lead naît alors rattaché à sa fiche ; sinon fiche courte
+//      (nom, contact, adresse — leadRapide.js) avec le contrôle de doublon de CLIENTS en direct (useDuplicateCheck +
+//      DuplicateClientPanel, les mêmes que l'assistant de contrat). Commercial, source, projet. Puis filet
+//      anti-doublon de LEADS (leadsService.findPotentialDuplicates) → faire le devis sur la carte existante, ou
+//      créer quand même ; le lead naît en « Nouveau » ;
 //   2. la fenêtre de devis habituelle (CreateDevisModal) s'ouvre sur ce lead.
 // Rien n'est créé tant que l'utilisateur n'a pas validé la fiche ; le lead créé reste si le devis est abandonné
 // (il est dans le pipeline, en « Nouveau »).
@@ -11,14 +14,18 @@ import { toast } from 'sonner';
 import { X, ChevronDown, Loader2, ArrowRight } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useLeadCommercials, useLeadSources, useLeadStatuses } from '@hooks/useLeads';
-import { useOrgSettings } from '@hooks/useOrgSettings';
+import { useOrgSettings, usePennylaneEnabled } from '@hooks/useOrgSettings';
+import { useDuplicateCheck } from '@hooks/useClients';
 import { buildDevisConfig, famillesActives } from '@/lib/devisConfig.js';
 import { FORMULAIRE_LEAD_VIDE, validerLeadRapide, leadDepuisFormulaire } from '@/lib/leadRapide.js';
 import { leadsService } from '@services/leads.service';
 import { DuplicateLeadDialog } from '../shared/DuplicateLeadDialog';
+import { DuplicateClientPanel } from '../shared/DuplicateClientPanel';
+import { useLeadClientLinking } from '../pipeline/useLeadClientLinking';
+import { SectionClientLinking } from '../pipeline/LeadFormSections';
 import CreateDevisModal from './CreateDevisModal';
 
-const inputClass = 'w-full px-3 py-2 border border-secondary-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+const inputClass = 'w-full px-3 py-2 border border-secondary-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-secondary-50 disabled:text-secondary-500';
 const selectClass = `${inputClass} pr-9 appearance-none bg-white`;
 
 function Champ({ id, label, requis = false, children }) {
@@ -60,23 +67,38 @@ export default function NouveauDevisRapideModal({ onClose, onDone }) {
   const [doublons, setDoublons] = useState(null);
   const [lead, setLead] = useState(null); // lead du devis (créé ou carte existante) ⇒ étape devis
 
+  // Client existant : même recherche et même sélection que la fiche lead (coordonnées recopiées de la fiche)
+  const pennylaneActive = usePennylaneEnabled();
+  const liaison = useLeadClientLinking({ orgId, pennylaneActive, sources: sources || [], setForm });
+  const clientLie = liaison.linkedClient;
+
+  // Pas de client choisi : contrôle de doublon de clients pendant la saisie
+  const { duplicates: clientsProches, isChecking: controleEnCours } = useDuplicateCheck(orgId, clientLie ? null : {
+    phone: form.phone, email: form.email, firstName: form.first_name, lastName: form.last_name, postalCode: form.postal_code,
+  });
+  // « Créer quand même » vaut pour les fiches montrées : une nouvelle fiche proche repose la question
+  const [clientsEcartes, setClientsEcartes] = useState('');
+  const cleClientsProches = clientsProches.map((c) => c.id).sort().join(',');
+  const doublonClientAVoir = !clientLie && clientsProches.length > 0 && clientsEcartes !== cleClientsProches;
+
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
-  const erreurs = validerLeadRapide(form);
+  const erreurs = validerLeadRapide(form, { clientLie: !!clientLie });
 
   const creerLead = async ({ force = false } = {}) => {
     if (erreurs.length) { toast.error(erreurs[0]); return; }
+    if (doublonClientAVoir) { toast.info('Ce client existe peut-être déjà : choisissez sa fiche ou confirmez la création.'); return; }
     setEnCours(true);
     try {
       if (!force) {
         const dup = await leadsService.findPotentialDuplicates({
-          orgId, phone: form.phone, email: form.email, firstName: form.first_name, lastName: form.last_name, clientId: null,
+          orgId, phone: form.phone, email: form.email, firstName: form.first_name, lastName: form.last_name, clientId: clientLie?.id || null,
         });
         if (dup.data?.length) { setDoublons(dup.data); return; }
       }
       // statut « Nouveau » (display_order 1) : un lead sans statut n'a pas de colonne dans le Kanban
       const nouveau = statuses.find((s) => s.display_order === 1);
       const { data: cree, error } = await leadsService.createLead({
-        orgId, userId: user?.id, ...leadDepuisFormulaire({ ...form, commercial_id: commercialId }, { statusId: nouveau?.id || null }),
+        orgId, userId: user?.id, ...leadDepuisFormulaire({ ...form, commercial_id: commercialId }, { statusId: nouveau?.id || null, clientId: clientLie?.id || null }),
       });
       if (error) throw error;
       if (!cree?.id) throw new Error('Le lead n\'a pas été créé');
@@ -116,23 +138,56 @@ export default function NouveauDevisRapideModal({ onClose, onDone }) {
         <div className="flex items-center justify-between px-6 py-3 border-b">
           <div>
             <h2 className="text-lg font-semibold text-secondary-900">Nouveau devis</h2>
-            <p className="text-xs text-secondary-500">Le client d&apos;abord : le lead est créé en « Nouveau », puis le devis s&apos;ouvre.</p>
+            <p className="text-xs text-secondary-500">Le client d&apos;abord : cherchez-le, ou saisissez-le s&apos;il est nouveau. Le lead est créé en « Nouveau », puis le devis s&apos;ouvre.</p>
           </div>
           <button type="button" onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer"><X className="w-5 h-5 text-secondary-500" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <SectionClientLinking
+            linkedClient={clientLie}
+            isEditing={false}
+            allowEdit={false}
+            editClientMode={false}
+            setEditClientMode={() => {}}
+            handleUnlinkClient={liaison.handleUnlinkClient}
+            showLinkSearch={liaison.showLinkSearch}
+            setShowLinkSearch={liaison.setShowLinkSearch}
+            clientSearchQuery={liaison.clientSearchQuery}
+            searchClient={liaison.searchClient}
+            showClientDropdown={liaison.showClientDropdown}
+            setShowClientDropdown={liaison.setShowClientDropdown}
+            clientSearching={liaison.clientSearching}
+            clientResults={liaison.clientResults}
+            handleSelectClient={liaison.handleSelectClient}
+            clearClientSearch={liaison.clearClientSearch}
+            pennylaneResults={liaison.pennylaneResults}
+            pennylaneSearching={liaison.pennylaneSearching}
+            handleImportPennylane={liaison.handleImportPennylane}
+            isImportingPennylane={liaison.isImportingPennylane}
+          />
+          {!clientLie && <p className="text-xs text-secondary-500 -mt-2">Nouveau client : saisissez-le ci-dessous.</p>}
+
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Champ id="ndr-nom" label="Nom" requis><input id="ndr-nom" autoFocus value={form.last_name} onChange={(e) => set('last_name')(e.target.value)} className={inputClass} /></Champ>
-            <Champ id="ndr-prenom" label="Prénom"><input id="ndr-prenom" value={form.first_name} onChange={(e) => set('first_name')(e.target.value)} className={inputClass} /></Champ>
-            <Champ id="ndr-tel" label="Téléphone"><input id="ndr-tel" type="tel" value={form.phone} onChange={(e) => set('phone')(e.target.value)} className={inputClass} /></Champ>
-            <Champ id="ndr-email" label="E-mail"><input id="ndr-email" type="email" value={form.email} onChange={(e) => set('email')(e.target.value)} className={inputClass} /></Champ>
+            <Champ id="ndr-nom" label="Nom" requis><input id="ndr-nom" disabled={!!clientLie} value={form.last_name} onChange={(e) => set('last_name')(e.target.value)} className={inputClass} /></Champ>
+            <Champ id="ndr-prenom" label="Prénom"><input id="ndr-prenom" disabled={!!clientLie} value={form.first_name} onChange={(e) => set('first_name')(e.target.value)} className={inputClass} /></Champ>
+            <Champ id="ndr-tel" label="Téléphone"><input id="ndr-tel" disabled={!!clientLie} type="tel" value={form.phone} onChange={(e) => set('phone')(e.target.value)} className={inputClass} /></Champ>
+            <Champ id="ndr-email" label="E-mail"><input id="ndr-email" disabled={!!clientLie} type="email" value={form.email} onChange={(e) => set('email')(e.target.value)} className={inputClass} /></Champ>
             <div className="sm:col-span-2">
-              <Champ id="ndr-adresse" label="Adresse"><input id="ndr-adresse" value={form.address} onChange={(e) => set('address')(e.target.value)} className={inputClass} /></Champ>
+              <Champ id="ndr-adresse" label="Adresse"><input id="ndr-adresse" disabled={!!clientLie} value={form.address} onChange={(e) => set('address')(e.target.value)} className={inputClass} /></Champ>
             </div>
-            <Champ id="ndr-cp" label="Code postal"><input id="ndr-cp" value={form.postal_code} onChange={(e) => set('postal_code')(e.target.value)} className={inputClass} /></Champ>
-            <Champ id="ndr-ville" label="Ville"><input id="ndr-ville" value={form.city} onChange={(e) => set('city')(e.target.value)} className={inputClass} /></Champ>
+            <Champ id="ndr-cp" label="Code postal"><input id="ndr-cp" disabled={!!clientLie} value={form.postal_code} onChange={(e) => set('postal_code')(e.target.value)} className={inputClass} /></Champ>
+            <Champ id="ndr-ville" label="Ville"><input id="ndr-ville" disabled={!!clientLie} value={form.city} onChange={(e) => set('city')(e.target.value)} className={inputClass} /></Champ>
           </section>
+
+          {doublonClientAVoir && (
+            <DuplicateClientPanel
+              candidates={clientsProches}
+              chooseLabel="Choisir"
+              onChoose={liaison.handleSelectClient}
+              onCreateAnyway={() => setClientsEcartes(cleClientsProches)}
+            />
+          )}
 
           <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-secondary-100">
             <Champ id="ndr-commercial" label="Commercial">
@@ -160,7 +215,7 @@ export default function NouveauDevisRapideModal({ onClose, onDone }) {
           <span className="text-xs text-amber-700">{erreurs[0] && (form.last_name || form.phone || form.email) ? erreurs[0] : ''}</span>
           <div className="flex items-center gap-2">
             <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
-            <button type="button" onClick={() => creerLead()} disabled={enCours || erreurs.length > 0} className="btn-primary inline-flex items-center gap-2">
+            <button type="button" onClick={() => creerLead()} disabled={enCours || controleEnCours || erreurs.length > 0} className="btn-primary inline-flex items-center gap-2">
               {enCours ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Continuer vers le devis
             </button>
           </div>

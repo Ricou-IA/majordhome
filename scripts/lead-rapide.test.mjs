@@ -27,3 +27,11 @@ test('leadDepuisFormulaire : champs nettoyés, vides ⇒ null, statut posé, ids
     status_id: 's-nouveau', assigned_user_id: 'c1', source_id: null, project_family_key: 'borne_recharge',
   });
 });
+
+test('client existant choisi : le lead naît rattaché à sa fiche, sans exiger un moyen de contact', () => {
+  const form = { ...FORMULAIRE_LEAD_VIDE, last_name: 'Cassagne' };
+  assert.deepEqual(validerLeadRapide(form, { clientLie: true }), []);
+  assert.deepEqual(validerLeadRapide({ ...form, email: 'pas-un-email' }, { clientLie: true }), ['E-mail invalide']);
+  assert.equal(leadDepuisFormulaire(form, { statusId: 's', clientId: 'cl-1' }).client_id, 'cl-1');
+  assert.equal('client_id' in leadDepuisFormulaire(form, { statusId: 's' }), false);
+});

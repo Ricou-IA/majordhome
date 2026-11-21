@@ -55,6 +55,8 @@ export const SectionClientLinking = ({
   pennylaneSearching = false,
   handleImportPennylane,
   isImportingPennylane = false,
+  // faux : la fenêtre appelante ne répercute pas les coordonnées sur la fiche client (Nouveau devis)
+  allowEdit = true,
 }) => (
   <div className="mb-2">
     {linkedClient ? (
@@ -75,7 +77,7 @@ export const SectionClientLinking = ({
           clientNumber={linkedClient.client_number}
           city={linkedClient.city}
         >
-          <button
+          {allowEdit && <button
             type="button"
             onClick={() => setEditClientMode(!editClientMode)}
             className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors shrink-0 ${
@@ -87,7 +89,7 @@ export const SectionClientLinking = ({
           >
             <PenLine className="h-3 w-3" />
             {editClientMode ? 'Modification' : 'Modifier'}
-          </button>
+          </button>}
         </LinkedClientCard>
         {editClientMode && (
           <div className="mt-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">

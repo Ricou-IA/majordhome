@@ -16,26 +16,30 @@ const ouNull = (v) => t(v) || null;
 
 /**
  * Erreurs bloquantes, dans l'ordre d'affichage ; [] = valide.
+ * Client existant choisi : sa fiche fait foi, un moyen de contact n'est pas exigé (fiche ancienne sans téléphone).
  * @param {typeof FORMULAIRE_LEAD_VIDE} form
+ * @param {{ clientLie?: boolean }} [p]
  * @returns {string[]}
  */
-export function validerLeadRapide(form) {
+export function validerLeadRapide(form, { clientLie = false } = {}) {
   const erreurs = [];
   if (!t(form.last_name)) erreurs.push('Le nom est requis');
   const email = t(form.email);
   if (!emailsValides(email)) erreurs.push('E-mail invalide');
-  else if (!t(form.phone) && !email && t(form.last_name)) erreurs.push('Un téléphone ou un e-mail est requis');
+  else if (!clientLie && !t(form.phone) && !email && t(form.last_name)) erreurs.push('Un téléphone ou un e-mail est requis');
   return erreurs;
 }
 
 /**
  * Données du lead à créer (leadsService.createLead), champs vides ⇒ null.
  * @param {typeof FORMULAIRE_LEAD_VIDE} form
- * @param {{ statusId: string | null }} p statut « Nouveau » de l'org
+ * @param {{ statusId: string | null, clientId?: string | null }} p statut « Nouveau » de l'org ; `clientId` =
+ *   client existant choisi dans la recherche (le lead naît rattaché à sa fiche)
  * @returns {Record<string, string | null>}
  */
-export function leadDepuisFormulaire(form, { statusId }) {
+export function leadDepuisFormulaire(form, { statusId, clientId = null }) {
   return {
+    ...(clientId ? { client_id: clientId } : {}),
     first_name: ouNull(form.first_name),
     last_name: ouNull(form.last_name),
     phone: ouNull(form.phone),
