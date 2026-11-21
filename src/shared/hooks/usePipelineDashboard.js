@@ -25,10 +25,11 @@ function aujourdhuiLocal() {
 }
 
 /**
- * @param {{ mois: string[], sourceIds: string[] }} filtres
+ * @param {{ mois: string[], sourceIds: string[], enabled?: boolean }} filtres
+ *   `enabled` faux ⇒ aucune lecture, `dashboard` reste null (page d'accueil d'un rôle sans pipeline).
  * @returns {{ dashboard: Object|null, commercials: Object[], isLoading: boolean, error: Error|null, refetch: Function, estCommercial: boolean }}
  */
-export function usePipelineDashboard({ mois, sourceIds }) {
+export function usePipelineDashboard({ mois, sourceIds, enabled = true }) {
   const { organization, user, effectiveRole } = useAuth();
   const orgId = organization?.id;
   const depuis = debutDesDonnees(mois);
@@ -40,7 +41,7 @@ export function usePipelineDashboard({ mois, sourceIds }) {
   const query = useQuery({
     queryKey: pipelineDashboardKeys.data(orgId, depuis),
     queryFn: () => unwrapResult(pipelineDashboardService.getData(orgId, depuis)),
-    enabled: !!orgId,
+    enabled: !!orgId && enabled,
     staleTime: 60_000,
   });
 
@@ -73,7 +74,7 @@ export function usePipelineDashboard({ mois, sourceIds }) {
   return {
     dashboard,
     commercials,
-    isLoading: query.isLoading || identiteEnAttente,
+    isLoading: enabled && (query.isLoading || identiteEnAttente),
     error: query.error || null,
     refetch: query.refetch,
     estCommercial,

@@ -1,249 +1,165 @@
 /**
  * Dashboard.jsx - Majord'home Artisan
  * ============================================================================
- * Dashboard principal : KPIs pipeline/chantiers, planning du jour, alertes,
- * action rapide "Nouveau lead".
+ * Page d'accueil : la journée (RDV du jour ou du prochain jour qui en a), quelques
+ * repères chiffrés, ce qui attend d'être traité, et — pour l'administrateur, en bas
+ * de page — le ménage des données.
  *
- * @version 2.0.0 - Sprint 6 — Données réelles
+ * La page assemble, elle ne calcule rien : règles de l'accueil dans src/lib/accueil.js,
+ * portefeuille et CA signé repris du Dashboard du pipeline (usePipelineDashboard),
+ * CA HT programmé repris du Planning (usePlanningCa). Un chiffre inconnu n'est pas
+ * affiché, jamais remplacé par un zéro.
+ *
+ * @version 3.0.0 - accueil métier (2026-11-22)
  * ============================================================================
  */
 
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
-import { useLeadCommercials } from '@hooks/useLeads';
+import { useAppointments } from '@hooks/useAppointments';
+import { usePlanningCa } from '@hooks/usePlanningCa';
+import { usePipelineDashboard } from '@hooks/usePipelineDashboard';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { useQuotesExplorer } from '@hooks/usePennylane';
+import { chantierKeys } from '@hooks/cacheKeys';
 import { supabase } from '@lib/supabaseClient';
-import { useQuery } from '@tanstack/react-query';
-import {
-  Calendar,
-  AlertTriangle,
-  Info,
-  Plus,
-  ArrowRight,
-  Sparkles,
-  FileText,
-  FileSearch,
-  HardHat,
-  ClipboardList,
-  MapPin,
-} from 'lucide-react';
-import { getAppointmentTypeConfig } from '@services/appointments.service';
-import { PennylaneDoublonsClients } from '@apps/artisan/components/devis/PennylaneDoublonsClients';
-import { PennylaneLeadsMultiPayeurs } from '@apps/artisan/components/devis/PennylaneLeadsMultiPayeurs';
-import AppareilsAControler from '@apps/artisan/components/dashboard/AppareilsAControler';
+import { SEUIL_RELANCE_JOURS } from '@lib/pipelineDashboard';
+import { cumulPeriode, formatCa } from '@/lib/planningCa';
+import { plageAccueil, journeeAffichee, compterRdv, lignesATraiter } from '@/lib/accueil';
+import { StatStrip } from '@apps/artisan/components/shared/StatStrip';
+import { entier, euros } from '@components/pipeline/dashboard/format';
+import { AccueilJournee } from '@apps/artisan/components/dashboard/AccueilJournee';
+import { AccueilATraiter } from '@apps/artisan/components/dashboard/AccueilATraiter';
+import { AccueilACorriger } from '@apps/artisan/components/dashboard/AccueilACorriger';
 
 // =============================================================================
-// HOOK — Données dashboard (KPIs + planning du jour)
+// HOOK — chantiers en attente d'un geste (commande à passer, pose à dater)
 // =============================================================================
 
-function useDashboardHome(orgId, effectiveRole, userId, commercialId) {
-  const today = new Date().toISOString().split('T')[0];
-
-  // ID à utiliser pour les filtres assigned_user_id (commercial = ID table commercials, sinon auth ID)
-  const filterUserId = effectiveRole === 'commercial' ? commercialId : userId;
-
-  // KPIs : compteurs leads pipeline + chantiers
-  // Scoping : commercial → ses propres leads/chantiers, technicien → uniquement chantiers
-  const { data: kpis, isLoading: kpisLoading } = useQuery({
-    queryKey: ['dashboard-kpis', orgId, effectiveRole, filterUserId],
+function useChantiersEnAttente(orgId, enabled) {
+  return useQuery({
+    queryKey: [...chantierKeys.all(orgId), 'accueil-en-attente'],
     queryFn: async () => {
-      // Technicien : pas de KPIs pipeline, uniquement chantiers
-      const showPipelineKpis = effectiveRole !== 'technicien';
-
-      let leads = [];
-      if (showPipelineKpis) {
-        let leadsQuery = supabase
-          .from('majordhome_leads')
-          .select('status_label, status_display_order, chantier_status', { count: 'exact' })
-          .eq('org_id', orgId)
-          .eq('is_deleted', false)
-          .eq('status_is_final', false);
-
-        // Commercial : filtre via ID commercial (dual ID bridge)
-        if (effectiveRole === 'commercial' && filterUserId) {
-          leadsQuery = leadsQuery.eq('assigned_user_id', filterUserId);
-        }
-        // Team leader : filtre sur ses propres leads (dashboard = les siens)
-        if (effectiveRole === 'team_leader') {
-          leadsQuery = leadsQuery.eq('assigned_user_id', userId);
-        }
-
-        const leadsRes = await leadsQuery;
-        leads = leadsRes.data || [];
-      }
-
-      // Chantiers : commercial = ses chantiers, technicien = planification+réalisé
-      let chantiersQuery = supabase
+      const compter = (statut) => supabase
         .from('majordhome_chantiers')
-        .select('chantier_status, assigned_user_id', { count: 'exact' })
-        .eq('org_id', orgId);
-
-      if (effectiveRole === 'commercial' && filterUserId) {
-        chantiersQuery = chantiersQuery.eq('assigned_user_id', filterUserId);
-      }
-      if (effectiveRole === 'team_leader') {
-        chantiersQuery = chantiersQuery.eq('assigned_user_id', userId);
-      }
-
-      const chantiersRes = await chantiersQuery;
-      const chantiers = chantiersRes.data || [];
-
-      return {
-        nouveauLead: showPipelineKpis ? leads.filter((l) => l.status_display_order === 1).length : null,
-        devisEnvoye: showPipelineKpis ? leads.filter((l) => l.status_display_order === 4).length : null,
-        commandeAFaire: chantiers.filter((c) => c.chantier_status === 'commande_a_faire').length,
-        aPlanifier: chantiers.filter((c) => c.chantier_status === 'commande_recue').length,
-      };
-    },
-    enabled: !!orgId && !!userId && (effectiveRole !== 'commercial' || !!commercialId),
-    staleTime: 30_000,
-  });
-
-  // Planning du jour
-  const { data: todayAppointments, isLoading: planningLoading } = useQuery({
-    queryKey: ['dashboard-planning', orgId, today],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('majordhome_appointments')
-        .select('*')
+        .select('id', { count: 'exact', head: true })
         .eq('org_id', orgId)
-        .eq('scheduled_date', today)
-        .neq('status', 'cancelled')
-        .order('scheduled_start', { ascending: true });
-
-      if (error) throw error;
-      return data || [];
+        .eq('chantier_status', statut);
+      const [commande, planifier] = await Promise.all([compter('commande_a_faire'), compter('commande_recue')]);
+      if (commande.error) throw commande.error;
+      if (planifier.error) throw planifier.error;
+      return { commandeAFaire: commande.count || 0, aPlanifier: planifier.count || 0 };
     },
-    enabled: !!orgId,
+    enabled: !!orgId && enabled,
     staleTime: 30_000,
   });
-
-  return {
-    kpis: kpis || { nouveauLead: 0, devisEnvoye: 0, commandeAFaire: 0, aPlanifier: 0 },
-    todayAppointments: todayAppointments || [],
-    isLoading: kpisLoading || planningLoading,
-  };
 }
 
 // =============================================================================
-// KPI CARD
-// =============================================================================
-
-function KpiCard({ label, value, icon: Icon, color, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="card group hover:shadow-md transition-shadow cursor-pointer text-left w-full"
-    >
-      <div className="flex items-center gap-4">
-        <div className={`w-12 h-12 rounded-lg ${color} flex items-center justify-center`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-2xl font-bold text-secondary-900">{value}</p>
-          <p className="text-sm text-secondary-600">{label}</p>
-        </div>
-        <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
-      </div>
-    </button>
-  );
-}
-
-// =============================================================================
-// PLANNING ROW
-// =============================================================================
-
-function PlanningRow({ appointment }) {
-  const typeConfig = getAppointmentTypeConfig(appointment.appointment_type);
-  const clientName = [appointment.client_name, appointment.client_first_name]
-    .filter(Boolean)
-    .join(' ');
-
-  return (
-    <div className="flex items-start gap-4 p-3 rounded-lg bg-secondary-50 hover:bg-secondary-100 transition-colors">
-      <div className="text-center min-w-[60px]">
-        <p className="text-lg font-semibold text-secondary-900">
-          {appointment.scheduled_start?.slice(0, 5)}
-        </p>
-      </div>
-      <div className="w-1 self-stretch rounded-full" style={{ backgroundColor: typeConfig.color }} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span
-            className="px-2 py-0.5 text-xs font-medium rounded text-white"
-            style={{ backgroundColor: typeConfig.color }}
-          >
-            {typeConfig.label}
-          </span>
-          {appointment.scheduled_end && (
-            <span className="text-xs text-gray-400">
-              → {appointment.scheduled_end.slice(0, 5)}
-            </span>
-          )}
-        </div>
-        <p className="mt-1 font-medium text-secondary-900 truncate">
-          {appointment.subject || clientName || 'Sans titre'}
-        </p>
-        {appointment.location && (
-          <p className="text-sm text-secondary-500 flex items-center gap-1 truncate">
-            <MapPin className="w-3 h-3 shrink-0" />
-            {appointment.location}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// PAGE DASHBOARD
+// PAGE
 // =============================================================================
 
 export default function Dashboard() {
-  const { profile, organization, user, effectiveRole, isOrgAdmin } = useAuth();
+  const { profile, organization, effectiveRole, isOrgAdmin } = useAuth();
   const { can } = useCanAccess();
-  const navigate = useNavigate();
   const orgId = organization?.id;
 
-  // Résoudre l'ID commercial depuis l'ID auth (dual ID bridge)
-  const { commercials } = useLeadCommercials(orgId);
-  const myCommercialId = useMemo(() => {
-    if (effectiveRole !== 'commercial' || !user?.id) return null;
-    return commercials.find(c => c.profile_id === user.id)?.id || null;
-  }, [effectiveRole, user?.id, commercials]);
+  const peutPlanning = can('planning', 'view');
+  const peutPipeline = can('pipeline', 'view');
+  // Commandes et poses à dater : affaire des responsables, pas des commerciaux.
+  const peutChantiers = can('chantiers', 'view') && effectiveRole !== 'commercial';
+  // Le chiffre du planning est un outil de pilotage (même règle que le Planning).
+  const pilote = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
 
-  const { kpis, todayAppointments, isLoading } = useDashboardHome(orgId, effectiveRole, user?.id, myCommercialId);
+  // Plage lue : figée à l'ouverture de la page (dates locales).
+  const plage = useMemo(() => plageAccueil(), []);
+  const weekEnd = plage.semaine.debut > plage.aujourdhui;
 
-  // Voyant devis non rattachés — org_admin + Pennylane actif uniquement.
-  // Même queryKey que la page /devis : le compteur ne peut pas diverger.
-  const pennylaneActive = usePennylaneEnabled();
-  const showQuotesKpi = isOrgAdmin && pennylaneActive;
-  const { orphanCount, error: quotesError } = useQuotesExplorer({ enabled: showQuotesKpi });
+  // --- Planning : RDV de la plage, et CA HT programmé de la semaine de référence ---
+  const { appointments, teamList, isLoading: rdvLoading, error: rdvError } = useAppointments({
+    orgId: peutPlanning ? orgId : undefined,
+    startDate: plage.startDate,
+    endDate: plage.endDate,
+  });
+  const { ca } = usePlanningCa({
+    orgId,
+    startDate: plage.startDate,
+    endDate: plage.endDate,
+    appointments,
+    enabled: pilote && peutPlanning,
+  });
+  const journee = useMemo(() => journeeAffichee(appointments, plage.aujourdhui), [appointments, plage.aujourdhui]);
+  const rdvConnus = peutPlanning && !rdvLoading && !rdvError;
 
-  // Alertes (scopées par rôle)
-  const alerts = useMemo(() => {
-    const list = [];
-    if (kpis.nouveauLead > 0) {
-      list.push({
-        id: 'new-leads',
-        type: 'info',
-        message: `${kpis.nouveauLead} nouveau${kpis.nouveauLead > 1 ? 'x' : ''} lead${kpis.nouveauLead > 1 ? 's' : ''} à qualifier`,
-      });
-    }
-    // Alerte commandes uniquement pour responsables (pas commerciaux)
-    if (kpis.commandeAFaire > 0 && effectiveRole !== 'commercial') {
-      list.push({
-        id: 'commandes',
-        type: 'warning',
-        message: `${kpis.commandeAFaire} commande${kpis.commandeAFaire > 1 ? 's' : ''} à passer`,
-      });
-    }
-    return list;
-  }, [kpis, effectiveRole]);
+  // --- Pipeline : portefeuille ouvert et CA signé du mois (mêmes chiffres que son Dashboard) ---
+  const moisCourant = plage.aujourdhui.slice(0, 7);
+  const mois = useMemo(() => [moisCourant], [moisCourant]);
+  const sourceIds = useMemo(() => [], []);
+  const { dashboard, isLoading: pipelineLoading, error: pipelineError } = usePipelineDashboard({
+    mois,
+    sourceIds,
+    enabled: peutPipeline,
+  });
+
+  // --- Chantiers en attente ---
+  const chantiers = useChantiersEnAttente(orgId, peutChantiers);
+
+  // --- Ménage des données (administrateur) ---
+  const pennylaneActif = usePennylaneEnabled();
+  const voitDevisNonRattaches = isOrgAdmin && pennylaneActif;
+  const { orphanCount, error: quotesError } = useQuotesExplorer({ enabled: voitDevisNonRattaches });
+
+  // --- Repères : seulement les chiffres connus ---
+  const reperes = [];
+  if (rdvConnus) {
+    const compte = compterRdv(appointments, plage);
+    reperes.push({
+      key: 'rdv',
+      label: 'RDV aujourd’hui',
+      value: entier(compte.aujourdhui),
+      sub: `${entier(compte.semaine)} ${weekEnd ? 'la semaine prochaine' : 'cette semaine'}`,
+    });
+  }
+  if (rdvConnus && ca) {
+    reperes.push({
+      key: 'ca-programme',
+      label: `CA HT programmé, ${weekEnd ? 'semaine prochaine' : 'cette semaine'}`,
+      value: formatCa(cumulPeriode(ca.parJour, plage.semaine.debut, plage.semaine.finExclue)),
+      sub: 'Interventions posées au planning',
+      title: 'Installations au prorata des journées posées, entretiens au montant du contrat ramené en HT.',
+    });
+  }
+  if (dashboard) {
+    const { actuel } = dashboard.entreprise;
+    const { total } = dashboard.portefeuille;
+    const nomDuMois = new Date().toLocaleDateString('fr-FR', { month: 'long' });
+    reperes.push({
+      key: 'ca-signe',
+      label: `CA signé HT en ${nomDuMois}`,
+      value: euros(actuel.ca),
+      sub: `${entier(actuel.ventes)} ${actuel.ventes > 1 ? 'ventes signées' : 'vente signée'}`,
+    });
+    reperes.push({
+      key: 'devis',
+      label: 'Devis en attente',
+      value: entier(total.devisEnAttente),
+      sub: `${euros(total.montantEnAttente)} HT`,
+    });
+  }
+
+  // --- À traiter ---
+  const lignes = lignesATraiter({
+    portefeuille: dashboard ? dashboard.portefeuille.total : null,
+    chantiers: chantiers.data || null,
+    seuilRelance: SEUIL_RELANCE_JOURS,
+  });
+  const echecs = [
+    peutPipeline && pipelineError ? 'le pipeline' : null,
+    peutChantiers && chantiers.error ? 'les chantiers' : null,
+  ].filter(Boolean);
+  const aTraiterVisible = peutPipeline || peutChantiers;
 
   // ===========================================================================
   // RENDER
@@ -251,172 +167,47 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-secondary-900">
-          Bonjour, {profile?.full_name?.split(' ')[0] || 'Utilisateur'} 👋
+          Bonjour{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
         </h1>
-        <p className="text-secondary-600">
-          Voici votre journée du{' '}
-          {new Date().toLocaleDateString('fr-FR', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-          })}
+        <p className="text-secondary-600 first-letter:uppercase">
+          {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
       </div>
 
-      {/* KPI Cards — masquer pipeline KPIs pour technicien */}
-      {/* Grid adapté : 4 cols admin/TL, 2 cols commercial (pipeline only), 2 cols technicien (chantiers only) */}
-      <div className={`grid grid-cols-2 ${
-        can('pipeline', 'view') && effectiveRole !== 'commercial'
-          ? (showQuotesKpi ? 'lg:grid-cols-5' : 'lg:grid-cols-4')
-          : 'lg:grid-cols-2'
-      } gap-4`}>
-        {can('pipeline', 'view') && (
-          <>
-            <KpiCard
-              label="Nouveaux leads"
-              value={kpis.nouveauLead ?? 0}
-              icon={Sparkles}
-              color="bg-gray-500"
-              onClick={() => navigate('/pipeline?tab=kanban')}
+      {reperes.length >= 2 && (
+        <StatStrip items={reperes} columns={reperes.length >= 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2'} />
+      )}
+
+      <div className={`grid gap-6 ${peutPlanning && aTraiterVisible ? 'lg:grid-cols-3' : ''}`}>
+        {peutPlanning && (
+          <div className={aTraiterVisible ? 'lg:col-span-2' : ''}>
+            <AccueilJournee
+              journee={journee}
+              equipe={teamList}
+              isLoading={rdvLoading}
+              error={rdvError}
+              finDeLecture={plage.endDate}
             />
-            <KpiCard
-              label="Devis envoyés"
-              value={kpis.devisEnvoye ?? 0}
-              icon={FileText}
-              color="bg-orange-500"
-              onClick={() => navigate('/pipeline?tab=kanban')}
-            />
-          </>
+          </div>
         )}
-        {/* Chantiers KPIs : uniquement pour responsables (org_admin, team_leader) — pas les commerciaux */}
-        {can('chantiers', 'view') && effectiveRole !== 'commercial' && (
-          <>
-            <KpiCard
-              label="Commandes à faire"
-              value={kpis.commandeAFaire}
-              icon={ClipboardList}
-              color="bg-amber-500"
-              onClick={() => navigate('/chantiers')}
-            />
-            <KpiCard
-              label="À planifier"
-              value={kpis.aPlanifier}
-              icon={HardHat}
-              color="bg-blue-500"
-              onClick={() => navigate('/chantiers')}
-            />
-          </>
-        )}
-        {/* Devis PL non rattachés — masqué si Pennylane est injoignable
-            (afficher « 0 » serait un mensonge, pas une information) */}
-        {showQuotesKpi && !quotesError && (
-          <KpiCard
-            label="Devis non rattachés"
-            value={orphanCount}
-            icon={FileSearch}
-            color="bg-rose-500"
-            onClick={() => navigate('/devis')}
+        {aTraiterVisible && (
+          <AccueilATraiter
+            lignes={lignes}
+            isLoading={(peutPipeline && pipelineLoading) || (peutChantiers && chantiers.isLoading)}
+            echecs={echecs}
+            peutCreerLead={can('pipeline', 'create')}
           />
         )}
       </div>
 
-      {/* Fiches client Pennylane en double : à fusionner dans Pennylane (décision 2026-09-16) */}
-      {showQuotesKpi && <PennylaneDoublonsClients />}
-
-      {/* Leads rattachés à plusieurs clients Pennylane : synchro d'identité suspendue, l'admin tranche (mouchard 2026-09-16) */}
-      {showQuotesKpi && <PennylaneLeadsMultiPayeurs />}
-
-      {/* Appareils trouvés sur le web par un intervenant, en attente de contrôle (référentiel des appareils) */}
-      {isOrgAdmin && <AppareilsAControler />}
-
-      {/* Contenu principal */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Planning du jour */}
-        <div className="lg:col-span-2 card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-500" />
-              Planning du jour
-              {todayAppointments.length > 0 && (
-                <span className="text-sm font-normal text-gray-400">
-                  ({todayAppointments.length})
-                </span>
-              )}
-            </h2>
-            <button
-              type="button"
-              onClick={() => navigate('/planning')}
-              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-            >
-              Voir tout →
-            </button>
-          </div>
-
-          {isLoading ? (
-            <div className="flex justify-center py-8 text-gray-400">Chargement...</div>
-          ) : todayAppointments.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>Aucun RDV aujourd&apos;hui</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {todayAppointments.map((apt) => (
-                <PlanningRow key={apt.id} appointment={apt} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Colonne droite : Alertes + Actions rapides */}
-        <div className="card">
-          <h2 className="text-lg font-semibold text-secondary-900 mb-4">Alertes</h2>
-
-          {alerts.length === 0 ? (
-            <p className="text-sm text-gray-400 py-2">Aucune alerte</p>
-          ) : (
-            <div className="space-y-3">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={`p-3 rounded-lg flex items-start gap-3 ${
-                    alert.type === 'warning'
-                      ? 'bg-amber-50 text-amber-800'
-                      : 'bg-blue-50 text-blue-800'
-                  }`}
-                >
-                  {alert.type === 'warning' ? (
-                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  )}
-                  <p className="text-sm">{alert.message}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Actions rapides */}
-          {can('pipeline', 'create') && (
-            <div className="mt-6 pt-6 border-t border-secondary-200">
-              <h3 className="text-sm font-medium text-secondary-700 mb-3">Actions rapides</h3>
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => navigate('/pipeline?tab=kanban&new=1')}
-                  className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-secondary-50 text-secondary-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm font-medium">Nouveau lead</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {isOrgAdmin && (
+        <AccueilACorriger
+          pennylaneActif={pennylaneActif}
+          devisNonRattaches={voitDevisNonRattaches && !quotesError ? orphanCount : null}
+        />
+      )}
     </div>
   );
 }
