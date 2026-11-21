@@ -86,3 +86,31 @@ test('dureeDuCentre : l\'étendue du centre, sinon le repli ; l\'empreinte suit 
     base,
   );
 });
+
+test('demiPlanProche : le côté du centre le plus proche, borné par la médiatrice', async () => {
+  const { demiPlanProche } = await import('../src/lib/territoire-config.js');
+  const siege = { lat: 43.9, lng: 1.9 };
+  const antenne = { lat: 43.7, lng: 1.45 };
+  const dedans = (poly, [x, y]) => { // point dans un polygone convexe (anneau fermé)
+    const a = poly.geometry.coordinates[0];
+    let signe = 0;
+    for (let i = 0; i < a.length - 1; i++) {
+      const v = (a[i + 1][0] - a[i][0]) * (y - a[i][1]) - (a[i + 1][1] - a[i][1]) * (x - a[i][0]);
+      if (v !== 0) { if (signe && Math.sign(v) !== signe) return false; signe = Math.sign(v); }
+    }
+    return true;
+  };
+  const cote = demiPlanProche(siege, antenne);
+  assert.equal(cote.geometry.type, 'Polygon');
+  assert.equal(dedans(cote, [antenne.lng, antenne.lat]), true);
+  assert.equal(dedans(cote, [siege.lng, siege.lat]), false);
+  // un point tout près de l'antenne, un point tout près du siège
+  assert.equal(dedans(cote, [1.5, 43.72]), true);
+  assert.equal(dedans(cote, [1.85, 43.88]), false);
+  // les deux côtés se partagent le plan : le milieu est sur la frontière, chacun a son centre
+  const autreCote = demiPlanProche(antenne, siege);
+  assert.equal(dedans(autreCote, [siege.lng, siege.lat]), true);
+  assert.equal(dedans(autreCote, [antenne.lng, antenne.lat]), false);
+  // deux centres au même endroit : pas de partage possible
+  assert.equal(demiPlanProche(siege, siege), null);
+});

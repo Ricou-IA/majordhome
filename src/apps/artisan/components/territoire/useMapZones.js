@@ -3,21 +3,22 @@
  * Hook pour calculer et cacher les zones isochrones territoriales
  * Utilise l'API Mapbox Isochrone + Matrix + contours CP + Turf.js
  *
- * Algorithme v2 : découpage de l'overlap par codes postaux
- * (le centre le plus rapide en temps de trajet prend le CP)
+ * Chaque centre (siège, antennes) a son territoire : la zone atteinte en voiture dans son étendue.
+ * Les zones ne se recouvrent pas : une partie commune va au centre le plus proche (par code postal
+ * et temps de trajet là où l'on a les contours, à vol d'oiseau ailleurs).
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as turf from '@turf/turf';
-import { TERRITOIRE_CONFIG, getTerritoireCenters, centresValides, empreinteCentres, dureeTerritoire, dureeDuCentre } from '@/lib/territoire-config';
+import { TERRITOIRE_CONFIG, getTerritoireCenters, centresValides, empreinteCentres, dureeTerritoire, dureeDuCentre, demiPlanProche } from '@/lib/territoire-config';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { logger } from '@lib/logger';
 
 // P1.9 — clés localStorage suffixées par orgId pour éviter fuite cross-org
 // au switch d'organisation (multi-tenant futur).
-const CACHE_KEY_BASE = 'territoire-zones-v9';
-const CACHE_TS_KEY_BASE = 'territoire-zones-v9-at';
+const CACHE_KEY_BASE = 'territoire-zones-v10';
+const CACHE_TS_KEY_BASE = 'territoire-zones-v10-at';
 const buildCacheKey = (orgId) => `${CACHE_KEY_BASE}:${orgId || 'noorg'}`;
 const buildCacheTsKey = (orgId) => `${CACHE_TS_KEY_BASE}:${orgId || 'noorg'}`;
 const CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 jours
@@ -201,145 +202,102 @@ function cleanupZone(zone, clipTo) {
 // ALGORITHME DE ZONES
 // ============================================================================
 
-/**
- * Découpe la zone d'overlap en utilisant les contours des codes postaux.
- * Chaque CP est assigné au centre le plus rapide en temps de trajet.
- *
- * @returns {{ zoneP: Feature|null }} - Zone de l'antenne (l'appelant calcule siège = isoG - zoneP)
- */
-async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, siege, antenne, token) {
-  // 1. Charger les contours CP
-  const cpData = await fetchPostalCodeContours();
-  if (!cpData || !cpData.features.length) {
-    throw new Error('Données codes postaux indisponibles');
-  }
+const fc = (features) => turf.featureCollection(features);
+const intersecter = (a, b) => { try { return turf.intersect(fc([a, b])); } catch { return null; } };
+const retirer = (a, b) => { try { return turf.difference(fc([a, b])); } catch { return a; } };
+const reunir = (morceaux) => morceaux.filter(Boolean).reduce((acc, m) => {
+  if (!acc) return m;
+  try { return turf.union(fc([acc, m])); } catch { return acc; }
+}, null);
 
-  // 2. Trouver les CP qui intersectent l'overlap
-  const overlapCPs = [];
-  for (const cpFeature of cpData.features) {
-    try {
-      const inter = turf.intersect(turf.featureCollection([overlap, cpFeature]));
-      if (inter && turf.area(inter) > 1000) { // > 1000 m² pour filtrer le bruit
-        overlapCPs.push({
-          feature: cpFeature,
-          clipped: inter,
-          centroid: turf.centroid(cpFeature).geometry.coordinates,
-          postalCode: cpFeature.properties.postal_code,
-        });
-      }
-    } catch {
-      // Géométrie invalide, on skip
-    }
-  }
+// En dessous, un reste hors contours de codes postaux n'est qu'un liseré de bord : on l'ignore.
+const RESTE_MIN_M2 = 1_000_000;
 
-
-  if (overlapCPs.length === 0) {
-    return { zoneP: clippedIsoP };
-  }
-
-  // 3. Temps de trajet centroïde → siège vs antenne
-  const centroids = overlapCPs.map(cp => cp.centroid);
-  const destinations = [
-    [siege.lng, siege.lat],
-    [antenne.lng, antenne.lat],
-  ];
-
-  const durations = await fetchDrivingTimesMatrix(centroids, destinations, token);
-
-  // 4. Assigner chaque CP au centre le plus rapide
-  const cpsAntenne = [];
-
-  for (let i = 0; i < overlapCPs.length; i++) {
-    const timeToG = durations[i]?.[0] ?? Infinity;
-    const timeToP = durations[i]?.[1] ?? Infinity;
-
-    if (timeToP < timeToG) {
-      cpsAntenne.push(overlapCPs[i]);
-    }
-    // Égalité ou erreur → siège (défaut)
-  }
-
-
-  // 5. Construire la zone de l'antenne = exclusive P + CPs assignés à P
-  // Zone exclusive de l'antenne = clippedIsoP - overlap
-  let exclusiveP = null;
-  try {
-    exclusiveP = turf.difference(turf.featureCollection([clippedIsoP, overlap]));
-  } catch {
-    // Pas de zone exclusive (100% overlap)
-  }
-
-  // Union de toutes les parts de l'antenne
-  const pParts = [
-    exclusiveP,
-    ...cpsAntenne.map(cp => cp.clipped),
-  ].filter(Boolean);
-
-  let zoneP = null;
-  if (pParts.length === 1) {
-    zoneP = pParts[0];
-  } else if (pParts.length > 1) {
-    try {
-      zoneP = pParts.reduce((acc, part) => {
-        if (!acc) return part;
-        try {
-          return turf.union(turf.featureCollection([acc, part]));
-        } catch {
-          return acc;
-        }
-      }, null);
-    } catch (e) {
-      logger.warn('[useMapZones] Union de la zone antenne échouée:', e);
-      zoneP = pParts[0];
-    }
-  }
-
-  // Clipper la zone P finale à la zone principale (isoG)
-  if (zoneP) {
-    try {
-      zoneP = turf.intersect(turf.featureCollection([zoneP, isoG]));
-    } catch {
-      // Garder tel quel
-    }
-  }
-
-  return { zoneP };
+/** Partage à vol d'oiseau : la partie de `commun` plus proche de l'antenne que du siège. */
+function partAuPlusProche(commun, siege, antenne) {
+  const cote = demiPlanProche(siege, antenne);
+  return cote ? intersecter(commun, cote) : null;
 }
 
 /**
- * Zone d'une antenne face au siège : son isochrone, bornée à celle du siège, la partie commune
- * étant partagée code postal par code postal (le centre le plus rapide en voiture prend le CP).
- * Hors des départements dont on a les contours, repli géométrique : l'antenne garde son isochrone.
+ * Part de l'antenne dans la partie COMMUNE à sa zone et à celle du siège (les zones ne se
+ * recouvrent pas : chaque morceau va au centre le plus proche).
+ *   - là où l'on a les contours des codes postaux : code postal par code postal, au centre le plus
+ *     rapide en voiture (à égalité ou sans réponse : le siège) ;
+ *   - ailleurs : à vol d'oiseau, de part et d'autre de la médiatrice des deux centres.
+ * @returns {Promise<Feature|null>}
+ */
+async function partDAntenneDansLeCommun(commun, siege, antenne, token) {
+  const cpData = await fetchPostalCodeContours();
+  if (!cpData?.features?.length) return partAuPlusProche(commun, siege, antenne);
+
+  // Codes postaux qui touchent la partie commune
+  const cps = [];
+  for (const cpFeature of cpData.features) {
+    const inter = intersecter(commun, cpFeature);
+    if (inter && turf.area(inter) > 1000) { // > 1000 m² pour filtrer le bruit
+      cps.push({ clipped: inter, centroid: turf.centroid(cpFeature).geometry.coordinates });
+    }
+  }
+  if (cps.length === 0) return partAuPlusProche(commun, siege, antenne);
+
+  // Temps de trajet de chaque code postal vers le siège et vers l'antenne
+  const durations = await fetchDrivingTimesMatrix(
+    cps.map((cp) => cp.centroid),
+    [[siege.lng, siege.lat], [antenne.lng, antenne.lat]],
+    token,
+  );
+  const morceaux = cps
+    .filter((_, i) => (durations[i]?.[1] ?? Infinity) < (durations[i]?.[0] ?? Infinity))
+    .map((cp) => cp.clipped);
+
+  // Reste de la partie commune, hors des contours connus : à vol d'oiseau
+  const couvert = reunir(cps.map((cp) => cp.clipped));
+  const reste = couvert ? retirer(commun, couvert) : null;
+  if (reste && turf.area(reste) > RESTE_MIN_M2) {
+    const part = partAuPlusProche(reste, siege, antenne);
+    if (part) morceaux.push(part);
+  }
+  return reunir(morceaux);
+}
+
+/**
+ * Zone d'une antenne : son territoire propre (ce que le siège n'atteint pas) + sa part de la partie
+ * commune avec le siège. Une antenne hors de portée du siège garde toute sa zone.
  */
 async function zoneDAntenne(isoSiege, isoAntenne, siege, antenne, token) {
-  let clipped = null;
-  try {
-    clipped = turf.intersect(turf.featureCollection([isoAntenne, isoSiege]));
-  } catch (e) {
-    logger.warn('[useMapZones] Clip antenne / siège échoué:', e);
-    clipped = isoAntenne;
-  }
-  if (!clipped) return null; // l'antenne est hors de portée du siège : pas de zone commune à partager
+  const commun = intersecter(isoAntenne, isoSiege);
+  if (!commun) return isoAntenne; // rien de commun avec le siège : un territoire à part
 
+  const propre = retirer(isoAntenne, isoSiege);
+  let part = null;
   try {
-    const { zoneP } = await splitOverlapByPostalCodes(clipped, isoSiege, clipped, siege, antenne, token);
-    return cleanupZone(zoneP, isoSiege) || zoneP;
+    part = await partDAntenneDansLeCommun(commun, siege, antenne, token);
   } catch (e) {
-    logger.warn('[useMapZones] Découpe CP échouée, repli géométrique:', e);
-    return clipped;
+    logger.warn('[useMapZones] Partage par codes postaux échoué, partage à vol d\'oiseau:', e);
+    part = partAuPlusProche(commun, siege, antenne);
   }
+  const zone = reunir([propre, part]);
+  if (!zone || turf.area(zone) < RESTE_MIN_M2) return null; // rien, ou un liseré de bord
+  // Lissage du contour (les codes postaux laissent des morceaux). Pas de découpe sur l'isochrone de
+  // l'antenne : ses bords se confondent avec ceux de la zone et la découpe la vidait. Un lissage qui
+  // perd de la surface est écarté : mieux vaut un contour en morceaux qu'une zone amputée.
+  const lissee = cleanupZone(zone, null);
+  return lissee && turf.area(lissee) >= turf.area(zone) * 0.95 ? lissee : zone;
 }
 
 /**
  * Calcule les zones du territoire à partir des centres des réglages de l'organisation
  * (`settings.territoire_centers`) : le 1er est le siège, les suivants des antennes.
  *   - siège seul : sa zone est son isochrone ;
- *   - antennes : chacune prend sa part (dans l'ordre des réglages, sans recouvrir une antenne
- *     déjà servie), le siège garde le reste de son isochrone.
+ *   - antennes : chacune a son territoire propre, plus sa part de ce qu'elle partage avec le siège
+ *     (dans l'ordre des réglages, sans recouvrir une antenne déjà servie) ; le siège garde le reste
+ *     de son isochrone.
+ * Le territoire entier (`zone_principale`) est la réunion des zones de tous les centres.
  *
  * @returns {Promise<{ zones: Object<string, Feature>, ordre: string[], zone_principale: Feature, metadata: Object }|null>}
  */
-async function calculateZones(token, centers, minutesParDefaut = TERRITOIRE_CONFIG.isochroneMinutes) {
+export async function calculateZones(token, centers, minutesParDefaut = TERRITOIRE_CONFIG.isochroneMinutes) {
   const entrees = centresValides(centers);
   if (entrees.length === 0) return null;
   const [siege, ...antennes] = entrees;
@@ -365,7 +323,7 @@ async function calculateZones(token, centers, minutesParDefaut = TERRITOIRE_CONF
     let zone = await zoneDAntenne(isoSiege, isos[i + 1], siege, antennes[i], token);
     if (zone && prises) {
       try {
-        zone = turf.difference(turf.featureCollection([zone, prises]));
+        zone = turf.difference(turf.featureCollection([zone, prises])); // null : antenne entièrement couverte
       } catch (e) {
         logger.warn('[useMapZones] Retrait des antennes précédentes échoué:', e);
       }
@@ -393,7 +351,7 @@ async function calculateZones(token, centers, minutesParDefaut = TERRITOIRE_CONF
   return {
     zones,
     ordre: entrees.map((c) => c.key),
-    zone_principale: isoSiege, // Pour l'outline pointillé
+    zone_principale: reunir(isos) || isoSiege, // contour pointillé : tout le territoire
     metadata: {
       computed_at: new Date().toISOString(),
       isochrone_minutes: isochroneMinutes,

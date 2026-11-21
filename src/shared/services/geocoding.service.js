@@ -443,7 +443,7 @@ async function geocodeLeadAddress(address, postalCode, city) {
  */
 function detectLeadZone(lat, lng, orgId) {
   try {
-    const cached = orgId ? localStorage.getItem(`territoire-zones-v9:${orgId}`) : null;
+    const cached = orgId ? localStorage.getItem(`territoire-zones-v10:${orgId}`) : null;
     if (!cached) {
       logger.warn('[geocoding] Zones non disponibles en cache — zone non détectée');
       return null;

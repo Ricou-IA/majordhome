@@ -72,6 +72,32 @@ export function empreinteCentres(centers, repli = TERRITOIRE_CONFIG.isochroneMin
 }
 
 /**
+ * Côté de `proche` : polygone (GeoJSON) des points plus proches de `proche` que de `autre`, à vol
+ * d'oiseau — le demi-plan borné par la médiatrice des deux centres. Sert à partager la partie
+ * commune de deux zones quand on n'a pas mieux (contours de codes postaux absents).
+ * Calcul plan local (longitudes ramenées à l'échelle des latitudes), suffisant à l'échelle d'une région.
+ * @param {{ lat: number, lng: number }} autre
+ * @param {{ lat: number, lng: number }} proche
+ * @param {number} [portee] - étendue du polygone, en degrés
+ * @returns {{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: number[][][] } }|null}
+ *   null si les deux centres sont au même endroit
+ */
+export function demiPlanProche(autre, proche, portee = 8) {
+  const k = Math.cos((((autre.lat + proche.lat) / 2) * Math.PI) / 180) || 1;
+  const ax = autre.lng * k; const ay = autre.lat;
+  const bx = proche.lng * k; const by = proche.lat;
+  const dx = bx - ax; const dy = by - ay;
+  const n = Math.hypot(dx, dy);
+  if (!n) return null;
+  const ux = dx / n; const uy = dy / n; // vers `proche`
+  const px = -uy; const py = ux; // le long de la médiatrice
+  const mx = (ax + bx) / 2; const my = (ay + by) / 2;
+  const coin = (s, t) => [(mx + px * s + ux * t) / k, my + py * s + uy * t];
+  const anneau = [coin(-portee, 0), coin(portee, 0), coin(portee, portee), coin(-portee, portee), coin(-portee, 0)];
+  return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [anneau] } };
+}
+
+/**
  * P0.19 — Multi-tenant : retourne les centres territoriaux depuis les settings
  * de l'organisation.
  *

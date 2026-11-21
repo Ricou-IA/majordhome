@@ -161,7 +161,7 @@ export default function TerritoryTab() {
       <SettingsSurface colonnes>
         <SettingsSection
           title="Siège sur la carte"
-          description="Point de départ des trajets et des tournées, centre de la carte du territoire. Son étendue délimite le territoire."
+          description="Point de départ des trajets et des tournées, centre de la carte du territoire. Sa zone est ce qu’il atteint en voiture dans son étendue."
         >
           <CenterEditor value={state.headquarters} onChange={(hq) => patch({ headquarters: hq })} />
           {(errors.hq_label || errors.hq_coords) && (
@@ -172,7 +172,7 @@ export default function TerritoryTab() {
         <SettingsSection
           title="Antennes commerciales"
           optional
-          description="Pour un commercial basé ailleurs qu’au siège : ses trajets partent de son antenne. Sa zone est prise dans le territoire du siège."
+          description="Pour un commercial basé ailleurs qu’au siège : ses trajets partent de son antenne. Chaque antenne a son propre territoire ; ce qu’elle partage avec le siège va au plus proche des deux."
         >
           {state.branches.length > 0 && (
             <ul className="rounded-lg border border-secondary-200 divide-y divide-secondary-100">
