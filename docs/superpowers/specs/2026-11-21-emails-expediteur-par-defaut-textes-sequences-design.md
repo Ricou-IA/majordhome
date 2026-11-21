@@ -3,8 +3,9 @@
 Date : 2026-11-21 · Statut : principe validé par Eric. Adresse de plateforme provisoire retenue :
 `envoi.confer-sas.fr` (le nom commercial n'est pas choisi). Tranche 2 en production le 2026-11-21
 (neuf edges déployées sur le oui d'Eric, migration `20261121_10` appliquée ; aucun envoi réel
-essayé). Tranche 1 codée le 2026-11-21, pas en service : il reste à vérifier `envoi.confer-sas.fr`
-dans Resend, poser le secret `MDH_PLATFORM_FROM_EMAIL`, déployer les edges. Écarts assumés avec le
+essayé). Tranche 1 en production le 2026-11-21 : `envoi.confer-sas.fr` vérifié dans Resend (un TXT DKIM et
+deux CNAME chez Hostinger, format « Forge » de Resend), secret `MDH_PLATFORM_FROM_EMAIL` posé, onze edges
+déployées sur le oui d'Eric ; aucun envoi réel essayé depuis une entreprise sans domaine. Écarts assumés avec le
 § 3.1 : `invite-client` et `maintenance-digest` non touchés ; le statut du domaine reste écrit par le
 navigateur (`org_resend_noter` non fait : Resend refuse de toute façon un domaine non vérifié) ;
 sans adresse de plateforme, comportement d'avant. Tranches 3 et 4 à faire.
