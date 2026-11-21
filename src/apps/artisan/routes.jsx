@@ -32,8 +32,7 @@ const ThermiqueSettings = lazy(() => import('./pages/settings/ThermiqueSettings'
 const ActiviteSettings = lazy(() => import('./pages/settings/ActiviteSettings'));
 const TourneesSettings = lazy(() => import('./pages/settings/TourneesSettings'));
 const FumisterieSettings = lazy(() => import('./pages/settings/FumisterieSettings'));
-const EmailsSettings = lazy(() => import('./pages/settings/EmailsSettings'));
-const SmsSettings = lazy(() => import('./pages/settings/SmsSettings'));
+const CommunicationSettings = lazy(() => import('./pages/settings/CommunicationSettings'));
 const TelephonieSettings = lazy(() => import('./pages/settings/TelephonieSettings'));
 const PennylaneSettings = lazy(() => import('./pages/settings/PennylaneSettings'));
 const PlanComptableSettings = lazy(() => import('./pages/settings/PlanComptableSettings'));
@@ -476,25 +475,18 @@ export const artisanRoutes = [
     ),
   },
   {
-    path: 'settings/emails',
+    path: 'settings/communication',
     element: (
       <SuspenseWrapper>
         <RouteGuard resource="settings">
-          <EmailsSettings />
+          <CommunicationSettings />
         </RouteGuard>
       </SuspenseWrapper>
     ),
   },
-  {
-    path: 'settings/sms',
-    element: (
-      <SuspenseWrapper>
-        <RouteGuard resource="settings">
-          <SmsSettings />
-        </RouteGuard>
-      </SuspenseWrapper>
-    ),
-  },
+  // Anciennes adresses (e-mails et SMS réunis le 2026-11-21).
+  { path: 'settings/emails', element: <Navigate to="/settings/communication" replace /> },
+  { path: 'settings/sms', element: <Navigate to="/settings/communication?tab=sms" replace /> },
   {
     path: 'settings/telephonie',
     element: (

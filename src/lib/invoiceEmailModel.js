@@ -35,7 +35,7 @@ export function invoiceEmailAvailability({ settings, mode, clientEmail, hasInvoi
 
 export const INVOICE_EMAIL_REASONS = Object.freeze({
   no_email: 'Le client n’a pas d’adresse e-mail (fiche client).',
-  no_from_email: 'Aucun e-mail expéditeur : Paramètres → Communication → Emails.',
+  no_from_email: 'Aucun e-mail expéditeur : Paramètres → E-mails & SMS.',
   draft_mode: 'Brouillon Pennylane : à envoyer depuis Pennylane après finalisation.',
   no_invoice: 'Aucune facture sur cette carte.',
   draft_invoice: 'La facture est encore un brouillon dans Pennylane : finalisez-la d’abord.',
@@ -75,7 +75,7 @@ export const INVOICE_EMAIL_ERROR_MESSAGES = Object.freeze({
   invoice_pdf_missing: 'Le PDF de la facture n’est pas disponible (Pennylane ne l’a pas encore produit, ou l’archive du hub manque).',
   certificate_not_allowed: 'Un certificat sélectionné n’appartient pas à cette intervention.',
   certificate_pdf_missing: 'Un certificat sélectionné n’a pas de PDF généré : ouvrez-le et générez le PDF.',
-  template_missing: 'Gabarit « Facture d’entretien » absent : créez-le dans Paramètres → Communication → Emails.',
+  template_missing: 'Gabarit « Facture d’entretien » absent : créez-le dans Paramètres → E-mails & SMS.',
   client_email_missing: 'Le client n’a pas d’adresse e-mail.',
   attachments_too_large: 'Pièces jointes trop volumineuses (plus de 29 Mo) : retirez des certificats.',
   resend_failed: 'Resend a refusé l’envoi.',

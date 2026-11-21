@@ -51,7 +51,7 @@ const navigation = [
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants', module: 'cedants' },
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale', module: 'prospection' },
   { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings', module: 'geogrid' },
-  { name: 'Mailing',     href: '/mailing',     icon: Mail,          resource: 'settings' },
+  { name: 'Mailing',     href: '/mailing',     icon: Mail,          resource: 'settings', module: 'communication' },
   { name: 'Meta Ads',    href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads', module: 'meta_ads' },
   { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator', module: 'solaire' },
   { name: 'Thermique',   href: '/thermique',   icon: Thermometer,   resource: 'thermal_study', module: 'thermique' },

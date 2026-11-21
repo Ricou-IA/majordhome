@@ -1,6 +1,6 @@
 // src/apps/artisan/pages/settings/communication/EmailsTab.jsx
 // ============================================================================
-// Settings → Communication → Emails (/settings/emails) : identité d'envoi des
+// Paramètres → E-mails & SMS (/settings/emails) : identité d'envoi des
 // emails de l'organisation — `from_email` (expéditeur, dont le domaine doit être
 // vérifié sur Resend) et `reply_to` — puis le domaine d'envoi (ResendDomainSection).
 // Sortis de Organisation → Coordonnées le 2026-09-13 (regroupement par module) :

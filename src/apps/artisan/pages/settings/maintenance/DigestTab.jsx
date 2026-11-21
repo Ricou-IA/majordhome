@@ -66,7 +66,7 @@ export default function DigestTab() {
         <div className="flex gap-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
           <AlertTriangle className="w-5 h-5 flex-shrink-0" />
           <p>
-            Aucune adresse d&apos;expédition n&apos;est configurée pour l&apos;organisation (Paramètres → Emails).
+            Aucune adresse d&apos;expédition n&apos;est configurée pour l&apos;organisation (Paramètres → E-mails & SMS).
             L&apos;e-mail ne partira que si l&apos;expéditeur de la plateforme Majord&apos;home est configuré ;
             sinon il est ignoré et signalé côté serveur.
           </p>

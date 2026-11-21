@@ -4,7 +4,7 @@
 // Gabarits transactionnels de l'auto-RDV (spec 2026-09-29 § 4.1, § 4.2), même
 // patron que invoiceEmailTemplate.js : rangés dans `majordhome_mail_campaigns`
 // (is_transactional = true, exclus du broadcast), créés depuis Settings →
-// Communication → Emails, modifiables dans Mailing → Éditeur. Placeholders
+// Paramètres → E-mails & SMS, modifiables dans Mailing → Éditeur. Placeholders
 // {{UPPER_SNAKE}} : ceux-ci + le branding (mail.ts::brandingReplacements).
 // Module PUR, copié pour Deno (PARTAGES) : l'edge auto-rdv-cron lit les clés.
 // ============================================================================

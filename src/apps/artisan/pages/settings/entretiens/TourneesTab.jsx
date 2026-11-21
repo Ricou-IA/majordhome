@@ -264,7 +264,7 @@ export default function TourneesTab() {
             <span className="font-medium">Chaque 1ᵉʳ du mois, inviter par e-mail les clients dont l’entretien est dû.</span>
             <br />
             La machine dédie des journées vides du mois à chaque secteur selon les contrats dus, envoie à chaque client un lien
-            vers la page où il choisit sa demi-journée (gabarit « auto_rdv » dans Communication → Emails), relance par SMS puis
+            vers la page où il choisit sa demi-journée (gabarit « auto_rdv » dans Paramètres → E-mails & SMS), relance par SMS puis
             passe en liste d’appels. Désactivé : rien n’est envoyé ; la page et « Copier le lien » restent utilisables à la main.
           </span>
         </label>

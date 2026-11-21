@@ -1,7 +1,7 @@
 // src/apps/artisan/pages/settings/webshop/EmailsWebshopTab.jsx
 // Settings → Webshop → E-mails : les 7 gabarits du webshop (`WEBSHOP_EMAIL_DEFAULTS`), rangés dans
 // `majordhome_mail_campaigns` (transactionnels). Création et lien vers Mailing → Éditeur par la même
-// ligne que Settings → Communication → Emails (`GabaritTransactionnel`).
+// ligne que Paramètres → E-mails & SMS (`GabaritTransactionnel`).
 import { WEBSHOP_EMAIL_DEFAULTS, WEBSHOP_EMAIL_KEYS, WEBSHOP_EMAIL_PLACEHOLDERS } from '@/lib/webshop/emailTemplates';
 import { buildWebshopConfig } from '@/lib/webshop/reglages';
 import { gabaritsManquants } from '@/lib/webshop/settingsForm';

@@ -1,6 +1,6 @@
 // Settings → Organisation → Coordonnées : adresse du siège, téléphone, site web.
 // Règles (formats, contrôles) : src/lib/organisation/identite.js.
-// Emails (from_email, reply_to, domaine d'envoi) : Settings → Communication → Emails (communication/EmailsTab.jsx).
+// Emails (from_email, reply_to, domaine d'envoi) : Paramètres → E-mails & SMS (communication/EmailsTab.jsx).
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -92,7 +92,7 @@ export default function ContactTab() {
 
         <SettingsSection
           title="Contact"
-          description={<>Affichés sur vos documents et vos e-mails. Les adresses d’envoi se règlent dans <Link to="/settings/emails" className="text-primary-700 hover:underline">Communication → Emails</Link>.</>}
+          description={<>Affichés sur vos documents et vos e-mails. Les adresses d’envoi se règlent dans <Link to="/settings/communication" className="text-primary-700 hover:underline">E-mails &amp; SMS</Link>.</>}
         >
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Téléphone" required error={errors.phone}>

@@ -30,9 +30,6 @@ export const MODULES = [
       // Ouverte au team_leader (Eric 2026-10-27) : visible dès que le rôle a le droit `articles.edit` (org_admin compris)
       { key: 'suppliers', title: 'Fournisseurs & catalogue', description: 'Fournisseurs et catalogues produits', icon: 'Truck', href: '/settings/suppliers', acces: { resource: 'articles', action: 'edit' } },
       { key: 'pennylane', title: 'Facturation', description: 'Numérotation, mentions et coordonnées bancaires des factures ; lien Pennylane et comptes de vente', icon: 'Receipt', href: '/settings/pennylane', adminOnly: true },
-      // L'expéditeur des e-mails sert à tous les modules qui écrivent (factures, e-mail du soir) :
-      // socle, pas Communication.
-      { key: 'emails', title: 'Emails', description: 'Expéditeur, adresse de réponse, domaine d\'envoi', icon: 'Mail', href: '/settings/emails', adminOnly: true, horsCrm: true, si: 'envoi_emails' },
       { key: 'plan-comptable', title: 'Plan comptable', description: 'Les comptes de vente Pennylane utilisables dans Majord\'home', icon: 'BookOpen', href: '/settings/plan-comptable', adminOnly: true, si: 'pennylane' },
       { key: 'devis', title: 'Devis', description: 'Chapitres par type de projet, mentions et affichage du document', icon: 'FileSignature', href: '/settings/devis', adminOnly: true },
     ],
@@ -76,9 +73,19 @@ export const MODULES = [
   {
     key: 'communication',
     label: 'Communication',
-    description: 'Emails, SMS et WhatsApp envoyés à vos clients.',
+    description: 'E-mails, SMS et WhatsApp envoyés à vos clients.',
     tiles: [
-      { key: 'sms', title: 'SMS & WhatsApp', description: 'Gabarits par campagne, rappel automatique des RDV', icon: 'MessageSquare', href: '/settings/sms', adminOnly: true },
+      // E-mails et SMS au même endroit (Eric 2026-11-21) : adresse d'envoi, textes des e-mails
+      // automatiques, propre domaine, gabarits SMS. L'écran Mailing suit le même module.
+      { key: 'communication', title: 'E-mails & SMS', description: 'Votre adresse d\'envoi, les e-mails automatiques, les SMS et le rappel des rendez-vous', icon: 'Mail', href: '/settings/communication', adminOnly: true },
+    ],
+  },
+  {
+    // Agent téléphonique : module à part depuis le 2026-11-21 (Eric : plus lourd, pas prêt pour tous).
+    key: 'telephonie',
+    label: 'Agent téléphonique',
+    description: 'Assistante vocale des appels non répondus.',
+    tiles: [
       { key: 'telephonie', title: 'Agent téléphonique', description: 'Assistante vocale des appels non répondus', icon: 'Phone', href: '/settings/telephonie', adminOnly: true },
     ],
   },
@@ -122,9 +129,10 @@ export function tuilesParametrage() {
  * `accueil` = écran d'entrée du module (accueil d'une org sans CRM). Le socle n'est pas activable.
  */
 export const CATALOGUE = [
-  { key: 'crm', label: 'CRM artisan', description: 'Clients, planning, pipeline commercial, chantiers, territoire, mailing.', parDefaut: true, accueil: '/' },
+  { key: 'crm', label: 'CRM artisan', description: 'Clients, planning, pipeline commercial, chantiers, territoire.', parDefaut: true, accueil: '/' },
   { key: 'entretiens', label: 'Entretiens & Contrats', description: "Contrats d'entretien, certificats, tournées, tarification.", parDefaut: true, accueil: '/entretiens' },
-  { key: 'communication', label: 'Communication', description: 'SMS et WhatsApp, envoi des factures par e-mail.', parDefaut: false, accueil: null },
+  { key: 'communication', label: 'Communication', description: 'E-mails et SMS envoyés aux clients : mailing, e-mails automatiques, rappels.', parDefaut: false, accueil: null },
+  { key: 'telephonie', label: 'Agent téléphonique', description: 'Assistante vocale des appels non répondus.', parDefaut: false, accueil: null },
   { key: 'solaire', label: 'Solaire', description: 'Simulateur photovoltaïque et dossiers PV.', parDefaut: true, accueil: '/solaire' },
   { key: 'thermique', label: 'Thermique', description: 'Études de déperditions et dimensionnement PAC.', parDefaut: true, accueil: '/thermique' },
   // Sortis du socle le 2026-11-21 (ouverture d'une 2e entité) : fermés par défaut, ouverts par Baikal
@@ -212,13 +220,14 @@ export function accueilSansCrm(settings) {
 const ROUTES_PAR_MODULE = {
   socle: [
     'settings', 'settings/team', 'settings/permissions', 'settings/organization', 'settings/suppliers',
-    'settings/activite', 'settings/equipements', 'settings/emails', 'settings/pennylane', 'settings/plan-comptable', 'settings/devis', 'settings/projets', 'profile',
+    'settings/activite', 'settings/equipements', 'settings/pennylane', 'settings/plan-comptable', 'settings/devis', 'settings/projets', 'profile',
   ],
   entretiens: [
     'contrats', 'entretiens', 'certificat/:interventionId', 'clients/:clientId/contrat/signer',
     'settings/pricing', 'settings/tournees',
   ],
-  communication: ['settings/sms', 'settings/telephonie'],
+  communication: ['mailing', 'settings/communication', 'settings/emails', 'settings/sms'],
+  telephonie: ['settings/telephonie'],
   solaire: ['solaire', 'solaire/autoconso', 'solaire/historique', 'settings/solaire'],
   thermique: ['thermique', 'thermique/historique', 'settings/thermique'],
   webshop: ['webshop', 'settings/webshop'],
@@ -254,13 +263,9 @@ export function moduleDeRoute(chemin) {
  * ce droit (`can` = useCanAccess().can, absent ⇒ admin seul) ; une tuile sans `adminOnly` ni `acces` l'est pour tous.
  */
 /** Conditions `si` d'une tuile : un réglage qui ne sert à rien pour cette organisation ne s'affiche pas. */
-const MODULES_QUI_ECRIVENT = ['crm', 'communication', 'entretiens', 'webshop', 'maintenance'];
 const CONDITIONS_TUILE = {
   // Le plan comptable ne sert qu'à une organisation reliée à Pennylane (lien posé dans la tuile Facturation).
   pennylane: (settings) => settings?.pennylane?.enabled === true,
-  // L'adresse d'envoi ne sert qu'à une organisation dont un module écrit à quelqu'un : le mailing du CRM,
-  // les e-mails de Communication, d'Entretiens, de la boutique ou l'e-mail du soir des tâches récurrentes.
-  envoi_emails: (settings) => MODULES_QUI_ECRIVENT.some((cle) => moduleActif(settings, cle)),
 };
 
 function tuileVisible(t, { isOrgAdmin, can }, settings) {

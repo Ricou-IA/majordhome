@@ -8,7 +8,7 @@
 //
 // Même patron que autoRdvEmailTemplates.js : gabarit transactionnel rangé dans
 // `majordhome_mail_campaigns` (is_transactional = true, exclu du broadcast),
-// créé depuis Settings → Communication → Emails, modifiable dans Mailing →
+// créé depuis Paramètres → E-mails & SMS, modifiable dans Mailing →
 // Éditeur. Placeholders {{UPPER_SNAKE}} : ceux-ci + le branding
 // (mail.ts::brandingReplacements).
 //

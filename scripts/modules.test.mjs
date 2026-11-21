@@ -80,7 +80,7 @@ test('modulesVisibles : un module fermé disparaît des Paramètres ; sans CRM s
   assert.ok(!cles({ modules: { solaire: false } }).includes('solaire'));
   const s = { modules: { maintenance: true, crm: false, entretiens: false, solaire: false, thermique: false } };
   const tuiles = modulesVisibles(s, { isOrgAdmin: true }).flatMap((m) => m.tiles.map((t) => t.key));
-  assert.deepEqual(tuiles.sort(), ['emails', 'maintenance', 'organization']);
+  assert.deepEqual(tuiles.sort(), ['maintenance', 'organization']);
   assert.deepEqual(modulesVisibles(s, { isOrgAdmin: false }), []);
 });
 
@@ -98,7 +98,7 @@ test('modulesVisibles : la tuile Fournisseurs & catalogue suit le droit articles
 
 test('modulesEffectifs : état de chaque module du catalogue, défauts appliqués', () => {
   assert.deepEqual(modulesEffectifs({ modules: { maintenance: true, crm: false } }), {
-    crm: false, entretiens: true, communication: false, solaire: true, thermique: true, webshop: false, climatisation: false, fumisterie: false, cedants: false, prospection: false, geogrid: false, meta_ads: false, maintenance: true, dpe: false, assistant: false,
+    crm: false, entretiens: true, communication: false, telephonie: false, solaire: true, thermique: true, webshop: false, climatisation: false, fumisterie: false, cedants: false, prospection: false, geogrid: false, meta_ads: false, maintenance: true, dpe: false, assistant: false,
   });
 });
 
@@ -129,7 +129,10 @@ test('moduleDeRoute : chaque route de routes.jsx appartient au socle ou à un mo
   assert.equal(moduleDeRoute('clients/:clientId/contrat/signer'), 'entretiens');
   assert.equal(moduleDeRoute('solaire/historique'), 'solaire');
   assert.equal(moduleDeRoute('settings/sms'), 'communication');
-  assert.equal(moduleDeRoute('settings/emails'), 'socle');
+  assert.equal(moduleDeRoute('settings/emails'), 'communication');
+  assert.equal(moduleDeRoute('settings/communication'), 'communication');
+  assert.equal(moduleDeRoute('mailing'), 'communication', 'le mailing suit le module qui règle son adresse');
+  assert.equal(moduleDeRoute('settings/telephonie'), 'telephonie');
   assert.equal(moduleDeRoute('maintenance'), 'maintenance');
   assert.equal(moduleDeRoute('webshop'), 'webshop');
   assert.equal(moduleDeRoute('settings/webshop'), 'webshop');
@@ -140,7 +143,6 @@ test('moduleDeRoute : chaque route de routes.jsx appartient au socle ou à un mo
   assert.equal(moduleDeRoute('prospection'), 'prospection');
   assert.equal(moduleDeRoute('geogrid'), 'geogrid');
   assert.equal(moduleDeRoute('meta-ads'), 'meta_ads');
-  assert.equal(moduleDeRoute('mailing'), 'crm', 'le mailing reste dans la base commune');
   assert.equal(moduleDeRoute('clients/:id'), 'crm');
   assert.equal(moduleDeRoute('route-future-non-declaree'), 'crm', 'par défaut une route appartient au CRM');
 });
@@ -170,11 +172,4 @@ test('une tuile « si » ne s’affiche que si son réglage sert : Plan comptabl
   assert.ok(!tuiles({ pennylane: { enabled: false } }).includes('plan-comptable'));
   assert.ok(tuiles({ pennylane: { enabled: true } }).includes('plan-comptable'));
   assert.ok(tuiles({}).includes('pennylane'), 'la tuile Facturation, qui porte le lien Pennylane, reste visible');
-});
-
-test('la tuile Emails ne s’affiche que si un module de l’organisation écrit à quelqu’un', () => {
-  const aEmails = (s) => modulesVisibles(s, { isOrgAdmin: true }).some((m) => m.tiles.some((t) => t.key === 'emails'));
-  assert.equal(aEmails({}), true, 'le CRM a le mailing');
-  assert.equal(aEmails({ modules: { crm: false, entretiens: false } }), false, 'solaire et thermique seuls n’écrivent à personne');
-  assert.equal(aEmails({ modules: { crm: false, entretiens: false, maintenance: true } }), true, 'e-mail du soir');
 });

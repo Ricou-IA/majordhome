@@ -87,9 +87,9 @@ const MESSAGES = {
   numero_protege: "Un numéro de DPE a été posé à la main sur cette fiche : la recherche automatique ne le remplace pas.",
   numero_ecarte: "Ce DPE a été écarté pour ce client (« Ce n'est pas le bon »).",
   module_communication_inactif: "L'envoi d'e-mails (module Communication) n'est pas ouvert pour votre organisation.",
-  no_from_email: "L'adresse d'expédition des e-mails n'est pas configurée : Paramètres → Emails.",
+  no_from_email: "L'adresse d'expédition des e-mails n'est pas configurée : Paramètres → E-mails & SMS.",
   client_sans_email: "Aucune adresse e-mail sur la fiche du client.",
-  template_missing: "Le modèle d'e-mail « Rapport MonsieurDPE » n'existe pas encore : créez-le dans Paramètres → Emails.",
+  template_missing: "Le modèle d'e-mail « Rapport MonsieurDPE » n'existe pas encore : créez-le dans Paramètres → E-mails & SMS.",
   pdf_indisponible: "MonsieurDPE n'a pas pu fournir le PDF du rapport. Réessayez dans quelques minutes.",
   resend_failed: "L'e-mail n'a pas pu partir. Réessayez, et prévenez-nous si cela se reproduit.",
 };
@@ -198,7 +198,7 @@ export function disponibiliteEnvoi({ communicationActive, peutModifier, emailCli
   const non = (raison) => ({ visible: true, actif: false, raison });
   if (!(emailClient || '').trim()) return non("Aucune adresse e-mail sur la fiche du client.");
   if (!rapportComplet) return non("MonsieurDPE n'a pas d'analyse complète pour ce DPE.");
-  if (!expediteurConfigure) return non("L'adresse d'expédition des e-mails n'est pas configurée : Paramètres → Emails.");
+  if (!expediteurConfigure) return non("L'adresse d'expédition des e-mails n'est pas configurée : Paramètres → E-mails & SMS.");
   return { visible: true, actif: true, raison: null };
 }
 

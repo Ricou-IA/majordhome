@@ -1,7 +1,7 @@
 // src/lib/invoiceEmailTemplate.js
 // ============================================================================
 // Gabarit PAR DÉFAUT de l'e-mail « Facture d'entretien » (module Communication).
-// Créé d'un clic dans Settings → Communication → Emails comme campagne
+// Créé d'un clic dans Paramètres → E-mails & SMS comme campagne
 // transactionnelle `facture_entretien` de l'org, puis éditable dans Mailing → Éditeur.
 // Module PUR. Le corps est habillé par le squelette d'e-mail de l'org (pas de <html>).
 // ============================================================================

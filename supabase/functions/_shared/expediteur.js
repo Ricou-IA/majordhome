@@ -135,6 +135,6 @@ export function phraseEtatEnvoi(settings) {
 
 /** Ce que l'écran dit d'un refus. */
 export const EXPEDITEUR_REFUS = Object.freeze({
-  no_from_email: 'Renseignez d’abord votre adresse e-mail : Paramètres → Communication → Emails.',
-  domaine_requis: 'Un envoi en nombre part de votre propre domaine : vérifiez-le dans Paramètres → Communication → Emails.',
+  no_from_email: 'Renseignez d’abord votre adresse e-mail : Paramètres → E-mails & SMS.',
+  domaine_requis: 'Un envoi en nombre part de votre propre domaine : vérifiez-le dans Paramètres → E-mails & SMS.',
 });

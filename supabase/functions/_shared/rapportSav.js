@@ -87,10 +87,10 @@ export const RAPPORT_SAV_CODES = Object.freeze({
   carte_introuvable: 'Demande SAV introuvable.',
   carte_non_sav: 'Le rapport d’intervention ne concerne que les demandes SAV réalisées.',
   client_sans_email: 'Le client n’a pas d’adresse e-mail (fiche client).',
-  no_from_email: 'Aucun e-mail expéditeur : Paramètres → Communication → Emails.',
+  no_from_email: 'Aucun e-mail expéditeur : Paramètres → E-mails & SMS.',
   rapport_absent: 'Aucun rapport archivé sur cette carte : éditez-le d’abord.',
   rapport_illisible: 'Le rapport archivé est illisible : éditez-le à nouveau.',
-  template_missing: 'Texte de l’e-mail « Rapport d’intervention SAV » absent : créez-le dans Paramètres → Communication → Emails.',
+  template_missing: 'Texte de l’e-mail « Rapport d’intervention SAV » absent : créez-le dans Paramètres → E-mails & SMS.',
   resend_failed: 'L’envoi a échoué chez le prestataire d’e-mail. Réessayez dans un instant.',
   envoi_pas_en_service: 'L’envoi par e-mail n’est pas encore en service. Le rapport reste téléchargeable.',
 });

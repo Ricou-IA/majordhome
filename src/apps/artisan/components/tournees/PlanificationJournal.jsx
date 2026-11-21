@@ -44,7 +44,7 @@ const JOBS = {
       ['Sans e-mail', (r) => r?.invitations?.sans_email ?? 0],
       ['Journées étiquetées', (r) => (r?.etiquetees || []).length],
     ],
-    remarque: (r) => (r?.invitations?.template_missing ? 'Gabarit « auto_rdv » absent : aucun mail envoyé (Settings → Communication → Emails)' : ''),
+    remarque: (r) => (r?.invitations?.template_missing ? 'Gabarit « auto_rdv » absent : aucun mail envoyé (Paramètres → E-mails & SMS)' : ''),
   },
   'auto-rdv-relances': {
     titre: 'Relances quotidiennes',

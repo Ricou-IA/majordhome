@@ -9,7 +9,7 @@
 // Testé : node --test scripts/pv-reception.test.mjs
 // ============================================================================
 
-/** Gabarit transactionnel de l'e-mail qui porte le lien (créé depuis Paramètres → Emails). */
+/** Gabarit transactionnel de l'e-mail qui porte le lien (créé depuis Paramètres → E-mails & SMS). */
 export const PV_RECEPTION_TEMPLATE_KEY = 'pv_reception';
 
 export const DEFAULT_PV_RECEPTION_EMAIL = Object.freeze({
@@ -96,8 +96,8 @@ const MESSAGES = Object.freeze({
   too_many_requests: 'Trop de tentatives. Réessayez dans une heure.',
   // envoi par le bureau
   client_sans_email: 'Le client n’a pas d’adresse e-mail : copiez le lien pour l’envoyer autrement.',
-  template_missing: 'Le texte de l’e-mail n’est pas encore créé (Paramètres → Communication → Emails).',
-  expediteur_absent: 'L’adresse d’expédition des e-mails n’est pas renseignée (Paramètres → Communication → Emails).',
+  template_missing: 'Le texte de l’e-mail n’est pas encore créé (Paramètres → E-mails & SMS).',
+  expediteur_absent: 'L’adresse d’expédition des e-mails n’est pas renseignée (Paramètres → E-mails & SMS).',
   module_communication_ferme: 'L’envoi d’e-mails n’est pas ouvert pour votre entreprise : copiez le lien pour l’envoyer autrement.',
   droit_requis: 'Vous n’avez pas le droit de modifier les chantiers.',
   envoi_echoue: 'L’e-mail n’a pas pu partir.',

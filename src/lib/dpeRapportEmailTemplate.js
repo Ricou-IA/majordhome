@@ -1,6 +1,6 @@
 // Gabarit PAR DÉFAUT de l'e-mail « Rapport MonsieurDPE » (module Communication). Même patron que
 // invoiceEmailTemplate.js : campagne transactionnelle `rapport_dpe` de l'org, créée d'un clic dans
-// Settings → Communication → Emails, éditable dans Mailing → Éditeur. Le PDF du rapport complet MonsieurDPE
+// Paramètres → E-mails & SMS, éditable dans Mailing → Éditeur. Le PDF du rapport complet MonsieurDPE
 // part en pièce jointe (edge dpe-lien, action `envoyer`). Module PUR, copié pour Deno (PARTAGES).
 // Spec : docs/superpowers/specs/2026-11-12-logement-monsieurdpe-fiche-client-design.md §8.
 
