@@ -183,8 +183,9 @@ une colonne que le modèle invente est jetée).
   **fort** → écarté par défaut, coche pour l'importer quand même ; **faible** → importé par défaut,
   signalé, coche pour l'écarter.
   - Fort : même téléphone, même e-mail, même ancien numéro (`external_ref`), ou même nom + prénom
-    dans le même code postal. Ce dernier cas est ce qui empêche un fichier déposé deux fois de
-    recréer toutes les fiches sans téléphone ni e-mail.
+    dans le même code postal (ou quand le code postal manque d'un des deux côtés). Ce dernier cas
+    est ce qui empêche un fichier déposé deux fois de recréer toutes les fiches sans téléphone ni
+    e-mail.
   - Faible : même nom + prénom ailleurs, ou même nom dans le même code postal (une famille).
 - **Invariant, testé et affiché** : lignes lues = importées + doublons écartés + écartées. Liste des
   clients existants inconnue (chargement, échec) ⇒ import fermé, jamais « aucun doublon » supposé.
