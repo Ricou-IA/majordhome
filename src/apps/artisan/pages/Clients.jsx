@@ -29,6 +29,7 @@ import {
   Building2,
   Landmark,
   Archive,
+  Upload,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -269,7 +270,7 @@ const ErrorState = ({ error, onRetry }) => (
  */
 export function Clients() {
   // Auth context pour récupérer l'org_id
-  const { organization } = useAuth();
+  const { organization, isOrgAdmin } = useAuth();
   const { can } = useCanAccess();
   const orgId = organization?.id;
   const navigate = useNavigate();
@@ -492,6 +493,17 @@ export function Clients() {
                 {totalCount} client{totalCount !== 1 ? 's' : ''} au total
               </p>
             </div>
+            <div className="flex items-center gap-2">
+            {isOrgAdmin && (
+              <button
+                type="button"
+                onClick={() => navigate('/clients/import')}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                <Upload className="w-5 h-5" />
+                Importer
+              </button>
+            )}
             {canCreateClient && (
               <button
                 onClick={handleAddClient}
@@ -501,6 +513,7 @@ export function Clients() {
                 Nouveau client
               </button>
             )}
+            </div>
           </div>
 
           {/* Stats */}

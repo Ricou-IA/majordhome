@@ -13,6 +13,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Planning = lazy(() => import('./pages/Planning'));
 const Clients = lazy(() => import('./pages/Clients'));
 const ClientDetail = lazy(() => import('./pages/ClientDetail'));
+const ClientsImport = lazy(() => import('./pages/ClientsImport'));
 const Pipeline = lazy(() => import('./pages/Pipeline'));
 const Entretiens = lazy(() => import('./pages/Entretiens'));
 const InterventionDetail = lazy(() => import('./pages/InterventionDetail'));
@@ -203,6 +204,15 @@ export const artisanRoutes = [
     element: (
       <SuspenseWrapper>
         <Clients />
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    // Import des clients d'un autre logiciel — garde org_admin in-component
+    path: 'clients/import',
+    element: (
+      <SuspenseWrapper>
+        <ClientsImport />
       </SuspenseWrapper>
     ),
   },
