@@ -4,12 +4,12 @@
  * une intervention ou un e-mail envoyé sont conservées). Rien n'est affiché tant qu'aucun import n'existe.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { formatDateTimeFR } from '@/lib/utils';
 import { messageErreurImport } from '@/lib/importClients/lots';
-import { texteRetrait, texteRetraitFait } from '@/lib/importClients/libelles';
+import { texteRetrait, texteRetraitFait, messageEchecRetrait } from '@/lib/importClients/libelles';
 import { useClientImports, useRemovalPreview, useRemoveClientImport } from '@hooks/useClientImports';
 
 const RETIRABLE = ['termine', 'en_cours'];
@@ -17,6 +17,12 @@ const RETIRABLE = ['termine', 'en_cours'];
 function libelleEtat(imp) {
   if (imp.status === 'retire') return `Retiré le ${formatDateTimeFR(imp.removed_at)}`;
   return imp.status === 'en_cours' ? 'En cours' : 'Terminé';
+}
+
+function libelleLigne(imp) {
+  // Import retiré : le nombre de fiches conservées n'est pas connu de la liste, on ne parle plus de fiches créées.
+  if (imp.status === 'retire') return libelleEtat(imp);
+  return `${libelleCreees(imp.counts)} · ${libelleEtat(imp)}`;
 }
 
 function libelleCreees(counts) {
@@ -29,18 +35,21 @@ function libelleCreees(counts) {
 function RetraitDialog({ orgId, imp, onClose }) {
   const apercu = useRemovalPreview(orgId, imp.id);
   const retrait = useRemoveClientImport(orgId);
+  const enCours = useRef(false); // garde synchrone : isPending n'est à jour qu'au rendu suivant
 
   let description;
-  if (apercu.isLoading) description = 'Calcul des fiches concernées…';
+  if (apercu.isLoading || apercu.isFetching) description = 'Calcul des fiches concernées…';
   else if (apercu.error || !apercu.data) description = messageErreurImport(apercu.error);
   else description = texteRetrait(apercu.data);
 
   const confirmer = async () => {
+    if (enCours.current || retrait.isPending) return;
+    enCours.current = true;
     try {
       const totaux = await retrait.mutateAsync(imp.id);
       toast.success(texteRetraitFait(totaux));
     } catch (e) {
-      toast.error(e?.message || messageErreurImport(e));
+      toast.error(messageEchecRetrait(e?.message || messageErreurImport(e)));
     }
     onClose();
   };
@@ -55,7 +64,7 @@ function RetraitDialog({ orgId, imp, onClose }) {
       variant="destructive"
       onConfirm={confirmer}
       loading={retrait.isPending}
-      confirmDisabled={!apercu.data || apercu.data.retirables <= 0}
+      confirmDisabled={apercu.isFetching || !apercu.data || apercu.data.retirables <= 0}
     />
   );
 }
@@ -81,8 +90,7 @@ export default function ImportsPrecedents({ orgId }) {
               <p className="text-gray-600">
                 {formatDateTimeFR(imp.created_at)}
                 {imp.created_by_name ? ` · ${imp.created_by_name}` : ''}
-                {` · ${libelleCreees(imp.counts)}`}
-                {` · ${libelleEtat(imp)}`}
+                {` · ${libelleLigne(imp)}`}
               </p>
             </div>
             {RETIRABLE.includes(imp.status) && (

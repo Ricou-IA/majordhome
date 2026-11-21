@@ -74,3 +74,12 @@ export function texteRetraitFait({ retirees, conservees }) {
   if (conservees <= 0) return retire;
   return `${retire}, ${nombreFR(conservees)} ${conservees > 1 ? 'conservées' : 'conservée'}`;
 }
+
+/**
+ * Message d'un retrait interrompu : des fiches ont pu être retirées avant l'arrêt.
+ * @param {string} message phrase d'erreur déjà en français
+ * @returns {string}
+ */
+export function messageEchecRetrait(message) {
+  return `${message} Des fiches ont pu être retirées avant l'arrêt : relancez le retrait pour terminer.`;
+}

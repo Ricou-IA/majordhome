@@ -135,6 +135,8 @@ export const clientsService = {
             `phone.ilike.%${term}%`,
             `city.ilike.%${term}%`,
             `postal_code.ilike.%${term}%`,
+            // `external_ref` vient de la migration 20261121_13_clients_import.sql (vue majordhome_clients) :
+            // sans elle, toute recherche de clients répond 400.
             `external_ref.ilike.%${term}%`,
           ];
           if (phoneSpaced && phoneSpaced !== term) {
