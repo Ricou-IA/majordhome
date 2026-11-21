@@ -37,7 +37,7 @@ export default function CenterEditor({ value, onChange, labelHint, disabled = fa
 
   const handleAddressSelect = ({ lat, lng, label }) => {
     // Ne pas écraser le label custom si déjà saisi par l'user
-    update({ lat, lng, label: value.label || label });
+    update({ lat, lng, label: value.label || label, address: label });
   };
 
   const hasCoords = Number.isFinite(value.lat) && Number.isFinite(value.lng);
@@ -57,7 +57,7 @@ export default function CenterEditor({ value, onChange, labelHint, disabled = fa
           />
         </Field>
         <Field label="Adresse">
-          <AddressSearch initialValue={adresse} onSelect={handleAddressSelect} disabled={disabled} />
+          <AddressSearch initialValue={value.address || adresse} onSelect={handleAddressSelect} disabled={disabled} />
         </Field>
       </div>
 

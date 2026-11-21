@@ -139,7 +139,7 @@ export default function TerritoryTab() {
     if (Number.isFinite(hqLat) && Number.isFinite(hqLng)) return;
     geocodageSiegeEssaye.current = true;
     geocoderAdresse(adresseSiege).then((pos) => {
-      if (pos) setState((s) => (Number.isFinite(s.headquarters.lat) ? s : { ...s, headquarters: { ...s.headquarters, ...pos } }));
+      if (pos) setState((s) => (Number.isFinite(s.headquarters.lat) ? s : { ...s, headquarters: { ...s.headquarters, ...pos, address: adresseSiege } }));
     });
   }, [isLoading, adresseSiege, hqLat, hqLng, setState]);
 

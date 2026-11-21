@@ -27,6 +27,19 @@ import ClientModal from '../clients/ClientModal';
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
+const echapper = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+// Carte d'un centre : son nom et son adresse (le nom et l'adresse sont saisis par l'entreprise : on les échappe).
+function carteDuCentre(center, adresseRepli) {
+  const adresse = center.address || adresseRepli || '';
+  return `
+    <div style="padding: 8px 10px; min-width: 160px; max-width: 240px;">
+      <p style="font-weight: 600; font-size: 14px; margin: 0;">${echapper(center.label)}</p>
+      ${adresse ? `<p style="font-size: 12px; color: #6b7280; margin: 4px 0 0; line-height: 1.35;">${echapper(adresse)}</p>` : ''}
+    </div>
+  `;
+}
+
 export default function TerritoireMap({
   points = [],
   zones = null,
@@ -44,6 +57,8 @@ export default function TerritoireMap({
   const { settings: orgSettings } = useOrgSettings();
   const orgCenters = useMemo(() => getTerritoireCenters(orgSettings), [orgSettings]);
   const hasOrgCenters = Object.keys(orgCenters).length > 0;
+  // Le siège sans adresse propre (centre enregistré avant) reprend celle de Coordonnées.
+  const adresseSiege = [orgSettings?.address, [orgSettings?.postal_code, orgSettings?.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
 
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
@@ -161,7 +176,7 @@ export default function TerritoireMap({
     markersRef.current = [];
 
     // P0.19 — centres territoriaux depuis settings org (fallback {} si non configuré)
-    Object.entries(orgCenters).forEach(([_key, center]) => {
+    Object.entries(orgCenters).forEach(([_key, center], index) => {
       // Créer l'élément HTML du marqueur
       const el = document.createElement('div');
       el.className = 'territoire-center-marker';
@@ -183,18 +198,13 @@ export default function TerritoireMap({
         .setLngLat([center.lng, center.lat])
         .setPopup(
           new mapboxgl.Popup({ offset: 25, closeButton: false })
-            .setHTML(`
-              <div style="padding: 8px;">
-                <p style="font-weight: 600; font-size: 14px; margin: 0 0 4px;">${center.label || ''}</p>
-                <p style="font-size: 12px; color: #6b7280; margin: 0;">${center.description || ''}</p>
-              </div>
-            `)
+            .setHTML(carteDuCentre(center, index === 0 ? adresseSiege : ''))
         )
         .addTo(mapRef.current);
 
       markersRef.current.push(marker);
     });
-  }, [mapLoaded, orgCenters]);
+  }, [mapLoaded, orgCenters, adresseSiege]);
 
   // ========================================================================
   // ZONES TERRITOIRE
