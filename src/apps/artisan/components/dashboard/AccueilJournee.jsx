@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, Loader2, MapPin } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@services/appointments.service';
 import { Panneau, Vide } from '@components/pipeline/dashboard/Tableau';
-import { personnesDuRdv } from '@/lib/accueil';
+import { personnesDuRdv, lieuDuRdv } from '@/lib/accueil';
 
 const jourEnClair = (iso) => {
   const [a, m, j] = iso.split('-').map(Number);
@@ -32,6 +32,7 @@ function Personnes({ personnes }) {
 function LigneRdv({ rdv, equipe }) {
   const type = getAppointmentTypeConfig(rdv.appointment_type);
   const client = [rdv.client_name, rdv.client_first_name].filter(Boolean).join(' ');
+  const lieu = lieuDuRdv(rdv);
   return (
     <li className="flex gap-4 px-4 py-3">
       <p className="w-24 shrink-0 text-sm tabular-nums text-secondary-900">
@@ -43,10 +44,10 @@ function LigneRdv({ rdv, equipe }) {
           {client || rdv.subject || 'Sans titre'}
           <span className="font-normal text-secondary-500"> · {type.label}</span>
         </p>
-        {rdv.location && (
+        {lieu && (
           <p className="mt-0.5 flex items-center gap-1 truncate text-sm text-secondary-500">
             <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            {rdv.location}
+            {lieu}
           </p>
         )}
         <Personnes personnes={personnesDuRdv(rdv, equipe)} />

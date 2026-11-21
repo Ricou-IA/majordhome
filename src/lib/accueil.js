@@ -103,6 +103,18 @@ export function personnesDuRdv(rdv, equipe = []) {
 }
 
 /**
+ * Lieu d'un RDV, en une ligne courte : code postal et ville, à défaut l'adresse.
+ * (Un RDV porte `address`, `postal_code`, `city` — pas de champ `location`, que
+ * l'ancien accueil lisait : le lieu ne s'affichait jamais.)
+ * @param {{ address?: string|null, postal_code?: string|null, city?: string|null }} rdv
+ * @returns {string}  vide si le RDV n'a pas de lieu
+ */
+export function lieuDuRdv(rdv) {
+  const propre = (v) => String(v ?? '').trim();
+  return [propre(rdv?.postal_code), propre(rdv?.city)].filter(Boolean).join(' ') || propre(rdv?.address);
+}
+
+/**
  * Ce qui attend d'être traité, en lignes prêtes à afficher. Une source inconnue
  * (`null` : chargement, lecture en échec, pas le droit) ne produit aucune ligne.
  * @param {object} p

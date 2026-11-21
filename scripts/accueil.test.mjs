@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { plageAccueil, journeeAffichee, compterRdv, personnesDuRdv, lignesATraiter } from '../src/lib/accueil.js';
+import { readFileSync } from 'node:fs';
+import { plageAccueil, journeeAffichee, compterRdv, personnesDuRdv, lieuDuRdv, lignesATraiter } from '../src/lib/accueil.js';
 
 const rdv = (date, heure, extra = {}) => ({ scheduled_date: date, scheduled_start: heure, status: 'scheduled', appointment_type: 'maintenance', ...extra });
 
@@ -80,6 +81,22 @@ test('personnesDuRdv : techniciens et commercial, une personne une seule fois', 
   assert.deepEqual(personnesDuRdv({ technician_ids: [], assigned_commercial_id: null }, equipe), []);
   assert.deepEqual(personnesDuRdv({ technician_ids: ['inconnu'] }, equipe), []);
   assert.deepEqual(personnesDuRdv({}, undefined), []);
+});
+
+test('lieuDuRdv : code postal et ville, à défaut l’adresse, vide sans lieu', () => {
+  assert.equal(lieuDuRdv({ address: '12 rue des Lilas', postal_code: '81600', city: 'Gaillac' }), '81600 Gaillac');
+  assert.equal(lieuDuRdv({ postal_code: null, city: ' Albi ' }), 'Albi');
+  assert.equal(lieuDuRdv({ address: ' 3 chemin du Moulin ', postal_code: '', city: '' }), '3 chemin du Moulin');
+  assert.equal(lieuDuRdv({}), '');
+  assert.equal(lieuDuRdv(null), '');
+});
+
+test('AccueilJournee ne lit que des champs que la vue des RDV porte', () => {
+  const source = readFileSync(new URL('../src/apps/artisan/components/dashboard/AccueilJournee.jsx', import.meta.url), 'utf8');
+  const lus = [...source.matchAll(/\brdv\.([a-z_]+)/g)].map((m) => m[1]);
+  // Colonnes de public.majordhome_appointments lues par ce bloc (relevées en base le 2026-11-22).
+  const colonnes = ['id', 'scheduled_start', 'scheduled_end', 'appointment_type', 'client_name', 'client_first_name', 'subject'];
+  assert.deepEqual([...new Set(lus)].filter((champ) => !colonnes.includes(champ)), []);
 });
 
 test('lignesATraiter : seules les lignes à nombre > 0, accords, retard signalé', () => {
