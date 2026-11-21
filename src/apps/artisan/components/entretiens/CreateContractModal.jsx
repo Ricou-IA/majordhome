@@ -486,7 +486,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
             <EnvoiPropositionDOffice
               clientId={envoi.clientId}
               orgId={orgId}
-              onFini={() => { onClose(); onSuccess?.(); }}
+              onFini={() => { setEnvoi(null); onClose(); onSuccess?.(); }}
             />
           )}
         </div>
