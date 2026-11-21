@@ -231,17 +231,18 @@ pour les organisations `en_attente`. Au bout de 24 h d'échecs, il cesse et lais
 
 ### 5.4 bis Logo (lot 4, 2026-11-21 — Eric : « pour le logo on peut synchroniser aussi »)
 
-Constat : Majord'home n'avait AUCUN écran pour régler  (celui de Mayer pointait sur son site).
-- **Majord'home** : section Logo de l'onglet Identité (), compartiment PUBLIC 
-  (migration  : lecture par l'adresse, écriture org_admin du dossier , 2 Mo, PNG / JPEG / WebP,
-  pas de SVG), un nom de fichier par téléversement (), enregistré dès l'envoi.
-- **Envoi** : après un envoi d'identité réussi,  (edge) envoie ou retire le logo selon  ;
-  seul un logo hébergé ici pour cette organisation est relu (), jamais une adresse reçue ; un logo
-  d'adresse extérieure n'est pas envoyé et le bloc le dit (). État : , .
+Constat : Majord'home n'avait AUCUN écran pour régler `settings.logo_url` (celui de Mayer pointait sur son site).
+- **Majord'home** : section Logo de l'onglet Identité (`LogoUpload`), compartiment PUBLIC `org-branding`
+  (migration `20261121_8` : lecture par l'adresse, écriture org_admin du dossier de son organisation, 2 Mo,
+  PNG / JPEG / WebP, pas de SVG), un nom de fichier par téléversement (`logo-<horodatage>.<ext>`), enregistré dès
+  l'envoi.
+- **Envoi** : après un envoi d'identité réussi, `alignerLogo` (edge) envoie ou retire le logo selon `gesteLogo` ;
+  seul un logo hébergé ici pour cette organisation est relu (`logoHeberge`), jamais une adresse reçue ; un logo
+  d'adresse extérieure n'est pas envoyé et le bloc le dit (`logo_externe`). État : `logo_envoye`, `logo_erreur`.
   Un échec de logo ne défait pas l'envoi de l'identité.
-- **HésiaSun** :  /  (corps = l'image, reconnue à ses octets),
+- **HésiaSun** : `PUT` / `DELETE /api/v1/organization/logo?liaison_id=…` (corps = l'image, reconnue à ses octets),
   seule la liaison en place écrit ; sous liaison, téléversement et retrait du logo sont fermés à l'écran et
-  refusés par leurs actions. Commit local .
+  refusés par leurs actions. Commit `9084e29`.
 - **Signature** : non synchronisée (elle engage sur des mandats ; à décider à part).
 
 ### 5.5 Recherche dans l'annuaire, côté Majord'home (lot 5, indépendant)
