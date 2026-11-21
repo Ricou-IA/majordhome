@@ -1,14 +1,15 @@
 // ============================================================================
 // email-essai — « M'envoyer un essai » d'un e-mail automatique (Réglages → Emails)
 // ============================================================================
-// L'administrateur reçoit, à l'adresse de SON compte, l'e-mail tel qu'il partira
+// L'entreprise reçoit, à SON adresse de réponse (réglages), l'e-mail tel qu'il partira
 // chez un client : texte de l'entreprise s'il existe, sinon texte par défaut,
 // habillé du squelette et des couleurs de l'entreprise, avec les valeurs
 // d'exemple du registre (`emailsAutomatiques.js`). Aucune pièce jointe.
 //
 // Sécurité :
 //   - verify_jwt:true + requireOrgMembership(org_admin) + module Communication.
-//   - Le destinataire n'est JAMAIS reçu : c'est l'adresse du compte appelant.
+//   - Le destinataire n'est JAMAIS reçu : c'est l'adresse de réponse de l'entreprise, relue en base
+//     (l'adresse d'un compte peut n'être qu'un identifiant sans boîte, Eric 2026-11-21).
 //   - La clé doit être au registre : pas de texte arbitraire, pas d'autre clé
 //     de `mail_campaigns`.
 //   - Rien n'est écrit en base (ni mailing_logs : ce n'est pas un envoi client).
@@ -43,7 +44,7 @@ Deno.serve(async (req: Request) => {
 
   const auth = await requireOrgMembership(req, { orgId: body.org_id, requiredRole: "org_admin" });
   if (!auth.ok) return auth.response;
-  const { orgId, userId, supabase } = auth;
+  const { orgId, supabase } = auth;
 
   const refus = (code: string, detail: string | null = null) => jsonResponse({ data: null, error: code, detail }, 200, req);
 
@@ -61,9 +62,8 @@ Deno.serve(async (req: Request) => {
     const branding = orgBranding(settings);
     if (!branding.fromEmail) return refus("no_from_email");
 
-    const { data: compte, error: compteErr } = await supabase.auth.admin.getUserById(userId);
-    const destinataire = String(compte?.user?.email || "").trim();
-    if (compteErr || !destinataire.includes("@")) return refus("destinataire_inconnu");
+    const destinataire = String(branding.replyTo || "").trim();
+    if (!destinataire.includes("@")) return refus("destinataire_inconnu");
 
     const lecture = await chargerTexteEmail(supabase, orgId, cle);
     if (lecture.erreur || !lecture.texte) return refus("texte_illisible");

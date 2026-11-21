@@ -168,7 +168,7 @@ export const ESSAI_CODES = Object.freeze({
   email_inconnu: 'Cet e-mail n’existe pas.',
   module_communication_inactif: 'Le module Communication n’est pas ouvert pour votre entreprise.',
   no_from_email: 'Renseignez d’abord votre adresse d’envoi, en haut de cette page.',
-  destinataire_inconnu: 'Votre compte n’a pas d’adresse e-mail : l’essai ne peut pas vous être envoyé.',
+  destinataire_inconnu: 'Enregistrez d’abord votre adresse e-mail : l’essai y est envoyé.',
   texte_illisible: 'Le texte de cet e-mail n’a pas pu être lu. Réessayez.',
   envoi_refuse: 'L’envoi a été refusé.',
 });

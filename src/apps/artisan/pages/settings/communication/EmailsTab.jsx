@@ -118,7 +118,8 @@ export default function EmailsTab() {
           <section>
             <h3 className={SECTION_TITLE}>E-mails envoyés automatiquement</h3>
             <p className={HINT_CLASS}>
-              Chaque e-mail part avec un texte par défaut tant que vous ne l&apos;avez pas modifié.
+              Chaque e-mail part avec un texte par défaut tant que vous ne l&apos;avez pas modifié. Un essai arrive à
+              l&apos;adresse enregistrée ci-dessus, celle qui reçoit les réponses.
             </p>
             {emailsAffiches((cle) => moduleActif(settings, cle)).map((email) => (
               email.interrupteur === 'lead_welcome_email'

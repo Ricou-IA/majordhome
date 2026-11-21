@@ -77,8 +77,8 @@ export const mailCampaignsService = {
   },
 
   /**
-   * « M'envoyer un essai » d'un e-mail automatique : l'edge `email-essai` l'envoie à l'adresse du
-   * compte connecté, avec des valeurs d'exemple. `error.code` = code de `ESSAI_CODES`, `error.detail` =
+   * « Envoyer un essai » d'un e-mail automatique : l'edge `email-essai` l'envoie à l'adresse de
+   * réponse de l'entreprise, avec des valeurs d'exemple. `error.code` = code de `ESSAI_CODES`, `error.detail` =
    * précision du service d'envoi.
    * @returns {Promise<{ data: { envoye_a: string, source: 'entreprise'|'defaut' } | null, error: { code: string, detail: string|null } | null }>}
    */

@@ -10,7 +10,7 @@
  * `majordhome_mail_campaigns` (is_transactional) avec le texte par défaut (ou la
  * restaure si elle était archivée), puis ouvre l'éditeur Mailing dessus
  * (/mailing?tab=editor&edit=<clé>). « M'envoyer un essai » envoie l'e-mail tel
- * qu'il partira, à l'adresse du compte connecté (edge `email-essai`).
+ * qu'il partira, à l'adresse de réponse de l'entreprise (edge `email-essai`).
  * ============================================================================
  */
 
@@ -65,7 +65,7 @@ export default function EmailAutoLigne({ orgId, gabarit, titre, description, con
       </div>
       <div className="flex items-center gap-4 shrink-0">
         <button type="button" onClick={envoyerEssai} disabled={essai} className={LIEN}>
-          {essai ? 'Envoi…' : 'M’envoyer un essai'}
+          {essai ? 'Envoi…' : 'Envoyer un essai'}
         </button>
         <button type="button" onClick={modifier} disabled={ouverture} className={LIEN}>
           {ouverture ? 'Ouverture…' : 'Modifier le texte'}

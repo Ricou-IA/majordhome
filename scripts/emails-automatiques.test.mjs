@@ -42,7 +42,7 @@ test('un texte par défaut ne nomme aucune entreprise', () => {
 });
 
 test('les variables de l’entreprise sont celles que remplit _shared/mail.ts', () => {
-  const source = lire('supabase', 'functions', '_shared', 'mail.ts');
+  const source = lire('supabase', 'functions', '_shared', 'mail.ts').replace(/\r\n/g, '\n');
   const corps = source.slice(source.indexOf('export function brandingReplacements'));
   const cles = [...corps.slice(0, corps.indexOf('\n}\n')).matchAll(/"(\{\{[A-Z_]+\}\})"/g)].map((m) => m[1]);
   assert.deepEqual([...cles].sort(), [...VARIABLES_MARQUE].sort());
