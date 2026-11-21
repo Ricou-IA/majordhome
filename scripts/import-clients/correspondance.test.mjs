@@ -47,6 +47,14 @@ test('découpes', () => {
   assert.deepEqual(decouper('@adresse_complete', '12 rue des Lilas 81600 Gaillac'), { adresse: '12 rue des Lilas', code_postal: '81600', ville: 'Gaillac' });
   assert.deepEqual(decouper('@adresse_complete', 'Lieu-dit Le Bosc'), { adresse: 'Lieu-dit Le Bosc', code_postal: '', ville: '' });
 });
+test('nom et prénom tout en majuscules : le dernier mot est le prénom', () => {
+  assert.deepEqual(decouper('@nom_prenom', 'DUPONT JEAN'), { nom: 'DUPONT', prenom: 'JEAN' });
+  assert.deepEqual(decouper('@nom_prenom', 'DE LA FONTAINE JEAN-PIERRE'), { nom: 'DE LA FONTAINE', prenom: 'JEAN-PIERRE' });
+  assert.deepEqual(decouper('@nom_prenom', 'DUPONT'), { nom: 'DUPONT', prenom: '' });
+  assert.deepEqual(decouper('@nom_prenom', 'MARTIN ÉLODIE'), { nom: 'MARTIN', prenom: 'ÉLODIE' });
+  assert.deepEqual(decouper('@nom_prenom', 'DE LA FONTAINE Jean-Pierre'), { nom: 'DE LA FONTAINE', prenom: 'Jean-Pierre' });
+  assert.deepEqual(decouper('@nom_prenom', 'Dupont Jean'), { nom: 'Dupont', prenom: 'Jean' });
+});
 test('application : notes ajoutées, colonnes ignorées', () => {
   const c = [{ index: 0, entete: 'Client', cible: '@nom_prenom' }, { index: 1, entete: 'Marque chaudière', cible: '@notes' }, { index: 2, entete: 'Agence', cible: '@ignorer' }];
   assert.deepEqual(appliquerCorrespondance({ numero: 7, cellules: ['DUPONT Jean', 'Viessmann', 'Albi'] }, c),

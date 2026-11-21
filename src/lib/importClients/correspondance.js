@@ -95,6 +95,8 @@ export function decouper(cibleComposee, texte) {
     const mots = t.split(/\s+/).filter(Boolean);
     let n = 0;
     while (n < mots.length && estMajuscules(mots[n])) n += 1;
+    // Tout en majuscules (anciens logiciels) : le dernier mot est le prénom.
+    if (n === mots.length && n >= 2) n -= 1;
     if (n === 0) n = Math.min(1, mots.length);
     return { nom: mots.slice(0, n).join(' '), prenom: mots.slice(n).join(' ') };
   }
