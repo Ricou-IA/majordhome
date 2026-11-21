@@ -26,19 +26,42 @@ test('après-vente : réceptionné et facturé seulement', () => {
 });
 
 test('contrat : actif prime sur proposé ; archivé ou annulé ne compte pas', () => {
-  assert.equal(etatContrat(['pending', 'active']), 'actif');
-  assert.equal(etatContrat(['pending']), 'propose');
-  assert.equal(etatContrat(['archived', 'cancelled']), 'aucun');
+  assert.equal(etatContrat([{ status: 'pending' }, { status: 'active' }]), 'actif');
+  assert.equal(etatContrat([{ status: 'pending' }]), 'propose');
+  assert.equal(etatContrat([{ status: 'archived' }, { status: 'cancelled' }]), 'aucun');
   assert.equal(etatContrat(undefined), 'aucun');
+});
+
+test('contrat : une proposition n’est « envoyée » que sortie de l’état Nouveau', () => {
+  assert.equal(etatContrat([{ status: 'pending', workflow_status: null }]), 'propose');
+  assert.equal(etatContrat([{ status: 'pending', workflow_status: 'nouveau' }]), 'propose');
+  assert.equal(etatContrat([{ status: 'pending', workflow_status: 'proposal_sent' }]), 'envoye');
+  // Un état de pipeline sur un contrat qui n'est pas une proposition ne compte pas.
+  assert.equal(etatContrat([{ status: 'archived', workflow_status: 'proposal_sent' }]), 'aucun');
+});
+
+test('repère contrat : libellé et geste selon l’état de la proposition', () => {
+  const repere = (contrats) => reperesApresVente(chantier(), { contrats: new Map([['cl1', contrats]]), avis: new Set() })
+    .find((r) => r.cle === 'contrat');
+  assert.deepEqual(
+    [repere([]).action, repere([{ status: 'pending', workflow_status: 'nouveau' }]).action,
+      repere([{ status: 'pending', workflow_status: 'proposal_sent' }]).action, repere([{ status: 'active' }]).action],
+    ['proposer', 'envoyer', 'renvoyer', null],
+  );
+  assert.match(repere([{ status: 'pending', workflow_status: 'nouveau' }]).titre, /pas encore envoyée/);
+  assert.equal(repere([{ status: 'pending', workflow_status: 'nouveau' }]).etat, 'attention');
+  assert.match(repere([{ status: 'pending', workflow_status: 'proposal_sent' }]).titre, /envoyée au client/);
+  // Liste inconnue : aucun geste proposé.
+  assert.equal(reperesApresVente(chantier(), {}).find((r) => r.cle === 'contrat').action, null);
 });
 
 test('contratsParClient : regroupe, ignore les lignes sans client', () => {
   const map = contratsParClient([
     { client_id: 'a', status: 'active' }, { client_id: 'a', status: 'archived' },
-    { client_id: null, status: 'active' }, { client_id: 'b', status: 'pending' },
+    { client_id: null, status: 'active' }, { client_id: 'b', status: 'pending', workflow_status: 'proposal_sent' },
   ]);
-  assert.deepEqual(map.get('a'), ['active', 'archived']);
-  assert.deepEqual(map.get('b'), ['pending']);
+  assert.deepEqual(map.get('a'), [{ status: 'active', workflow_status: null }, { status: 'archived', workflow_status: null }]);
+  assert.deepEqual(map.get('b'), [{ status: 'pending', workflow_status: 'proposal_sent' }]);
   assert.equal(map.size, 2);
 });
 
@@ -63,7 +86,7 @@ test('repères : listes inconnues ⇒ avis et contrat « inconnu », jamais « �
 test('repères : quatre pastilles dans l\'ordre, états lus sur le chantier et les listes', () => {
   const reperes = reperesApresVente(
     chantier({ pv_reception_path: 'p.pdf', is_invoiced: true }),
-    { contrats: new Map([['cl1', ['pending']]]), avis: new Set(['cl1']) },
+    { contrats: new Map([['cl1', [{ status: 'pending', workflow_status: 'proposal_sent' }]]]), avis: new Set(['cl1']) },
   );
   assert.deepEqual(reperes.map((r) => r.cle), ['pv', 'avis', 'contrat', 'facture']);
   assert.deepEqual(etats(reperes), { pv: 'fait', avis: 'fait', contrat: 'en_cours', facture: 'fait' });

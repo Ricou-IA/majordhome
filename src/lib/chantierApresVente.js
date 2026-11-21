@@ -23,29 +23,34 @@ export function enApresVente(chantier) {
   return STATUTS_APRES_VENTE.includes(chantier?.chantier_status);
 }
 
+/** État du pipeline Contrats d'une proposition créée mais pas encore envoyée au client. */
+const WORKFLOW_NON_ENVOYE = 'nouveau';
+
 /**
- * Contrat d'entretien du client, d'après les statuts de ses contrats.
- * @param {string[]|undefined|null} statuts statuts des contrats du client (`active`, `pending`…)
- * @returns {'actif'|'propose'|'aucun'}
+ * Contrat d'entretien du client, d'après ses contrats. Une proposition (`pending`) n'est
+ * « envoyée » que si son état de pipeline a quitté « Nouveau » : la créer n'envoie rien.
+ * @param {Array<{status: string|null, workflow_status?: string|null}>|undefined|null} contrats
+ * @returns {'actif'|'envoye'|'propose'|'aucun'}
  */
-export function etatContrat(statuts) {
-  const liste = statuts || [];
-  if (liste.includes('active')) return 'actif';
-  if (liste.includes('pending')) return 'propose';
-  return 'aucun';
+export function etatContrat(contrats) {
+  const liste = contrats || [];
+  if (liste.some((c) => c?.status === 'active')) return 'actif';
+  const propositions = liste.filter((c) => c?.status === 'pending');
+  if (propositions.length === 0) return 'aucun';
+  return propositions.some((c) => c.workflow_status && c.workflow_status !== WORKFLOW_NON_ENVOYE) ? 'envoye' : 'propose';
 }
 
 /**
  * Regroupe les contrats par client.
- * @param {Array<{client_id: string|null, status: string|null}>} lignes
- * @returns {Map<string, string[]>}
+ * @param {Array<{client_id: string|null, status: string|null, workflow_status?: string|null}>} lignes
+ * @returns {Map<string, {status: string, workflow_status: string|null}[]>}
  */
 export function contratsParClient(lignes) {
   const map = new Map();
   for (const l of lignes || []) {
     if (!l?.client_id) continue;
     if (!map.has(l.client_id)) map.set(l.client_id, []);
-    if (l.status) map.get(l.client_id).push(l.status);
+    if (l.status) map.get(l.client_id).push({ status: l.status, workflow_status: l.workflow_status || null });
   }
   return map;
 }
@@ -56,6 +61,7 @@ export function contratsParClient(lignes) {
  * @property {string} libelle   texte court de la pastille
  * @property {'fait'|'en_cours'|'attention'|'a_faire'|'inconnu'} etat
  * @property {string} titre     l'état en toutes lettres (infobulle, fiche)
+ * @property {'proposer'|'envoyer'|'renvoyer'|null} [action] repère contrat : le geste que la fiche propose
  */
 
 /**
@@ -123,7 +129,7 @@ export function reponseReservesNonEnregistree(formulaire, pv) {
 
 /**
  * @param {Object} chantier ligne de `majordhome_chantiers`
- * @param {{ contrats?: Map<string, string[]>, avis?: Set<string> }} [listes] `undefined` = pas encore connues
+ * @param {{ contrats?: Map<string, {status: string, workflow_status: string|null}[]>, avis?: Set<string> }} [listes] `undefined` = pas encore connues
  * @returns {Repere[]}
  */
 export function reperesApresVente(chantier, { contrats, avis } = {}) {
@@ -135,12 +141,14 @@ export function reperesApresVente(chantier, { contrats, avis } = {}) {
   else repereAvis = { etat: 'a_faire', titre: 'Avis pas encore demandé' };
 
   let repereContrat;
-  if (!contrats) repereContrat = { etat: 'inconnu', titre: 'Contrat d\'entretien : vérification en cours' };
+  if (!contrats) repereContrat = { etat: 'inconnu', titre: 'Contrat d\'entretien : vérification en cours', action: null };
   else {
     const etat = etatContrat(clientId ? contrats.get(clientId) : null);
-    if (etat === 'actif') repereContrat = { etat: 'fait', titre: 'Contrat d\'entretien en cours' };
-    else if (etat === 'propose') repereContrat = { etat: 'en_cours', titre: 'Contrat d\'entretien proposé, pas encore signé' };
-    else repereContrat = { etat: 'a_faire', titre: 'Pas de contrat d\'entretien' };
+    if (etat === 'actif') repereContrat = { etat: 'fait', titre: 'Contrat d\'entretien en cours', action: null };
+    else if (etat === 'envoye') repereContrat = { etat: 'en_cours', titre: 'Proposition envoyée au client, pas encore signée', action: 'renvoyer' };
+    // Créer la proposition n'envoie rien : tant qu'elle n'est pas partie, il reste un geste à faire.
+    else if (etat === 'propose') repereContrat = { etat: 'attention', titre: 'Proposition créée, pas encore envoyée au client', action: 'envoyer' };
+    else repereContrat = { etat: 'a_faire', titre: 'Pas de contrat d\'entretien', action: 'proposer' };
   }
 
   const facture = chantier?.is_invoiced === true;

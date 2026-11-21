@@ -168,7 +168,7 @@ export const chantiersService = {
       if (!orgId) throw new Error('[chantiers] orgId requis');
       const [contrats, avis] = await Promise.all([
         fetchAllPages((from, to) => supabase
-          .from('majordhome_contracts').select('id, client_id, status')
+          .from('majordhome_contracts').select('id, client_id, status, workflow_status')
           .eq('org_id', orgId).order('id').range(from, to)),
         fetchAllPages((from, to) => supabase
           .from('majordhome_sms_logs').select('id, client_id')
