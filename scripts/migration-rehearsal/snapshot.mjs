@@ -53,7 +53,7 @@ const TABLES = [
     'is_reliable', 'import_source', 'notes', 'internal_notes', 'created_by', 'archived_at', 'siren', 'latitude', 'longitude',
     'geocoded_at', 'owner_client_id', 'parrain_id', 'mail_optin', 'email_unsubscribed_at', 'email_unsubscribe_reason',
     'geocode_attempts', 'address_precision'] },
-  { schema: 'majordhome', table: 'client_dpe', columns: null, data: false }, // 20261121_13 : une fiche importée qui n'a qu'une ligne client_dpe reste retirable // dpe_number : 20261112_2 (client_dpe_record tient le numéro de la fiche) // client_category : 20261021_1 (find_or_create_client crée la fiche) // address_complement / company_name : 20261011_1 (push identité PL) // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
+  { schema: 'majordhome', table: 'client_dpe', columns: null, data: false }, // 20261121_13 : une fiche importée qui n'a qu'une ligne client_dpe reste retirable (sa ligne client_dpe part en cascade)
   // 20261116_5 : lue par le trigger tr_equipments_check_model_org à CHAQUE écriture d'un équipement (PL/pgSQL
   // planifie toute la condition, même sans modèle) — sans elle, aucun INSERT d'équipement ne se répète
   { schema: 'majordhome', table: 'equipment_models', columns: null, data: false },

@@ -138,9 +138,12 @@ aucune policy d'écriture, `authenticated` n'a que SELECT, `anon` rien ; `servic
 colonnes, une ligne déjà écrite est comptée `skipped`, un projet `core.projects` par fiche, `identity.created_from =
 'import_clients'`) ; `clients_import_finish(p_import_id, p_counts)` ; `clients_import_removal_preview(p_import_id) →
 { retirables, conservees }` ; `clients_import_remove(p_import_id, p_limit = 200) → { retirees, conservees, restantes }`
-(au plus `p_limit` fiches par appel, à rappeler tant que `restantes > 0` ; ne passe pas par `client_hard_delete`).
-Les quatre dernières dérivent l'organisation de l'import. Codes : `unauthenticated`, `org_admin_required` (42501),
-`import_not_found` (P0002), `import_closed`, `rows_invalid`, `row_invalid`, `file_name_required`.
+(au plus `p_limit` fiches par appel, à rappeler tant que `restantes > 0` ; `restantes` est recompté APRÈS la
+suppression — une fiche libérée par celle qui vient de partir est comptée — et `retire` n'est posé qu'à 0 ; ne passe
+pas par `client_hard_delete`). Les quatre dernières dérivent l'organisation de l'import. Codes : `unauthenticated`,
+`org_admin_required` (42501), `import_not_found` (P0002), `import_closed`, `rows_invalid` (pas un tableau de 1 à 500
+objets, ou deux lignes du même `import_line`), `row_invalid` (contenu d'une ligne), `file_name_required`,
+`removal_incomplete` (moins de fiches ou de projets supprimés que visé : tout est annulé).
 **Retirable** = fiche de l'import que rien ne référence : toute clé étrangère vers `majordhome.clients` ou vers son
 projet `core.projects`, lue dans `pg_constraint` à l'exécution (`majordhome.clients_import_retirables`, interne), sauf
 `clients.project_id` et `majordhome.client_dpe` (supprimée en cascade). Une fiche qui a un contrat, un lead, un RDV, une

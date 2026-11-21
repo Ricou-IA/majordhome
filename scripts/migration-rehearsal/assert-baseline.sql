@@ -39,7 +39,11 @@ BEGIN
       ('majordhome.lead_pennylane_quotes_invariant_winning()'),
       ('majordhome.chantier_ensure_for_quote()'),
       ('public.lead_merge(uuid, uuid)'),
-      ('public.supplier_pieces_upsert(uuid, uuid, text, text, jsonb)') -- 20261113_3 : écrivain des pièces tel qu'en prod
+      ('public.supplier_pieces_upsert(uuid, uuid, text, text, jsonb)'), -- 20261113_3 : écrivain des pièces tel qu'en prod
+      ('majordhome.reset_geocode_on_address_change()'), -- 20261121_13 : triggers de majordhome.clients
+      ('majordhome.cascade_client_archive_to_contract()'),
+      ('majordhome.update_clients_updated_at()'),
+      ('majordhome.lead_commercial_meme_organisation()') -- trigger leads de 20261121_9
     ) AS t(fn)
   LOOP
     IF to_regprocedure(r.fn) IS NULL THEN RAISE EXCEPTION 'fonction absente : %', r.fn; END IF;
@@ -88,6 +92,19 @@ BEGIN
      AND tgname = 'trg_lead_pennylane_quotes_invariant_winning'
      AND tgfoid = to_regprocedure('majordhome.lead_pennylane_quotes_invariant_winning()');
   IF NOT FOUND THEN RAISE EXCEPTION 'trigger invariant_winning absent sur majordhome.lead_pennylane_quotes'; END IF;
+  -- Triggers utilisateur de majordhome.clients (TRIGGER_TABLES, 20261121_13)
+  FOR r IN SELECT * FROM (VALUES
+      ('trg_audit_clients', 'majordhome.audit_row_change()'),
+      ('trg_reset_geocode_on_address_change', 'majordhome.reset_geocode_on_address_change()'),
+      ('trigger_clients_updated_at', 'majordhome.update_clients_updated_at()'),
+      ('trigger_cascade_client_archive', 'majordhome.cascade_client_archive_to_contract()')
+    ) AS t(trg, fn)
+  LOOP
+    PERFORM 1 FROM pg_trigger
+     WHERE tgrelid = 'majordhome.clients'::regclass AND NOT tgisinternal
+       AND tgname = r.trg AND tgfoid = to_regprocedure(r.fn);
+    IF NOT FOUND THEN RAISE EXCEPTION 'trigger % → % absent sur majordhome.clients', r.trg, r.fn; END IF;
+  END LOOP;
 
   -- Vues (liste VIEWS) ; celles exposées via PostgREST doivent être security_invoker=true
   FOR r IN SELECT * FROM (VALUES
@@ -107,7 +124,9 @@ BEGIN
       ('public.majordhome_chantiers_write', true),
       ('public.majordhome_entretien_sav', true),
       ('public.majordhome_lead_pennylane_quotes', true),
-      ('public.majordhome_appointments', true)
+      ('public.majordhome_appointments', true),
+      ('public.majordhome_clients', true), -- 20261121_13
+      ('public.majordhome_clients_all', true)
     ) AS t(vue, invoker)
   LOOP
     IF to_regclass(r.vue) IS NULL THEN RAISE EXCEPTION 'vue absente : %', r.vue; END IF;

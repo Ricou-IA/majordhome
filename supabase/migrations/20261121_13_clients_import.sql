@@ -15,8 +15,17 @@
 --     sans migration), identifiants cités par %I / regclass, aucun texte venu de l'appelant, pas de table temporaire.
 --
 -- Mesuré sur le harnais le 2026-11-21 (`assert-clients-import.sql`, trigger d'audit de `clients` actif, 17 clés
--- étrangères vers clients / projects photographiées sur ~40 en prod) : lot de 200 lignes ≈ 72 ms ; retrait de 200
--- fiches ≈ 391 ms. Plafond PostgREST : 8 s ; cible : < 2 s — TAILLE_LOT = 200 tient la marge.
+-- étrangères vers clients / projects photographiées sur ~40 en prod) : lot de 200 lignes 70 à 215 ms ; retrait de
+-- 200 fiches 330 à 1 010 ms (les retirables sont calculés deux fois : avant et après la suppression). Plafond PostgREST : 8 s ; cible : < 2 s — TAILLE_LOT = 200 tient la marge.
+--
+-- Codes d'erreur (message de l'exception, à traduire par l'écran) : `unauthenticated` et `org_admin_required`
+-- (42501), `import_not_found` (P0002), `import_closed` (55000), `rows_invalid` (forme du lot : pas un tableau de 1 à
+-- 500 objets, ou deux lignes du même numéro), `row_invalid` (contenu d'une ligne), `file_name_required`,
+-- `removal_incomplete` (le retrait n'a pas supprimé autant de fiches ou de projets que visé : tout est annulé).
+
+-- Base partagée : la pose de colonnes sur `clients` demande un verrou exclusif ; mieux vaut échouer et rejouer
+-- que faire attendre toutes les requêtes de l'instance derrière une longue lecture.
+SET lock_timeout = '3s';
 
 -- ----------------------------------------------------------------------------
 -- 1. Table des imports
@@ -136,7 +145,7 @@ GRANT SELECT ON public.majordhome_client_imports TO authenticated, service_role;
 CREATE FUNCTION majordhome.clients_import_admin_de(p_org_id uuid)
 RETURNS void
 LANGUAGE plpgsql
-SET search_path = majordhome, public
+SET search_path = majordhome, public, pg_temp
 AS $$
 DECLARE
   v_admin boolean;
@@ -158,7 +167,7 @@ $$;
 CREATE FUNCTION majordhome.clients_import_org_admin(p_import_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
-SET search_path = majordhome, public
+SET search_path = majordhome, public, pg_temp
 AS $$
 DECLARE
   v_org uuid;
@@ -180,7 +189,7 @@ CREATE FUNCTION majordhome.clients_import_texte(p_row jsonb, p_cle text, p_ligne
 RETURNS text
 LANGUAGE plpgsql
 IMMUTABLE
-SET search_path = majordhome, public
+SET search_path = majordhome, public, pg_temp
 AS $$
 DECLARE
   v_type text := jsonb_typeof(p_row -> p_cle);
@@ -202,7 +211,7 @@ $$;
 CREATE FUNCTION majordhome.clients_import_retirables(p_import_id uuid)
 RETURNS uuid[]
 LANGUAGE plpgsql
-SET search_path = majordhome, public
+SET search_path = majordhome, public, pg_temp
 AS $$
 DECLARE
   v_candidats uuid[];
@@ -266,7 +275,7 @@ CREATE FUNCTION public.clients_import_start(
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = majordhome, public
+SET search_path = majordhome, public, pg_temp
 AS $$
 DECLARE
   v_uid  uuid := auth.uid();
@@ -297,7 +306,7 @@ CREATE FUNCTION public.clients_import_batch(p_import_id uuid, p_rows jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = majordhome, public
+SET search_path = majordhome, public, pg_temp
 AS $$
 DECLARE
   v_uid     uuid := auth.uid();
@@ -339,10 +348,18 @@ BEGIN
     RAISE EXCEPTION 'rows_invalid' USING ERRCODE = '22023', DETAIL = format('%s lignes (1 à 500)', jsonb_array_length(p_rows));
   END IF;
 
+  -- Forme du lot : que des objets, et jamais deux fois le même numéro de ligne (sinon la seconde serait prise
+  -- pour un rejeu de la première et disparaîtrait sans erreur).
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(p_rows) AS e(v) WHERE jsonb_typeof(e.v) IS DISTINCT FROM 'object') THEN
+    RAISE EXCEPTION 'rows_invalid' USING ERRCODE = '22023', DETAIL = 'élément qui n''est pas un objet';
+  END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(p_rows) AS e(v)
+              WHERE jsonb_typeof(e.v -> 'import_line') IS NOT NULL AND jsonb_typeof(e.v -> 'import_line') <> 'null'
+              GROUP BY e.v -> 'import_line' HAVING count(*) > 1) THEN
+    RAISE EXCEPTION 'rows_invalid' USING ERRCODE = '22023', DETAIL = 'numéro de ligne en double dans le lot';
+  END IF;
+
   FOR v_row IN SELECT value FROM jsonb_array_elements(p_rows) LOOP
-    IF jsonb_typeof(v_row) IS DISTINCT FROM 'object' THEN
-      RAISE EXCEPTION 'row_invalid' USING ERRCODE = '22023', DETAIL = 'ligne qui n''est pas un objet';
-    END IF;
 
     -- Numéro de ligne : entier positif (nombre JSON)
     IF jsonb_typeof(v_row -> 'import_line') IS DISTINCT FROM 'number'
@@ -477,7 +494,7 @@ CREATE FUNCTION public.clients_import_finish(p_import_id uuid, p_counts jsonb)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = majordhome, public
+SET search_path = majordhome, public, pg_temp
 AS $$
 DECLARE
   v_org    uuid;
@@ -504,7 +521,7 @@ CREATE FUNCTION public.clients_import_removal_preview(p_import_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = majordhome, public
+SET search_path = majordhome, public, pg_temp
 AS $$
 DECLARE
   v_org   uuid;
@@ -528,16 +545,18 @@ CREATE FUNCTION public.clients_import_remove(p_import_id uuid, p_limit integer D
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = majordhome, public
+SET search_path = majordhome, public, pg_temp
 AS $$
 DECLARE
-  v_uid      uuid := auth.uid();
-  v_org      uuid;
-  v_limit    integer := LEAST(GREATEST(coalesce(p_limit, 200), 1), 500);
-  v_total    integer;
-  v_ret      uuid[];
-  v_projets  uuid[];
-  v_retirees integer;
+  v_uid       uuid := auth.uid();
+  v_org       uuid;
+  v_limit     integer := LEAST(GREATEST(coalesce(p_limit, 200), 1), 500);
+  v_ret       uuid[];
+  v_lot       uuid[];
+  v_projets   uuid[];
+  v_vises     integer;
+  v_n         integer;
+  v_total     integer;
   v_restantes integer;
 BEGIN
   IF v_uid IS NULL THEN
@@ -552,27 +571,36 @@ BEGIN
   PERFORM 1 FROM majordhome.clients c JOIN core.projects p ON p.id = c.project_id
     WHERE c.import_id = p_import_id FOR UPDATE OF c, p;
 
-  SELECT count(*) INTO v_total FROM majordhome.clients WHERE import_id = p_import_id AND org_id = v_org;
   v_ret := majordhome.clients_import_retirables(p_import_id);
+  v_lot := coalesce(v_ret[1:v_limit], '{}');
+  v_vises := cardinality(v_lot);
+  SELECT coalesce(array_agg(project_id), '{}') INTO v_projets
+    FROM majordhome.clients WHERE id = ANY (v_lot) AND import_id = p_import_id AND org_id = v_org;
 
-  WITH supprimees AS (
-    DELETE FROM majordhome.clients
-     WHERE id = ANY (v_ret[1:v_limit]) AND import_id = p_import_id AND org_id = v_org
-    RETURNING project_id
-  )
-  SELECT coalesce(array_agg(project_id), '{}') INTO v_projets FROM supprimees;
-  v_retirees := cardinality(v_projets);
-
+  -- Chaque suppression doit toucher exactement ce qui est visé : sinon tout est annulé (jamais un succès annoncé
+  -- sur des fiches ou des projets restés en place).
+  DELETE FROM majordhome.clients WHERE id = ANY (v_lot) AND import_id = p_import_id AND org_id = v_org;
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  IF v_n IS DISTINCT FROM v_vises THEN
+    RAISE EXCEPTION 'removal_incomplete' USING ERRCODE = 'P0001', DETAIL = format('fiches : %s supprimées sur %s', v_n, v_vises);
+  END IF;
   DELETE FROM core.projects WHERE id = ANY (v_projets) AND org_id = v_org;
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  IF v_n IS DISTINCT FROM v_vises THEN
+    RAISE EXCEPTION 'removal_incomplete' USING ERRCODE = 'P0001', DETAIL = format('projets : %s supprimés sur %s', v_n, v_vises);
+  END IF;
 
-  v_restantes := cardinality(v_ret) - v_retirees;
+  -- Recompté APRÈS la suppression : une fiche que retenait une fiche qui vient de partir (parrain) devient
+  -- retirable, et l'import ne passe à « retire » que s'il ne reste vraiment plus rien à retirer.
+  SELECT count(*) INTO v_total FROM majordhome.clients WHERE import_id = p_import_id AND org_id = v_org;
+  v_restantes := cardinality(majordhome.clients_import_retirables(p_import_id));
   IF v_restantes = 0 THEN
     UPDATE majordhome.client_imports
        SET status = 'retire', removed_at = coalesce(removed_at, now()), removed_by = coalesce(removed_by, v_uid)
      WHERE id = p_import_id AND org_id = v_org;
   END IF;
 
-  RETURN jsonb_build_object('retirees', v_retirees, 'conservees', v_total - cardinality(v_ret), 'restantes', v_restantes);
+  RETURN jsonb_build_object('retirees', v_vises, 'conservees', v_total - v_restantes, 'restantes', v_restantes);
 END;
 $$;
 

@@ -88,6 +88,13 @@ BEGIN
    WHERE ns.nspname = 'majordhome' AND p.proname IN ('clients_import_org_admin', 'clients_import_retirables');
   IF n <> 2 THEN RAISE EXCEPTION 'fonctions internes attendues : clients_import_org_admin, clients_import_retirables (% trouvées)', n; END IF;
 
+  -- search_path de chaque fonction de la migration : pg_temp en dernier
+  FOR f IN SELECT p.oid::regprocedure::text FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace
+            WHERE ns.nspname IN ('majordhome', 'public') AND p.proname LIKE 'clients\_import\_%' LOOP
+    IF (SELECT 'search_path=majordhome, public, pg_temp' = ANY (proconfig) FROM pg_proc WHERE oid = f::regprocedure) IS NOT TRUE THEN
+      RAISE EXCEPTION '% : search_path « majordhome, public, pg_temp » attendu, trouvé %', f, (SELECT proconfig FROM pg_proc WHERE oid = f::regprocedure);
+    END IF;
+  END LOOP;
   IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'majordhome' AND tablename = 'clients'
                   AND indexdef LIKE 'CREATE UNIQUE INDEX%(import_id, import_line)%WHERE (import_id IS NOT NULL)%') THEN
     RAISE EXCEPTION 'index unique partiel (import_id, import_line) absent';
@@ -184,6 +191,15 @@ BEGIN
     '[{"import_line": "5", "display_name": "LEROY Anne"}]'), 'row_invalid');
   PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_batch(%L, %L::jsonb)$q$, v_imp,
     '[{"display_name": "LEROY Anne"}]'), 'row_invalid');
+  -- Deux lignes du même numéro (5 et 5.0 sont le même nombre JSON) ; élément qui n'est pas un objet
+  PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_batch(%L, %L::jsonb)$q$, v_imp,
+    '[{"import_line": 5, "display_name": "LEROY Anne"}, {"import_line": 5, "display_name": "LEROY Paul"}]'), 'rows_invalid');
+  PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_batch(%L, %L::jsonb)$q$, v_imp,
+    '[{"import_line": 5, "display_name": "LEROY Anne"}, {"import_line": 5.0, "display_name": "LEROY Paul"}]'), 'rows_invalid');
+  PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_batch(%L, %L::jsonb)$q$, v_imp,
+    '[{"import_line": 5, "display_name": "LEROY Anne"}, 3]'), 'rows_invalid');
+  PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_batch(%L, %L::jsonb)$q$, v_imp,
+    '[{"import_line": 5, "display_name": "LEROY Anne"}, "texte"]'), 'rows_invalid');
   PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_batch(%L, %L::jsonb)$q$, v_imp, '[]'), 'rows_invalid');
   PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_batch(%L, %L::jsonb)$q$, v_imp, '{"a": 1}'), 'rows_invalid');
   PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_batch(%L, NULL)$q$, v_imp), 'rows_invalid');
@@ -378,6 +394,93 @@ BEGIN
   SET LOCAL ROLE postgres;
   RAISE NOTICE '§7 bis retrait par tranches : OK';
 END $$;
+
+-- ── Adhésion non active : un org_admin suspendu est refusé ──────────────────
+DO $$
+DECLARE
+  v_b        uuid := '62cd2073-96e0-4300-adae-4c1bb8934546';
+  v_b_admin  uuid := '8ebd6637-489e-473e-9583-807ab1e3154e';
+  v_suspendu uuid := '19500c66-20a9-46fb-8ffa-089577d9512f';
+  v_imp uuid; n int;
+BEGIN
+  IF (SELECT role FROM core.organization_members WHERE org_id = v_b AND user_id = v_suspendu) IS DISTINCT FROM 'org_admin' THEN
+    RAISE EXCEPTION 'donnée de test : % n''est plus org_admin de B', v_suspendu;
+  END IF;
+  UPDATE core.organization_members SET status = 'suspended' WHERE org_id = v_b AND user_id = v_suspendu;
+  PERFORM set_config('request.jwt.claim.sub', v_b_admin::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_b_admin, 'role', 'authenticated')::text, true);
+  SET LOCAL ROLE authenticated;
+  v_imp := public.clients_import_start(v_b, 'cimaj.csv', NULL, '[]', '{}');
+  PERFORM set_config('request.jwt.claim.sub', v_suspendu::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_suspendu, 'role', 'authenticated')::text, true);
+  PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_start(%L, 'f.csv', NULL, '[]', '{}')$q$, v_b), 'org_admin_required', '42501');
+  PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_batch(%L, '[{"import_line": 1, "display_name": "SUSPENDU"}]'::jsonb)$q$, v_imp), 'org_admin_required', '42501');
+  SET LOCAL ROLE postgres;
+  SELECT count(*) INTO n FROM majordhome.clients WHERE import_id = v_imp;
+  IF n <> 0 THEN RAISE EXCEPTION 'un org_admin suspendu a écrit % fiche(s)', n; END IF;
+  UPDATE core.organization_members SET status = 'active' WHERE org_id = v_b AND user_id = v_suspendu;
+  RAISE NOTICE 'adhésion non active : OK';
+END $$;
+
+-- ── Parrain dans le même import : la fiche libérée est retirée, « retire » seulement à la fin ──
+DO $$
+DECLARE
+  v_a     uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+  v_admin uuid := '8a4907a3-f382-4707-bc38-2ff4832f873a';
+  v_imp uuid; v_x uuid; v_y uuid; r jsonb; i int := 0;
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  SET LOCAL ROLE authenticated;
+  v_imp := public.clients_import_start(v_a, 'parrains.csv', NULL, '[]', '{}');
+  PERFORM public.clients_import_batch(v_imp, '[{"import_line": 1, "display_name": "FILLEUL X"}, {"import_line": 2, "display_name": "PARRAIN Y"}]');
+  SET LOCAL ROLE postgres;
+  SELECT id INTO v_x FROM majordhome.clients WHERE import_id = v_imp AND import_line = 1;
+  SELECT id INTO v_y FROM majordhome.clients WHERE import_id = v_imp AND import_line = 2;
+  UPDATE majordhome.clients SET parrain_id = v_y WHERE id = v_x;
+  SET LOCAL ROLE authenticated;
+  r := public.clients_import_remove(v_imp);
+  IF r IS DISTINCT FROM '{"retirees": 1, "conservees": 0, "restantes": 1}'::jsonb THEN RAISE EXCEPTION 'parrain, 1er appel : %', r; END IF;
+  IF (SELECT status FROM public.majordhome_client_imports WHERE id = v_imp) <> 'en_cours' THEN RAISE EXCEPTION 'retire posé alors que le parrain reste'; END IF;
+  WHILE (r->>'restantes')::int > 0 LOOP
+    i := i + 1;
+    IF i > 5 THEN RAISE EXCEPTION 'retrait qui ne converge pas : %', r; END IF;
+    r := public.clients_import_remove(v_imp);
+  END LOOP;
+  IF (SELECT status FROM public.majordhome_client_imports WHERE id = v_imp) <> 'retire' THEN RAISE EXCEPTION 'statut retire attendu à la fin'; END IF;
+  SET LOCAL ROLE postgres;
+  IF EXISTS (SELECT 1 FROM majordhome.clients WHERE id IN (v_x, v_y)) THEN RAISE EXCEPTION 'parrain ou filleul resté'; END IF;
+  RAISE NOTICE 'parrain dans le même import : OK';
+END $$;
+
+-- ── Suppression incomplète : un projet que la base ne supprime pas annule tout ──
+-- Le trigger de test avale la suppression du projet « BLOQUE », comme le ferait une RLS qui masquerait la ligne.
+CREATE OR REPLACE FUNCTION public.zz_projet_bloque() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.name = 'BLOQUE' THEN RETURN NULL; END IF;
+  RETURN OLD;
+END $$;
+CREATE TRIGGER zz_projet_bloque BEFORE DELETE ON core.projects FOR EACH ROW EXECUTE FUNCTION public.zz_projet_bloque();
+DO $$
+DECLARE
+  v_a     uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+  v_admin uuid := '8a4907a3-f382-4707-bc38-2ff4832f873a';
+  v_imp uuid; n int;
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  SET LOCAL ROLE authenticated;
+  v_imp := public.clients_import_start(v_a, 'bloque.csv', NULL, '[]', '{}');
+  PERFORM public.clients_import_batch(v_imp, '[{"import_line": 1, "display_name": "BLOQUE"}, {"import_line": 2, "display_name": "LIBRE"}]');
+  PERFORM public.zz_assert_erreur(format($q$SELECT public.clients_import_remove(%L)$q$, v_imp), 'removal_incomplete', 'P0001');
+  SET LOCAL ROLE postgres;
+  SELECT count(*) INTO n FROM majordhome.clients WHERE import_id = v_imp;
+  IF n <> 2 THEN RAISE EXCEPTION 'removal_incomplete n''a pas tout annulé : % fiche(s) sur 2', n; END IF;
+  IF (SELECT status FROM majordhome.client_imports WHERE id = v_imp) <> 'en_cours' THEN RAISE EXCEPTION 'statut changé malgré removal_incomplete'; END IF;
+  RAISE NOTICE 'suppression incomplète : OK';
+END $$;
+DROP TRIGGER zz_projet_bloque ON core.projects;
+DROP FUNCTION public.zz_projet_bloque();
 
 -- ── Mesure (Step 5) : 200 lignes écrites puis retirées ──────────────────────
 DO $$
