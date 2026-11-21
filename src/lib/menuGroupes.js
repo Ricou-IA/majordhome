@@ -17,6 +17,8 @@ export const GROUPES_MENU = Object.freeze([
   Object.freeze({ cle: 'quotidien', titre: null }),
   Object.freeze({ cle: 'ventes', titre: 'Clients & ventes' }),
   Object.freeze({ cle: 'terrain', titre: 'Terrain' }),
+  // Prospection et Cédants : à part des ventes du quotidien (Eric, recette du 2026-11-22).
+  Object.freeze({ cle: 'developpement', titre: 'Développement', replie: true }),
   Object.freeze({ cle: 'marketing', titre: 'Marketing', replie: true }),
   Object.freeze({ cle: 'etudes', titre: 'Études', replie: true }),
 ]);

@@ -29,6 +29,16 @@ test('grouperMenu : au-delà du seuil, groupes dans l’ordre, entrées dans leu
   assert.deepEqual(groupes[2].items.map((i) => i.href), ['/chantiers', '/entretiens']);
 });
 
+test('grouperMenu : Prospection et Cédants ont leur groupe « Développement », entre Terrain et Marketing', () => {
+  const groupes = grouperMenu([...MENU_COMPLET, entree('/cedants', 'developpement'), entree('/prospection', 'developpement')]);
+  assert.deepEqual(groupes.map((g) => g.cle), ['quotidien', 'ventes', 'terrain', 'developpement', 'marketing', 'etudes']);
+  const developpement = groupes.find((g) => g.cle === 'developpement');
+  assert.equal(developpement.titre, 'Développement');
+  assert.deepEqual(developpement.items.map((i) => i.href), ['/cedants', '/prospection']);
+  assert.deepEqual(etatDuGroupe(developpement), { ouvert: false, force: false });
+  assert.deepEqual(etatDuGroupe(developpement, { pathname: '/prospection' }), { ouvert: true, force: true });
+});
+
 test('grouperMenu : aucune entrée perdue — groupe inconnu ou absent = premier groupe ; groupe vide absent', () => {
   const items = [...MENU_COMPLET.filter((i) => i.groupe !== 'marketing'), entree('/nouveau'), entree('/autre', 'inconnu')];
   const groupes = grouperMenu(items);
