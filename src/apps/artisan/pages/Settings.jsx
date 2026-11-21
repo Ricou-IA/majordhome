@@ -4,6 +4,7 @@ import { ROLE_LABELS } from '@lib/permissions';
 import { modulesVisibles } from '@/lib/modules';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useCanAccess } from '@hooks/usePermissions';
+import DemarrageCard from './settings/DemarrageCard';
 import {
   Building2,
   Users,
@@ -78,6 +79,9 @@ export default function Settings() {
           </div>
         </div>
       )}
+
+      {/* Ce qu'il reste à renseigner pour démarrer (administrateur) */}
+      {isOrgAdmin && settings && <DemarrageCard settings={settings} />}
 
       {/* Un groupe par module */}
       {groupes.map((m) => (
