@@ -155,7 +155,7 @@ export default function TerritoryTab() {
 
   return (
     <>
-      <SettingsSurface>
+      <SettingsSurface colonnes>
         <SettingsSection
           title="Siège sur la carte"
           description="Point de départ des trajets et des tournées, centre de la carte du territoire."
@@ -225,6 +225,7 @@ export default function TerritoryTab() {
         <SettingsSection
           title="Visibilité locale"
           optional
+          large
           description="Utilisés par le suivi de positionnement Google (GeoGrid) : votre fiche et la zone à surveiller."
         >
           <Field

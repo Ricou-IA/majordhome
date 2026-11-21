@@ -83,7 +83,8 @@ export default function IdentityTab() {
   return (
     <>
       <SettingsSurface>
-        <SettingsSection title="Entreprise" description="Le nom affiché sur vos documents, vos e-mails et l’espace client.">
+        <SettingsSection title="Entreprise">
+          <div className="grid lg:grid-cols-3 gap-x-4 gap-y-3 items-start">
           {replie ? (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-secondary-200 bg-secondary-50 px-3 py-2 text-sm">
               <Building2 className="w-4 h-4 shrink-0 text-secondary-500" />
@@ -99,7 +100,7 @@ export default function IdentityTab() {
             <div className="space-y-2">
               <Field
                 label="Retrouver votre entreprise"
-                hint="Par son nom ou son SIRET, dans l’annuaire des entreprises. Remplit les mentions légales et l’adresse du siège ; rien n’est enregistré avant « Enregistrer »."
+                hint="Par son nom ou son SIRET. Remplit les mentions légales et l’adresse du siège."
               >
                 <EntrepriseSearch onSelect={choisirEntreprise} autoFocus={changer} />
               </Field>
@@ -112,7 +113,7 @@ export default function IdentityTab() {
           )}
 
           {annuaire && isDirty && (
-            <div role="status" className="rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-secondary-900 space-y-1">
+            <div role="status" className="lg:col-span-3 lg:order-last rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-secondary-900 space-y-1">
               <p className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-primary-700" />
                 <span>{annuaire.detail}</span>
@@ -121,7 +122,7 @@ export default function IdentityTab() {
             </div>
           )}
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 gap-x-4 gap-y-3 lg:col-span-2">
             <Field label="Nom commercial" required error={errors.brand_name}>
               <input
                 type="text"
@@ -134,7 +135,7 @@ export default function IdentityTab() {
             </Field>
             <Field
               label="Raison sociale"
-              hint={saisieLibre ? 'Reprend le nom commercial si vide.' : 'Reprise de l’annuaire des entreprises.'}
+              hint={saisieLibre ? 'Reprend le nom commercial si vide.' : undefined}
               error={errors.legal_name}
             >
               <input
@@ -147,10 +148,11 @@ export default function IdentityTab() {
               />
             </Field>
           </div>
+          </div>
         </SettingsSection>
 
-        <SettingsSection title="Mentions légales" description="Imprimées en pied de page des devis, factures, certificats et attestations.">
-          <div className="grid sm:grid-cols-2 gap-4">
+        <SettingsSection title="Mentions légales" description="Imprimées en pied de page de vos documents.">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
             <Field label="SIRET" error={errors.siret}>
               <input
                 type="text"
@@ -202,7 +204,7 @@ export default function IdentityTab() {
                 className={INPUT_CLASS}
               />
             </Field>
-            <Field label="RCS" className="sm:col-span-2" hint="SIREN et ville du greffe, tels qu’ils figurent sur votre extrait Kbis.">
+            <Field label="RCS" className="sm:col-span-2" hint="Tel qu’il figure sur votre Kbis.">
               <input
                 type="text"
                 value={form.rcs}
@@ -212,24 +214,24 @@ export default function IdentityTab() {
                 className={INPUT_CLASS}
               />
             </Field>
-          </div>
-          <Field label="Mention assurance" error={errors.insurance}>
+          <Field label="Mention assurance" error={errors.insurance} className="sm:col-span-2">
             <textarea
               value={form.insurance}
               onChange={(e) => set('insurance', e.target.value)}
               maxLength={200}
-              rows={2}
+              rows={1}
               placeholder="Ex. Couvert par une assurance responsabilité civile professionnelle"
               className={INPUT_CLASS}
             />
           </Field>
+          </div>
         </SettingsSection>
 
         <SettingsSection
           title="Signataire"
-          description="La personne qui signe au nom de l’entreprise : mandats des dossiers solaires et attestations d’entretien."
+          description="Signe au nom de l’entreprise les mandats et les attestations."
         >
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
             <Field label="Nom et prénom" error={errors.signatory_name}>
               <input
                 type="text"
@@ -250,14 +252,14 @@ export default function IdentityTab() {
                 className={INPUT_CLASS}
               />
             </Field>
-          </div>
-          <Field label="Signature">
+          <Field label="Signature" className="sm:col-span-2">
             <SignatureUpload
               orgId={organization?.id}
               path={form.signatory_signature_path}
               onChange={(path) => set('signatory_signature_path', path)}
             />
           </Field>
+          </div>
         </SettingsSection>
       </SettingsSurface>
 

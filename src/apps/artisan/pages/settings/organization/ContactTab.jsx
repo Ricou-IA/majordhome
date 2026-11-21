@@ -46,8 +46,8 @@ export default function ContactTab() {
 
   return (
     <>
-      <SettingsSurface>
-        <SettingsSection title="Siège social" description="Adresse imprimée sur vos documents. Le point de départ des trajets se règle dans l’onglet Territoire.">
+      <SettingsSurface colonnes>
+        <SettingsSection title="Siège social" description="Adresse imprimée sur vos documents.">
           <Field label="Adresse" required error={errors.address}>
             <input
               type="text"

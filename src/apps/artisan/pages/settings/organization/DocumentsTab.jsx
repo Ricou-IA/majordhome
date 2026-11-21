@@ -59,7 +59,7 @@ export default function DocumentsTab() {
 
   return (
     <>
-      <SettingsSurface>
+      <SettingsSurface colonnes>
         <SettingsSection
           title="Qualifications RGE"
           description={hasCertificates

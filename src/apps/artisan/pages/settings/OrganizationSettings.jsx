@@ -24,12 +24,11 @@ export default function OrganizationSettings() {
   return (
     <SettingsPage
       title="Organisation"
-      description="Ce que vos clients voient de votre entreprise : identité, coordonnées, qualifications et territoire."
       tabs={TABS}
       tab={tab}
       onTabChange={(key) => setParams(key === 'identity' ? {} : { tab: key }, { replace: true })}
     >
-      <div className="max-w-5xl">
+      <div className="max-w-7xl">
         {TABS.map(({ key, Component }) => (
           <div key={key} hidden={key !== tab}>
             <Component />
