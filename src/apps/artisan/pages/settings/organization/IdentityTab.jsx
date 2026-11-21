@@ -2,13 +2,16 @@
 // Les qualifications et les documents de l'entreprise ont leur onglet (DocumentsTab).
 // Règles (champs, formats, contrôles) : src/lib/organisation/identite.js. Raison sociale, SIRET et forme
 // juridique viennent de l'annuaire des entreprises, la TVA se calcule du SIRET (Eric 2026-11-21, comme
-// HésiaSun) ; la saisie à la main ne s'ouvre que si l'entreprise est introuvable.
-import { useEffect, useMemo, useState } from 'react';
+// HésiaSun) ; la saisie à la main ne s'ouvre que si l'entreprise est introuvable. RCS et capital social, que
+// l'annuaire ne donne pas, sont lus dans les annonces légales de l'entreprise (BODACC, src/lib/organisation/bodacc.js).
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Building2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { CLES_IDENTITE, LEGAL_FORMS, formatSiret, formatTva, tvaDepuisSiret, validerSaisie } from '@/lib/organisation/identite';
 import { appliquerEntreprise, identiteEnregistree } from '@/lib/organisation/annuaire';
+import { appliquerImmatriculation } from '@/lib/organisation/bodacc';
+import { lireImmatriculationBodacc } from '@/lib/organisation/bodaccClient';
 import EntrepriseSearch from './components/EntrepriseSearch';
 import SignatureUpload from './components/SignatureUpload';
 import { useSettingsForm } from './components/useSettingsForm';
@@ -17,6 +20,7 @@ import { Field, INPUT_CLASS, SaveBar, SettingsLoading, SettingsSection, Settings
 // Signataire : mandats du dossier PV (mairie + Enedis) et attestations d'entretien
 const FIELDS = [...CLES_IDENTITE, 'signatory_signature_path'];
 const VERROUILLE = 'bg-secondary-50 text-secondary-700 cursor-default';
+const sirenDuSiret = (siret) => String(siret ?? '').replace(/\D/g, '').slice(0, 9);
 
 function pickIdentityFields(settings) {
   const out = {};
@@ -34,10 +38,17 @@ export default function IdentityTab() {
   const [annuaire, setAnnuaire] = useState(null);
   const [changer, setChanger] = useState(false);
   const [saisieLibre, setSaisieLibre] = useState(false);
+  // RCS et capital lus dans les annonces légales : { etat: 'chargement' | 'fait', detail }.
+  const [immat, setImmat] = useState(null);
+  const derniereLecture = useRef(0);
 
   // Enregistré ou annulé : le préremplissage est consommé.
   useEffect(() => {
-    if (!isDirty) setAnnuaire(null);
+    if (!isDirty) {
+      setAnnuaire(null);
+      setImmat(null);
+      derniereLecture.current += 1; // une lecture encore en route ne réécrit pas un formulaire remis à zéro
+    }
   }, [isDirty]);
 
   // La TVA suit le SIRET dès qu'il est complet ; sans SIRET complet elle reste ce qui est enregistré.
@@ -55,9 +66,26 @@ export default function IdentityTab() {
 
   const choisirEntreprise = (entreprise) => {
     const report = appliquerEntreprise(form, entreprise);
-    setForm(report.form);
+    // Autre entreprise que celle du formulaire : son RCS et son capital ne sont pas ceux de la précédente.
+    const autre = sirenDuSiret(form.siret) !== entreprise.siren;
+    const base = autre ? { ...report.form, rcs: '', capital: '' } : report.form;
+    setForm(base);
     setAnnuaire(report);
     setSaisieLibre(false);
+
+    const lecture = ++derniereLecture.current;
+    setImmat({ etat: 'chargement', detail: 'Annonces légales : recherche du RCS et du capital social…' });
+    lireImmatriculationBodacc(entreprise.siren)
+      .then((immatriculation) => {
+        if (lecture !== derniereLecture.current) return; // une autre entreprise a été choisie depuis
+        setImmat({ etat: 'fait', detail: appliquerImmatriculation(base, immatriculation, { remplacer: autre }).detail });
+        // Sur le formulaire tel qu'il est maintenant : ce qui a été saisi entre-temps est gardé.
+        setForm((f) => (sirenDuSiret(f.siret) === entreprise.siren ? appliquerImmatriculation(f, immatriculation).form : f));
+      })
+      .catch(() => {
+        if (lecture !== derniereLecture.current) return;
+        setImmat({ etat: 'fait', detail: 'Annonces légales indisponibles : RCS et capital social à saisir.' });
+      });
   };
 
   const handleSave = async () => {
@@ -118,6 +146,7 @@ export default function IdentityTab() {
                 <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-primary-700" />
                 <span>{annuaire.detail}</span>
               </p>
+              {immat?.detail && <p className="pl-6">{immat.detail}</p>}
               {annuaire.avertissement && <p className="pl-6 font-medium">{annuaire.avertissement}</p>}
             </div>
           )}
