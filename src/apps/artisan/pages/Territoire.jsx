@@ -138,6 +138,27 @@ export default function Territoire() {
     }
   }, [orgId, refetchPoints]);
 
+  // Recalcul des zones (périmètre changé) : les leads déjà géocodés sont reclassés dans la foulée,
+  // sinon ils gardent la zone d'avant (un lead ne prend sa zone qu'à l'enregistrement de sa fiche).
+  const handleRecalculerZones = useCallback(async () => {
+    const nouvelles = await invalidateZones();
+    if (!nouvelles || !orgId) return;
+    try {
+      const { data: leads, error } = await territoireService.getGeocodedLeads(orgId);
+      if (error) throw error;
+      const bilan = await geocodingService.rezonerLeads(leads, orgId);
+      if (!bilan) return;
+      const parts = [`${bilan.reclasses} lead${bilan.reclasses > 1 ? 's' : ''} reclassé${bilan.reclasses > 1 ? 's' : ''}`];
+      parts.push(`${bilan.horsZone} hors zone`);
+      if (bilan.echecs > 0) parts.push(`${bilan.echecs} en échec`);
+      (bilan.echecs > 0 ? toast.warning : toast.success)(`Zones recalculées : ${parts.join(', ')}`);
+      if (bilan.reclasses > 0) refetchPoints();
+    } catch (error) {
+      toast.error('Zones recalculées, mais le reclassement des leads a échoué');
+      logger.error('[Territoire] rezonage des leads :', error);
+    }
+  }, [invalidateZones, orgId, refetchPoints]);
+
   // ========================================================================
   // HANDLERS
   // ========================================================================
@@ -258,7 +279,7 @@ export default function Territoire() {
           points={points}
           zones={zones}
           zonesLoading={zonesLoading}
-          onInvalidateZones={invalidateZones}
+          onInvalidateZones={handleRecalculerZones}
           stats={stats}
           height="calc(100vh - 200px)"
           onPointClick={handlePointClick}

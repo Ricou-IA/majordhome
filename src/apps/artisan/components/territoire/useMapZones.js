@@ -3,22 +3,23 @@
  * Hook pour calculer et cacher les zones isochrones territoriales
  * Utilise l'API Mapbox Isochrone + Matrix + contours CP + Turf.js
  *
- * Chaque centre (siège, antennes) a son territoire : la zone atteinte en voiture dans son étendue.
- * Les zones ne se recouvrent pas : une partie commune va au centre le plus proche (par code postal
- * et temps de trajet là où l'on a les contours, à vol d'oiseau ailleurs).
+ * Deux périmètres par centre (siège, antennes) : intervention (où l'entreprise intervient) et
+ * commercial (où son commercial se déplace, borné au périmètre d'intervention de l'entreprise).
+ * Les zones commerciales ne se recouvrent pas : une partie commune va au centre le plus proche (par
+ * code postal et temps de trajet là où l'on a les contours, à vol d'oiseau ailleurs).
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as turf from '@turf/turf';
-import { TERRITOIRE_CONFIG, getTerritoireCenters, centresValides, empreinteCentres, dureeTerritoire, dureeDuCentre, demiPlanProche } from '@/lib/territoire-config';
+import { TERRITOIRE_CONFIG, getTerritoireCenters, centresValides, empreinteCentres, dureeTerritoire, dureeDuCentre, interventionDuCentre, demiPlanProche } from '@/lib/territoire-config';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { logger } from '@lib/logger';
 
 // P1.9 — clés localStorage suffixées par orgId pour éviter fuite cross-org
 // au switch d'organisation (multi-tenant futur).
-const CACHE_KEY_BASE = 'territoire-zones-v10';
-const CACHE_TS_KEY_BASE = 'territoire-zones-v10-at';
+const CACHE_KEY_BASE = 'territoire-zones-v11';
+const CACHE_TS_KEY_BASE = 'territoire-zones-v11-at';
 const buildCacheKey = (orgId) => `${CACHE_KEY_BASE}:${orgId || 'noorg'}`;
 const buildCacheTsKey = (orgId) => `${CACHE_TS_KEY_BASE}:${orgId || 'noorg'}`;
 const CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 jours
@@ -269,7 +270,8 @@ async function zoneDAntenne(isoSiege, isoAntenne, siege, antenne, token) {
   const commun = intersecter(isoAntenne, isoSiege);
   if (!commun) return isoAntenne; // rien de commun avec le siège : un territoire à part
 
-  const propre = retirer(isoAntenne, isoSiege);
+  let propre = retirer(isoAntenne, isoSiege);
+  if (propre && turf.area(propre) < RESTE_MIN_M2) propre = null; // liseré de bord
   let part = null;
   try {
     part = await partDAntenneDansLeCommun(commun, siege, antenne, token);
@@ -288,12 +290,14 @@ async function zoneDAntenne(isoSiege, isoAntenne, siege, antenne, token) {
 
 /**
  * Calcule les zones du territoire à partir des centres des réglages de l'organisation
- * (`settings.territoire_centers`) : le 1er est le siège, les suivants des antennes.
- *   - siège seul : sa zone est son isochrone ;
- *   - antennes : chacune a son territoire propre, plus sa part de ce qu'elle partage avec le siège
- *     (dans l'ordre des réglages, sans recouvrir une antenne déjà servie) ; le siège garde le reste
- *     de son isochrone.
- * Le territoire entier (`zone_principale`) est la réunion des zones de tous les centres.
+ * (`settings.territoire_centers`) : le 1er est le siège, les suivants des antennes. Chaque centre a
+ * DEUX périmètres (minutes de voiture) :
+ *   - intervention : jusqu'où les équipes interviennent depuis ce point. Leur réunion est le
+ *     périmètre d'intervention de l'entreprise (`zone_principale`) ; au-delà, un lead est hors zone.
+ *     Une agence commerciale seule (0) ne l'étend pas ;
+ *   - commercial : jusqu'où son commercial se déplace, BORNÉ au périmètre d'intervention.
+ * Les zones commerciales ne se recouvrent pas : ce qu'une antenne partage avec le siège va au plus
+ * proche des deux (dans l'ordre des réglages entre antennes), le siège garde le reste.
  *
  * @returns {Promise<{ zones: Object<string, Feature>, ordre: string[], zone_principale: Feature, metadata: Object }|null>}
  */
@@ -301,60 +305,59 @@ export async function calculateZones(token, centers, minutesParDefaut = TERRITOI
   const entrees = centresValides(centers);
   if (entrees.length === 0) return null;
   const [siege, ...antennes] = entrees;
-  // Chaque centre a son étendue (minutes de voiture autour de lui)
-  const durees = entrees.map((c) => dureeDuCentre(c, minutesParDefaut));
-  const isochroneMinutes = durees[0];
+  const commercial = entrees.map((c) => dureeDuCentre(c, minutesParDefaut));
+  const intervention = entrees.map((c, i) => interventionDuCentre(c, i === 0, minutesParDefaut));
 
-  // 1. Isochrones de tous les centres, en parallèle (cercle approximatif si l'API ne répond pas)
+  // 1. Isochrones, en parallèle (cercle approximatif si l'API ne répond pas). Un centre dont les
+  //    deux périmètres sont égaux n'en demande qu'une.
   let usedFallback = false;
-  const isos = (await Promise.all(
-    entrees.map((c, i) => fetchIsochrone(c.lng, c.lat, durees[i], token)),
-  )).map((iso, i) => {
+  const isochrone = async (c, minutes) => {
+    const iso = await fetchIsochrone(c.lng, c.lat, minutes, token);
     if (iso) return iso;
     usedFallback = true;
-    return createFallbackCircle(entrees[i].lng, entrees[i].lat, durees[i]);
-  });
+    return createFallbackCircle(c.lng, c.lat, minutes);
+  };
+  const isosCommerciales = await Promise.all(entrees.map((c, i) => isochrone(c, commercial[i])));
+  const isosIntervention = await Promise.all(entrees.map((c, i) => {
+    if (intervention[i] === 0) return null;
+    return intervention[i] === commercial[i] ? isosCommerciales[i] : isochrone(c, intervention[i]);
+  }));
+
+  // 2. Périmètre d'intervention de l'entreprise
+  const perimetre = reunir(isosIntervention);
+  if (!perimetre) return null;
+
+  // 3. Périmètre commercial de chaque centre, borné au périmètre d'intervention. Un centre qui
+  //    intervient au moins aussi loin que son commercial y est déjà tout entier.
+  const isos = isosCommerciales.map((iso, i) => (
+    intervention[i] >= commercial[i] ? iso : intersecter(iso, perimetre)
+  ));
   const isoSiege = isos[0];
 
-  // 2. Chaque antenne prend sa part, sans recouvrir celles déjà attribuées
+  // 4. Chaque antenne prend sa part, sans recouvrir celles déjà attribuées
   const zones = {};
   let prises = null;
   for (let i = 0; i < antennes.length; i++) {
-    let zone = await zoneDAntenne(isoSiege, isos[i + 1], siege, antennes[i], token);
-    if (zone && prises) {
-      try {
-        zone = turf.difference(turf.featureCollection([zone, prises])); // null : antenne entièrement couverte
-      } catch (e) {
-        logger.warn('[useMapZones] Retrait des antennes précédentes échoué:', e);
-      }
-    }
+    if (!isos[i + 1]) continue; // agence hors du périmètre d'intervention : aucune zone
+    let zone = isoSiege
+      ? await zoneDAntenne(isoSiege, isos[i + 1], siege, antennes[i], token)
+      : isos[i + 1];
+    if (zone && prises) zone = retirer(zone, prises); // null : antenne entièrement couverte
     if (!zone) continue;
     zones[antennes[i].key] = zone;
-    try {
-      prises = prises ? turf.union(turf.featureCollection([prises, zone])) : zone;
-    } catch (e) {
-      logger.warn('[useMapZones] Union des antennes échouée:', e);
-    }
+    prises = reunir([prises, zone]);
   }
 
-  // 3. Le siège garde le reste de son isochrone
-  let zoneSiege = isoSiege;
-  if (prises) {
-    try {
-      zoneSiege = turf.difference(turf.featureCollection([isoSiege, prises])) || isoSiege;
-    } catch (e) {
-      logger.warn('[useMapZones] Zone du siège : différence échouée:', e);
-    }
-  }
-  zones[siege.key] = zoneSiege;
+  // 5. Le siège garde le reste de son périmètre commercial
+  if (isoSiege) zones[siege.key] = (prises ? retirer(isoSiege, prises) : isoSiege) || isoSiege;
 
   return {
     zones,
     ordre: entrees.map((c) => c.key),
-    zone_principale: reunir(isos) || isoSiege, // contour pointillé : tout le territoire
+    zone_principale: perimetre, // contour pointillé : périmètre d'intervention de l'entreprise
     metadata: {
       computed_at: new Date().toISOString(),
-      isochrone_minutes: isochroneMinutes,
+      isochrone_minutes: intervention[0],
       fallback: usedFallback,
     },
   };
@@ -441,7 +444,7 @@ export function useMapZones(mapboxToken) {
     setError(null);
 
     if (mapboxToken && aDesCentres) {
-      calculateZones(mapboxToken, orgCenters, minutes)
+      return calculateZones(mapboxToken, orgCenters, minutes)
         .then(data => {
           if (data) data.metadata.centres = empreinte;
           setZones(data);
@@ -449,13 +452,14 @@ export function useMapZones(mapboxToken) {
             localStorage.setItem(cacheKey, JSON.stringify(data));
             localStorage.setItem(cacheTsKey, String(Date.now()));
           }
+          return data;
         })
-        .catch(e => setError(e.message))
+        .catch(e => { setError(e.message); return null; })
         .finally(() => setLoading(false));
-    } else {
-      setZones(null);
-      setLoading(false);
     }
+    setZones(null);
+    setLoading(false);
+    return Promise.resolve(null);
   }, [mapboxToken, cacheKey, cacheTsKey, orgCenters, minutes, empreinte, aDesCentres]);
 
   return { zones, isLoading, error, invalidate };

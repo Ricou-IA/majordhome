@@ -114,3 +114,47 @@ test('demiPlanProche : le côté du centre le plus proche, borné par la médiat
   // deux centres au même endroit : pas de partage possible
   assert.equal(demiPlanProche(siege, siege), null);
 });
+
+test('interventionDuCentre : le siège intervient toujours, une antenne seulement si on le règle', async () => {
+  const { interventionDuCentre } = await import('../src/lib/territoire-config.js');
+  // sans réglage : le siège intervient aussi loin que son commercial, l'antenne pas du tout
+  assert.equal(interventionDuCentre({}, true), 60);
+  assert.equal(interventionDuCentre({ minutes: 30 }, true), 30);
+  assert.equal(interventionDuCentre({ minutes: 45 }, false), 0);
+  assert.equal(interventionDuCentre(null, false), 0);
+  // réglé
+  assert.equal(interventionDuCentre({ minutes: 60, intervention_minutes: 30 }, true), 30);
+  assert.equal(interventionDuCentre({ intervention_minutes: 60 }, false), 60);
+  assert.equal(interventionDuCentre({ intervention_minutes: 0 }, false), 0);
+  assert.equal(interventionDuCentre({ intervention_minutes: '45' }, false), 45);
+  // un siège sans intervention n'a pas de sens : son périmètre commercial fait foi
+  assert.equal(interventionDuCentre({ minutes: 45, intervention_minutes: 0 }, true), 45);
+  // valeur hors liste : comme sans réglage
+  assert.equal(interventionDuCentre({ intervention_minutes: 90 }, false), 0);
+
+  // l'empreinte suit le périmètre d'intervention
+  const base = empreinteCentres(deuxCentres);
+  assert.notEqual(empreinteCentres({ ...deuxCentres, antenne: { ...deuxCentres.antenne, intervention_minutes: 60 } }), base);
+  assert.equal(empreinteCentres({ ...deuxCentres, antenne: { ...deuxCentres.antenne, intervention_minutes: 0 } }), base);
+});
+
+test('zoneDuPoint : zone du commercial, hors zone hors du périmètre où l’entreprise intervient, inconnue sinon', async () => {
+  const { zoneDuPoint, ZONE_HORS, estHorsZone } = await import('../src/lib/territoire-config.js');
+  const zones = { ordre: ['siege', 'antenne'], zones: { siege: 'S', antenne: 'A' }, zone_principale: 'P' };
+  const dans = (...noms) => (zone) => noms.includes(zone);
+  assert.equal(zoneDuPoint(zones, dans('S', 'P')), 'siege');
+  assert.equal(zoneDuPoint(zones, dans('A', 'P')), 'antenne');
+  assert.equal(zoneDuPoint(zones, dans('A', 'S', 'P')), 'antenne'); // l'antenne d'abord
+  // dans le périmètre d'intervention mais chez aucun commercial : ni zone, ni hors zone
+  assert.equal(zoneDuPoint(zones, dans('P')), null);
+  assert.equal(zoneDuPoint(zones, dans()), ZONE_HORS);
+  // hors du périmètre mais dans le contour lissé d'une zone commerciale : hors zone quand même
+  assert.equal(zoneDuPoint(zones, dans('A')), ZONE_HORS);
+  // zones inconnues : on ne dit jamais « hors zone »
+  assert.equal(zoneDuPoint(null, dans()), null);
+  assert.equal(zoneDuPoint({}, dans()), null);
+  assert.equal(estHorsZone({ zone: ZONE_HORS }), true);
+  assert.equal(estHorsZone({ zone: 'siege' }), false);
+  assert.equal(estHorsZone({ zone: null }), false);
+  assert.equal(estHorsZone(null), false);
+});

@@ -13,6 +13,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import * as turf from '@turf/turf';
 import { logger } from '@lib/logger';
+import { ZONE_HORS, zoneDuPoint } from '@/lib/territoire-config';
 
 const API_BASE = 'https://api-adresse.data.gouv.fr';
 
@@ -443,26 +444,46 @@ async function geocodeLeadAddress(address, postalCode, city) {
  */
 function detectLeadZone(lat, lng, orgId) {
   try {
-    const cached = orgId ? localStorage.getItem(`territoire-zones-v10:${orgId}`) : null;
+    const cached = orgId ? localStorage.getItem(`territoire-zones-v11:${orgId}`) : null;
     if (!cached) {
       logger.warn('[geocoding] Zones non disponibles en cache — zone non détectée');
       return null;
     }
-
-    const zones = JSON.parse(cached);
     const point = turf.point([lng, lat]);
-    const [siege, ...antennes] = zones.ordre || [];
-
-    // Les antennes d'abord (plus petites, plus spécifiques), le siège ensuite
-    for (const key of [...antennes, siege]) {
-      const zone = key ? zones.zones?.[key] : null;
-      if (zone && turf.booleanPointInPolygon(point, zone)) return key;
-    }
-    return null;
+    return zoneDuPoint(JSON.parse(cached), (zone) => turf.booleanPointInPolygon(point, zone));
   } catch (error) {
     logger.error('[geocoding] Erreur detectLeadZone:', error);
     return null;
   }
+}
+
+/**
+ * Reclasse les leads déjà géocodés d'après les zones en cache (après un changement de périmètre) :
+ * n'écrit que les leads dont la zone change, sans toucher à leur commercial ni à leur date de
+ * modification. Zones inconnues : rien n'est écrit.
+ * @param {Array<{ id: string, lat: number, lng: number, zone: string|null, updatedAt?: string }>} leads
+ * @param {string} orgId - organisation (core)
+ * @returns {Promise<{ reclasses: number, horsZone: number, echecs: number }|null>} null = zones inconnues
+ */
+export async function rezonerLeads(leads, orgId) {
+  if (!orgId || !localStorage.getItem(`territoire-zones-v11:${orgId}`)) return null;
+  const bilan = { reclasses: 0, horsZone: 0, echecs: 0 };
+  for (const lead of leads || []) {
+    const zone = detectLeadZone(lead.lat, lead.lng, orgId);
+    if (zone === ZONE_HORS) bilan.horsZone++;
+    if (zone === (lead.zone ?? null)) continue;
+    const { error } = await supabase.rpc('update_majordhome_lead', {
+      p_lead_id: lead.id,
+      p_updates: { zone, ...(lead.updatedAt ? { updated_at: lead.updatedAt } : {}) },
+    });
+    if (error) {
+      logger.error('[geocoding] rezonerLeads :', lead.id, error);
+      bilan.echecs++;
+    } else {
+      bilan.reclasses++;
+    }
+  }
+  return bilan;
 }
 
 /**
@@ -549,8 +570,8 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city, or
   // 3. Mettre à jour coordonnées + zone
   await updateLeadCoordinates(leadId, coords.lat, coords.lng, zone);
 
-  // 4. Auto-assigner commercial si zone détectée (depuis table commercials)
-  if (zone) {
+  // 4. Auto-assigner commercial si zone détectée (depuis table commercials) — jamais hors zone
+  if (zone && zone !== ZONE_HORS) {
     const commercial = await resolveCommercialByZone(zone);
 
     if (commercial) {
@@ -618,8 +639,8 @@ export async function batchGeocodeLeads(leads, onProgress, orgId) {
 
       results.success++;
 
-      // 4. Auto-assigner commercial si zone détectée (depuis table commercials)
-      if (zone) {
+      // 4. Auto-assigner commercial si zone détectée (depuis table commercials) — jamais hors zone
+      if (zone && zone !== ZONE_HORS) {
         const commercial = await resolveCommercialByZone(zone);
 
         if (commercial && !lead.assigned_user_id) {
@@ -666,6 +687,7 @@ export const geocodingService = {
   updateClientCoordinates,
   batchGeocodeClients,
   batchGeocodeLeads,
+  rezonerLeads,
 };
 
 export default geocodingService;

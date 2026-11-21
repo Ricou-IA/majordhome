@@ -86,7 +86,7 @@ export const territoireService = {
 
       const { data, error } = await supabase
         .from('majordhome_leads')
-        .select('id, first_name, last_name, company_name, city, postal_code, status_id, order_amount_ht, source_id, latitude, longitude, zone, assigned_user_id')
+        .select('id, first_name, last_name, company_name, city, postal_code, status_id, order_amount_ht, source_id, latitude, longitude, zone, assigned_user_id, updated_at')
         .eq('org_id', orgId)
         .eq('is_deleted', false)
         .not('latitude', 'is', null)
@@ -106,6 +106,7 @@ export const territoireService = {
         amount: l.order_amount_ht ? Number(l.order_amount_ht) : undefined,
         source: l.source_id,
         zone: l.zone,
+        updatedAt: l.updated_at,
       }));
 
       return { data: points, error: null };

@@ -7,8 +7,9 @@
 // ne sont pas ici : ils se saisissent dans Paramètres → Organisation → Territoire
 // (`settings.territoire_centers`, 1er = siège).
 export const TERRITOIRE_CONFIG = {
-  // Étendue par défaut d'un centre ; chaque centre (siège, antenne) règle la sienne
-  // (`territoire_centers[clé].minutes`, Paramètres → Organisation → Territoire), lue par `dureeDuCentre`.
+  // Étendue par défaut d'un centre. Chaque centre (siège, antenne) règle ses DEUX périmètres dans
+  // Paramètres → Organisation → Territoire : commercial (`territoire_centers[clé].minutes`, lu par
+  // `dureeDuCentre`) et intervention (`.intervention_minutes`, lu par `interventionDuCentre`).
   isochroneMinutes: 60,
   // Contours des codes postaux connus (partage fin d'une zone commune entre siège et antenne).
   // Ailleurs, le partage se fait par les isochrones seules.
@@ -56,19 +57,68 @@ export function dureeDuCentre(centre, repli = TERRITOIRE_CONFIG.isochroneMinutes
   return DUREES_TERRITOIRE.includes(minutes) ? minutes : repli;
 }
 
+/** Périmètres d'intervention proposés : 0 = aucun (agence commerciale seulement), sinon comme le commercial. */
+export const DUREES_INTERVENTION = Object.freeze([0, ...DUREES_TERRITOIRE]);
+
 /**
- * Empreinte du territoire (clé, position, ordre et étendue des centres) : change dès qu'un centre
- * est ajouté, retiré ou déplacé, ou que son étendue change. Chaîne vide = aucun centre exploitable.
- * L'étendue par défaut n'est pas écrite : les zones déjà calculées restent valables.
+ * Périmètre d'INTERVENTION d'un centre, en minutes de voiture : jusqu'où les équipes interviennent
+ * depuis ce point. Le périmètre d'intervention de l'entreprise est la réunion de ceux de ses centres.
+ *   - valeur du centre (`intervention_minutes`) si elle est proposée ; 0 = le centre n'étend pas le
+ *     périmètre (agence commerciale seulement), refusé pour le siège ;
+ *   - sinon : le siège intervient aussi loin que son commercial, une antenne n'intervient pas.
+ * @param {{ minutes?: number|string, intervention_minutes?: number|string }|null|undefined} centre
+ * @param {boolean} estSiege - 1er centre des réglages
+ * @param {number} [repli] - étendue commune (dureeTerritoire)
+ * @returns {number}
+ */
+export function interventionDuCentre(centre, estSiege, repli = TERRITOIRE_CONFIG.isochroneMinutes) {
+  const brut = centre?.intervention_minutes;
+  const minutes = brut === null || brut === undefined || brut === '' ? NaN : Number(brut);
+  if (DUREES_INTERVENTION.includes(minutes) && !(estSiege && minutes === 0)) return minutes;
+  return estSiege ? dureeDuCentre(centre, repli) : 0;
+}
+
+/**
+ * Empreinte du territoire (clé, position, ordre et périmètres des centres) : change dès qu'un centre
+ * est ajouté, retiré ou déplacé, ou qu'un de ses deux périmètres change. Chaîne vide = aucun centre
+ * exploitable.
  * @param {Object|null|undefined} centers
  * @param {number} [repli] - étendue commune (dureeTerritoire)
  * @returns {string}
  */
 export function empreinteCentres(centers, repli = TERRITOIRE_CONFIG.isochroneMinutes) {
-  return centresValides(centers).map((c) => {
-    const minutes = dureeDuCentre(c, repli);
-    return `${c.key}:${c.lat},${c.lng}${minutes === TERRITOIRE_CONFIG.isochroneMinutes ? '' : `@${minutes}`}`;
-  }).join('|');
+  return centresValides(centers)
+    .map((c, i) => `${c.key}:${c.lat},${c.lng}@${dureeDuCentre(c, repli)}/${interventionDuCentre(c, i === 0, repli)}`)
+    .join('|');
+}
+
+/** Valeur de `leads.zone` d'un lead situé hors du périmètre d'intervention de l'entreprise. */
+export const ZONE_HORS = 'hors_zone';
+
+/** Un lead géocodé hors du périmètre d'intervention (à signaler : l'entreprise n'y intervient pas). */
+export function estHorsZone(lead) {
+  return lead?.zone === ZONE_HORS;
+}
+
+/**
+ * Zone d'un point d'après les zones calculées (useMapZones) :
+ *   - la clé du centre dont la zone commerciale contient le point (antennes d'abord, siège ensuite) ;
+ *   - `ZONE_HORS` s'il est hors du périmètre d'intervention de l'entreprise (`zone_principale`) ;
+ *   - `null` s'il est dans le périmètre mais dans la zone d'aucun commercial, ou si les zones sont inconnues.
+ * @param {{ zones?: Object, ordre?: string[], zone_principale?: Object }|null} zones
+ * @param {(zone: Object) => boolean} contient - le point est-il dans cette zone (GeoJSON) ?
+ * @returns {string|null}
+ */
+export function zoneDuPoint(zones, contient) {
+  if (!zones?.zones) return null;
+  // Le périmètre d'intervention d'abord : le contour lissé d'une zone commerciale peut en déborder un peu.
+  if (zones.zone_principale && !contient(zones.zone_principale)) return ZONE_HORS;
+  const [siege, ...antennes] = zones.ordre || [];
+  for (const key of [...antennes, siege]) {
+    const zone = key ? zones.zones[key] : null;
+    if (zone && contient(zone)) return key;
+  }
+  return null;
 }
 
 /**

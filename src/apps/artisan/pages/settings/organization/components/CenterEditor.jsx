@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { MapPin } from 'lucide-react';
 import AddressSearch from './AddressSearch';
 import { Field, INPUT_CLASS } from './layout';
-import { DUREES_TERRITOIRE, dureeDuCentre } from '@/lib/territoire-config';
+import { DUREES_TERRITOIRE, DUREES_INTERVENTION, dureeDuCentre, interventionDuCentre } from '@/lib/territoire-config';
+
+const libelleDuree = (m) => (m === 60 ? '1 heure' : `${m} minutes`);
 
 const COLOR_PRESETS = [
   { value: '#f97316', name: 'Orange' },
@@ -20,12 +22,14 @@ const EMOJI_PRESETS = ['🏢', '🏠', '🏭', '⚡', '📍'];
  * Géré en controlled mode : le parent passe `value` et reçoit `onChange`.
  *
  * @param {Object} props
- * @param {Object} props.value - { label, lat, lng, color, emoji, minutes } (minutes = étendue de la zone)
+ * @param {Object} props.value - { label, lat, lng, color, emoji, minutes, intervention_minutes }
+ *   (minutes = périmètre commercial, intervention_minutes = périmètre d'intervention, 0 = aucun)
+ * @param {boolean} [props.estSiege] - le siège intervient toujours : pas de périmètre d'intervention nul
  * @param {Function} props.onChange - (newCenter) => void
  * @param {string} [props.labelHint] - texte d'aide sous "Nom"
  * @param {boolean} [props.disabled]
  */
-export default function CenterEditor({ value, onChange, labelHint, disabled = false }) {
+export default function CenterEditor({ value, onChange, labelHint, disabled = false, estSiege = false }) {
   const [manualMode, setManualMode] = useState(false);
 
   const update = (patch) => onChange({ ...value, ...patch });
@@ -95,21 +99,38 @@ export default function CenterEditor({ value, onChange, labelHint, disabled = fa
         </div>
       )}
 
-      <Field
-        label="Étendue de la zone"
-        hint="Temps de trajet en voiture autour de ce point. La zone suit les routes : elle s’étire le long des axes rapides."
-      >
-        <select
-          value={dureeDuCentre(value)}
-          onChange={(e) => update({ minutes: Number(e.target.value) })}
-          disabled={disabled}
-          className={`${INPUT_CLASS} sm:max-w-xs`}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field
+          label="Périmètre d’intervention"
+          hint={estSiege
+            ? 'Jusqu’où vos équipes interviennent depuis ce point, en voiture. Au-delà, un lead est signalé hors zone.'
+            : 'Si des équipes partent de cette agence, elle étend la zone où l’entreprise intervient.'}
         >
-          {DUREES_TERRITOIRE.map((m) => (
-            <option key={m} value={m}>{m === 60 ? '1 heure' : `${m} minutes`}</option>
-          ))}
-        </select>
-      </Field>
+          <select
+            value={interventionDuCentre(value, estSiege)}
+            onChange={(e) => update({ intervention_minutes: Number(e.target.value) })}
+            disabled={disabled}
+            className={INPUT_CLASS}
+          >
+            {DUREES_INTERVENTION.filter((m) => !(estSiege && m === 0)).map((m) => (
+              <option key={m} value={m}>{m === 0 ? 'Aucun : agence commerciale seulement' : libelleDuree(m)}</option>
+            ))}
+          </select>
+        </Field>
+        <Field
+          label="Périmètre commercial"
+          hint="Jusqu’où le commercial de ce point se déplace. Il ne dépasse jamais la zone où l’entreprise intervient."
+        >
+          <select
+            value={dureeDuCentre(value)}
+            onChange={(e) => update({ minutes: Number(e.target.value) })}
+            disabled={disabled}
+            className={INPUT_CLASS}
+          >
+            {DUREES_TERRITOIRE.map((m) => <option key={m} value={m}>{libelleDuree(m)}</option>)}
+          </select>
+        </Field>
+      </div>
 
       <div className="flex flex-wrap gap-x-10 gap-y-4">
         <Field label="Couleur du repère">

@@ -1,4 +1,4 @@
-// Settings → Organisation → Territoire : siège sur la carte (départ des trajets), antennes (chacun avec l'étendue de sa zone),
+// Settings → Organisation → Territoire : siège sur la carte (départ des trajets), antennes (chacun avec ses deux périmètres : intervention et commercial),
 // commerciales, visibilité locale (fiche Google Business, département principal pour GeoGrid).
 import { useMemo, useState } from 'react';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -6,7 +6,7 @@ import { moduleActif } from '@/lib/modules';
 import { toast } from 'sonner';
 import { ChevronDown, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { MAPBOX_CONFIG } from '@lib/mapbox';
-import { dureeTerritoire, dureeDuCentre } from '@/lib/territoire-config';
+import { dureeTerritoire, dureeDuCentre, interventionDuCentre } from '@/lib/territoire-config';
 import CenterEditor from './components/CenterEditor';
 import DepartmentSelect from './components/DepartmentSelect';
 import { useSettingsForm } from './components/useSettingsForm';
@@ -38,7 +38,7 @@ function defaultBranch() {
 function deserialize(settings) {
   const centers = settings?.territoire_centers;
   const empty = {
-    headquarters: { ...defaultCenter(), minutes: dureeTerritoire(settings) },
+    headquarters: { ...defaultCenter(), minutes: dureeTerritoire(settings), intervention_minutes: dureeTerritoire(settings) },
     branches: [],
     google_place_id: settings?.google_place_id || '',
     geogrid_target_department: settings?.geogrid_target_department || '',
@@ -49,9 +49,18 @@ function deserialize(settings) {
   const [, hq] = entries[0];
   const branches = entries.slice(1).map(([, c]) => c);
   return {
-    // Étendue : celle du centre, sinon l'ancienne étendue commune (repli), sinon une heure
-    headquarters: { ...defaultCenter(), ...hq, minutes: dureeDuCentre(hq, dureeTerritoire(settings)) },
-    branches: branches.map((b) => ({ ...defaultBranch(), ...b, minutes: dureeDuCentre(b, dureeTerritoire(settings)) })),
+    // Périmètres : ceux du centre, sinon l'ancienne étendue commune (repli), sinon une heure.
+    // Sans réglage, le siège intervient aussi loin que son commercial et une antenne n'intervient pas.
+    headquarters: {
+      ...defaultCenter(), ...hq,
+      minutes: dureeDuCentre(hq, dureeTerritoire(settings)),
+      intervention_minutes: interventionDuCentre(hq, true, dureeTerritoire(settings)),
+    },
+    branches: branches.map((b) => ({
+      ...defaultBranch(), ...b,
+      minutes: dureeDuCentre(b, dureeTerritoire(settings)),
+      intervention_minutes: interventionDuCentre(b, false, dureeTerritoire(settings)),
+    })),
     google_place_id: settings?.google_place_id || '',
     geogrid_target_department: settings?.geogrid_target_department || '',
   };
@@ -141,8 +150,11 @@ export default function TerritoryTab() {
 
   const addBranch = () => {
     setEditingBranchIdx(state.branches.length);
-    // Une nouvelle antenne part de l'étendue du siège
-    setState((s) => ({ ...s, branches: [...s.branches, { ...defaultBranch(), minutes: dureeDuCentre(s.headquarters) }] }));
+    // Une nouvelle antenne : agence commerciale (aucune intervention), au périmètre commercial du siège
+    setState((s) => ({
+      ...s,
+      branches: [...s.branches, { ...defaultBranch(), minutes: dureeDuCentre(s.headquarters), intervention_minutes: 0 }],
+    }));
   };
 
   const updateBranch = (idx, updated) => {
@@ -161,9 +173,9 @@ export default function TerritoryTab() {
       <SettingsSurface colonnes>
         <SettingsSection
           title="Siège sur la carte"
-          description="Point de départ des trajets et des tournées, centre de la carte du territoire. Sa zone est ce qu’il atteint en voiture dans son étendue."
+          description="Point de départ des trajets et des tournées, centre de la carte du territoire. Son périmètre d’intervention délimite la zone où l’entreprise intervient."
         >
-          <CenterEditor value={state.headquarters} onChange={(hq) => patch({ headquarters: hq })} />
+          <CenterEditor estSiege value={state.headquarters} onChange={(hq) => patch({ headquarters: hq })} />
           {(errors.hq_label || errors.hq_coords) && (
             <p className="text-xs text-red-700">{errors.hq_label || errors.hq_coords}</p>
           )}
@@ -172,7 +184,7 @@ export default function TerritoryTab() {
         <SettingsSection
           title="Antennes commerciales"
           optional
-          description="Pour un commercial basé ailleurs qu’au siège : ses trajets partent de son antenne. Chaque antenne a son propre territoire ; ce qu’elle partage avec le siège va au plus proche des deux."
+          description="Pour un commercial basé ailleurs qu’au siège : ses trajets partent de son antenne. Une agence commerciale reste dans la zone d’intervention de l’entreprise ; si des équipes en partent, elle l’étend. Les zones des commerciaux ne se recouvrent pas : la partie commune va au plus proche."
         >
           {state.branches.length > 0 && (
             <ul className="rounded-lg border border-secondary-200 divide-y divide-secondary-100">

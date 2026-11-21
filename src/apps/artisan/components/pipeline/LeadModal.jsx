@@ -43,6 +43,7 @@ import { logger } from '@lib/logger';
 import { hasPhoneNumber } from '@/lib/phoneUtils';
 import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
+import { estHorsZone } from '@/lib/territoire-config';
 import { statutDeRetour } from '@/lib/leadReactivation';
 
 // Sous-composants extraits
@@ -496,6 +497,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 contactFieldsDisabled={contactFieldsDisabled}
                 pennylaneSynced={pennylaneSyncedContact}
                 emailError={emailInvalide ? EMAIL_INVALIDE_MESSAGE : null}
+                horsZone={estHorsZone(lead)}
               />
 
               <SectionPipeline

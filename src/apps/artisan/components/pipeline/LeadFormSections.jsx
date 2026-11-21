@@ -18,7 +18,7 @@ import {
   Search, PenLine, Unlink, Link2, X,
   Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, ChevronDown, CalendarDays,
   Target, Loader2, Wrench, Undo2,
-  FileText, ChevronRight, Plus, Info,
+  FileText, ChevronRight, Plus, Info, MapPinOff,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -225,7 +225,7 @@ export const SectionClientLinking = ({
 // CONTACT
 // ============================================================================
 
-export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylaneSynced = false, emailError = null }) => {
+export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylaneSynced = false, emailError = null, horsZone = false }) => {
   // Hint conditionnel — évite de mentir si on prétend "synchronisé" alors qu'on
   // n'a rien aspiré du customer PL (cf bug #6, fix commit pré-remplissage contact).
   // Si tous les champs contact sont vides, c'est probablement un lead ancien
@@ -360,6 +360,12 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylan
       disabled={contactFieldsDisabled}
       autoComplete="off"
     />
+    {horsZone && (
+      <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
+        <MapPinOff className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <span>Hors zone : cette adresse est en dehors de la zone où l’entreprise intervient.</span>
+      </p>
+    )}
   </>
   );
 };

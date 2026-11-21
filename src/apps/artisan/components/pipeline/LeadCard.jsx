@@ -11,11 +11,12 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Phone, Calendar, Clock, PhoneCall, FileText, Trophy, XCircle, Hourglass, ChevronDown, ChevronUp, CalendarClock, AlertTriangle } from 'lucide-react';
+import { Phone, Calendar, Clock, PhoneCall, FileText, Trophy, XCircle, Hourglass, ChevronDown, ChevronUp, CalendarClock, AlertTriangle, MapPinOff } from 'lucide-react';
 import { formatEuroCeil } from '@/lib/utils';
 import { useLinkedPennylaneQuotes, usePrefetchLinkedPennylaneQuotes } from '@hooks/usePennylane';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { dateDeCarte } from '@/lib/leadCardDate';
+import { estHorsZone } from '@/lib/territoire-config';
 import { QuoteSubCard } from './QuoteSubCard';
 
 // Statuts depuis lesquels un lead peut partir en suivi MT-LT : tout le funnel
@@ -249,6 +250,14 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
         </div>
 
         <div className="flex items-center gap-1.5 mt-1.5">
+          {estHorsZone(lead) && (
+            <span
+              className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 font-medium whitespace-nowrap"
+              title="Adresse hors de la zone où l’entreprise intervient"
+            >
+              <MapPinOff className="h-3 w-3" />Hors zone
+            </span>
+          )}
           {sourceLabel && (
             <span
               className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium truncate max-w-[100px]"
