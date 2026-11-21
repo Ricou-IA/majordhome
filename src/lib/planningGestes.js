@@ -80,6 +80,20 @@ export function creneauParDefaut(maintenant = new Date()) {
 }
 
 /**
+ * Date sur laquelle ouvrir le calendrier. Le planning masque samedi et dimanche :
+ * le week-end, la vue Semaine montrerait la semaine qui vient de finir. On ouvre
+ * donc sur le lundi suivant ; en semaine, rien à imposer (aujourd'hui).
+ * @param {Date} [maintenant]
+ * @returns {string|undefined}  `YYYY-MM-DD` du lundi suivant le week-end, sinon undefined
+ */
+export function jourDOuverture(maintenant = new Date()) {
+  const jour = maintenant.getDay(); // 0 = dimanche, 6 = samedi
+  if (jour !== 0 && jour !== 6) return undefined;
+  const lundi = new Date(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate() + (jour === 6 ? 2 : 1));
+  return dateLocale(lundi);
+}
+
+/**
  * Id du RDV porté par un bloc du calendrier. Un RDV à plusieurs techniciens est
  * éclaté en un bloc par personne (`${id}__${technicienId}`) : l'id réel est dans
  * `extendedProps.id`, jamais dans `event.id`.

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dateLocale, heureLocale, plageDeVue, creneauDeSelection, creneauParDefaut, idDuRdv, horaireDeBloc,
+  jourDOuverture,
 } from '../src/lib/planningGestes.js';
 
 const le = (j, h = 0, m = 0) => new Date(2026, 10, j, h, m);
@@ -49,6 +50,15 @@ test('creneauDeSelection : heure cliquée, ou 9 h pour une journée entière', (
 
 test('creneauParDefaut : aujourd’hui en date locale, 9 h', () => {
   assert.deepEqual(creneauParDefaut(new Date(2026, 10, 16, 0, 20)), { defaultDate: '2026-11-16', defaultTime: '09:00' });
+});
+
+test('jourDOuverture : en semaine rien à imposer, le week-end le lundi suivant', () => {
+  assert.equal(jourDOuverture(le(16, 8)), undefined);          // lundi
+  assert.equal(jourDOuverture(le(20, 23, 59)), undefined);     // vendredi soir
+  assert.equal(jourDOuverture(le(21, 0, 20)), '2026-11-23');   // samedi juste après minuit
+  assert.equal(jourDOuverture(le(22, 18)), '2026-11-23');      // dimanche
+  assert.equal(jourDOuverture(new Date(2026, 10, 28, 9)), '2026-11-30');
+  assert.equal(jourDOuverture(new Date(2027, 0, 30, 9)), '2027-02-01'); // samedi 30 janvier : le lundi est en février
 });
 
 test('idDuRdv : l’id réel d’un bloc de RDV à plusieurs techniciens', () => {

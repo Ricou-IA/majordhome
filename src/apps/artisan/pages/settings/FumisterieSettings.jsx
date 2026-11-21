@@ -6,7 +6,7 @@ import FumisterieTab from './entretiens/FumisterieTab';
 
 export default function FumisterieSettings() {
   return (
-    <SettingsPage title="Fumisterie" description="Réglages du métré de conduits : finition proposée, éléments disponibles, fixations, règle de zone 1. Les quantités « provisoires » se corrigent ici, pas dans le code.">
+    <SettingsPage title="Fumisterie" description="Réglages du métré de conduits : finition proposée, éléments disponibles, fixations, règle de zone 1. Les quantités par défaut sont à vérifier et à ajuster à votre pratique.">
       <FumisterieTab />
     </SettingsPage>
   );

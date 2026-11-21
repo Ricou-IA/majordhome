@@ -159,7 +159,7 @@ export function KanbanBoard({
   searchFilter,
   columnAmount,
   headerExtra,
-  emptyMessage = 'Aucun element',
+  emptyMessage = 'Aucun élément',
   children,
   headerLeft,
   headerRight,
@@ -244,8 +244,8 @@ export function KanbanBoard({
             {headerLeft ?? (
               <p className="text-sm text-gray-500">
                 {searchTerm.trim()
-                  ? `${filteredItems.length} / ${items.length} element${items.length !== 1 ? 's' : ''}`
-                  : `${items.length} element${items.length !== 1 ? 's' : ''}`}
+                  ? `${filteredItems.length} / ${items.length} élément${items.length > 1 ? 's' : ''}`
+                  : `${items.length} élément${items.length > 1 ? 's' : ''}`}
               </p>
             )}
           </div>

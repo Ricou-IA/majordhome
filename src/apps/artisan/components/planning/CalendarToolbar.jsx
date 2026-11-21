@@ -9,6 +9,7 @@
 
 import { Plus, ChevronLeft, ChevronRight, Loader2, RefreshCw, Printer } from 'lucide-react';
 import { formatCa } from '@/lib/planningCa';
+import { jourDOuverture } from '@/lib/planningGestes';
 
 const VUES_BUREAU = [
   { value: 'timeGridDay', label: 'Jour' },
@@ -49,7 +50,13 @@ export function CalendarToolbar({
   isMobileDevice,
   search,
 }) {
-  const goToday = () => calendarRef.current?.getApi().today();
+  // Le week-end, « Aujourd'hui » mène au lundi suivant, comme à l'ouverture.
+  const goToday = () => {
+    const api = calendarRef.current?.getApi();
+    const lundi = jourDOuverture();
+    if (lundi) api?.gotoDate(lundi);
+    else api?.today();
+  };
   const goPrev = () => calendarRef.current?.getApi().prev();
   const goNext = () => calendarRef.current?.getApi().next();
 

@@ -137,7 +137,7 @@ export default function FumisterieTab() {
         </div>
       </section>
       <section>
-        <h3 className={SECTION_TITLE}>Éléments et fixations (règles provisoires)</h3>
+        <h3 className={SECTION_TITLE}>Éléments et fixations (valeurs par défaut à vérifier)</h3>
         <div className="grid sm:grid-cols-2 gap-4">
           <Champ label="Longueurs d'éléments droits (mm)" hint="Du plus long au plus court, ex. 1000, 500, 250" error={errors.longueurs}><input value={form.longueurs} onChange={set('longueurs')} className={INPUT_CLASS} /></Champ>
           <Champ label="Élément réglable (mm)" hint="Min / max, entre 100 et 1000" error={errors.reglable}><div className="flex gap-2"><input type="number" min={100} max={1000} value={form.reglable_min} onChange={set('reglable_min')} className={INPUT_CLASS} /><input type="number" min={100} max={1000} value={form.reglable_max} onChange={set('reglable_max')} className={INPUT_CLASS} /></div></Champ>
@@ -157,7 +157,7 @@ export default function FumisterieTab() {
         </div>
       </section>
       <section>
-        <h3 className={SECTION_TITLE}>{'Tubage d\'un conduit existant (règles provisoires)'}</h3>
+        <h3 className={SECTION_TITLE}>{'Tubage d\'un conduit existant (valeurs par défaut à vérifier)'}</h3>
         <div className="grid sm:grid-cols-2 gap-4">
           <Champ label="Débord du flexible ajouté à la hauteur du conduit (cm)" hint="Haut de souche + raccord bas — de 0 à 200" error={errors.flexible_marge_cm}><input type="number" min={0} max={200} value={form.flexible_marge_cm} onChange={set('flexible_marge_cm')} className={INPUT_CLASS} /></Champ>
           <Champ label="Arrondi de commande du flexible (cm)" hint="Vendu au mètre, commandé au multiple supérieur — de 10 à 100" error={errors.flexible_arrondi_cm}><input type="number" min={10} max={100} value={form.flexible_arrondi_cm} onChange={set('flexible_arrondi_cm')} className={INPUT_CLASS} /></Champ>
@@ -166,7 +166,7 @@ export default function FumisterieTab() {
         </div>
       </section>
       <section>
-        <h3 className={SECTION_TITLE}>{'Conduit extérieur en façade (règles provisoires)'}</h3>
+        <h3 className={SECTION_TITLE}>{'Conduit extérieur en façade (valeurs par défaut à vérifier)'}</h3>
         <div className="grid sm:grid-cols-2 gap-4">
           <Champ label="Un support mural tous les (m)" hint="De 1 à 4 m de conduit en façade" error={errors.supports_muraux_tous_les_m}><input type="number" step="0.5" min={1} max={4} value={form.supports_muraux_tous_les_m} onChange={set('supports_muraux_tous_les_m')} className={INPUT_CLASS} /></Champ>
         </div>

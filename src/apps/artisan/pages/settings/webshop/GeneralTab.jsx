@@ -17,7 +17,7 @@ export default function GeneralTab() {
         <Champ
           label="Adresse du site"
           erreur={erreurs.site_url}
-          aide="Sert au lien « Voir sur le site », à l’aperçu des photos et à l’envoi des feuilles de route. Sans adresse, l’envoi automatique échoue (site_url_missing). Par défaut : vide."
+          aide="Sert au lien « Voir sur le site », à l’aperçu des photos et à l’envoi des feuilles de route. Sans adresse, l’envoi automatique des feuilles de route échoue."
         >
           <div className="relative">
             <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />

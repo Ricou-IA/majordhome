@@ -108,7 +108,7 @@ export function TableauCommerciaux({ dashboard, estCommercial }) {
       titre="Commerciaux"
       precision={
         lecture === 'commercial'
-          ? `Activité de la période, écart vs ${versus}. Les deux dernières colonnes suivent les leads reçus.`
+          ? `Écart vs ${versus} sur l’activité de la période. Les deux dernières colonnes suivent les leads reçus.`
           : 'Les 6 derniers mois, mesurés de la même façon : comparables d’un mois sur l’autre.'
       }
       actions={

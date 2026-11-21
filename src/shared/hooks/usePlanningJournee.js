@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { panneauDeLigne, sortJourneeDemandee } from '@/lib/planningCharge';
+import { jourDOuverture } from '@/lib/planningGestes';
 
 /**
  * @param {object} p
@@ -27,7 +28,8 @@ import { panneauDeLigne, sortJourneeDemandee } from '@/lib/planningCharge';
  * @param {string|null} p.finPlage  borne exclusive de la plage affichée
  * @returns {{ dateInitiale: string|undefined, journeeSelectionnee: object|null, feuilleOuverte: object|null,
  *   ouvrirJournee: (ligne: object) => void, fermerJournee: () => void, fermerFeuille: () => void }}
- *   `dateInitiale` : date du lien direct, à donner au calendrier à son montage.
+ *   `dateInitiale` : date du lien direct, sinon le lundi suivant quand on ouvre un
+ *   week-end (jourDOuverture), à donner au calendrier à son montage.
  */
 export function usePlanningJournee({ journeesHorizon, etatsLoading, etatsError, finPlage }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -36,7 +38,7 @@ export function usePlanningJournee({ journeesHorizon, etatsLoading, etatsError, 
     const technicienId = searchParams.get('tech');
     return date && technicienId ? { date, technicienId } : null;
   });
-  const [dateInitiale] = useState(() => searchParams.get('journee') || undefined);
+  const [dateInitiale] = useState(() => searchParams.get('journee') || jourDOuverture());
   const [feuilleOuverte, setFeuilleOuverte] = useState(null);
 
   const ouvrirJournee = useCallback((ligne) => {

@@ -157,7 +157,10 @@ export function PublicOnlyRoute({ children }) {
   const { user, isClient, initialized, loading } = useAuth();
   const location = useLocation();
 
-  if (!initialized || loading) {
+  // Pendant une tentative de connexion (`loading` sans utilisateur), la page reste
+  // montée : la remplacer par l'attente la recréait vide, et le message d'erreur
+  // d'une connexion refusée ne s'affichait jamais.
+  if (!initialized || (loading && user)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-secondary-50">
         <div className="text-center">
