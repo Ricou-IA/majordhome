@@ -84,3 +84,31 @@ test('tableau : cellules complétées ou coupées, textes d\'en-tête rognés, l
   const large = tableau([[...Array(28).fill('x').map((v, i) => (i < 26 ? v : ''))]], 0);
   assert.deepEqual(large.entetes.slice(26), ['Colonne AA', 'Colonne AB']);
 });
+test('CSV à virgule précédé d\'un titre sans séparateur : lu de bout en bout', () => {
+  const m = lireCsv('Export clients du 12/11\nNom,Prénom\nDUPONT,Jean\nMARTIN,Léa\n');
+  const i = trouverEntete(m);
+  assert.equal(i, 1);
+  const t = tableau(m, i);
+  assert.deepEqual(t.entetes, ['Nom', 'Prénom']);
+  assert.deepEqual(t.lignes, [{ numero: 3, cellules: ['DUPONT', 'Jean'] }, { numero: 4, cellules: ['MARTIN', 'Léa'] }]);
+});
+test('CSV à tabulation précédé d\'un titre', () => {
+  assert.deepEqual(lireCsv('Titre\na\tb\n1\t2'), [['Titre'], ['a', 'b'], ['1', '2']]);
+});
+test('titre avec une virgule au-dessus de données en point-virgule : le point-virgule gagne', () => {
+  assert.deepEqual(lireCsv('Export clients, du 12/11\nNom;Ville\nA;B\nC;D'), [['Export clients, du 12/11'], ['Nom', 'Ville'], ['A', 'B'], ['C', 'D']]);
+});
+test('guillemet au milieu d\'une cellule non quotée : gardé tel quel', () => {
+  assert.deepEqual(lireCsv('Nom;Note\nDUPONT;tube 5" inox\nMARTIN;Jean "Jo"'), [['Nom', 'Note'], ['DUPONT', 'tube 5" inox'], ['MARTIN', 'Jean "Jo"']]);
+});
+test('ligne vide au milieu : gardée par lireCsv, retirée par tableau, numéros fidèles', () => {
+  const m = lireCsv('Nom;Ville\nA;B\n\nC;D\n');
+  assert.deepEqual(m, [['Nom', 'Ville'], ['A', 'B'], [''], ['C', 'D']]);
+  assert.deepEqual(tableau(m, 0).lignes.map((l) => l.numero), [2, 4]);
+});
+test('guillemet ouvrant jamais fermé : pas de plantage', () => {
+  assert.deepEqual(lireCsv('a;b\n"c;d\ne;f'), [['a', 'b'], ['c;d\ne;f']]);
+});
+test('fin de ligne a;b; : cellule vide finale présente', () => {
+  assert.deepEqual(lireCsv('a;b;\n1;2;'), [['a', 'b', ''], ['1', '2', '']]);
+});

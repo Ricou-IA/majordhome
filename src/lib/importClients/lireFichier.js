@@ -33,26 +33,30 @@ export function decoderTexte(octets) {
   return texte.charCodeAt(0) === 0xFEFF ? texte.slice(1) : texte;
 }
 
-const SEPARATEURS = [';', ',', '\t'];
-
-// Séparateur le plus fréquent, hors guillemets, sur la première ligne non vide.
+// Séparateur le plus fréquent, hors guillemets, sur les 10 premières lignes non vides.
+// À égalité (ou zéro partout) : `;`, puis tabulation, puis `,`.
 function detecterSeparateur(texte) {
-  const compte = { ';': 0, ',': 0, '\t': 0 };
+  const compte = { ';': 0, '	': 0, ',': 0 };
   let dansGuillemets = false;
+  let debutCellule = true;
   let vu = false;
+  let lignes = 0;
   for (const c of texte) {
-    if (c === '"') dansGuillemets = !dansGuillemets;
-    else if (!dansGuillemets) {
-      if (c === '\n' || c === '\r') {
-        if (vu) break;
-      } else {
-        vu = true;
-        if (c in compte) compte[c] += 1;
-      }
+    if (dansGuillemets) {
+      if (c === '"') dansGuillemets = false;
+      continue;
     }
+    if (c === '\n' || c === '\r') {
+      if (vu) { lignes += 1; vu = false; if (lignes >= 10) break; }
+      debutCellule = true;
+      continue;
+    }
+    vu = true;
+    if (c === '"' && debutCellule) { dansGuillemets = true; debutCellule = false; continue; }
+    if (c in compte) { compte[c] += 1; debutCellule = true; } else debutCellule = false;
   }
   let meilleur = ';';
-  for (const s of SEPARATEURS) if (compte[s] > compte[meilleur]) meilleur = s;
+  for (const sep of [';', '	', ',']) if (compte[sep] > compte[meilleur]) meilleur = sep;
   return meilleur;
 }
 
@@ -77,7 +81,7 @@ export function lireCsv(texte) {
       if (c === '"') {
         if (texte[i + 1] === '"') { cellule += '"'; i += 1; } else dansGuillemets = false;
       } else cellule += c;
-    } else if (c === '"') dansGuillemets = true;
+    } else if (c === '"' && cellule === '') dansGuillemets = true; // n'ouvre qu'en début de cellule
     else if (c === sep) finCellule();
     else if (c === '\r') {
       if (texte[i + 1] === '\n') i += 1;
