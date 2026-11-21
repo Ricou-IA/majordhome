@@ -31,15 +31,24 @@ const ok = (valeur) => ({ valeur, illisible: false });
 
 const groupesDeDeux = (dix) => ok(dix.match(/\d{2}/g).join(' '));
 
+// Un numéro est lu seulement s'il ne porte que des chiffres, espaces, points, tirets, parenthèses et un « + » de tête.
+// Deux numéros dans la cellule, « poste 12 », un numéro trop court ou du texte : illisible, jamais gardé tel quel.
+const FORME_NUMERO = /^\+?[\d\s.\-()]+$/;
+
 function telephone(texte) {
-  const chiffres = texte.replace(/\D/g, '');
-  const international = texte.startsWith('+');
+  if (!/\d/.test(texte) || !FORME_NUMERO.test(texte)) return ILLISIBLE;
+  const lu = texte.replace(/^(\+\s*33|0033)\s*\(0\)/, '$1');
+  const chiffres = lu.replace(/\D/g, '');
   const fr = chiffres.match(/^(?:0033|33)(\d{9})$/);
   if (fr) return groupesDeDeux('0' + fr[1]);
+  const international = lu.startsWith('+') || lu.startsWith('00');
   if (!international && /^[1-9]\d{8}$/.test(chiffres)) return groupesDeDeux('0' + chiffres);
   if (!international && /^0\d{9}$/.test(chiffres)) return groupesDeDeux(chiffres);
-  const nettoye = cleanPhone(texte);
-  return nettoye ? ok(nettoye) : VIDE;
+  if (international && !/^(?:\+\s*33|0033)/.test(lu) && chiffres.length >= 8 && chiffres.length <= 15) {
+    const nettoye = cleanPhone(lu.replace(/[.\-()]/g, ' '));
+    return nettoye ? ok(nettoye.replace(/\s+/g, ' ')) : ILLISIBLE;
+  }
+  return ILLISIBLE;
 }
 
 function codePostal(texte) {

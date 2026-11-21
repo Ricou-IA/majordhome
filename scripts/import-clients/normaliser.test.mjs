@@ -12,6 +12,16 @@ test('téléphone : +33 et points', () => {
   assert.equal(n('telephone', '0033612345678').valeur, '06 12 34 56 78');
 });
 test('téléphone étranger gardé tel quel, nettoyé', () => assert.equal(n('telephone', '+41 22 555 01 02').valeur, '+41 22 555 01 02'));
+test('téléphone : non reconnu = illisible, jamais gardé tel quel', () => {
+  for (const v of ['néant', 'n/a', '06 12 34 56 78 / 05 63 00 00 00', '0612345678 poste 12', '06 12 34 56', '+33 6 12 34 56']) {
+    assert.deepEqual(n('telephone', v), { valeur: null, illisible: true }, v);
+  }
+});
+test('téléphone : +33 (0)6 retrouvé, international toujours accepté', () => {
+  assert.equal(n('telephone', '+33 (0)6 12 34 56 78').valeur, '06 12 34 56 78');
+  assert.equal(n('telephone', '+41 22 555 01 02').valeur, '+41 22 555 01 02');
+  assert.equal(n('telephone', '0041 22 555 01 02').valeur, '0041 22 555 01 02');
+});
 test('code postal : zéro retrouvé', () => {
   assert.equal(n('code_postal', '1000').valeur, '01000');
   assert.equal(n('code_postal', '81 600').valeur, '81600');
