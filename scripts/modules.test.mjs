@@ -171,3 +171,10 @@ test('une tuile « si » ne s’affiche que si son réglage sert : Plan comptabl
   assert.ok(tuiles({ pennylane: { enabled: true } }).includes('plan-comptable'));
   assert.ok(tuiles({}).includes('pennylane'), 'la tuile Facturation, qui porte le lien Pennylane, reste visible');
 });
+
+test('la tuile Emails ne s’affiche que si un module de l’organisation écrit à quelqu’un', () => {
+  const aEmails = (s) => modulesVisibles(s, { isOrgAdmin: true }).some((m) => m.tiles.some((t) => t.key === 'emails'));
+  assert.equal(aEmails({}), true, 'le CRM a le mailing');
+  assert.equal(aEmails({ modules: { crm: false, entretiens: false } }), false, 'solaire et thermique seuls n’écrivent à personne');
+  assert.equal(aEmails({ modules: { crm: false, entretiens: false, maintenance: true } }), true, 'e-mail du soir');
+});

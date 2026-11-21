@@ -32,7 +32,7 @@ export const MODULES = [
       { key: 'pennylane', title: 'Facturation', description: 'Numérotation, mentions et coordonnées bancaires des factures ; lien Pennylane et comptes de vente', icon: 'Receipt', href: '/settings/pennylane', adminOnly: true },
       // L'expéditeur des e-mails sert à tous les modules qui écrivent (factures, e-mail du soir) :
       // socle, pas Communication.
-      { key: 'emails', title: 'Emails', description: 'Expéditeur, adresse de réponse, domaine d\'envoi', icon: 'Mail', href: '/settings/emails', adminOnly: true, horsCrm: true },
+      { key: 'emails', title: 'Emails', description: 'Expéditeur, adresse de réponse, domaine d\'envoi', icon: 'Mail', href: '/settings/emails', adminOnly: true, horsCrm: true, si: 'envoi_emails' },
       { key: 'plan-comptable', title: 'Plan comptable', description: 'Les comptes de vente Pennylane utilisables dans Majord\'home', icon: 'BookOpen', href: '/settings/plan-comptable', adminOnly: true, si: 'pennylane' },
       { key: 'devis', title: 'Devis', description: 'Chapitres par type de projet, mentions et affichage du document', icon: 'FileSignature', href: '/settings/devis', adminOnly: true },
     ],
@@ -254,9 +254,13 @@ export function moduleDeRoute(chemin) {
  * ce droit (`can` = useCanAccess().can, absent ⇒ admin seul) ; une tuile sans `adminOnly` ni `acces` l'est pour tous.
  */
 /** Conditions `si` d'une tuile : un réglage qui ne sert à rien pour cette organisation ne s'affiche pas. */
+const MODULES_QUI_ECRIVENT = ['crm', 'communication', 'entretiens', 'webshop', 'maintenance'];
 const CONDITIONS_TUILE = {
   // Le plan comptable ne sert qu'à une organisation reliée à Pennylane (lien posé dans la tuile Facturation).
   pennylane: (settings) => settings?.pennylane?.enabled === true,
+  // L'adresse d'envoi ne sert qu'à une organisation dont un module écrit à quelqu'un : le mailing du CRM,
+  // les e-mails de Communication, d'Entretiens, de la boutique ou l'e-mail du soir des tâches récurrentes.
+  envoi_emails: (settings) => MODULES_QUI_ECRIVENT.some((cle) => moduleActif(settings, cle)),
 };
 
 function tuileVisible(t, { isOrgAdmin, can }, settings) {
