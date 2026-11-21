@@ -24,12 +24,13 @@ const EMOJI_PRESETS = ['🏢', '🏠', '🏭', '⚡', '📍'];
  * @param {Object} props
  * @param {Object} props.value - { label, lat, lng, color, emoji, minutes, intervention_minutes }
  *   (minutes = périmètre commercial, intervention_minutes = périmètre d'intervention, 0 = aucun)
+ * @param {string} [props.adresse] - adresse déjà connue, affichée dans le champ de recherche (le siège : celle de Coordonnées)
  * @param {boolean} [props.estSiege] - le siège intervient toujours : pas de périmètre d'intervention nul
  * @param {Function} props.onChange - (newCenter) => void
  * @param {string} [props.labelHint] - texte d'aide sous "Nom"
  * @param {boolean} [props.disabled]
  */
-export default function CenterEditor({ value, onChange, labelHint, disabled = false, estSiege = false }) {
+export default function CenterEditor({ value, onChange, labelHint, disabled = false, estSiege = false, adresse = '' }) {
   const [manualMode, setManualMode] = useState(false);
 
   const update = (patch) => onChange({ ...value, ...patch });
@@ -51,12 +52,12 @@ export default function CenterEditor({ value, onChange, labelHint, disabled = fa
             onChange={(e) => update({ label: e.target.value })}
             disabled={disabled}
             maxLength={80}
-            placeholder="Ex. Siège Cimaj, Toulouse"
+            placeholder={estSiege ? 'Siège' : 'Ex. Agence de Toulouse'}
             className={INPUT_CLASS}
           />
         </Field>
         <Field label="Adresse">
-          <AddressSearch initialValue="" onSelect={handleAddressSelect} disabled={disabled} />
+          <AddressSearch initialValue={adresse} onSelect={handleAddressSelect} disabled={disabled} />
         </Field>
       </div>
 

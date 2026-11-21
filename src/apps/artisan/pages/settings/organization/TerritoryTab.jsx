@@ -1,6 +1,6 @@
 // Settings → Organisation → Territoire : siège sur la carte (départ des trajets), antennes (chacun avec ses deux périmètres : intervention et commercial),
 // commerciales, visibilité locale (fiche Google Business, département principal pour GeoGrid).
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { moduleActif } from '@/lib/modules';
 import { toast } from 'sonner';
@@ -25,8 +25,9 @@ function slugify(label) {
   );
 }
 
+// Le siège porte « Siège » d'office : le nom se change, mais l'onboarding n'a rien à y saisir.
 function defaultCenter() {
-  return { label: '', lat: null, lng: null, color: '#3b82f6', emoji: '🏢' };
+  return { label: 'Siège', lat: null, lng: null, color: '#3b82f6', emoji: '🏢' };
 }
 
 function defaultBranch() {
@@ -80,6 +81,28 @@ function serializeTerritoireCenters(headquarters, branches) {
   return out;
 }
 
+// Adresse du siège telle qu'elle a été saisie à la création de l'entreprise (Organisation → Coordonnées).
+function adresseDuSiege(settings) {
+  const ville = [settings?.postal_code, settings?.city].filter(Boolean).join(' ');
+  return [settings?.address, ville].filter(Boolean).join(', ');
+}
+
+// Position de cette adresse (Mapbox) ; null si introuvable ou service indisponible : on laisse alors la recherche manuelle.
+async function geocoderAdresse(adresse) {
+  try {
+    const token = MAPBOX_CONFIG.accessToken;
+    if (!token) return null;
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(adresse)}.json?country=fr&language=fr&limit=1&access_token=${token}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const [lng, lat] = data.features?.[0]?.center || [];
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  } catch {
+    return null;
+  }
+}
+
 function validate(state) {
   const errors = {};
   if (!state.headquarters.label?.trim()) errors.hq_label = 'Nom du siège obligatoire';
@@ -101,10 +124,24 @@ export default function TerritoryTab() {
   // Les réglages de visibilité locale ne servent qu'au module GeoGrid : fermés avec lui.
   const { settings: orgSettings } = useOrgSettings();
   const geogridOuvert = moduleActif(orgSettings, 'geogrid');
+  const adresseSiege = adresseDuSiege(orgSettings);
 
   const errors = useMemo(() => validate(state), [state]);
   const isValid = Object.keys(errors).length === 0;
   const patch = (p) => setState((s) => ({ ...s, ...p }));
+
+  // Siège sans position : on la déduit de l'adresse déjà saisie, une seule fois. Rien n'est enregistré
+  // sans le clic sur « Enregistrer » ; un échec laisse la recherche d'adresse comme avant.
+  const geocodageSiegeEssaye = useRef(false);
+  const { lat: hqLat, lng: hqLng } = state.headquarters;
+  useEffect(() => {
+    if (isLoading || geocodageSiegeEssaye.current || !adresseSiege) return;
+    if (Number.isFinite(hqLat) && Number.isFinite(hqLng)) return;
+    geocodageSiegeEssaye.current = true;
+    geocoderAdresse(adresseSiege).then((pos) => {
+      if (pos) setState((s) => (Number.isFinite(s.headquarters.lat) ? s : { ...s, headquarters: { ...s.headquarters, ...pos } }));
+    });
+  }, [isLoading, adresseSiege, hqLat, hqLng, setState]);
 
   const handleSave = async () => {
     if (!isValid) {
@@ -175,7 +212,7 @@ export default function TerritoryTab() {
           title="Siège sur la carte"
           description="Point de départ des trajets et des tournées, centre de la carte du territoire. Son périmètre d’intervention délimite la zone où l’entreprise intervient."
         >
-          <CenterEditor estSiege value={state.headquarters} onChange={(hq) => patch({ headquarters: hq })} />
+          <CenterEditor estSiege adresse={adresseSiege} value={state.headquarters} onChange={(hq) => patch({ headquarters: hq })} />
           {(errors.hq_label || errors.hq_coords) && (
             <p className="text-xs text-red-700">{errors.hq_label || errors.hq_coords}</p>
           )}
