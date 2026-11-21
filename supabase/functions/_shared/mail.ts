@@ -13,6 +13,21 @@
 // ============================================================================
 
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { resoudreExpediteur } from "./expediteur.js";
+
+/**
+ * Expéditeur d'un e-mail de l'organisation — seule lecture de l'adresse commune de la plateforme
+ * (secret `MDH_PLATFORM_FROM_EMAIL`). Règles : `_shared/expediteur.js` (copie de `src/lib/expediteur.js`).
+ */
+export function expediteurDe(settings: Record<string, unknown> | null, usage: "individuel" | "nombre" = "individuel") {
+  let plateforme = "";
+  try {
+    plateforme = Deno.env.get("MDH_PLATFORM_FROM_EMAIL") || "";
+  } catch {
+    // Environnement illisible (tests lancés sans --allow-env) : pas d'adresse commune.
+  }
+  return resoudreExpediteur(settings ?? {}, { usage, plateforme });
+}
 
 export function arrayBufferToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
@@ -48,8 +63,11 @@ export function escapeHtml(s: string): string {
 
 export interface OrgBranding {
   fromName: string;
+  /** Adresse d'où part l'e-mail : celle de l'entreprise, ou l'adresse commune tant que son domaine n'est pas vérifié. */
   fromEmail: string;
   replyTo: string;
+  /** Adresse de l'entreprise, à écrire dans le corps d'un e-mail — jamais l'adresse commune. */
+  contactEmail: string;
   brandName: string;
   phone: string;
   address: string;
@@ -64,18 +82,18 @@ export interface OrgBranding {
 }
 
 /**
- * Reproduit `loadOrgBranding` de `mailing-send/index.ts:226-251` — mêmes clés
- * et mêmes défauts de couleur. PAS de fallback Mayer sur `fromEmail` :
- * `settings.from_email || settings.reply_to || ''` — vide ⇒ l'appelant refuse
- * l'envoi (cf. spec, prérequis techniques).
+ * Identité d'envoi et habillage d'un e-mail INDIVIDUEL de l'organisation. L'expéditeur est résolu
+ * par `expediteurDe` : `fromEmail` vide ⇒ l'entreprise n'a aucune adresse, l'appelant refuse l'envoi
+ * (`no_from_email`). Jamais l'adresse d'une autre entreprise.
  */
 export function orgBranding(settings: Record<string, unknown>): OrgBranding {
   const s = (settings ?? {}) as Record<string, string>;
-  const fromEmail = s.from_email || s.reply_to || "";
+  const exp = expediteurDe(settings);
   return {
-    fromName: s.from_name || s.brand_name || "",
-    fromEmail,
-    replyTo: s.reply_to || fromEmail,
+    fromName: exp.fromName,
+    fromEmail: exp.fromEmail,
+    replyTo: exp.replyTo,
+    contactEmail: exp.contactEmail,
     brandName: s.brand_name || "",
     phone: s.phone || "",
     address: s.address || "",
@@ -93,7 +111,7 @@ export function orgBranding(settings: Record<string, unknown>): OrgBranding {
 export function brandingReplacements(b: OrgBranding): Record<string, string> {
   return {
     "{{BRAND_NAME}}": b.brandName,
-    "{{ORG_EMAIL}}": b.fromEmail,
+    "{{ORG_EMAIL}}": b.contactEmail,
     "{{ORG_PHONE}}": b.phone,
     "{{ORG_ADDRESS}}": b.address,
     "{{ORG_POSTAL_CODE}}": b.postalCode,
@@ -107,13 +125,35 @@ export function brandingReplacements(b: OrgBranding): Record<string, string> {
 }
 
 /**
- * Enveloppe `body` dans le squelette `{{EMAIL_BODY}}` de l'org, sauf si `body`
- * est déjà un HTML complet (rétrocompat gabarits legacy, cf.
+ * Habillage par défaut d'une entreprise qui n'a pas le sien : son nom (ou son logo) en tête, ses
+ * coordonnées en pied, tons neutres. Les valeurs sont posées ici, échappées — il ne reste aucune
+ * variable à remplacer par l'appelant.
+ */
+function habillageNeutre(b: OrgBranding, body: string): string {
+  const nom = escapeHtml(b.brandName);
+  const logo = /^https:\/\//i.test(b.logoUrl)
+    ? `<img src="${escapeHtml(b.logoUrl)}" alt="${nom}" style="max-height:56px;max-width:220px;">`
+    : (nom ? `<span style="font-size:18px;font-weight:600;color:#0f172a;">${nom}</span>` : "");
+  const adresse = [b.address, [b.postalCode, b.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const pied = [b.brandName, adresse, b.phone, b.contactEmail].filter(Boolean).map(escapeHtml).join(" · ");
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>`
+    + `<body style="margin:0;padding:0;background:#f1f5f9;">`
+    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;"><tr><td align="center" style="padding:24px 12px;">`
+    + `<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1e293b;">`
+    + (logo ? `<tr><td style="padding:24px 28px 0 28px;">${logo}</td></tr>` : "")
+    + `<tr><td style="padding:24px 28px;">${body}</td></tr>`
+    + (pied ? `<tr><td style="padding:16px 28px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">${pied}</td></tr>` : "")
+    + `</table></td></tr></table></body></html>`;
+}
+
+/**
+ * Enveloppe `body` dans l'habillage de l'org (`email_skeleton_html`, variable `{{EMAIL_BODY}}`), à
+ * défaut dans l'habillage neutre — sauf si `body` est déjà un HTML complet (gabarits legacy, cf.
  * `contract-signed-notify`).
  */
 export function wrapWithSkeleton(b: OrgBranding, body: string): string {
-  if (!b.skeleton || !b.skeleton.includes("{{EMAIL_BODY}}")) return body;
   if (/<html[\s>]/i.test(body)) return body;
+  if (!b.skeleton || !b.skeleton.includes("{{EMAIL_BODY}}")) return habillageNeutre(b, body);
   return b.skeleton.replace("{{EMAIL_BODY}}", body);
 }
 

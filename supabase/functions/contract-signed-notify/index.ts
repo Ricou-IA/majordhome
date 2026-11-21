@@ -27,6 +27,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { chargerTexteEmail } from "../_shared/texteEmail.ts";
+import { expediteurDe } from "../_shared/mail.ts";
 import { CONTRAT_SIGNE_TEMPLATE_KEY } from "../_shared/contratEmailTemplates.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -138,9 +139,9 @@ Deno.serve(async (req: Request) => {
 
     const settings = (org.settings as Record<string, string | null> | null) || {};
     const brandName = settings.brand_name || org.name;
-    const fromEmail = settings.from_email;
-    const fromName = settings.from_name || brandName;
-    const replyTo = settings.reply_to || fromEmail;
+    // Expéditeur : domaine de l'entreprise s'il est vérifié, sinon l'adresse commune (_shared/expediteur.js).
+    const expediteur = expediteurDe({ ...settings, brand_name: brandName });
+    const fromEmail = expediteur.contactEmail;
     const accentColor = settings.accent_color || "#f97316";
     const secondaryColor = settings.secondary_color || "#1E4D8C";
     const emailTagline = settings.email_tagline || "";
@@ -148,7 +149,7 @@ Deno.serve(async (req: Request) => {
     const websiteUrl = settings.website_url || "";
     const emailSkeleton = settings.email_skeleton_html || null;
 
-    if (!fromEmail) {
+    if (expediteur.refus) {
       return json(
         { error: "Settings org incomplets : from_email manquant. Configurer core.organizations.settings." },
         500,
@@ -211,9 +212,9 @@ Deno.serve(async (req: Request) => {
 
     // 6) Envoi via Resend
     const resendPayload = {
-      from: `${fromName} <${fromEmail}>`,
+      from: expediteur.from,
       to: [contract.client_email],
-      reply_to: replyTo,
+      reply_to: expediteur.replyTo,
       subject,
       html: htmlBody,
       attachments: [

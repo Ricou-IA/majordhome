@@ -6,6 +6,7 @@
 // messages d'erreur de l'edge `invoice-send`. Aucun import React / Supabase.
 // ============================================================================
 import { moduleActif } from './modules.js';
+import { resoudreExpediteur } from './expediteur.js';
 
 /**
  * @param {object} p
@@ -18,14 +19,14 @@ import { moduleActif } from './modules.js';
  * @param {string|null|undefined} p.clientEmail
  * @param {boolean} [p.hasInvoice=true]  renvoi depuis la carte : la carte porte-t-elle une facture ?
  * @param {boolean} [p.isDraftInvoice]  renvoi : la facture Pennylane est-elle encore un brouillon ? (si connu)
- * @returns {{ visible: boolean, enabled: boolean, reason: null|'module_off'|'no_email'|'no_from_email'|'resend_not_verified'|'draft_mode'|'no_invoice'|'draft_invoice' }}
+ * @returns {{ visible: boolean, enabled: boolean, reason: null|'module_off'|'no_email'|'no_from_email'|'draft_mode'|'no_invoice'|'draft_invoice' }}
  */
 export function invoiceEmailAvailability({ settings, mode, clientEmail, hasInvoice = true, isDraftInvoice }) {
   if (!moduleActif(settings, 'communication')) return { visible: false, enabled: false, reason: 'module_off' };
   const off = (reason) => ({ visible: true, enabled: false, reason });
   if (!(clientEmail || '').trim()) return off('no_email');
-  if (!(settings?.from_email || '').trim()) return off('no_from_email');
-  if (settings?.resend?.status !== 'verified') return off('resend_not_verified');
+  // Domaine non vérifié : l'e-mail part de l'adresse commune de la plateforme (src/lib/expediteur.js).
+  if (resoudreExpediteur(settings).refus) return off('no_from_email');
   if (!hasInvoice) return off('no_invoice');
   if (isDraftInvoice === true) return off('draft_invoice');
   if (isDraftInvoice == null && mode === 'draft') return off('draft_mode');
@@ -35,7 +36,6 @@ export function invoiceEmailAvailability({ settings, mode, clientEmail, hasInvoi
 export const INVOICE_EMAIL_REASONS = Object.freeze({
   no_email: 'Le client n’a pas d’adresse e-mail (fiche client).',
   no_from_email: 'Aucun e-mail expéditeur : Paramètres → Communication → Emails.',
-  resend_not_verified: 'Le domaine d’envoi n’est pas vérifié : Paramètres → Communication → Emails.',
   draft_mode: 'Brouillon Pennylane : à envoyer depuis Pennylane après finalisation.',
   no_invoice: 'Aucune facture sur cette carte.',
   draft_invoice: 'La facture est encore un brouillon dans Pennylane : finalisez-la d’abord.',

@@ -6,6 +6,7 @@ import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { supabase } from '@/lib/supabaseClient';
+import { resoudreExpediteur, EXPEDITEUR_REFUS } from '@/lib/expediteur';
 import CampaignIdentityPanel from './CampaignIdentityPanel';
 import { useMailCampaigns } from '@hooks/useMailCampaigns';
 import { useMailSegments, useSegmentCount } from '@hooks/useMailSegments';
@@ -155,6 +156,12 @@ export default function SendTab() {
       toast.error('Sélectionne un segment de ciblage');
       return;
     }
+    // Un envoi à un segment part du domaine vérifié de l'entreprise, jamais de l'adresse commune.
+    const refusExpediteur = resoudreExpediteur(orgSettings, { usage: isTest ? 'individuel' : 'nombre' }).refus;
+    if (refusExpediteur) {
+      toast.error(EXPEDITEUR_REFUS[refusExpediteur]);
+      return;
+    }
 
     const body = {
       mode: 'bulk',
@@ -225,7 +232,7 @@ export default function SendTab() {
       setSending(false);
       setBulkProgress(null);
     }
-  }, [segment, subject, htmlBody, campaignLabel, testEmail, recipientCount]);
+  }, [segment, subject, htmlBody, campaignLabel, testEmail, recipientCount, orgSettings]);
 
   if (campaignsLoading || segmentsLoading) {
     return (

@@ -20,6 +20,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { resoudreExpediteur } from "../_shared/expediteur.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -205,6 +206,8 @@ async function resolveOrgIfEmpty(
 }
 
 type OrgBranding = {
+  /** Refus de l'expéditeur (`no_from_email`, `domaine_requis`) ; null = l'envoi peut partir. */
+  refus: string | null;
   fromName: string;
   fromEmail: string;
   replyTo: string;
@@ -223,17 +226,21 @@ type OrgBranding = {
   emailSkeleton: string | null;
 };
 
-async function loadOrgBranding(orgId: string): Promise<OrgBranding> {
+// `usage` : un envoi à un segment part du domaine vérifié de l'entreprise, jamais de l'adresse commune
+// de la plateforme (`_shared/expediteur.js`) ; un e-mail à UN client ou un essai est un e-mail individuel.
+async function loadOrgBranding(orgId: string, usage: "individuel" | "nombre"): Promise<OrgBranding> {
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: org } = await admin
     .schema("core").from("organizations")
     .select("settings").eq("id", orgId).maybeSingle();
   const s = ((org?.settings as Record<string, unknown> | null) ?? {}) as Record<string, string>;
-  const contactEmail = s.from_email || s.reply_to || "";
+  const exp = resoudreExpediteur(s, { usage, plateforme: Deno.env.get("MDH_PLATFORM_FROM_EMAIL") || "" });
+  const contactEmail = exp.contactEmail;
   return {
-    fromName: s.from_name || s.brand_name || "Majord'home",
-    fromEmail: s.from_email || contactEmail,
-    replyTo: s.reply_to || contactEmail,
+    refus: exp.refus,
+    fromName: exp.fromName || "Majord'home",
+    fromEmail: exp.fromEmail,
+    replyTo: exp.replyTo,
     brandName: s.brand_name || "Majord'home",
     websiteUrl: s.website_url || "",
     pelletsOfferUrl: s.pellets_offer_url || null,
@@ -501,10 +508,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const branding = await loadOrgBranding(orgId);
-    // Pas d'adresse d'expédition dans les réglages de l'organisation ⇒ rien ne part
-    // (jamais l'adresse d'une autre entreprise à la place).
-    if (!branding.fromEmail) return jsonResponse({ error: "no_from_email" }, 409);
+    const branding = await loadOrgBranding(orgId, mode === "bulk" && !testEmail ? "nombre" : "individuel");
+    // Pas d'adresse dans les réglages de l'organisation, ou envoi en nombre sans domaine vérifié ⇒
+    // rien ne part (jamais l'adresse d'une autre entreprise à la place).
+    if (branding.refus || !branding.fromEmail) {
+      return jsonResponse({ error: branding.refus || "no_from_email" }, 409);
+    }
 
     // v12 — cap par invocation pour rester sous le wall-clock edge (~150 s).
     // Les destinataires non traités restent éligibles : l'exclusion campagne

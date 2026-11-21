@@ -289,7 +289,7 @@ async function executerAction(
         order: oc.order,
         lines: oc.lines as never,
         envoi: spec.envoi,
-        company: { name: ctx.branding.brandName, email: ctx.branding.fromEmail, phone: ctx.branding.phone },
+        company: { name: ctx.branding.brandName, email: ctx.branding.contactEmail, phone: ctx.branding.phone },
         slot: slot ? { date: slot.delivery_date } : null,
         depot: oc.depot,
         // Liens CGV / charte de {{LEGAL_INFO}} (confirmation réglée sur une transition).

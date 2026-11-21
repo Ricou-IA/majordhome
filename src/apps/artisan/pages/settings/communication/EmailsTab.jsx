@@ -13,6 +13,7 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useAuth } from '@contexts/AuthContext';
 import { moduleActif } from '@/lib/modules';
 import { emailsAffiches } from '@/lib/emailsAutomatiques';
+import { phraseEtatEnvoi } from '@/lib/expediteur';
 import ResendDomainSection from './ResendDomainSection';
 import EmailAutoLigne from './EmailAutoLigne';
 import AccueilLeadMetaSection from './AccueilLeadMetaSection';
@@ -48,6 +49,8 @@ export default function EmailsTab() {
   const [initial, setInitial] = useState(() => pickFields({}));
 
   const communicationActive = moduleActif(settings, 'communication');
+  // D'où partent les e-mails, d'après ce qui est ENREGISTRÉ (pas la saisie en cours).
+  const etatEnvoi = phraseEtatEnvoi(settings);
 
   useEffect(() => {
     const picked = pickFields(settings);
@@ -84,7 +87,7 @@ export default function EmailsTab() {
           <h3 className={SECTION_TITLE}>Identité d&apos;envoi</h3>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className={LABEL_CLASS}>Email expéditeur *</label>
+              <label className={LABEL_CLASS}>Votre adresse e-mail *</label>
               <input
                 type="email"
                 value={form.from_email}
@@ -93,7 +96,7 @@ export default function EmailsTab() {
                 className={INPUT_CLASS}
               />
               {errors.from_email && <p className={ERROR_CLASS}>{errors.from_email}</p>}
-              <p className={HINT_CLASS}>Son domaine doit être vérifié ci-dessous (« Domaine d&apos;envoi »).</p>
+              <p className={HINT_CLASS}>Les réponses de vos clients y arrivent.</p>
             </div>
             <div>
               <label className={LABEL_CLASS}>Email de réponse (si différent)</label>
@@ -105,9 +108,10 @@ export default function EmailsTab() {
                 className={INPUT_CLASS}
               />
               {errors.reply_to && <p className={ERROR_CLASS}>{errors.reply_to}</p>}
-              <p className={HINT_CLASS}>Laisse vide pour utiliser l&apos;email expéditeur.</p>
+              <p className={HINT_CLASS}>Laissez vide pour recevoir les réponses à votre adresse.</p>
             </div>
           </div>
+          {etatEnvoi && <p className="mt-3 text-sm text-secondary-700">{etatEnvoi}</p>}
         </section>
 
         {communicationActive && (

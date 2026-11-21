@@ -184,7 +184,7 @@ export default function ResendDomainSection() {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Globe className="w-4 h-4 text-secondary-400" />
-          <h3 className={SECTION_TITLE + ' mb-0'}>Domaine d&apos;envoi (Resend)</h3>
+          <h3 className={SECTION_TITLE + ' mb-0'}>Envoyer depuis votre propre domaine</h3>
         </div>
         {domain && (
           <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${meta.cls}`}>
@@ -201,9 +201,11 @@ export default function ResendDomainSection() {
       ) : (
         <>
           <p className={HINT_CLASS}>
-            Pour envoyer des emails depuis <span className="font-mono">@{domain}</span>, ce domaine
-            doit être vérifié dans Resend (DKIM/SPF). Configure-le, publie les enregistrements DNS
-            chez ton registrar (OVH, Gandi, Cloudflare…), puis lance la vérification.
+            Facultatif pour démarrer : sans lui, vos e-mails individuels partent déjà, à votre nom.
+            Pour envoyer depuis <span className="font-mono">@{domain}</span>, et pour les envois en
+            nombre (campagnes, relances), ce domaine doit être vérifié : configurez-le, publiez les
+            enregistrements DNS chez l&apos;hébergeur du domaine (OVH, Gandi, Cloudflare…), puis
+            lancez la vérification.
           </p>
 
           {/* Domaine vérifié */}

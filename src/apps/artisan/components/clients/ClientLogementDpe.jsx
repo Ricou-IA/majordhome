@@ -27,6 +27,7 @@ import {
 import { formatDateShortFR } from '@lib/utils';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { DpeLogementCard } from './DpeLogementCard';
+import { resoudreExpediteur } from '@/lib/expediteur';
 
 const BOUTON = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-secondary-300 text-secondary-700 bg-white hover:bg-secondary-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 const BOUTON_PRINCIPAL = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
@@ -156,7 +157,7 @@ export function ClientLogementDpe({ client, formHousingType, formSurface, onAppl
       peutModifier,
       emailClient: client?.email,
       rapportComplet: ligne.rapport_complet === true,
-      expediteurConfigure: Boolean((settings?.from_email || '').trim()) && settings?.resend?.status === 'verified',
+      expediteurConfigure: !resoudreExpediteur(settings).refus,
     });
     const entete = (
       <div className="space-y-1.5">

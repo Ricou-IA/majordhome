@@ -22,7 +22,7 @@ export function etapesDeDemarrage(settings) {
   ];
   // L'adresse d'expédition ne sert qu'avec le module Communication : sans lui, rien à proposer.
   if (moduleActif(s, 'communication')) {
-    etapes.push({ cle: 'expediteur', titre: 'Adresse d’envoi des e-mails', detail: 'Sans elle, aucun e-mail ne part (factures, rendez-vous, mailing).', vers: '/settings/emails', fait: Boolean((s.from_email || '').trim()) });
+    etapes.push({ cle: 'expediteur', titre: 'Votre adresse e-mail', detail: 'Les réponses de vos clients y arrivent. Sans elle, aucun e-mail ne part (factures, rendez-vous).', vers: '/settings/emails', fait: Boolean((s.from_email || '').trim()) });
   }
   return etapes;
 }

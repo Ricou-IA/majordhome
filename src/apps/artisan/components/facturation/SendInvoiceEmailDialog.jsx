@@ -65,7 +65,7 @@ export default function SendInvoiceEmailDialog({ item, orgId, open, onOpenChange
       open={open}
       onOpenChange={onOpenChange}
       title="Envoyer la facture par e-mail"
-      description={`${clientLabel}${item.contract_number ? ` · ${item.contract_number}` : ''} — la facture et les certificats cochés partent par e-mail depuis ${settings?.from_email || 'l’adresse configurée'}.`}
+      description={`${clientLabel}${item.contract_number ? ` · ${item.contract_number}` : ''} — la facture et les certificats cochés partent par e-mail.`}
       confirmLabel="Envoyer"
       variant="default"
       size="lg"

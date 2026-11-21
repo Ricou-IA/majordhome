@@ -7,19 +7,19 @@ import { DEFAULT_INVOICE_EMAIL, INVOICE_EMAIL_TEMPLATE_KEY, INVOICE_EMAIL_PLACEH
 
 const OK = { modules: { communication: true }, from_email: 'contact@mayer-energie.fr', resend: { status: 'verified' } };
 
-test('invoiceEmailAvailability : invisible sans module, sinon activée seulement si e-mail + from_email + domaine vérifié + facture non brouillon', () => {
+test('invoiceEmailAvailability : invisible sans module, sinon activée seulement si e-mail + from_email + facture non brouillon', () => {
   assert.deepEqual(invoiceEmailAvailability({ settings: {}, mode: 'final', clientEmail: 'a@b.fr' }), { visible: false, enabled: false, reason: 'module_off' });
   assert.deepEqual(invoiceEmailAvailability({ settings: OK, mode: 'final', clientEmail: 'a@b.fr' }), { visible: true, enabled: true, reason: null });
   assert.deepEqual(invoiceEmailAvailability({ settings: OK, mode: 'hub', clientEmail: 'a@b.fr' }), { visible: true, enabled: true, reason: null });
   assert.equal(invoiceEmailAvailability({ settings: OK, mode: 'draft', clientEmail: 'a@b.fr' }).reason, 'draft_mode');
   assert.equal(invoiceEmailAvailability({ settings: OK, mode: 'final', clientEmail: '' }).reason, 'no_email');
   assert.equal(invoiceEmailAvailability({ settings: { ...OK, from_email: '' }, mode: 'final', clientEmail: 'a@b.fr' }).reason, 'no_from_email');
-  assert.equal(invoiceEmailAvailability({ settings: { ...OK, resend: { status: 'pending' } }, mode: 'final', clientEmail: 'a@b.fr' }).reason, 'resend_not_verified');
+  assert.equal(invoiceEmailAvailability({ settings: { ...OK, resend: { status: 'pending' } }, mode: 'final', clientEmail: 'a@b.fr' }).enabled, true, 'domaine non vérifié : la facture part de l’adresse commune');
   // renvoi depuis la carte : la facture doit exister et ne pas être un brouillon Pennylane
   assert.equal(invoiceEmailAvailability({ settings: OK, mode: 'final', clientEmail: 'a@b.fr', hasInvoice: false }).reason, 'no_invoice');
   assert.equal(invoiceEmailAvailability({ settings: OK, mode: 'draft', clientEmail: 'a@b.fr', hasInvoice: true, isDraftInvoice: false }).enabled, true, 'une facture Pennylane déjà finalisée se renvoie même si le mode courant est brouillon');
   assert.equal(invoiceEmailAvailability({ settings: OK, mode: 'final', clientEmail: 'a@b.fr', hasInvoice: true, isDraftInvoice: true }).reason, 'draft_invoice');
-  // ordre des raisons : module, puis e-mail, puis expéditeur, puis domaine, puis facture
+  // ordre des raisons : module, puis e-mail, puis expéditeur, puis facture
   assert.equal(invoiceEmailAvailability({ settings: { modules: { communication: true } }, mode: 'draft', clientEmail: '' }).reason, 'no_email');
   // I1 — renvoi (`mode: 'resend'`) : ne déclenche JAMAIS draft_mode, quel que soit le mode de
   // création courant de l'org (une facture déjà émise peut être renvoyée même si l'org crée
