@@ -229,6 +229,21 @@ pour les organisations `en_attente`. Au bout de 24 h d'échecs, il cesse et lais
 - Limite connue : un org_admin peut écrire `settings.hesiasun` de sa propre organisation par `org_update_settings`.
 - Non essayé avec une vraie clé au moment de la livraison.
 
+### 5.4 bis Logo (lot 4, 2026-11-21 — Eric : « pour le logo on peut synchroniser aussi »)
+
+Constat : Majord'home n'avait AUCUN écran pour régler  (celui de Mayer pointait sur son site).
+- **Majord'home** : section Logo de l'onglet Identité (), compartiment PUBLIC 
+  (migration  : lecture par l'adresse, écriture org_admin du dossier , 2 Mo, PNG / JPEG / WebP,
+  pas de SVG), un nom de fichier par téléversement (), enregistré dès l'envoi.
+- **Envoi** : après un envoi d'identité réussi,  (edge) envoie ou retire le logo selon  ;
+  seul un logo hébergé ici pour cette organisation est relu (), jamais une adresse reçue ; un logo
+  d'adresse extérieure n'est pas envoyé et le bloc le dit (). État : , .
+  Un échec de logo ne défait pas l'envoi de l'identité.
+- **HésiaSun** :  /  (corps = l'image, reconnue à ses octets),
+  seule la liaison en place écrit ; sous liaison, téléversement et retrait du logo sont fermés à l'écran et
+  refusés par leurs actions. Commit local .
+- **Signature** : non synchronisée (elle engage sur des mandats ; à décider à part).
+
 ### 5.5 Recherche dans l'annuaire, côté Majord'home (lot 5, indépendant)
 
 HésiaSun sait « Retrouver votre entreprise » (annuaire des entreprises) ; Majord'home fait tout saisir. À
