@@ -1,7 +1,8 @@
 // src/lib/orgRoles.js
 // ============================================================================
 // Profils « maison » — logique de PRÉSENTATION (module pur, aucun import).
-// Un profil maison = libellé propre à l'org + modèle standard (base_role).
+// Un profil maison = libellé propre à l'org + modèle standard (base_role, point de départ des droits :
+// jamais affiché, Eric 2026-11-21).
 // Partout où le code teste un rôle, c'est le modèle qui est vu ; la grille Droits
 // d'accès est la seule à distinguer le profil (spec 2026-10-06 § 2).
 // Testé : node --test scripts/org-roles.test.mjs
@@ -18,7 +19,6 @@ export const BASE_ROLE_HINTS = {
 };
 
 const STANDARD_ROLES = ['org_admin', 'team_leader', 'commercial', 'technicien'];
-const dApres = (labels, baseRole) => `d’après ${labels[baseRole] || baseRole}`;
 const actifs = (orgRoles) => (orgRoles || []).filter((r) => r.is_active !== false);
 
 /** Valeur d'option d'un profil maison dans un <select> de rôle. */
@@ -41,13 +41,13 @@ export function parseRoleChoice(value) {
 export function buildRoleOptions(standardRoles, labels, orgRoles) {
   return [
     ...standardRoles.map((role) => ({ value: role, label: labels[role] || role })),
-    ...actifs(orgRoles).map((r) => ({ value: roleChoiceValue(r), label: `${r.label} (${dApres(labels, r.base_role)})` })),
+    ...actifs(orgRoles).map((r) => ({ value: roleChoiceValue(r), label: r.label })),
   ];
 }
 
 /** Libellé d'un membre : son profil maison s'il en porte un, sinon son rôle standard. */
 export function memberRoleDisplay(effectiveRole, orgRole, labels) {
-  if (orgRole) return { label: orgRole.label, sub: dApres(labels, orgRole.base_role) };
+  if (orgRole) return { label: orgRole.label, sub: null };
   return { label: labels[effectiveRole] || effectiveRole, sub: null };
 }
 
@@ -56,7 +56,7 @@ export function permissionColumns(editableRoles, labels, orgRoles) {
   return [
     ...editableRoles.map((role) => ({ key: role, role, code: null, label: labels[role] || role, sub: null, orgRole: null })),
     ...actifs(orgRoles).map((r) => ({
-      key: r.code, role: r.base_role, code: r.code, label: r.label, sub: dApres(labels, r.base_role), orgRole: r,
+      key: r.code, role: r.base_role, code: r.code, label: r.label, sub: null, orgRole: r,
     })),
   ];
 }

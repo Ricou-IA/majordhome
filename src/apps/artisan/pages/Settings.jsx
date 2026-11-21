@@ -71,7 +71,7 @@ export default function Settings() {
               </h2>
               <p className="text-sm text-secondary-600">
                 Votre rôle : {orgRole
-                  ? `${orgRole.label} (d’après ${ROLE_LABELS[orgRole.baseRole] || orgRole.baseRole})`
+                  ? orgRole.label
                   : (ROLE_LABELS[effectiveRole] || effectiveRole)}
               </p>
             </div>

@@ -15,12 +15,12 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
-import { usePermissions } from '@hooks/usePermissions';
+import { usePermissions, useOrgMembers } from '@hooks/usePermissions';
 import { useOrgRoles } from '@hooks/useOrgRoles';
 import { permissionsService } from '@services/permissions.service';
-import { ACTIONS, EDITABLE_ROLES, ROLE_LABELS } from '@lib/permissions';
+import { ACTIONS, EDITABLE_ROLES, ROLE_LABELS, ROLE_DB_MAPPING } from '@lib/permissions';
 import { REGISTRY, resolvePermission } from '@lib/permissionsRegistry';
-import { permissionColumns } from '@/lib/orgRoles';
+import { permissionColumns, buildRoleOptions, parseRoleChoice } from '@/lib/orgRoles';
 import {
   Shield,
   ArrowLeft,
@@ -40,6 +40,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { permissionKeys } from '@hooks/usePermissions';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { OrgRoleModal } from './permissions/OrgRoleModal';
+import { ReassignOrgRoleDialog } from './permissions/ReassignOrgRoleDialog';
 
 const orgRoleErrorMessage = (err, fallback) =>
   (err?.code === '42501' ? 'Réservé à l’administrateur' : fallback);
@@ -90,7 +91,7 @@ export default function PermissionsEditor({ embedded = false }) {
   const { permissionMap, permissionRows, isLoading, error } = usePermissions(orgId);
   const {
     orgRoles, activeOrgRoles, memberOrgRoleByUser,
-    createOrgRole, updateOrgRole, deleteOrgRole, isMutating,
+    createOrgRole, updateOrgRole, deleteOrgRole, setMemberOrgRole, isMutating,
   } = useOrgRoles(orgId);
 
   // null | { mode: 'create' } | { mode: 'rename', orgRole }
@@ -106,6 +107,20 @@ export default function PermissionsEditor({ embedded = false }) {
   const inactiveOrgRoles = orgRoles.filter((r) => !r.is_active);
   const membersOf = (orgRole) =>
     [...memberOrgRoleByUser.values()].filter((m) => m.org_role_id === orgRole.id).length;
+  const [reassigning, setReassigning] = useState(false);
+  const { members: orgMembers, updateRole: updateMemberRole } = useOrgMembers(orgId);
+  // Membres du profil en cours de suppression, avec leur nom (liste inconnue ⇒ aucun nom inventé)
+  const membersToReassign = deleteFor
+    ? [...memberOrgRoleByUser.values()]
+      .filter((m) => m.org_role_id === deleteFor.id)
+      .map((m) => {
+        const profil = orgMembers.find((o) => o.user_id === m.user_id)?.profile;
+        return { userId: m.user_id, name: profil?.full_name || profil?.email || 'Utilisateur' };
+      })
+    : [];
+  const reassignOptions = buildRoleOptions(
+    EDITABLE_ROLES, ROLE_LABELS, activeOrgRoles.filter((r) => r.id !== deleteFor?.id),
+  );
 
   // ===========================================================================
   // HANDLERS
@@ -180,6 +195,40 @@ export default function PermissionsEditor({ embedded = false }) {
         : `Profil « ${orgRole.label} » désactivé — ses membres agissent comme leur modèle`);
     } catch (err) {
       toast.error(orgRoleErrorMessage(err, 'Erreur lors de la mise à jour du profil'));
+    }
+  };
+
+  // Supprimer un profil qui a des membres : chacun est d'abord remis sur le profil choisi à la main
+  // (sinon il retomberait sur le modèle du profil supprimé). Le profil n'est supprimé que si TOUS ont suivi.
+  const handleReassignConfirm = async (choices) => {
+    if (!deleteFor) return;
+    setReassigning(true);
+    try {
+      for (const m of membersToReassign) {
+        const choice = parseRoleChoice(choices[m.userId]);
+        if (!choice) throw new Error(`Profil manquant pour ${m.name}`);
+        if (choice.kind === 'org') {
+          await setMemberOrgRole({ userId: m.userId, orgRoleId: choice.orgRoleId });
+        } else {
+          const mapping = ROLE_DB_MAPPING[choice.role];
+          if (!mapping) throw new Error(`Rôle inconnu pour ${m.name}`);
+          await setMemberOrgRole({ userId: m.userId, orgRoleId: null });
+          const result = await updateMemberRole({
+            userId: m.userId,
+            appRole: mapping.app_role,
+            businessRole: mapping.business_role,
+            membershipRole: mapping.membership_role,
+          });
+          if (result?.error) throw result.error;
+        }
+      }
+      const res = await deleteOrgRole(deleteFor.id);
+      toast.success(`Profil « ${deleteFor.label} » supprimé (${res?.members_reset ?? 0} membre(s) restant sur le modèle)`);
+      setDeleteFor(null);
+    } catch (err) {
+      toast.error(orgRoleErrorMessage(err, `Profils non tous changés : ${err?.message || 'erreur'} — le profil n’est pas supprimé`));
+    } finally {
+      setReassigning(false);
     }
   };
 
@@ -340,7 +389,7 @@ export default function PermissionsEditor({ embedded = false }) {
               <li key={r.id} className="flex items-center justify-between gap-3 text-sm">
                 <span className="text-secondary-700">
                   {r.label}
-                  <span className="ml-2 text-xs text-secondary-400">d’après {ROLE_LABELS[r.base_role] || r.base_role} · {membersOf(r)} membre(s)</span>
+                  <span className="ml-2 text-xs text-secondary-400">{membersOf(r)} membre(s)</span>
                 </span>
                 <span className="flex items-center gap-2">
                   <button
@@ -415,12 +464,22 @@ export default function PermissionsEditor({ embedded = false }) {
         isSaving={isMutating}
       />
 
+      <ReassignOrgRoleDialog
+        open={!!deleteFor && membersToReassign.length > 0}
+        orgRole={deleteFor}
+        members={membersToReassign}
+        options={reassignOptions}
+        onConfirm={handleReassignConfirm}
+        onClose={() => setDeleteFor(null)}
+        loading={reassigning}
+      />
+
       <ConfirmDialog
-        open={!!deleteFor}
+        open={!!deleteFor && membersToReassign.length === 0}
         onOpenChange={(open) => { if (!open) setDeleteFor(null); }}
         title="Supprimer ce profil ?"
         description={deleteFor
-          ? `« ${deleteFor.label} » sera supprimé. ${membersOf(deleteFor)} membre(s) le portent : ils reprendront les droits du modèle (${ROLE_LABELS[deleteFor.base_role] || deleteFor.base_role}). Les cases réglées pour ce profil seront perdues.`
+          ? `« ${deleteFor.label} » sera supprimé. Aucun membre ne le porte ; les cases réglées pour ce profil seront perdues.`
           : ''}
         confirmLabel="Supprimer"
         variant="destructive"

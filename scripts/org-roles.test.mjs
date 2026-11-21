@@ -23,14 +23,14 @@ test('buildRoleOptions : standards puis profils actifs seulement', () => {
   assert.deepEqual(opts, [
     { value: 'org_admin', label: 'Administrateur' },
     { value: 'team_leader', label: 'Responsable' },
-    { value: 'org:r1', label: 'Secrétaire (d’après Responsable)' },
+    { value: 'org:r1', label: 'Secrétaire' },
   ]);
   assert.deepEqual(buildRoleOptions(['technicien'], LABELS, []), [{ value: 'technicien', label: 'Technicien' }]);
   assert.deepEqual(buildRoleOptions(['technicien'], LABELS, null), [{ value: 'technicien', label: 'Technicien' }]);
 });
 
 test('memberRoleDisplay : libellé du profil, sous-ligne du modèle', () => {
-  assert.deepEqual(memberRoleDisplay('team_leader', SECRETAIRE, LABELS), { label: 'Secrétaire', sub: 'd’après Responsable' });
+  assert.deepEqual(memberRoleDisplay('team_leader', SECRETAIRE, LABELS), { label: 'Secrétaire', sub: null });
   assert.deepEqual(memberRoleDisplay('technicien', null, LABELS), { label: 'Technicien', sub: null });
   assert.deepEqual(memberRoleDisplay('inconnu', null, LABELS), { label: 'inconnu', sub: null });
 });
@@ -39,7 +39,7 @@ test('permissionColumns : standards puis profils actifs, chacun avec son modèle
   const cols = permissionColumns(['team_leader', 'commercial', 'technicien'], LABELS, [SECRETAIRE, ARCHIVE]);
   assert.equal(cols.length, 4);
   assert.deepEqual(cols[0], { key: 'team_leader', role: 'team_leader', code: null, label: 'Responsable', sub: null, orgRole: null });
-  assert.deepEqual(cols[3], { key: 'secretaire', role: 'team_leader', code: 'secretaire', label: 'Secrétaire', sub: 'd’après Responsable', orgRole: SECRETAIRE });
+  assert.deepEqual(cols[3], { key: 'secretaire', role: 'team_leader', code: 'secretaire', label: 'Secrétaire', sub: null, orgRole: SECRETAIRE });
 });
 
 test('BASE_ROLES = les 3 modèles autorisés en base', () => {
