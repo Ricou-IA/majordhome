@@ -53,7 +53,7 @@ export function LinkedQuotesPanel({ quotes, isLoading }) {
                     {displayNumber}
                   </span>
                   {q.quote_date && (
-                    <span className="text-[10px] text-gray-500 leading-none mt-0.5">
+                    <span className="text-[11px] text-gray-500 leading-none mt-0.5">
                       {formatDateShortFR(q.quote_date)}
                     </span>
                   )}

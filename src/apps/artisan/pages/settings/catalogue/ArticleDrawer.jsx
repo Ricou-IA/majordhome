@@ -172,7 +172,7 @@ export default function ArticleDrawer({ orgId, itemId, onClose, enrichirDOffice 
             <section className="space-y-2">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary-500 flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5" /> Photo</h4>
               <div className="flex flex-wrap items-center gap-2">
-                {form.imageUrl ? <img src={form.imageUrl} alt="" className="w-20 h-20 object-contain rounded border border-secondary-200 bg-white" /> : <div className="w-20 h-20 rounded border border-dashed border-secondary-300 flex items-center justify-center text-[10px] text-secondary-400">aucune</div>}
+                {form.imageUrl ? <img src={form.imageUrl} alt="" className="w-20 h-20 object-contain rounded border border-secondary-200 bg-white" /> : <div className="w-20 h-20 rounded border border-dashed border-secondary-300 flex items-center justify-center text-[11px] text-secondary-400">aucune</div>}
                 {photosOffres.filter((u) => u !== form.imageUrl).map((u) => (
                   <button key={u} type="button" disabled={!canEdit} onClick={() => setField('imageUrl', u)} title="Choisir cette photo (relevé fournisseur)"
                     className="w-14 h-14 rounded border border-secondary-200 hover:border-primary-400 overflow-hidden bg-white disabled:opacity-60">

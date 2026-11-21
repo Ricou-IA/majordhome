@@ -161,7 +161,7 @@ function InvoiceRow({ inv, isDeposit = false }) {
         <span className="inline-flex items-center gap-1.5">
           {inv.invoice_number || '—'}
           {isDeposit && (
-            <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-violet-100 text-violet-600 border border-violet-200">
+            <span className="inline-flex items-center px-1.5 py-0.5 text-[11px] font-medium rounded bg-violet-100 text-violet-600 border border-violet-200">
               Acompte
             </span>
           )}

@@ -110,7 +110,7 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
         {date ? (
           <>
             <span className="text-sm font-bold leading-none" style={{ color: bandeCouleur }}>{date.jour}</span>
-            <span className="text-[10px] uppercase leading-tight" style={{ color: bandeCouleur }}>{date.mois}</span>
+            <span className="text-[11px] uppercase leading-tight" style={{ color: bandeCouleur }}>{date.mois}</span>
           </>
         ) : (
           <Icone className="h-4 w-4" style={{ color: bandeCouleur }} aria-label={bandeTitre} />
@@ -149,7 +149,7 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
                   disabled={avisEnCours}
                   onClick={(e) => { e.stopPropagation(); onDemanderAvis(chantier); }}
                   title="Demander un avis au client par SMS"
-                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 border
+                  className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded-full font-bold shrink-0 border
                              border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 disabled:opacity-60"
                 >
                   {avisEnCours ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <MessageSquare className="h-2.5 w-2.5" />}
@@ -165,12 +165,12 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
           <span className="flex-1" />
           {pvEnAttente && <Repere repere={reperePv(chantier)} />}
           {plusieursDevis && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold shrink-0" title="Devis groupés sur ce chantier">
+            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold shrink-0" title="Devis groupés sur ce chantier">
               {chantier.quotes_count} devis
             </span>
           )}
           {sansDevisValide && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold truncate" title="Aucun devis validé sur ce chantier">
+            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold truncate" title="Aucun devis validé sur ce chantier">
               sans devis validé
             </span>
           )}
@@ -193,7 +193,7 @@ const REPERE_STYLES = {
 function Repere({ repere }) {
   const { css, Icone } = REPERE_STYLES[repere.etat] || REPERE_STYLES.a_faire;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 border ${css}`} title={repere.titre}>
+    <span className={`inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded-full font-bold shrink-0 border ${css}`} title={repere.titre}>
       {Icone && <Icone className="h-2.5 w-2.5" />}
       {repere.libelle}
     </span>
@@ -209,7 +209,7 @@ const ORDER_STYLES = {
 function OrderIndicator({ label, nom, status }) {
   const style = ORDER_STYLES[status] || { css: 'bg-gray-50 text-gray-300 border border-gray-200', etat: 'non renseigné' };
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${style.css}`} title={`${nom} : ${style.etat}`}>
+    <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${style.css}`} title={`${nom} : ${style.etat}`}>
       {label}
     </span>
   );

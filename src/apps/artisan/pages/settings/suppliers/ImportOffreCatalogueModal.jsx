@@ -145,7 +145,7 @@ export default function ImportOffreCatalogueModal({ supplier, orgId, onClose }) 
                 <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary-600" /></div>
               ) : (
                 <div className="space-y-1.5">
-                  <div className={`${GRILLE} px-3 text-[10px] font-medium uppercase tracking-wider text-secondary-400`}>
+                  <div className={`${GRILLE} px-3 text-[11px] font-medium uppercase tracking-wider text-secondary-400`}>
                     <span className="w-3.5" /><span>Ligne de l&apos;offre</span><span>Nature</span><span>Prix d&apos;achat</span><span>Article</span>
                   </div>
                   {lignes.map((l, i) => (

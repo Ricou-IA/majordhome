@@ -53,7 +53,7 @@ export function SAVUrgencyBadge({ item, taille = 'carte' }) {
   if (!urgenceVisible(item)) return null;
   const niveau = urgenceDe(item);
   const { Icon, pastille } = VISUELS[niveau];
-  const classes = taille === 'fiche' ? 'text-xs px-2 py-0.5 gap-1' : 'text-[10px] px-1.5 py-0.5 gap-0.5';
+  const classes = taille === 'fiche' ? 'text-xs px-2 py-0.5 gap-1' : 'text-[11px] px-1.5 py-0.5 gap-0.5';
   return (
     <span className={`inline-flex items-center font-semibold rounded ${classes} ${pastille}`}>
       <Icon className={taille === 'fiche' ? 'w-3.5 h-3.5' : 'w-3 h-3'} />

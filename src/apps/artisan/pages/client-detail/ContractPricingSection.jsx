@@ -308,7 +308,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
               <div className="flex items-center gap-1.5 shrink-0">
                 {item.isForced && (
                   <span
-                    className="inline-flex items-center gap-0.5 text-[10px] text-amber-600"
+                    className="inline-flex items-center gap-0.5 text-[11px] text-amber-600"
                     title={`Prix grille : ${formatEuro(item.gridPrice)}`}
                   >
                     <Lock className="w-3 h-3" /> forcé

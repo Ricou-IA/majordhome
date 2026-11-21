@@ -515,7 +515,7 @@ function ResultTags({ raw }) {
         <span
           key={tag.label}
           title={tag.title}
-          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none ${tag.color}`}
+          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold leading-none ${tag.color}`}
         >
           {tag.label}
         </span>

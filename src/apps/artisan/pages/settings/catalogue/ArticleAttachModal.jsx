@@ -27,8 +27,8 @@ function LigneCandidate({ p, raisons, avertissement, onAttach, attaching }) {
         <p className="text-xs text-secondary-400 break-words">{[p.supplier_name, p.reference].filter(Boolean).join(' · ')}</p>
         {(raisons?.length > 0 || avertissement) && (
           <div className="flex flex-wrap items-center gap-1 mt-1">
-            {(raisons || []).map((r) => <span key={r} className="text-[10px] px-1.5 py-0.5 rounded bg-primary-50 text-primary-700">{r}</span>)}
-            {avertissement && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">{avertissement}</span>}
+            {(raisons || []).map((r) => <span key={r} className="text-[11px] px-1.5 py-0.5 rounded bg-primary-50 text-primary-700">{r}</span>)}
+            {avertissement && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">{avertissement}</span>}
           </div>
         )}
       </div>

@@ -238,7 +238,7 @@ export default function NafSelector({ selectedCodes = [], onChange, module, defa
                                   </span>
                                   <span className="flex-1">{group.label}</span>
                                   {groupSelected > 0 && (
-                                    <span className="text-[10px] text-[#2196F3]">
+                                    <span className="text-[11px] text-[#2196F3]">
                                       {groupSelected}/{group.codes.length}
                                     </span>
                                   )}
@@ -303,7 +303,7 @@ function NafCodeRow({ code, label, subtitle, isSelected, highlight, onToggle }) 
       </span>
       <span className="text-sm text-secondary-700 truncate">{label}</span>
       {subtitle && (
-        <span className="text-[10px] text-secondary-400 truncate ml-auto flex-shrink-0">{subtitle}</span>
+        <span className="text-[11px] text-secondary-400 truncate ml-auto flex-shrink-0">{subtitle}</span>
       )}
     </button>
   );

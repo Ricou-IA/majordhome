@@ -137,7 +137,7 @@ export function EquipmentDocumentUploadModal({ equipment, onClose, onSubmit, isS
           <button
             type="submit"
             disabled={!file || isSubmitting}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             Déposer

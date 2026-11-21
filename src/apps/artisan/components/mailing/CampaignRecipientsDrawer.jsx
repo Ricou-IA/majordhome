@@ -163,7 +163,7 @@ function RecipientRow({ r, cfg, tone, onNavigate }) {
             <span className="font-medium text-sm text-secondary-900 truncate">{displayName}</span>
           )}
           {!r.client_id && r.lead_id && (
-            <span className="px-1.5 py-0.5 rounded bg-secondary-100 text-secondary-500 text-[10px] font-semibold uppercase tracking-wide shrink-0">
+            <span className="px-1.5 py-0.5 rounded bg-secondary-100 text-secondary-500 text-[11px] font-semibold uppercase tracking-wide shrink-0">
               Lead
             </span>
           )}

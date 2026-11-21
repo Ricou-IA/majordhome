@@ -79,7 +79,7 @@ export function CertificatEquipmentRow({
           <p className="text-xs text-gray-500 truncate">{detail}</p>
         )}
         {equipment?.serial_number && (
-          <p className="text-[10px] text-gray-400 truncate">S/N : {equipment.serial_number}</p>
+          <p className="text-[11px] text-gray-400 truncate">S/N : {equipment.serial_number}</p>
         )}
       </div>
 

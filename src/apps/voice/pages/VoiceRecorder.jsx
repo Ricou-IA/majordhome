@@ -246,7 +246,7 @@ export default function VoiceRecorder() {
           <ChevronLeft className="w-3.5 h-3.5" /> Changer
         </button>
         <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
-          <div className="text-secondary-400 text-[10px] uppercase tracking-wide mb-1">
+          <div className="text-secondary-400 text-[11px] uppercase tracking-wide mb-1">
             {context.type === 'rdv' && 'RDV planifié'}
             {context.type === 'client' && 'Client existant'}
             {context.type === 'prospect' && 'Nouveau prospect'}

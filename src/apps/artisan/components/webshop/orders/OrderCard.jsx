@@ -27,7 +27,7 @@ export default function OrderCard({ order, actions }) {
       <div className="flex items-end justify-between gap-2">
         <div className="flex flex-wrap gap-1">
           {badges.map((b) => (
-            <span key={b.key} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${TONES[b.tone]}`}>
+            <span key={b.key} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium ${TONES[b.tone]}`}>
               {b.tone === 'warning' && <AlertTriangle className="w-3 h-3" />}
               {b.label}
             </span>

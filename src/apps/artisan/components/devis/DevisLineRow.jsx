@@ -66,7 +66,7 @@ export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee,
                   </select>
                 )}
                 {line.supplier_name && (
-                  <span className="text-[10px] text-secondary-400 truncate">{line.supplier_name}{line.reference ? ` · ${line.reference}` : ''}</span>
+                  <span className="text-[11px] text-secondary-400 truncate">{line.supplier_name}{line.reference ? ` · ${line.reference}` : ''}</span>
                 )}
               </div>
             )}
@@ -82,7 +82,7 @@ export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee,
           />
         )}
         {line.catalog_item_id && (
-          <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-secondary-500">
+          <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-secondary-500">
             <label className={`flex items-center gap-1 cursor-pointer ${nbCaracteristiques === 0 ? 'opacity-50' : ''}`} title={nbCaracteristiques === 0 ? 'Aucune caractéristique renseignée sur l’article' : 'Imprimer les caractéristiques de l’article sous la ligne'}>
               <input type="checkbox" checked={line.show_specs === true} onChange={(e) => setLineField('show_specs', e.target.checked)} className="rounded border-secondary-300" />
               {nbCaracteristiques} caract.

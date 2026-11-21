@@ -4,7 +4,7 @@ import { FUNNEL_BENCHMARKS, STEP_COLORS, computeRate, rateColor } from './funnel
 function MiniStep({ label, value, color = 'indigo' }) {
   return (
     <div className={`flex-1 min-w-[70px] rounded-md border px-2 py-1.5 ${STEP_COLORS[color] || STEP_COLORS.indigo}`}>
-      <div className="text-[10px] uppercase tracking-wide opacity-70">{label}</div>
+      <div className="text-[11px] uppercase tracking-wide opacity-70">{label}</div>
       <div className="text-lg font-semibold tabular-nums">{value}</div>
     </div>
   );

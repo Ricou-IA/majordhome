@@ -122,7 +122,7 @@ export function EntretienPartsSection({ item, orgId }) {
                 {Number(p.quantite) > 1 ? ` ×${p.quantite}` : ''}
               </span>
               {p.offert && (
-                <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-medium flex-shrink-0">
+                <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[11px] font-medium flex-shrink-0">
                   Offert
                 </span>
               )}
@@ -136,7 +136,7 @@ export function EntretienPartsSection({ item, orgId }) {
                     type="button"
                     onClick={() => toggleOffert(p)}
                     disabled={busy}
-                    className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded border transition-colors disabled:opacity-40 ${
+                    className={`flex-shrink-0 text-[11px] px-1.5 py-0.5 rounded border transition-colors disabled:opacity-40 ${
                       p.offert
                         ? 'border-gray-200 text-gray-500 hover:bg-gray-50'
                         : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
@@ -159,12 +159,12 @@ export function EntretienPartsSection({ item, orgId }) {
 
               {isTeamLeaderOrAbove && confirming && (
                 <span className="flex items-center gap-1 flex-shrink-0">
-                  <span className="text-[10px] text-gray-500">Supprimer ?</span>
+                  <span className="text-[11px] text-gray-500">Supprimer ?</span>
                   <button
                     type="button"
                     onClick={() => confirmDelete(p)}
                     disabled={busy}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-40"
+                    className="text-[11px] px-1.5 py-0.5 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-40"
                   >
                     Oui
                   </button>
@@ -172,7 +172,7 @@ export function EntretienPartsSection({ item, orgId }) {
                     type="button"
                     onClick={() => setConfirmDeleteKey(null)}
                     disabled={busy}
-                    className="text-[10px] px-1.5 py-0.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50"
+                    className="text-[11px] px-1.5 py-0.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50"
                   >
                     Non
                   </button>

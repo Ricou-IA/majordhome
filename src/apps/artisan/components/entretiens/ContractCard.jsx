@@ -111,7 +111,7 @@ export function ContractCard({ contract, onClick, selected = false }) {
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {source === 'web' && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-indigo-100 text-indigo-700">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-indigo-100 text-indigo-700">
               <Globe className="w-2.5 h-2.5" />
               Web
             </span>

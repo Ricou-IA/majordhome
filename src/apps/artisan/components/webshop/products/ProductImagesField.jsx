@@ -55,12 +55,12 @@ export default function ProductImagesField({ images, onChange, onUploaded, orgId
               {src ? (
                 <img src={src} alt="" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-secondary-400 text-[10px] p-1 text-center">
+                <div className="w-full h-full flex flex-col items-center justify-center text-secondary-400 text-[11px] p-1 text-center">
                   <ImageOff className="w-5 h-5 mb-1" /> Aperçu indisponible
                 </div>
               )}
               {i === 0 && (
-                <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-primary-600 text-white text-[10px] font-medium">Principale</span>
+                <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-primary-600 text-white text-[11px] font-medium">Principale</span>
               )}
               {!disabled && (
                 <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">

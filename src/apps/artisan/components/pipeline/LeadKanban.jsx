@@ -846,7 +846,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
           {onNewLead && (
             <button
               onClick={onNewLead}
-              className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm min-h-[40px]"
+              className="inline-flex items-center gap-2 px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm min-h-[40px]"
             >
               <Plus className="h-4 w-4" />
               Nouveau lead

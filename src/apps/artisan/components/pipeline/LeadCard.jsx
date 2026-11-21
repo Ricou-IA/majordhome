@@ -219,7 +219,7 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
             <span className="text-sm font-bold leading-none" style={{ color: statusColor }}>
               {shortDate.day}
             </span>
-            <span className="text-[10px] uppercase leading-tight" style={{ color: statusColor }}>
+            <span className="text-[11px] uppercase leading-tight" style={{ color: statusColor }}>
               {shortDate.month}
             </span>
           </>
@@ -269,7 +269,7 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
           )}
           {commercial && (
             <span
-              className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ring-1 ${getCommercialColor(commercial.colorIndex)}`}
+              className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ring-1 ${getCommercialColor(commercial.colorIndex)}`}
               title={commercial.name}
             >
               {commercial.initials}

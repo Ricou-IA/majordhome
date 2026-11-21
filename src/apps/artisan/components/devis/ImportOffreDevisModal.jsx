@@ -205,7 +205,7 @@ export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose })
                         {nouvelles.length} nouvel{nouvelles.length > 1 ? 's' : ''} article{nouvelles.length > 1 ? 's' : ''}
                         {!peutEditerArticles && <span className="ml-2 text-xs font-normal text-amber-600">ajoutés en lignes libres : la création d&apos;articles est réservée aux responsables</span>}
                       </p>
-                      <div className={`${GRILLE} px-3 text-[10px] font-medium uppercase tracking-wider text-secondary-400`}>
+                      <div className={`${GRILLE} px-3 text-[11px] font-medium uppercase tracking-wider text-secondary-400`}>
                         <span>Ligne de l&apos;offre</span><span>Nature</span><span>Article</span><span className="text-right">Vente HT</span>
                       </div>
                       {nouvelles.map((r) => (

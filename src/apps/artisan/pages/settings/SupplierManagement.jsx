@@ -859,12 +859,12 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
                         <div className="font-medium text-secondary-900 flex items-center gap-1.5 flex-wrap">
                           <span>{product.name}</span>
                           {product.brand && (
-                            <span className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium bg-secondary-100 text-secondary-600 rounded">
+                            <span className="inline-flex items-center px-1 py-0.5 text-[11px] font-medium bg-secondary-100 text-secondary-600 rounded">
                               {product.brand}
                             </span>
                           )}
                           {product.fuel_type && (
-                            <span className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium bg-amber-50 text-amber-700 rounded">
+                            <span className="inline-flex items-center px-1 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 rounded">
                               {product.fuel_type}
                             </span>
                           )}

@@ -42,7 +42,7 @@ export default function ArticleOffersTable({ offers, canEdit, onDetach, detachin
               <tr key={o.product_id} className={`border-b border-secondary-100 ${o.is_active ? '' : 'opacity-50'}`}>
                 <td className="py-1.5 pr-3 text-secondary-900">
                   {o.supplier_name}
-                  {!o.is_active && <span className="ml-1 text-[10px] text-secondary-400">(inactive)</span>}
+                  {!o.is_active && <span className="ml-1 text-[11px] text-secondary-400">(inactive)</span>}
                 </td>
                 <td className="py-1.5 pr-3 text-secondary-600 font-mono text-xs" title={o.name}>{o.reference}</td>
                 <td className="py-1.5 pr-3 text-right text-secondary-900 whitespace-nowrap">{o.purchase_price_ht > 0 ? formatEuro(o.purchase_price_ht) : '—'}</td>

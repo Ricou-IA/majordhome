@@ -190,7 +190,7 @@ export const SectionClientLinking = ({
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => handleImportPennylane?.(plCust)}
                             disabled={isImportingPennylane}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Importer ce client depuis Pennylane"
                           >
                             {isImportingPennylane ? (

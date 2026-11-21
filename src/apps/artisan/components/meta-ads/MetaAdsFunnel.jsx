@@ -16,7 +16,7 @@ function Transition({ rate, benchmark }) {
     <div className="flex flex-col items-center px-1 min-w-[70px]" title={benchmark.hint}>
       <ChevronRight className="w-5 h-5 text-secondary-300" />
       <div className={`text-sm font-semibold tabular-nums ${rateColor(rate, benchmark)}`}>{display}</div>
-      <div className="text-[10px] text-secondary-500 mt-0.5 text-center leading-tight">
+      <div className="text-[11px] text-secondary-500 mt-0.5 text-center leading-tight">
         bench. {benchmark.avg}-{benchmark.good}%
       </div>
     </div>

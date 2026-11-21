@@ -143,7 +143,7 @@ export default function ProductVariantsSection({ parent, orgId }) {
         <div className="border border-primary-200 bg-primary-50/40 rounded-lg p-3 space-y-2">
           <div className="grid grid-cols-12 gap-2 items-end">
             <div className="col-span-5">
-              <label className="text-[10px] uppercase tracking-wider text-secondary-500 font-semibold">Libellé variante</label>
+              <label className="text-[11px] uppercase tracking-wider text-secondary-500 font-semibold">Libellé variante</label>
               <input
                 type="text"
                 value={newVariant.label}
@@ -154,7 +154,7 @@ export default function ProductVariantsSection({ parent, orgId }) {
               />
             </div>
             <div className="col-span-3">
-              <label className="text-[10px] uppercase tracking-wider text-secondary-500 font-semibold">Prix public HT</label>
+              <label className="text-[11px] uppercase tracking-wider text-secondary-500 font-semibold">Prix public HT</label>
               <input
                 type="number"
                 step="0.01"
@@ -165,7 +165,7 @@ export default function ProductVariantsSection({ parent, orgId }) {
               />
             </div>
             <div className="col-span-2">
-              <label className="text-[10px] uppercase tracking-wider text-secondary-500 font-semibold">Remise %</label>
+              <label className="text-[11px] uppercase tracking-wider text-secondary-500 font-semibold">Remise %</label>
               <input
                 type="number"
                 step="0.1"
@@ -204,7 +204,7 @@ export default function ProductVariantsSection({ parent, orgId }) {
       ) : (
         <div className="border border-secondary-200 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-secondary-50 text-[10px] uppercase tracking-wider text-secondary-500 font-semibold">
+            <thead className="bg-secondary-50 text-[11px] uppercase tracking-wider text-secondary-500 font-semibold">
               <tr>
                 <th className="text-left px-3 py-2 w-[40%]">Variante</th>
                 <th className="text-right px-3 py-2">Prix public</th>

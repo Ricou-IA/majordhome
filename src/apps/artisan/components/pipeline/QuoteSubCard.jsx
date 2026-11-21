@@ -32,7 +32,7 @@ export function QuoteSubCard({ quote, refused = false }) {
           <span className="text-gray-500 shrink-0">{formatDateShortFR(quote.quote_date)}</span>
         )}
         {refused && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-gray-200 text-gray-600 shrink-0">
+          <span className="text-[11px] px-1.5 py-0.5 rounded font-medium bg-gray-200 text-gray-600 shrink-0">
             Refusé
           </span>
         )}

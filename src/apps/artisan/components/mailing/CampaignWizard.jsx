@@ -333,7 +333,7 @@ function StepIdentity({ form, update, segments }) {
             </details>
             <p className="text-xs text-amber-800">
               <Filter className="w-3 h-3 inline mr-1" />
-              Le scheduler N8n lit les campagnes dont <code className="text-[10px]">next_run_at ≤ NOW()</code> toutes les 10 min et déclenche l&apos;envoi.
+              Le scheduler N8n lit les campagnes dont <code className="text-[11px]">next_run_at ≤ NOW()</code> toutes les 10 min et déclenche l&apos;envoi.
             </p>
           </div>
         )}

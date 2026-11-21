@@ -42,7 +42,7 @@ export function SectionBlock({ blocIndex, sectionIndex, section, type, childLine
             className="bg-transparent border-none outline-none text-sm font-semibold text-secondary-700 uppercase tracking-wider min-w-0"
             placeholder="TITRE DU CHAPITRE"
           />
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-secondary-200 text-secondary-500 whitespace-nowrap" title="Ce que propose le catalogue de ce chapitre">{TYPE_LABELS[type] || type}</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-white border border-secondary-200 text-secondary-500 whitespace-nowrap" title="Ce que propose le catalogue de ce chapitre">{TYPE_LABELS[type] || type}</span>
           <label className="flex items-center gap-1.5 text-xs text-secondary-600 whitespace-nowrap cursor-pointer" title="Décochée : le document liste les lignes sans prix unitaire ni total, le sous-total du chapitre reste">
             <input
               type="checkbox"
@@ -92,7 +92,7 @@ export function SectionBlock({ blocIndex, sectionIndex, section, type, childLine
 
 function EnTeteLignes() {
   return (
-    <div className="flex items-center gap-1.5 px-3 ml-4 text-[10px] font-medium text-secondary-400 uppercase tracking-wider">
+    <div className="flex items-center gap-1.5 px-3 ml-4 text-[11px] font-medium text-secondary-400 uppercase tracking-wider">
       <span className="w-3.5 flex-shrink-0" />
       <span className="flex-1">Désignation</span>
       <span className="w-10 text-center flex-shrink-0">Qté</span>

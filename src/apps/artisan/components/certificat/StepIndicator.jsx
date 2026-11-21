@@ -47,7 +47,7 @@ export function StepIndicator({ steps, currentIndex, onStepClick }) {
                   {isCompleted ? <Check className="w-4 h-4" /> : index + 1}
                 </div>
                 <span
-                  className="text-[10px] leading-tight text-center truncate max-w-[64px]"
+                  className="text-[11px] leading-tight text-center truncate max-w-[64px]"
                   style={{
                     fontWeight: isCurrent ? 700 : 400,
                     color: isCurrent ? COLORS.current : isCompleted ? COLORS.completed : '#9CA3AF',

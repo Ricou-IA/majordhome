@@ -173,7 +173,7 @@ function AppointmentRow({ apt, dayLabel, teamSize = null, onDelete, disabled }) 
           <CalendarDays className="w-3.5 h-3.5 text-gray-400 shrink-0" />
           <span className="text-sm font-medium text-gray-900">{dateStr}</span>
           {dayLabel && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-bold">
+            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-bold">
               {dayLabel}
             </span>
           )}
@@ -185,7 +185,7 @@ function AppointmentRow({ apt, dayLabel, teamSize = null, onDelete, disabled }) 
           )}
           {teamSize && personnes != null && (
             <span
-              className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
                 sousEffectif ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
               }`}
               title={`${personnes} personne(s) sur ${teamSize} attendue(s)`}

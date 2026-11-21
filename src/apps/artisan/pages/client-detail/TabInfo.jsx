@@ -34,7 +34,7 @@ function LinkedClientCard({ client, role, onUnlink, isUnlinking }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-secondary-900 truncate">{client.display_name}</span>
-            <span className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
+            <span className={`inline-flex items-center px-1.5 py-0.5 text-[11px] font-medium rounded-full ${
               role === 'proprietaire' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
             }`}>
               {role === 'proprietaire' ? 'Propriétaire' : 'Locataire'}
@@ -234,7 +234,7 @@ function LinkedClientsSection({ clientId, orgId, isLocked }) {
         <Link2 className="w-4 h-4 text-secondary-500" />
         Clients liés
         {hasLinks && (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-secondary-100 text-secondary-600 rounded-full">
+          <span className="px-1.5 py-0.5 text-[11px] font-medium bg-secondary-100 text-secondary-600 rounded-full">
             {(owner ? 1 : 0) + tenants.length}
           </span>
         )}

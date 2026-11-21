@@ -33,7 +33,7 @@ export default function ListePieces({ lignes, totaux }) {
               <td className="pr-2 align-middle max-w-0" title={[l.libelle, l.sous_libelle].filter(Boolean).join(' — ')}>
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="truncate">{l.libelle}</span>
-                  <span className={`shrink-0 inline-block border rounded px-1.5 text-[10px] uppercase font-mono ${STATUT[l.statut] || STATUT.implicite}`}>{l.statut}</span>
+                  <span className={`shrink-0 inline-block border rounded px-1.5 text-[11px] uppercase font-mono ${STATUT[l.statut] || STATUT.implicite}`}>{l.statut}</span>
                   {l.sous_libelle && <span className="shrink-0 max-w-[38%] truncate text-xs text-secondary-500">· {l.sous_libelle}</span>}
                 </div>
               </td>

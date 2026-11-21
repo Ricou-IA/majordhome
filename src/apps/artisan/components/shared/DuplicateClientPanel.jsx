@@ -93,7 +93,7 @@ export function DuplicateClientPanel({
             <button
               type="button"
               onClick={() => onChoose(c)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex-shrink-0"
             >
               <Check className="w-3.5 h-3.5" />
               {chooseLabel}

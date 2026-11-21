@@ -79,7 +79,7 @@ export default function InvoiceEmailOptions({
                     {row.sublabel && <span className="text-gray-500"> · {row.sublabel}</span>}
                     {row.badge && (
                       <span
-                        className={`ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                        className={`ml-1.5 text-[11px] font-medium px-1.5 py-0.5 rounded ${
                           row.badge === 'non signé' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
                         }`}
                       >

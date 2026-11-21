@@ -114,7 +114,7 @@ export function ChantierKanban() {
 
   // Sous le titre de chaque colonne : ce que l'étape veut dire.
   const headerExtra = useCallback(
-    (column) => (column.hint ? <p className="text-[11px] leading-4 text-gray-400">{column.hint}</p> : null),
+    (column) => (column.hint ? <p className="text-xs leading-4 text-gray-500">{column.hint}</p> : null),
     [],
   );
 

@@ -138,11 +138,11 @@ export default function ArticlesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-sm font-medium text-secondary-900 truncate">{it.code && <span className="font-mono text-[11px] text-secondary-500 mr-1">{it.code}</span>}{it.name}</span>
-                      {it.brand && <span className="px-1 py-0.5 text-[10px] bg-secondary-100 text-secondary-600 rounded">{it.brand}</span>}
-                      {it.category ? <span className="px-1 py-0.5 text-[10px] bg-primary-50 text-primary-700 rounded">{CATEGORIE_LABELS[it.category] || it.category}</span>
-                        : <span className="px-1 py-0.5 text-[10px] bg-amber-50 text-amber-700 rounded">sans catégorie</span>}
-                      {['stock', 'main_oeuvre'].includes(it.product_kind) && <span className="px-1 py-0.5 text-[10px] bg-secondary-100 text-secondary-700 rounded">{NATURE_LABELS[it.product_kind]}</span>}
-                      {it.offres_actives === 0 && it.offres_total > 0 && <span className="px-1 py-0.5 text-[10px] bg-secondary-200 text-secondary-600 rounded">plus au catalogue</span>}
+                      {it.brand && <span className="px-1 py-0.5 text-[11px] bg-secondary-100 text-secondary-600 rounded">{it.brand}</span>}
+                      {it.category ? <span className="px-1 py-0.5 text-[11px] bg-primary-50 text-primary-700 rounded">{CATEGORIE_LABELS[it.category] || it.category}</span>
+                        : <span className="px-1 py-0.5 text-[11px] bg-amber-50 text-amber-700 rounded">sans catégorie</span>}
+                      {['stock', 'main_oeuvre'].includes(it.product_kind) && <span className="px-1 py-0.5 text-[11px] bg-secondary-100 text-secondary-700 rounded">{NATURE_LABELS[it.product_kind]}</span>}
+                      {it.offres_actives === 0 && it.offres_total > 0 && <span className="px-1 py-0.5 text-[11px] bg-secondary-200 text-secondary-600 rounded">plus au catalogue</span>}
                     </div>
                     <p className="text-xs text-secondary-400 truncate">
                       {it.gamme ? `${it.gamme} · ` : ''}
