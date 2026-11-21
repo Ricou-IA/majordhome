@@ -22,7 +22,6 @@ const Territoire = lazy(() => import('./pages/Territoire'));
 const Chantiers = lazy(() => import('./pages/Chantiers'));
 const GeoGrid = lazy(() => import('./pages/GeoGrid'));
 const TeamManagement = lazy(() => import('./pages/settings/TeamManagement'));
-const PermissionsEditor = lazy(() => import('./pages/settings/PermissionsEditor'));
 const SupplierManagement = lazy(() => import('./pages/settings/SupplierManagement'));
 const ArticlesPage = lazy(() => import('./pages/settings/catalogue/ArticlesPage'));
 const HarmonisationPage = lazy(() => import('./pages/settings/catalogue/HarmonisationPage'));
@@ -80,6 +79,7 @@ const MaintenanceSettings = lazy(() => import('./pages/settings/MaintenanceSetti
 const ClimDimensionnement = lazy(() => import('@apps/clim/pages/Dimensionnement'));
 const ClimSettings = lazy(() => import('./pages/settings/ClimSettings'));
 const DevisSettings = lazy(() => import('./pages/settings/DevisSettings'));
+const TypesProjetSettings = lazy(() => import('./pages/settings/TypesProjetSettings'));
 const WebshopSettings = lazy(() => import('./pages/settings/WebshopSettings'));
 
 // Thermique (étude de déperditions)
@@ -302,9 +302,8 @@ export const artisanRoutes = [
     path: 'settings/permissions',
     element: (
       <SuspenseWrapper>
-        <RouteGuard resource="settings">
-          <PermissionsEditor />
-        </RouteGuard>
+        {/* ancienne adresse : les droits vivent dans Administration utilisateurs */}
+        <Navigate to="/settings/team?tab=droits" replace />
       </SuspenseWrapper>
     ),
   },
@@ -425,6 +424,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <WebshopSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/projets',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <TypesProjetSettings />
         </RouteGuard>
       </SuspenseWrapper>
     ),

@@ -22,7 +22,13 @@ function deplacer(arr, i, delta) {
 /** Chapitres d'une famille du formulaire (`chapitres` typés, sinon titres seuls déduits). */
 const chapitresDe = (f) => (Array.isArray(f.chapitres) ? f.chapitres : (f.sections || []).map((t) => ({ titre: t, type: typeChapitreDeduit(t) })));
 
-export default function FamillesEditor({ familles, onChange }) {
+/**
+ * @param {'types'|'devis'} mode  `types` : la liste des types de projet (nom, proposé ou non, ordre, ajout) —
+ *   page Types de projet ; `devis` : ce qui sert au devis (catégories de produits, TVA, chapitres) — page Devis.
+ */
+export default function FamillesEditor({ familles, onChange, mode = 'devis' }) {
+  const types = mode === 'types';
+  const devis = mode === 'devis';
   const [ouverte, setOuverte] = useState(null);
   const { settings } = useOrgSettings();
   // Mention de l'outil d'un type proposé : disponible, ou lié à un module que l'entreprise n'a pas.
@@ -45,8 +51,9 @@ export default function FamillesEditor({ familles, onChange }) {
   return (
     <div className="space-y-2">
       <p className="text-xs text-secondary-500">
-        Les types proposés s’activent d’une coche ; ceux qui portent un outil le gardent. Un type que vous ajoutez
-        sert au suivi des leads et des devis, sans outil.
+        {types
+          ? 'Les types proposés s’activent d’une coche ; ceux qui portent un outil le gardent. Un type que vous ajoutez sert au suivi des leads et des devis, sans outil.'
+          : 'Pour chaque type de projet : catégories de produits, TVA par défaut et chapitres du devis. Les types eux-mêmes se gèrent dans Types de projet.'}
       </p>
       {familles.map((f, i) => {
         const open = ouverte === i;
@@ -66,10 +73,16 @@ export default function FamillesEditor({ familles, onChange }) {
             </div>
             {open && (
               <div className="px-3 pb-3 space-y-3 border-t border-secondary-100 pt-3">
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <label className="block text-xs text-secondary-600">Libellé
+                {types && (
+                  <label className="block text-xs text-secondary-600 max-w-sm">Libellé
                     <input value={f.label} onChange={(e) => set(i, { label: e.target.value, key: f.key.startsWith('famille_') && /^famille_[a-z0-9]+$/.test(f.key) ? (slugFamille(e.target.value) || f.key) : f.key })} disabled={propose} title={propose ? 'Le nom d’un type proposé est fixe : les outils et l’historique s’y rattachent' : undefined} className={`${INPUT} mt-1 disabled:bg-secondary-50 disabled:text-secondary-500`} />
                   </label>
+                )}
+                {devis && (<>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="block text-xs text-secondary-600">Type de projet
+                    <div className="mt-1 py-1.5 text-sm font-medium text-secondary-800">{f.label}</div>
+                  </div>
                   <div className="block text-xs text-secondary-600">Catégories des chapitres Équipement et Options <span className="text-secondary-400">(aucune = tout le catalogue)</span>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                       {CATEGORIES_PRODUIT.map((c) => {
@@ -106,19 +119,22 @@ export default function FamillesEditor({ familles, onChange }) {
                   </div>
                   <button type="button" onClick={() => setChapitres(i, [...chapitresDe(f), { titre: '', type: 'equipement' }])} className="mt-1.5 text-xs text-primary-700 hover:underline flex items-center gap-1"><Plus className="w-3 h-3" /> Ajouter un chapitre</button>
                 </div>
+                </>)}
+                {types && (
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={f.actif} onChange={(e) => set(i, { actif: e.target.checked })} /> Proposé dans les leads et les devis</label>
                   {propose
                     ? <span className="text-xs text-secondary-400">Type proposé : il se désactive, il ne se supprime pas.</span>
                     : <button type="button" onClick={() => retirer(i)} className="text-xs text-secondary-500 hover:text-red-600 flex items-center gap-1"><Trash2 className="w-3.5 h-3.5" /> Supprimer ce type</button>}
                 </div>
-                <p className="text-xs text-secondary-400">Les devis et devis types déjà créés gardent leur famille par son libellé : renommer une famille ne les détache pas, la supprimer les laisse orphelins.</p>
+                )}
+                {types && <p className="text-xs text-secondary-400">Les devis et devis types déjà créés gardent leur famille par son libellé : renommer une famille ne les détache pas, la supprimer les laisse orphelins.</p>}
               </div>
             )}
           </div>
         );
       })}
-      <button type="button" onClick={ajouter} className="btn-secondary text-sm flex items-center gap-2"><Plus className="w-4 h-4" /> Ajouter un type de projet</button>
+      {types && <button type="button" onClick={ajouter} className="btn-secondary text-sm flex items-center gap-2"><Plus className="w-4 h-4" /> Ajouter un type de projet</button>}
     </div>
   );
 }

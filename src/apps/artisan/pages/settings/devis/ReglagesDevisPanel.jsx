@@ -59,8 +59,8 @@ export default function ReglagesDevisPanel({ form, onChange, onFamilles, ouverts
   const champ = (props) => <Champ {...props} form={form} onChange={onChange} zoneActive={zoneActive} onFocusZone={onFocusZone} />;
   return (
     <div className="space-y-3">
-      <Accordeon k="familles" label="Types de projet et chapitres" icon={Layers} ouvert={ouverts.familles} onToggle={() => onToggle('familles')}>
-        <p className="text-xs text-secondary-500">Les familles proposées dans « Nouveau devis », et les chapitres créés pour chacune. Les familles masquées restent lisibles sur les anciens devis.</p>
+      <Accordeon k="familles" label="Chapitres par type de projet" icon={Layers} ouvert={ouverts.familles} onToggle={() => onToggle('familles')}>
+        <p className="text-xs text-secondary-500">Les chapitres créés dans « Nouveau devis » pour chaque type de projet.</p>
         <FamillesEditor familles={form.familles} onChange={onFamilles} />
       </Accordeon>
 

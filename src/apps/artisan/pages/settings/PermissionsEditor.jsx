@@ -81,7 +81,7 @@ function OrgRoleHeaderMenu({ orgRole, open, onToggle, onRename, onDeactivate, on
 // PAGE
 // =============================================================================
 
-export default function PermissionsEditor() {
+export default function PermissionsEditor({ embedded = false }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useAuth();
@@ -202,23 +202,29 @@ export default function PermissionsEditor() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/settings')}
-            className="p-2 rounded-lg hover:bg-secondary-100 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-secondary-600" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
-              <Shield className="w-7 h-7 text-primary-600" />
-              Droits d&apos;accès
-            </h1>
-            <p className="text-sm text-secondary-600 mt-1">
-              Configurez les permissions par rôle. L&apos;administrateur a toujours accès à tout.
-            </p>
+        {embedded ? (
+          <p className="text-sm text-secondary-600">
+            Configurez les permissions par rôle. L&apos;administrateur a toujours accès à tout.
+          </p>
+        ) : (
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/settings')}
+              className="p-2 rounded-lg hover:bg-secondary-100 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-secondary-600" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
+                <Shield className="w-7 h-7 text-primary-600" />
+                Droits d&apos;accès
+              </h1>
+              <p className="text-sm text-secondary-600 mt-1">
+                Configurez les permissions par rôle. L&apos;administrateur a toujours accès à tout.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
         <button
           type="button"
           onClick={() => setModal({ mode: 'create' })}

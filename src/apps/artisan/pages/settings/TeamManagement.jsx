@@ -1,7 +1,8 @@
 /**
  * TeamManagement.jsx - Majord'home Artisan
  * ============================================================================
- * Page de gestion de l'équipe (org_admin uniquement).
+ * Page « Administration utilisateurs » (org_admin uniquement) : onglet Membres
+ * + onglet Droits d'accès et profils (`PermissionsEditor embedded`, ?tab=droits).
  *
  * Source unique : core.organization_members + profiles
  * Synthèse en lecture seule (une ligne par membre, cliquable) ; toute l'édition
@@ -16,7 +17,8 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import PermissionsEditor from './PermissionsEditor';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgMembers } from '@hooks/usePermissions';
 import { useLeadCommercials, useSetLeadCommercial } from '@hooks/useLeads';
@@ -331,6 +333,8 @@ function MemberRow({ member, teamMember, orgRole, isCurrentUser, isCommercial, s
 
 export default function TeamManagement() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') === 'droits' ? 'droits' : 'membres';
   const { organization, user, isOrgAdmin } = useAuth();
   const orgId = organization?.id;
 
@@ -656,31 +660,57 @@ export default function TeamManagement() {
           <div>
             <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
               <Users className="w-7 h-7 text-primary-600" />
-              Gestion de l&apos;équipe
+              Administration utilisateurs
             </h1>
             <p className="text-sm text-secondary-600 mt-1">
-              Gérez les membres et leurs rôles dans l&apos;organisation. Cliquez sur un membre pour le modifier.
+              Membres, rôles, profils et droits d&apos;accès de l&apos;organisation.
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowInviteModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-        >
-          <UserPlus className="w-4 h-4" />
-          Inviter un membre
-        </button>
+        {tab === 'membres' && (
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+          >
+            <UserPlus className="w-4 h-4" />
+            Inviter un membre
+          </button>
+        )}
       </div>
 
+      {/* Onglets */}
+      <div className="flex border-b border-secondary-200">
+        {[
+          { key: 'membres', label: 'Membres', icon: Users },
+          { key: 'droits', label: 'Droits d’accès et profils', icon: Shield },
+        ].map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setSearchParams(t.key === 'membres' ? {} : { tab: t.key }, { replace: true })}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 whitespace-nowrap ${
+              tab === t.key
+                ? 'border-primary-500 text-primary-700'
+                : 'border-transparent text-secondary-500 hover:text-secondary-700'
+            }`}
+          >
+            <t.icon className="w-4 h-4" />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'droits' && <PermissionsEditor embedded />}
+
       {/* Loading */}
-      {isLoading && (
+      {tab === 'membres' && isLoading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
         </div>
       )}
 
       {/* Error */}
-      {error && (
+      {tab === 'membres' && error && (
         <div className="card bg-red-50 border-red-200">
           <div className="flex items-center gap-3 text-red-700">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -690,7 +720,7 @@ export default function TeamManagement() {
       )}
 
       {/* Membres */}
-      {!isLoading && !error && (
+      {tab === 'membres' && !isLoading && !error && (
         <div className="card overflow-hidden">
           <table className="w-full">
             <thead>
@@ -743,6 +773,7 @@ export default function TeamManagement() {
       )}
 
       {/* Info rôles */}
+      {tab === 'membres' && (
       <div className="card bg-blue-50 border-blue-200">
         <div className="flex items-start gap-3">
           <Shield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -753,11 +784,12 @@ export default function TeamManagement() {
               <li><strong>Responsable</strong> — Vision globale, supervision de l&apos;équipe</li>
               <li><strong>Commercial</strong> — Pipeline, ses leads et chantiers, planning</li>
               <li><strong>Technicien</strong> — Clients, chantiers planifiés, entretiens, planning</li>
-              <li><strong>Profil maison</strong> — créé dans Droits d&apos;accès à partir d&apos;un modèle ; hors de la grille des droits, l&apos;application le traite comme son modèle</li>
+              <li><strong>Profil maison</strong> — créé dans l&apos;onglet Droits d&apos;accès à partir d&apos;un modèle ; hors de la grille des droits, l&apos;application le traite comme son modèle</li>
             </ul>
           </div>
         </div>
       </div>
+      )}
 
       {/* ================================================================= */}
       {/* MODALS                                                            */}

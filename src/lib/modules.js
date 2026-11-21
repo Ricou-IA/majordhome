@@ -25,8 +25,7 @@ export const MODULES = [
     description: 'Votre entreprise, votre équipe, vos clients et leur parc — toujours inclus.',
     tiles: [
       { key: 'organization', title: 'Organisation', description: 'Identité, coordonnées, siège et territoire', icon: 'Building2', href: '/settings/organization', adminOnly: true, horsCrm: true },
-      { key: 'team', title: 'Équipe', description: 'Membres, rôles, couleur planning, compétences', icon: 'Users', href: '/settings/team', adminOnly: true },
-      { key: 'permissions', title: 'Droits d\'accès', description: 'Permissions par rôle', icon: 'Shield', href: '/settings/permissions', adminOnly: true },
+      { key: 'team', title: 'Administration utilisateurs', description: 'Membres, rôles, profils et droits d\'accès, couleur planning, compétences', icon: 'Users', href: '/settings/team', adminOnly: true },
       { key: 'equipements', title: 'Équipements', description: 'Catégories et types d\'équipement du parc client', icon: 'Wrench', href: '/settings/equipements', adminOnly: true },
       // Ouverte au team_leader (Eric 2026-10-27) : visible dès que le rôle a le droit `articles.edit` (org_admin compris)
       { key: 'suppliers', title: 'Fournisseurs & catalogue', description: 'Fournisseurs et catalogues produits', icon: 'Truck', href: '/settings/suppliers', acces: { resource: 'articles', action: 'edit' } },
@@ -35,7 +34,8 @@ export const MODULES = [
       // socle, pas Communication.
       { key: 'emails', title: 'Emails', description: 'Expéditeur, adresse de réponse, domaine d\'envoi', icon: 'Mail', href: '/settings/emails', adminOnly: true, horsCrm: true },
       { key: 'plan-comptable', title: 'Plan comptable', description: 'Les comptes de vente Pennylane utilisables dans Majord\'home', icon: 'BookOpen', href: '/settings/plan-comptable', adminOnly: true, si: 'pennylane' },
-      { key: 'devis', title: 'Devis', description: 'Familles de devis, chapitres, mentions et affichage du document', icon: 'FileSignature', href: '/settings/devis', adminOnly: true },
+      { key: 'projets', title: 'Types de projet', description: 'Les types proposés dans les leads et les devis', icon: 'Layers', href: '/settings/projets', adminOnly: true },
+      { key: 'devis', title: 'Devis', description: 'Chapitres par type de projet, mentions et affichage du document', icon: 'FileSignature', href: '/settings/devis', adminOnly: true },
     ],
   },
   {
@@ -213,7 +213,7 @@ export function accueilSansCrm(settings) {
 const ROUTES_PAR_MODULE = {
   socle: [
     'settings', 'settings/team', 'settings/permissions', 'settings/organization', 'settings/suppliers',
-    'settings/equipements', 'settings/emails', 'settings/pennylane', 'settings/plan-comptable', 'settings/devis', 'profile',
+    'settings/equipements', 'settings/emails', 'settings/pennylane', 'settings/plan-comptable', 'settings/devis', 'settings/projets', 'profile',
   ],
   entretiens: [
     'contrats', 'entretiens', 'certificat/:interventionId', 'clients/:clientId/contrat/signer',
