@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Globe, Phone } from 'lucide-react';
+import { useLiaisonHesiasun } from '@hooks/useLiaisonHesiasun';
 import { useSettingsForm } from './components/useSettingsForm';
 import { CLES_COORDONNEES, formatTelephone, prefixerHttps, validerSaisie } from '@/lib/organisation/identite';
 import { Field, INPUT_CLASS, SaveBar, SettingsLoading, SettingsSection, SettingsSurface } from './components/layout';
@@ -22,6 +23,8 @@ function pickFields(settings) {
 export default function ContactTab() {
   const { form, setForm, initial, setInitial, isDirty, save, isSaving, isLoading } = useSettingsForm(pickFields);
 
+  const { envoyerApresEnregistrement } = useLiaisonHesiasun();
+
   const errors = useMemo(() => validerSaisie(form, CLES_COORDONNEES), [form]);
   const isValid = Object.keys(errors).length === 0;
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -37,6 +40,8 @@ export default function ContactTab() {
       toast.success('Coordonnées enregistrées');
       setInitial(payload);
       setForm(payload);
+      // Entreprise reliée à HésiaSun : les coordonnées enregistrées y partent.
+      envoyerApresEnregistrement();
     } catch (err) {
       toast.error(err.message || 'Erreur lors de l’enregistrement');
     }

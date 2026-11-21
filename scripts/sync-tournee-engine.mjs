@@ -40,7 +40,15 @@ const WEBSHOP = ['orders', 'reglages', 'process', 'emailTemplates'];
 // Copiés dans _shared/catalogue/ (offreFournisseur importe './modelKey.js', même dossier).
 const CATALOGUE = ['suitecommerce', 'woocommerce', 'woocommercePieces', 'cataloguePieces', 'modelKey', 'mapping', 'releve', 'enrichissement', 'enrichissementAppareil', 'ressourcesPage', 'offreFournisseur'];
 
+// Identité de l'entreprise et liaison HésiaSun → edges hesiasun-identite et hesiasun-identite-cron.
+// Copiés dans _shared/organisation/ : liaisonHesiasun.js importe './identite.js' (même dossier).
+const ORGANISATION = ['identite', 'liaisonHesiasun'];
+
 export const FICHIERS = [
+  ...ORGANISATION.map((n) => ({
+    source: path.join(racine, 'src', 'lib', 'organisation', `${n}.js`),
+    cible: path.join(racine, 'supabase', 'functions', '_shared', 'organisation', `${n}.js`),
+  })),
   ...NOMS.map((n) => ({ source: path.join(SRC, `${n}.js`), cible: path.join(DST, `${n}.js`) })),
   ...MAINTENANCE.map((n) => ({
     source: path.join(racine, 'src', 'lib', 'maintenance', `${n}.js`),

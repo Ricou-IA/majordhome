@@ -244,6 +244,14 @@ verify_jwt = true
 [functions.assistant-pieces-cron]
 verify_jwt = false
 
+# hesiasun-identite : liaison Majord'home → HésiaSun (identité de l'entreprise saisie une fois). JWT user + org_admin. 2026-11-21.
+[functions.hesiasun-identite]
+verify_jwt = true
+
+# hesiasun-identite-cron : rejeu horaire des envois d'identité restés en attente — protégée par MDH_CRON_SECRET. 2026-11-21.
+[functions.hesiasun-identite-cron]
+verify_jwt = false
+
 # sav-report-send : envoi au client du rapport d'intervention SAV archivé (Resend). JWT user + module Communication + user_can(sav | entretiens, edit). 2026-11-19.
 [functions.sav-report-send]
 verify_jwt = true

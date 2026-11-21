@@ -12,7 +12,9 @@ import { CLES_IDENTITE, LEGAL_FORMS, formatSiret, formatTva, tvaDepuisSiret, val
 import { appliquerEntreprise, identiteEnregistree } from '@/lib/organisation/annuaire';
 import { appliquerImmatriculation } from '@/lib/organisation/bodacc';
 import { lireImmatriculationBodacc } from '@/lib/organisation/bodaccClient';
+import { useLiaisonHesiasun } from '@hooks/useLiaisonHesiasun';
 import EntrepriseSearch from './components/EntrepriseSearch';
+import LiaisonHesiasun from './components/LiaisonHesiasun';
 import SignatureUpload from './components/SignatureUpload';
 import { useSettingsForm } from './components/useSettingsForm';
 import { Field, INPUT_CLASS, SaveBar, SettingsLoading, SettingsSection, SettingsSurface } from './components/layout';
@@ -38,6 +40,7 @@ export default function IdentityTab() {
   const [annuaire, setAnnuaire] = useState(null);
   const [changer, setChanger] = useState(false);
   const [saisieLibre, setSaisieLibre] = useState(false);
+  const { envoyerApresEnregistrement } = useLiaisonHesiasun();
   // RCS et capital lus dans les annonces légales : { etat: 'chargement' | 'fait', detail }.
   const [immat, setImmat] = useState(null);
   const derniereLecture = useRef(0);
@@ -101,6 +104,8 @@ export default function IdentityTab() {
       setInitial(identite);
       setForm(identite);
       setChanger(false);
+      // Entreprise reliée à HésiaSun : l'identité enregistrée y part (un refus se dit, sans défaire l'enregistrement).
+      envoyerApresEnregistrement();
     } catch (err) {
       toast.error(err.message || 'Erreur lors de l’enregistrement');
     }
@@ -291,6 +296,8 @@ export default function IdentityTab() {
           </div>
         </SettingsSection>
       </SettingsSurface>
+
+      <LiaisonHesiasun formulaireModifie={isDirty} />
 
       <SaveBar
         isDirty={isDirty}
