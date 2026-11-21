@@ -56,6 +56,9 @@ export default {
           },
           // Couleurs secondaires
           secondary: {
+            // Même raison que `primary` : le bouton secondaire de components/ui n'avait pas de fond.
+            DEFAULT: 'hsl(var(--secondary))',
+            foreground: 'hsl(var(--secondary-foreground))',
             50: '#f8fafc',
             100: '#f1f5f9',
             200: '#e2e8f0',
