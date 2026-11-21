@@ -76,6 +76,8 @@ npm run audit:quality     # lint:errors + audit:dead-code (à lancer avant PR)
 
 **Pre-commit hook actif** (`.githooks/pre-commit`) : lance `npm run lint:errors` avant chaque commit, bloque si une error apparaît. Setup automatique via `npm prepare` (`git config core.hooksPath .githooks`). Bypass d'urgence : `git commit --no-verify`.
 
+**Build Vercel** : un push qui ne touche que `docs/`, `.claude/` ou les `.md` racine ne déclenche pas de build Vercel (`ignoreCommand` dans `vercel.json`). Un fichier `.md` publié sur le site doit rester hors de ces exclusions.
+
 ## Conventions qualité (2026-05-21)
 
 Règles pour maintenir le niveau atteint après le hardening Sem 0 + audit qualité. **Ces règles s'appliquent à toute nouvelle feature ou refacto** :
