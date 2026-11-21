@@ -125,7 +125,8 @@ test('aImporter : règles par statut', () => {
   assert.equal(aImporter({ numero: 9, statut: 'doublon_fort' }, choix), false);
   assert.equal(aImporter({ numero: 9, statut: 'doublon_faible' }, choix), true);
   assert.equal(aImporter({ numero: 2, statut: 'doublon_faible' }, choix), false);
-  assert.equal(aImporter({ numero: 1, statut: 'doublon_fichier' }, choix), false);
+  assert.equal(aImporter({ numero: 1, statut: 'doublon_fichier' }, choix), true);
+  assert.equal(aImporter({ numero: 9, statut: 'doublon_fichier' }, choix), false);
   assert.equal(aImporter({ numero: 1, statut: 'ecartee' }, choix), false);
 });
 test('ligne à écrire : numéro de ligne, aucune organisation', () => {
@@ -146,4 +147,66 @@ test('5 000 lignes contre 5 000 clients : bien moins d\'une seconde', () => {
   assert.ok(Date.now() - t < 1000, `trop lent : ${Date.now() - t} ms`);
   assert.equal(r.filter((l) => l.statut === 'doublon_fort').length, 2500);
   assert.equal(r.filter((l) => l.statut === 'prete').length, 2500);
+});
+
+const societe = { display_name: 'GARAGE DURAND', company_name: 'Garage Durand', client_category: 'entreprise', first_name: null, last_name: null, phone: null, email: null, postal_code: null, external_ref: null };
+test('société seule déposée deux fois : doublon fort, rien importé par défaut', () => {
+  const r = classerLignes([cand(2, { societe: 'Garage Durand' })], [societe]);
+  assert.equal(r[0].statut, 'doublon_fort');
+  assert.equal(bilan(r, aucun()).importees, 0);
+});
+test('nom de famille seul déposé deux fois', () => {
+  const base = (postal) => [{ id: 'z', first_name: null, last_name: 'DUBOIS', display_name: 'DUBOIS', postal_code: postal }];
+  assert.equal(classerLignes([cand(2, { nom: 'Dubois' })], base(null))[0].statut, 'doublon_fort');
+  assert.equal(classerLignes([cand(2, { nom: 'Dubois', code_postal: '81000' })], base('81000'))[0].statut, 'doublon_fort');
+  assert.equal(classerLignes([cand(2, { nom: 'Dubois', code_postal: '81000' })], base('31000'))[0].statut, 'doublon_faible');
+});
+test('nom affiché reconstruit quand le client existant n’en porte pas', () => {
+  const r = classerLignes([cand(2, { societe: 'Garage Durand' })], [{ ...societe, display_name: undefined }]);
+  assert.equal(r[0].statut, 'doublon_fort');
+  assert.ok(r[0].doublons[0].matchReasons.includes('nom_affiche'));
+});
+test('deux « Garage Durand » dans le même fichier', () => {
+  const r = classerLignes([cand(2, { societe: 'Garage Durand' }), cand(3, { societe: 'garage  durand' })], []);
+  assert.deepEqual(r.map((l) => l.statut), ['prete', 'doublon_fichier']);
+  assert.deepEqual(r[1].doublons, [{ numero: 2 }]);
+  const avecCp = classerLignes([cand(2, { societe: 'Garage Durand', code_postal: '81000' }), cand(3, { societe: 'Garage Durand' })], []);
+  assert.deepEqual(avecCp.map((l) => l.statut), ['prete', 'prete']);
+});
+test('père et fils : doublon du fichier écarté par défaut, repris sur demande', () => {
+  const r = classerLignes([
+    cand(2, { nom: 'Petit', prenom: 'Luc', code_postal: '81000', telephone: '0611111111' }),
+    cand(3, { nom: 'Petit', prenom: 'Luc', code_postal: '81000', telephone: '0622222222' }),
+  ], []);
+  assert.deepEqual(r.map((l) => l.statut), ['prete', 'doublon_fichier']);
+  assert.deepEqual(bilan(r, aucun()), { lues: 2, importees: 1, doublons_ecartes: 1, ecartees: 0 });
+  const choix = { importer: new Set([3]), ecarter: new Set() };
+  assert.deepEqual(bilan(r, choix), { lues: 2, importees: 2, doublons_ecartes: 0, ecartees: 0 });
+  assert.deepEqual(lignesPourEcriture(r, choix).map((l) => l.import_line), [2, 3]);
+});
+test('société seule avec type « particulier » : entreprise, non écartée', () => {
+  const r = controlerFiche(cand(2, { societe: 'Garage Durand', type_client: 'particulier' }));
+  assert.equal(r.ecartee, false);
+  assert.equal(r.fiche.client_category, 'entreprise');
+  assert.equal(r.fiche.display_name, 'GARAGE DURAND');
+  const avecNom = controlerFiche(cand(2, { societe: 'Garage', nom: 'Durand', type_client: 'particulier' }));
+  assert.equal(avecNom.fiche.client_category, 'particulier');
+});
+test('invariant : choix contradictoires ou numéro inconnu', () => {
+  const fichier = [cand(2, { nom: 'Nouveau' }), cand(3, { nom: 'Roux', prenom: 'Paul' }), cand(4, { nom: 'Roux', prenom: 'Anne', code_postal: '31000' }), cand(5, { email: 'x@y.fr' }),
+    cand(6, { nom: 'Nouveau' }), cand(7, { nom: 'Nouveau' })];
+  const classees = classerLignes(fichier, existants);
+  for (const choix of [{ importer: new Set([3, 4, 7, 99]), ecarter: new Set([3, 4, 7, 99]) }, { importer: new Set([99]), ecarter: new Set([98]) }]) {
+    const b = bilan(classees, choix);
+    assert.equal(b.lues, 6);
+    assert.equal(b.importees + b.doublons_ecartes + b.ecartees, b.lues);
+    assert.equal(lignesPourEcriture(classees, choix).length, b.importees);
+  }
+});
+test('liste vide et clients existants sans nom ni coordonnées', () => {
+  assert.deepEqual(classerLignes([], []), []);
+  const vides = [{ id: 'v', first_name: null, last_name: null, display_name: null, phone: null, email: null, postal_code: null, external_ref: null }, {}];
+  const r = classerLignes([cand(2, { nom: 'Nouveau' })], vides);
+  assert.equal(r[0].statut, 'prete');
+  assert.deepEqual(classerLignes([], null), []);
 });

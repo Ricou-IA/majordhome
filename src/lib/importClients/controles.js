@@ -41,7 +41,9 @@ export function controlerFiche(candidate) {
 
   if (fiche.last_name) fiche.last_name = fiche.last_name.toUpperCase();
   if (fiche.first_name) fiche.first_name = fiche.first_name.toUpperCase();
-  if (!CATEGORIES.includes(fiche.client_category)) {
+  if (fiche.company_name && !fiche.last_name && !fiche.first_name) {
+    fiche.client_category = 'entreprise'; // une société seule est une entreprise, quoi que dise le fichier
+  } else if (!CATEGORIES.includes(fiche.client_category)) {
     fiche.client_category = fiche.company_name ? 'entreprise' : 'particulier';
   }
   fiche.display_name = buildClientDisplayName({
@@ -58,6 +60,8 @@ export function controlerFiche(candidate) {
 
 const cleRef = (ref) => (vide(ref) ? '' : String(ref).trim().toLowerCase());
 const cleNom = (k) => (k ? `${k.last}|${k.first}` : null);
+// Nom affiché comparable : majuscules, sans accent, espaces réduits (même normalisation que les noms de famille).
+const cleAffiche = (nomAffiche) => { const k = normalizeNameKey('x', nomAffiche); return k ? k.last : null; };
 const cp = (v) => (vide(v) ? '' : String(v).trim());
 
 function ajouter(index, cle, valeur) {
@@ -66,17 +70,25 @@ function ajouter(index, cle, valeur) {
   if (liste) liste.push(valeur); else index.set(cle, [valeur]);
 }
 
-/** Index des clients existants : téléphones, e-mail, nom de famille, ancien numéro. */
+/** Nom affiché d'un client existant : celui fourni, sinon reconstruit depuis ses champs. */
+function nomAfficheExistant(c) {
+  return c.display_name || buildClientDisplayName({
+    firstName: c.first_name, lastName: c.last_name, companyName: c.company_name, clientCategory: c.client_category,
+  });
+}
+
+/** Index des clients existants : téléphones, e-mail, nom de famille, nom affiché, ancien numéro. */
 function indexerExistants(clients) {
-  const tel = new Map(); const mail = new Map(); const nom = new Map(); const ref = new Map();
+  const tel = new Map(); const mail = new Map(); const nom = new Map(); const ref = new Map(); const affiche = new Map();
   for (const c of clients) {
+    ajouter(affiche, cleAffiche(nomAfficheExistant(c)), c);
     for (const k of new Set([phoneTailKey(c.phone), phoneTailKey(c.phone_secondary)])) ajouter(tel, k, c);
     ajouter(mail, normalizeEmailKey(c.email), c);
     const n = normalizeNameKey('x', c.last_name);
     ajouter(nom, n && n.last, c);
     ajouter(ref, cleRef(c.external_ref), c);
   }
-  return { tel, mail, nom, ref };
+  return { tel, mail, nom, ref, affiche };
 }
 
 /** Rapprochements d'une fiche avec la base : fiches confirmées par matchClientDuplicates, plus l'ancien numéro. */
@@ -93,6 +105,12 @@ function doublonsAvecBase(fiche, index) {
     for (const c of (n && index.nom.get(n.last)) || []) candidats.add(c);
   }
   const trouves = probe ? matchClientDuplicates([...candidats], probe) : [];
+  const aff = cleAffiche(fiche.display_name);
+  for (const c of (aff && index.affiche.get(aff)) || []) {
+    const deja = trouves.find((m) => m.id === c.id);
+    if (deja) { if (!deja.matchReasons.includes('nom_affiche')) deja.matchReasons.push('nom_affiche'); }
+    else trouves.push({ ...c, matchReasons: ['nom_affiche'], isStrong: false });
+  }
   const ref = cleRef(fiche.external_ref);
   if (ref) {
     for (const c of index.ref.get(ref) || []) {
@@ -104,28 +122,32 @@ function doublonsAvecBase(fiche, index) {
   return trouves;
 }
 
-/** « Fort » : même téléphone ou e-mail, même ancien numéro, ou même nom + prénom sans code postal contradictoire. */
+/** « Fort » : même téléphone ou e-mail, même ancien numéro, ou même nom (affiché, ou nom + prénom) sans code postal contradictoire. */
 function estFort(m, codePostalFiche) {
   if (m.isStrong || m.raisonAncienNumero) return true;
-  if (!m.matchReasons.includes('name')) return false;
+  if (!m.matchReasons.includes('name') && !m.matchReasons.includes('nom_affiche')) return false;
   const autre = cp(m.postal_code);
   return !codePostalFiche || !autre || codePostalFiche === autre;
 }
 
 /** Mémoire des lignes déjà vues dans le fichier, pour y repérer les doublons. */
 function nouvelleMemoireFichier() {
-  const parRef = new Map(); const parNom = new Map();
+  const parRef = new Map(); const parNom = new Map(); const parAffiche = new Map();
+  const memes = (v, tels, mail, codePostal) => tels.some((t) => v.tels.includes(t)) || (mail && mail === v.mail) || (codePostal && codePostal === v.codePostal);
+  const anonyme = (v) => !v.tels.length && !v.mail && !v.codePostal;
   return {
-    chercher(ref, nom, tels, mail, codePostal) {
+    chercher(ligne) {
+      const { ref, nom, affiche, tels, mail, codePostal } = ligne;
       if (ref && parRef.has(ref)) return parRef.get(ref);
-      for (const v of (nom && parNom.get(nom)) || []) {
-        if (tels.some((t) => v.tels.includes(t)) || (mail && mail === v.mail) || (codePostal && codePostal === v.codePostal)) return v.numero;
-      }
+      for (const v of (nom && parNom.get(nom)) || []) if (memes(v, tels, mail, codePostal)) return v.numero;
+      // Même nom affiché : mêmes coordonnées, ou rien de part et d'autre pour les distinguer.
+      for (const v of (affiche && parAffiche.get(affiche)) || []) if (memes(v, tels, mail, codePostal) || (anonyme(v) && anonyme(ligne))) return v.numero;
       return null;
     },
-    retenir(numero, ref, nom, tels, mail, codePostal) {
-      if (ref && !parRef.has(ref)) parRef.set(ref, numero);
-      ajouter(parNom, nom, { numero, tels, mail, codePostal });
+    retenir(ligne) {
+      if (ligne.ref && !parRef.has(ligne.ref)) parRef.set(ligne.ref, ligne.numero);
+      ajouter(parNom, ligne.nom, ligne);
+      ajouter(parAffiche, ligne.affiche, ligne);
     },
   };
 }
@@ -134,7 +156,7 @@ function nouvelleMemoireFichier() {
  * Classe chaque candidat : prête, doublon (fichier, base forte ou faible) ou écartée. Ordre des tests : doublon dans
  * le fichier (la première ligne gagne), puis doublon avec les clients existants, sinon prête.
  * @param {Array<{ numero: number, valeurs: Record<string, string>, notesAjoutees: string[] }>} candidates dans l'ordre du fichier
- * @param {Array<object>} clientsExistants clients de l'entreprise (first_name, last_name, phone, phone_secondary, email, postal_code, external_ref)
+ * @param {Array<object>} clientsExistants clients de l'entreprise (display_name, first_name, last_name, company_name, client_category, phone, phone_secondary, email, postal_code, external_ref)
  * @returns {Array<{ numero: number, fiche: Record<string, unknown>, statut: 'prete'|'doublon_fort'|'doublon_faible'|'doublon_fichier'|'ecartee', raison: string, doublons: Array<object>, corrections: Array<{ libelle: string, valeur: string }> }>}
  */
 export function classerLignes(candidates, clientsExistants) {
@@ -144,14 +166,19 @@ export function classerLignes(candidates, clientsExistants) {
     const { numero, fiche, ecartee, corrections } = controlerFiche(candidate);
     if (ecartee) return { numero, fiche, statut: 'ecartee', raison: 'sans_nom', doublons: [], corrections };
 
-    const ref = cleRef(fiche.external_ref);
-    const nom = cleNom(normalizeNameKey(fiche.first_name, fiche.last_name));
-    const tels = [...new Set([phoneTailKey(fiche.phone), phoneTailKey(fiche.phone_secondary)].filter(Boolean))];
-    const mail = normalizeEmailKey(fiche.email);
     const codePostal = cp(fiche.postal_code);
+    const ligne = {
+      numero,
+      ref: cleRef(fiche.external_ref),
+      nom: cleNom(normalizeNameKey(fiche.first_name, fiche.last_name)),
+      affiche: cleAffiche(fiche.display_name),
+      tels: [...new Set([phoneTailKey(fiche.phone), phoneTailKey(fiche.phone_secondary)].filter(Boolean))],
+      mail: normalizeEmailKey(fiche.email),
+      codePostal,
+    };
 
-    const dejaVue = memoire.chercher(ref, nom, tels, mail, codePostal);
-    memoire.retenir(numero, ref, nom, tels, mail, codePostal);
+    const dejaVue = memoire.chercher(ligne);
+    memoire.retenir(ligne);
     if (dejaVue !== null) {
       return { numero, fiche, statut: 'doublon_fichier', raison: 'doublon_fichier', doublons: [{ numero: dejaVue }], corrections };
     }
@@ -166,7 +193,8 @@ export function classerLignes(candidates, clientsExistants) {
 }
 
 /**
- * Une ligne est-elle écrite, compte tenu des choix de l'utilisateur ?
+ * Une ligne est-elle écrite, compte tenu des choix de l'utilisateur ? Un doublon fort ou du fichier est écarté par défaut
+ * mais se reprend (numéro dans `importer`) ; un doublon faible est repris par défaut et s'écarte (numéro dans `ecarter`).
  * @param {{ numero: number, statut: string }} ligneClassee
  * @param {{ importer: Set<number>, ecarter: Set<number> }} choix numéros de ligne
  * @returns {boolean}
@@ -174,7 +202,7 @@ export function classerLignes(candidates, clientsExistants) {
 export function aImporter(ligneClassee, choix) {
   const { numero, statut } = ligneClassee;
   if (statut === 'prete') return true;
-  if (statut === 'doublon_fort') return choix.importer.has(numero);
+  if (statut === 'doublon_fort' || statut === 'doublon_fichier') return choix.importer.has(numero);
   if (statut === 'doublon_faible') return !choix.ecarter.has(numero);
   return false;
 }
