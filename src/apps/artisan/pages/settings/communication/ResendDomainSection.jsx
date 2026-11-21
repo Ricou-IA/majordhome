@@ -195,8 +195,8 @@ export default function ResendDomainSection() {
 
       {!domain ? (
         <p className={HINT_CLASS}>
-          Renseigne et enregistre d&apos;abord l&apos;<strong>email expéditeur</strong> ci-dessus. Le domaine
-          d&apos;envoi en sera dérivé, puis tu pourras le vérifier ici.
+          Facultatif. Enregistrez d&apos;abord <strong>votre adresse e-mail</strong> ci-dessus : son
+          domaine pourra ensuite être vérifié ici.
         </p>
       ) : (
         <>

@@ -92,7 +92,7 @@ export default function EmailsTab() {
                 type="email"
                 value={form.from_email}
                 onChange={(e) => setForm({ ...form, from_email: e.target.value })}
-                placeholder="contact@cimaj.fr"
+                placeholder="contact@votre-entreprise.fr"
                 className={INPUT_CLASS}
               />
               {errors.from_email && <p className={ERROR_CLASS}>{errors.from_email}</p>}
@@ -104,7 +104,7 @@ export default function EmailsTab() {
                 type="email"
                 value={form.reply_to}
                 onChange={(e) => setForm({ ...form, reply_to: e.target.value })}
-                placeholder="reply@cimaj.fr"
+                placeholder="bureau@votre-entreprise.fr"
                 className={INPUT_CLASS}
               />
               {errors.reply_to && <p className={ERROR_CLASS}>{errors.reply_to}</p>}
