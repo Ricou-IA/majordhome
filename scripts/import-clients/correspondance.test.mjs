@@ -55,6 +55,32 @@ test('nom et prénom tout en majuscules : le dernier mot est le prénom', () => 
   assert.deepEqual(decouper('@nom_prenom', 'DE LA FONTAINE Jean-Pierre'), { nom: 'DE LA FONTAINE', prenom: 'Jean-Pierre' });
   assert.deepEqual(decouper('@nom_prenom', 'Dupont Jean'), { nom: 'Dupont', prenom: 'Jean' });
 });
+test('@cp_ville : rien n est jeté', () => {
+  assert.deepEqual(decouper('@cp_ville', 'Gaillac 81600'), { code_postal: '81600', ville: 'Gaillac' });
+  assert.deepEqual(decouper('@cp_ville', '81600 Gaillac'), { code_postal: '81600', ville: 'Gaillac' });
+  assert.deepEqual(decouper('@cp_ville', 'F 81600 Gaillac'), { code_postal: '81600', ville: 'F Gaillac' });
+  assert.deepEqual(decouper('@cp_ville', 'Gaillac'), { code_postal: '', ville: 'Gaillac' });
+});
+test('civilités retirées avant la découpe', () => {
+  assert.deepEqual(decouper('@nom_prenom', 'Mme DUPONT Jean'), { nom: 'DUPONT', prenom: 'Jean' });
+  assert.deepEqual(decouper('@nom_prenom', 'M. DUPONT Jean'), { nom: 'DUPONT', prenom: 'Jean' });
+  assert.deepEqual(decouper('@nom_prenom', 'M DUPONT Jean'), { nom: 'DUPONT', prenom: 'Jean' });
+  assert.deepEqual(decouper('@nom_prenom', 'M. et Mme DUPONT JEAN'), { nom: 'DUPONT', prenom: 'JEAN' });
+  assert.deepEqual(decouper('@nom_prenom', 'Mr & Mme DUPONT Jean'), { nom: 'DUPONT', prenom: 'Jean' });
+  assert.deepEqual(decouper('@nom_prenom', 'Monsieur et Madame DUPONT Jean'), { nom: 'DUPONT', prenom: 'Jean' });
+  assert.deepEqual(decouper('@prenom_nom', 'Madame Jeanne Martin'), { prenom: 'Jeanne', nom: 'Martin' });
+  assert.deepEqual(decouper('@nom_prenom', 'MARTIN Marie'), { nom: 'MARTIN', prenom: 'Marie' });
+  assert.deepEqual(decouper('@nom_prenom', 'M Dupont'), { nom: 'M', prenom: 'Dupont' });
+  assert.deepEqual(decouper('@nom_prenom', 'Mme'), { nom: 'Mme', prenom: '' });
+});
+test('espaces multiples dans un nom', () => {
+  assert.deepEqual(decouper('@nom_prenom', 'DUPONT   Jean'), { nom: 'DUPONT', prenom: 'Jean' });
+});
+test('en-tête vide ou d espaces : colonne ignorée', () => {
+  const c = proposerCorrespondance(['Nom', '', '   ']);
+  assert.deepEqual(c.map((x) => x.cible), ['nom', CIBLE_IGNORER, CIBLE_IGNORER]);
+  assert.deepEqual(c.map((x) => x.origine), ['fichier_type', '', '']);
+});
 test('application : notes ajoutées, colonnes ignorées', () => {
   const c = [{ index: 0, entete: 'Client', cible: '@nom_prenom' }, { index: 1, entete: 'Marque chaudière', cible: '@notes' }, { index: 2, entete: 'Agence', cible: '@ignorer' }];
   assert.deepEqual(appliquerCorrespondance({ numero: 7, cellules: ['DUPONT Jean', 'Viessmann', 'Albi'] }, c),

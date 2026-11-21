@@ -83,6 +83,25 @@ function separerCodePostal(texte) {
   };
 }
 
+const CIVILITE = /^(m|mr|mme|mlle|melle|monsieur|madame|mademoiselle)\.?$/i;
+const LIEN_CIVILITES = /^(et|&|ou)$/i;
+
+/**
+ * Retire la civilité de tête (« M. », « Mme », « M. et Mme »…). Un « M » sans point n'en est une
+ * que s'il reste au moins deux mots après lui. Si rien ne reste, le texte d'origine est gardé.
+ * @param {string[]} mots
+ * @returns {string[]}
+ */
+function sansCivilite(mots) {
+  const estCivilite = (i) => i < mots.length && CIVILITE.test(mots[i])
+    && (/\.$/.test(mots[i]) || !/^m$/i.test(mots[i]) || mots.length - i - 1 >= 2);
+  let i = 0;
+  if (!estCivilite(0)) return mots;
+  i = 1;
+  while (i + 1 < mots.length && LIEN_CIVILITES.test(mots[i]) && estCivilite(i + 1)) i += 2;
+  return i >= mots.length ? mots : mots.slice(i);
+}
+
 /**
  * Découpe le texte d'une colonne composée en champs. Rend tous les champs de la cible ('' si une part manque).
  * @param {string} cibleComposee clé d'une cible composée
@@ -92,7 +111,7 @@ function separerCodePostal(texte) {
 export function decouper(cibleComposee, texte) {
   const t = String(texte ?? '').trim();
   if (cibleComposee === '@nom_prenom') {
-    const mots = t.split(/\s+/).filter(Boolean);
+    const mots = sansCivilite(t.split(/\s+/).filter(Boolean));
     let n = 0;
     while (n < mots.length && estMajuscules(mots[n])) n += 1;
     // Tout en majuscules (anciens logiciels) : le dernier mot est le prénom.
@@ -101,13 +120,14 @@ export function decouper(cibleComposee, texte) {
     return { nom: mots.slice(0, n).join(' '), prenom: mots.slice(n).join(' ') };
   }
   if (cibleComposee === '@prenom_nom') {
-    const mots = t.split(/\s+/).filter(Boolean);
+    const mots = sansCivilite(t.split(/\s+/).filter(Boolean));
     return { prenom: mots[0] || '', nom: mots.slice(1).join(' ') };
   }
   if (cibleComposee === '@cp_ville') {
     const s = separerCodePostal(t);
+    // La ville = ce qui précède le code postal puis ce qui le suit : rien n'est jeté.
     // Sans code postal reconnaissable, le texte est pris pour la ville (jamais pour un code postal).
-    return s ? { code_postal: s.cp, ville: s.apres } : { code_postal: '', ville: t };
+    return s ? { code_postal: s.cp, ville: [s.avant, s.apres].filter(Boolean).join(' ') } : { code_postal: '', ville: t };
   }
   if (cibleComposee === '@adresse_complete') {
     const s = separerCodePostal(t);
