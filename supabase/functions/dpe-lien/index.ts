@@ -29,6 +29,7 @@ import {
   orgBranding, brandingReplacements, wrapWithSkeleton, applyPlaceholders, escapeHtml,
   sendResendEmail, insertMailingLog, arrayBufferToBase64,
 } from "../_shared/mail.ts";
+import { chargerTexteEmail } from "../_shared/texteEmail.ts";
 import { mapCorpusDossier, colonnesFiltrables, VERSION_CARTE } from "../_shared/dpeCorpus.js";
 import { adresseNormalisee } from "../_shared/dpeLien.js";
 import { DPE_RAPPORT_EMAIL_TEMPLATE_KEY } from "../_shared/dpeRapportEmailTemplate.js";
@@ -371,10 +372,9 @@ Deno.serve(async (req) => {
       const ecart = controleNumero({ numeroFiche: numero, ligne, rapportRequis: true });
       if (ecart) return refus(ecart);
 
-      const { data: gabarit, error: errGabarit } = await auth.supabase.from("majordhome_mail_campaigns")
-        .select("subject, html_body").eq("org_id", orgId).eq("key", DPE_RAPPORT_EMAIL_TEMPLATE_KEY).eq("is_archived", false)
-        .maybeSingle();
-      if (errGabarit) return jsonResponse({ error: sanitizeError(errGabarit, "lecture du gabarit") }, 500, req);
+      const lecture = await chargerTexteEmail(auth.supabase, orgId, DPE_RAPPORT_EMAIL_TEMPLATE_KEY);
+      if (lecture.erreur) return jsonResponse({ error: sanitizeError(lecture.erreur, "lecture du gabarit") }, 500, req);
+      const gabarit = lecture.texte;
       if (!gabarit) return refus("template_missing");
 
       const lien = await lienRapport(client, numero, false);

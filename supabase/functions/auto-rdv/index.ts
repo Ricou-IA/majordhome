@@ -27,6 +27,7 @@ import { signer, verifier, expirationLien, isoLocal, secretConfigure, UUID_RE } 
 import {
   orgBranding, brandingReplacements, wrapWithSkeleton, applyPlaceholders, escapeHtml, sendResendEmail, insertMailingLog,
 } from "../_shared/mail.ts";
+import { chargerTexteEmail } from "../_shared/texteEmail.ts";
 import { minutesVersHeure } from "../_shared/tournee/arrets.js";
 import { journeesProposables, creneauxPourContrat, empreinteJournee, demiJournees, placerParSequencement } from "../_shared/tournee/auto-rdv.js";
 import { charger, rdvDejaPris, trajetPour, type Contexte } from "../_shared/autoRdvContexte.ts";
@@ -89,9 +90,9 @@ function formatDateLongue(iso: string): string {
 async function envoyerConfirmation(ctx: Contexte, p: { date: string; demi: string; technicien: string }): Promise<string | null> {
   try {
     if (!RESEND_API_KEY || !ctx.clientEmail) return null;
-    const { data: tpl } = await ctx.admin
-      .from("majordhome_mail_campaigns").select("subject, html_body")
-      .eq("org_id", ctx.coreOrgId).eq("key", AUTO_RDV_CONFIRMATION_TEMPLATE_KEY).eq("is_archived", false).maybeSingle();
+    const lecture = await chargerTexteEmail(ctx.admin as never, ctx.coreOrgId, AUTO_RDV_CONFIRMATION_TEMPLATE_KEY);
+    if (lecture.erreur) return `texte_illisible: ${lecture.erreur}`;
+    const tpl = lecture.texte;
     if (!tpl) return "template_missing";
     const b = orgBranding(ctx.settings as never);
     if (!b.fromEmail) return "no_from_email";

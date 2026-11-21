@@ -26,6 +26,8 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { chargerTexteEmail } from "../_shared/texteEmail.ts";
+import { CONTRAT_SIGNE_TEMPLATE_KEY } from "../_shared/contratEmailTemplates.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -153,19 +155,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 3) Template depuis mail_campaigns
-    const { data: template, error: tmplErr } = await supabase
-      .from("majordhome_mail_campaigns")
-      .select("subject, html_body")
-      .eq("org_id", contract.org_id)
-      .eq("key", "contrat_signature_confirm")
-      .single();
-
-    if (tmplErr || !template) {
+    // 3) Texte : celui de l'entreprise (mail_campaigns, non archivé), sinon le texte par défaut
+    const lecture = await chargerTexteEmail(supabase, contract.org_id, CONTRAT_SIGNE_TEMPLATE_KEY);
+    const template = lecture.texte;
+    if (lecture.erreur || !template) {
       return json(
         {
-          error: "Template 'contrat_signature_confirm' introuvable dans mail_campaigns",
-          details: tmplErr?.message,
+          error: "Texte de l'e-mail 'contrat_signature_confirm' illisible",
+          details: lecture.erreur,
         },
         500,
       );

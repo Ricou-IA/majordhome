@@ -20,6 +20,7 @@ import { requireSharedSecret, jsonResponse, buildCorsHeaders, getAdminClient, sa
 import {
   orgBranding, brandingReplacements, wrapWithSkeleton, applyPlaceholders, escapeHtml, sendResendEmail, insertMailingLog,
 } from "../_shared/mail.ts";
+import { chargerTexteEmail } from "../_shared/texteEmail.ts";
 import { moduleActif } from "../_shared/modules.js";
 import { capitaliserPrenom } from "../_shared/smsCampaigns.js";
 import {
@@ -71,9 +72,9 @@ async function traiterOrg(
   report.echecs = 0;
   if (!aEnvoyer.length || dryRun) { if (dryRun) report.envoyes = aEnvoyer.length; return; }
 
-  const { data: tpl, error: tErr } = await admin.from("majordhome_mail_campaigns").select("subject, html_body")
-    .eq("org_id", org.id).eq("key", LEAD_WELCOME_TEMPLATE_KEY).eq("is_archived", false).maybeSingle();
-  if (tErr) { report.error = sanitizeError(tErr, "gabarit illisible"); return; }
+  const lecture = await chargerTexteEmail(admin, org.id, LEAD_WELCOME_TEMPLATE_KEY);
+  if (lecture.erreur) { report.error = sanitizeError(lecture.erreur, "gabarit illisible"); return; }
+  const tpl = lecture.texte;
   if (!tpl) { report.skipped = "template_missing"; return; }
   const b = orgBranding(org.settings);
   if (!b.fromEmail) { report.skipped = "from_email_manquant"; return; }

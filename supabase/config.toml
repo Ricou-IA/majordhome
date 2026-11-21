@@ -255,3 +255,7 @@ verify_jwt = false
 # sav-report-send : envoi au client du rapport d'intervention SAV archivé (Resend). JWT user + module Communication + user_can(sav | entretiens, edit). 2026-11-19.
 [functions.sav-report-send]
 verify_jwt = true
+
+# email-essai : « M'envoyer un essai » d'un e-mail automatique, à l'adresse du compte appelant. JWT user + org_admin + module Communication. 2026-11-21.
+[functions.email-essai]
+verify_jwt = true

@@ -25,6 +25,8 @@ import { useContractZone } from '@hooks/useContractZone';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { formatEuro } from '@/lib/utils';
+import { texteEffectif } from '@/lib/emailsAutomatiques';
+import { PROPOSITION_CONTRAT_TEMPLATE_KEY, PROPOSITION_CONTRAT_PLACEHOLDERS_REQUIS } from '@/lib/contratEmailTemplates';
 import { logger } from '@lib/logger';
 
 /**
@@ -173,13 +175,12 @@ export function useContractProposal({ contract, client, clientId, orgId }) {
       .join(', ') || 'Vos équipements';
     const totalStr = formatEuro(billableTotal);
 
-    // 5. Texte de l'e-mail : mail_campaigns (éditable via l'onglet Éditeur)
-    const { data: template, error: templateError } = await mailCampaignsService.getByKey(orgId, 'proposition_contrat');
-    if (templateError || !template) {
-      throw new Error("Template 'proposition_contrat' introuvable — vérifie l'onglet Mailing > Éditeur");
-    }
-    const requiredPlaceholders = ['{{EQUIP_RECAP}}', '{{TOTAL_AMOUNT}}', '{{PDF_URL}}'];
-    const missing = requiredPlaceholders.filter((p) => !template.html_body?.includes(p));
+    // 5. Texte de l'e-mail : celui de l'entreprise (mail_campaigns, éditable dans Réglages → Emails),
+    // sinon le texte par défaut du registre. Une lecture en échec n'est jamais remplacée par le défaut.
+    const { data: ligne, error: templateError } = await mailCampaignsService.getByKey(orgId, PROPOSITION_CONTRAT_TEMPLATE_KEY);
+    if (templateError) throw new Error('Le texte de l’e-mail de proposition n’a pas pu être lu. Réessayez.');
+    const template = texteEffectif(ligne, PROPOSITION_CONTRAT_TEMPLATE_KEY);
+    const missing = PROPOSITION_CONTRAT_PLACEHOLDERS_REQUIS.filter((p) => !template.html_body?.includes(p));
     if (missing.length > 0) logger.warn('[useContractProposal] Placeholders manquants dans le template:', missing);
 
     const htmlBody = (template.html_body || '')

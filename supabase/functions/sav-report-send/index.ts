@@ -22,6 +22,7 @@ import {
   orgBranding, brandingReplacements, wrapWithSkeleton, applyPlaceholders, escapeHtml, sanitizeFilename,
   sendResendEmail, insertMailingLog, arrayBufferToBase64,
 } from "../_shared/mail.ts";
+import { chargerTexteEmail } from "../_shared/texteEmail.ts";
 import { buildInterventionReportPath } from "../_shared/interventionStoragePath.js";
 import {
   RAPPORT_SAV_EMAIL_TEMPLATE_KEY, peutFaireRapportSav, rapportDeCarte, dateInterventionFr, appareilPourEmail,
@@ -122,10 +123,9 @@ Deno.serve(async (req) => {
       return refus("rapport_illisible");
     }
 
-    const { data: gabarit, error: errGabarit } = await auth.supabase.from("majordhome_mail_campaigns")
-      .select("subject, html_body").eq("org_id", orgId).eq("key", RAPPORT_SAV_EMAIL_TEMPLATE_KEY).eq("is_archived", false)
-      .maybeSingle();
-    if (errGabarit) return jsonResponse({ error: sanitizeError(errGabarit, "lecture du gabarit") }, 500, req);
+    const lecture = await chargerTexteEmail(auth.supabase, orgId, RAPPORT_SAV_EMAIL_TEMPLATE_KEY);
+    if (lecture.erreur) return jsonResponse({ error: sanitizeError(lecture.erreur, "lecture du gabarit") }, 500, req);
+    const gabarit = lecture.texte;
     if (!gabarit) return refus("template_missing");
 
     const contenu = ((trace.contenu ?? {}) as Record<string, unknown>);

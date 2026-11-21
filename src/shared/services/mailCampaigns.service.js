@@ -76,6 +76,19 @@ export const mailCampaignsService = {
     return { error };
   },
 
+  /**
+   * « M'envoyer un essai » d'un e-mail automatique : l'edge `email-essai` l'envoie à l'adresse du
+   * compte connecté, avec des valeurs d'exemple. `error.code` = code de `ESSAI_CODES`, `error.detail` =
+   * précision du service d'envoi.
+   * @returns {Promise<{ data: { envoye_a: string, source: 'entreprise'|'defaut' } | null, error: { code: string, detail: string|null } | null }>}
+   */
+  async envoyerEssai(orgId, cle) {
+    const { data, error } = await supabase.functions.invoke('email-essai', { body: { org_id: orgId, cle } });
+    if (error) return { data: null, error: { code: 'appel_echoue', detail: null } };
+    if (data?.error) return { data: null, error: { code: data.error, detail: data.detail ?? null } };
+    return { data: data?.data ?? null, error: null };
+  },
+
   async duplicate(campaign, newKey) {
     const {
       id: _id,

@@ -35,7 +35,6 @@ export const MODULES = [
       // socle, pas Communication.
       { key: 'emails', title: 'Emails', description: 'Expéditeur, adresse de réponse, domaine d\'envoi', icon: 'Mail', href: '/settings/emails', adminOnly: true, horsCrm: true },
       { key: 'plan-comptable', title: 'Plan comptable', description: 'Les comptes de vente Pennylane utilisables dans Majord\'home', icon: 'BookOpen', href: '/settings/plan-comptable', adminOnly: true, si: 'pennylane' },
-      { key: 'projets', title: 'Types de projet', description: 'Les types proposés dans les leads et les devis', icon: 'Layers', href: '/settings/projets', adminOnly: true },
       { key: 'devis', title: 'Devis', description: 'Chapitres par type de projet, mentions et affichage du document', icon: 'FileSignature', href: '/settings/devis', adminOnly: true },
     ],
   },
@@ -214,7 +213,7 @@ export function accueilSansCrm(settings) {
 const ROUTES_PAR_MODULE = {
   socle: [
     'settings', 'settings/team', 'settings/permissions', 'settings/organization', 'settings/suppliers',
-    'settings/equipements', 'settings/emails', 'settings/pennylane', 'settings/plan-comptable', 'settings/devis', 'settings/projets', 'profile',
+    'settings/activite', 'settings/equipements', 'settings/emails', 'settings/pennylane', 'settings/plan-comptable', 'settings/devis', 'settings/projets', 'profile',
   ],
   entretiens: [
     'contrats', 'entretiens', 'certificat/:interventionId', 'clients/:clientId/contrat/signer',

@@ -68,6 +68,7 @@ import {
   insertMailingLog,
 } from "../_shared/mail.ts";
 import type { ResendAttachment } from "../_shared/mail.ts";
+import { chargerTexteEmail } from "../_shared/texteEmail.ts";
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
@@ -381,15 +382,10 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "attachments_too_large" }, 413, req);
     }
 
-    // 5) Gabarit — campagne `facture_entretien`, non archivée.
-    const { data: template, error: tmplErr } = await supabase
-      .from("majordhome_mail_campaigns")
-      .select("subject, html_body")
-      .eq("org_id", orgId)
-      .eq("key", "facture_entretien")
-      .eq("is_archived", false)
-      .maybeSingle();
-    if (tmplErr) return jsonResponse({ error: sanitizeError(tmplErr, "lecture gabarit") }, 500, req);
+    // 5) Texte — celui de l'entreprise (`facture_entretien`, non archivé), sinon le texte par défaut.
+    const lecture = await chargerTexteEmail(supabase, orgId, "facture_entretien");
+    if (lecture.erreur) return jsonResponse({ error: sanitizeError(lecture.erreur, "lecture gabarit") }, 500, req);
+    const template = lecture.texte;
     if (!template) return jsonResponse({ error: "template_missing" }, 409, req);
 
     // 6) Placeholders (marque + facture + certificats). Le sujet garde des valeurs brutes

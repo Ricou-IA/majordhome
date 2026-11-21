@@ -54,6 +54,7 @@ import { signerPv, verifierPv, secretConfigure, UUID_RE } from "../_shared/pvTok
 import {
   orgBranding, brandingReplacements, wrapWithSkeleton, applyPlaceholders, escapeHtml, sendResendEmail, insertMailingLog,
 } from "../_shared/mail.ts";
+import { chargerTexteEmail } from "../_shared/texteEmail.ts";
 import { moduleActif } from "../_shared/modules.js";
 import {
   PV_RECEPTION_TEMPLATE_KEY, PV_LEVEE_TEMPLATE_KEY, PV_LIEN_VALIDITE_JOURS,
@@ -249,10 +250,9 @@ async function envoyerCourriel(req: Request, ctx: ContextePv, cle: string): Prom
   const b = orgBranding(ctx.settings as never);
   if (!b.fromEmail) return refus("expediteur_absent", 400);
 
-  const { data: tpl, error: tplErr } = await admin
-    .from("majordhome_mail_campaigns").select("subject, html_body")
-    .eq("org_id", ctx.org_id).eq("key", cle).eq("is_archived", false).maybeSingle();
-  if (tplErr) return refus(sanitizeError(tplErr, "gabarit illisible"), 500);
+  const lecture = await chargerTexteEmail(admin, ctx.org_id, cle);
+  if (lecture.erreur) return refus(sanitizeError(lecture.erreur, "gabarit illisible"), 500);
+  const tpl = lecture.texte;
   if (!tpl) return refus("template_missing", 400);
 
   const { url } = await lienPour(ctx.chantier_id);

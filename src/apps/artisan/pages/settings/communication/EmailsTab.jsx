@@ -12,14 +12,10 @@ import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useAuth } from '@contexts/AuthContext';
 import { moduleActif } from '@/lib/modules';
-import { DEFAULT_INVOICE_EMAIL } from '@/lib/invoiceEmailTemplate';
-import { DEFAULT_DPE_RAPPORT_EMAIL } from '@/lib/dpeRapportEmailTemplate';
-import { DEFAULT_RAPPORT_SAV_EMAIL } from '@/lib/rapportSav';
-import { DEFAULT_PV_RECEPTION_EMAIL, DEFAULT_PV_LEVEE_EMAIL } from '@/lib/pvReception';
+import { emailsAffiches } from '@/lib/emailsAutomatiques';
 import ResendDomainSection from './ResendDomainSection';
 import EmailAutoLigne from './EmailAutoLigne';
 import AccueilLeadMetaSection from './AccueilLeadMetaSection';
-import { DEFAULT_AUTO_RDV_EMAIL, DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL } from '@/lib/autoRdvEmailTemplates';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -117,44 +113,22 @@ export default function EmailsTab() {
         {communicationActive && (
           <section>
             <h3 className={SECTION_TITLE}>E-mails envoyés automatiquement</h3>
-            <EmailAutoLigne
-              orgId={orgId} gabarit={DEFAULT_INVOICE_EMAIL}
-              titre="Envoyer la facture d’entretien au client"
-              description="Utilisé quand vous envoyez une facture d’entretien par e-mail depuis la carte."
-            />
-            <EmailAutoLigne
-              orgId={orgId} gabarit={DEFAULT_AUTO_RDV_EMAIL}
-              titre="Inviter le client à choisir son rendez-vous d’entretien"
-              description="Envoyé chaque mois aux clients dont l’entretien arrive, si la prise de rendez-vous en ligne est activée (Réglages → Tournées)."
-            />
-            <EmailAutoLigne
-              orgId={orgId} gabarit={DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL}
-              titre="Confirmer le rendez-vous choisi en ligne"
-              description="Envoyé quand le client a choisi sa demi-journée."
-            />
-            <EmailAutoLigne
-              orgId={orgId} gabarit={DEFAULT_PV_RECEPTION_EMAIL}
-              titre="Faire signer le PV de réception au client"
-              description="Utilisé par « Envoyer au client » de la fiche chantier : le client signe la réception des travaux depuis le lien, sur son téléphone."
-            />
-            <EmailAutoLigne
-              orgId={orgId} gabarit={DEFAULT_PV_LEVEE_EMAIL}
-              titre="Demander au client de confirmer la levée des réserves"
-              description="Utilisé par « Demander la levée » de la fiche chantier : le client confirme depuis le lien, sur son téléphone, que ses réserves sont levées."
-            />
-            <EmailAutoLigne
-              orgId={orgId} gabarit={DEFAULT_RAPPORT_SAV_EMAIL}
-              titre="Envoyer le rapport d’intervention SAV au client"
-              description="Utilisé par « Envoyer au client » de la fenêtre Rapport d’intervention d’une demande SAV réalisée : le rapport part en pièce jointe."
-            />
-            {moduleActif(settings, 'dpe') && (
-              <EmailAutoLigne
-                orgId={orgId} gabarit={DEFAULT_DPE_RAPPORT_EMAIL}
-                titre="Envoyer l’analyse MonsieurDPE du logement au client"
-                description="Utilisé par « Envoyer le rapport au client » de la fiche client : le PDF de l’analyse complète part en pièce jointe."
-              />
-            )}
-            <AccueilLeadMetaSection orgId={orgId} />
+            <p className={HINT_CLASS}>
+              Chaque e-mail part avec un texte par défaut tant que vous ne l&apos;avez pas modifié.
+            </p>
+            {emailsAffiches((cle) => moduleActif(settings, cle)).map((email) => (
+              email.interrupteur === 'lead_welcome_email'
+                ? <AccueilLeadMetaSection key={email.gabarit.key} orgId={orgId} />
+                : (
+                  <EmailAutoLigne
+                    key={email.gabarit.key}
+                    orgId={orgId}
+                    gabarit={email.gabarit}
+                    titre={email.titre}
+                    description={email.description}
+                  />
+                )
+            ))}
           </section>
         )}
 

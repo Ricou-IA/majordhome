@@ -21,6 +21,7 @@ import { signer, expirationLien, isoLocal } from "../_shared/autoRdvToken.ts";
 import {
   orgBranding, brandingReplacements, wrapWithSkeleton, applyPlaceholders, escapeHtml, sendResendEmail, insertMailingLog,
 } from "../_shared/mail.ts";
+import { chargerTexteEmail } from "../_shared/texteEmail.ts";
 import { sendCampaignSms, type SmsSettings } from "../_shared/sms.ts";
 import { capitaliserPrenom } from "../_shared/smsCampaigns.js";
 import { isMobileFR } from "../_shared/phoneUtils.js";
@@ -230,9 +231,11 @@ async function ouverture(admin: Admin, d: Donnees, dryRun: boolean, report: OrgR
     .eq("org_id", d.coreOrgId).eq("mois", moisPrec);
   const relancesPrec = new Map((precedentes ?? []).filter((p) => !p.booked_at).map((p) => [String(p.contract_id), Number(p.relances) || 0]));
 
-  // Gabarit et branding.
-  const { data: tpl } = await admin.from("majordhome_mail_campaigns").select("subject, html_body")
-    .eq("org_id", d.coreOrgId).eq("key", AUTO_RDV_TEMPLATE_KEY).eq("is_archived", false).maybeSingle();
+  // Texte (celui de l'entreprise, sinon le texte par défaut) et branding. Texte illisible : comme un
+  // texte absent, les invitations partent en liste d'appels et le rapport le signale.
+  const lecture = await chargerTexteEmail(admin as never, d.coreOrgId, AUTO_RDV_TEMPLATE_KEY);
+  if (lecture.erreur) console.error(`[auto-rdv-cron] texte ${AUTO_RDV_TEMPLATE_KEY} illisible :`, lecture.erreur);
+  const tpl = lecture.texte;
   const b = orgBranding(d.settings as never);
   const peutEnvoyer = !!tpl && !!b.fromEmail && !!RESEND_API_KEY;
   if (!tpl) report.invitations.template_missing = true;
