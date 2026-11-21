@@ -212,6 +212,23 @@ n'échoue jamais à cause de HésiaSun.
 l'edge `hesiasun-identite-cron` (`verify_jwt = false`, `requireSharedSecret`), qui ne fait un appel réseau que
 pour les organisations `en_attente`. Au bout de 24 h d'échecs, il cesse et laisse l'erreur affichée.
 
+**État du lot 3 au 2026-11-21 : en production** (commit `5697c8f7`, migrations `20261121_6` et `_7`, edges
+`hesiasun-identite` et `hesiasun-identite-cron` déployées, secret `MDH_HESIASUN_URL` posé). Écarts avec ce qui précède :
+- **Pas d'action `etat`** : l'écran lit `settings.hesiasun` dans les réglages. Actions : `relier`, `comparer`,
+  `pousser`, `delier`.
+- **Relier n'envoie rien** : la liaison est notée `ouverte: false` ; c'est le premier `pousser` (après le choix de
+  l'identité à garder) qui l'ouvre côté HésiaSun. L'envoi automatique à l'enregistrement ne part que si elle est ouverte.
+- **Coffre** : la clé est rangée et retirée au jeton de l'utilisateur (`org_secret_set` / `_delete` contrôlent
+  org_admin par `auth.uid()`). Quand c'est le rejeu horaire qui constate `liaison_rompue`, la clé reste au coffre
+  jusqu'à la prochaine liaison.
+- **État** : `{ liaison_id, relie_le, entreprise, ouverte, dernier_envoi_le, erreur, erreur_champs, en_attente,
+  en_attente_depuis }` ; après une rupture, `{ rompue_le }` seul. Seuls `hesiasun_injoignable` et `version_inconnue`
+  se rejouent ; un refus motivé attend un geste.
+- **Cron** : minute 20 de chaque heure, seulement s'il existe une organisation en attente ; au-delà de 24 h il
+  cesse et laisse l'erreur affichée.
+- Limite connue : un org_admin peut écrire `settings.hesiasun` de sa propre organisation par `org_update_settings`.
+- Non essayé avec une vraie clé au moment de la livraison.
+
 ### 5.5 Recherche dans l'annuaire, côté Majord'home (lot 5, indépendant)
 
 HésiaSun sait « Retrouver votre entreprise » (annuaire des entreprises) ; Majord'home fait tout saisir. À
