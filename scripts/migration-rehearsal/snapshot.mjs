@@ -240,6 +240,7 @@ const FUNCTIONS = [
   'majordhome.cascade_client_archive_to_contract()',
   'majordhome.update_clients_updated_at()',
   'majordhome.lead_commercial_meme_organisation()', // trigger leads posé par 20261121_9, en prod depuis le 2026-11-21 : sans elle le schéma ne charge plus
+  'public.geocode_fetch_pending_clients(integer)', // 20260617_2, remplacée par 20261121_14 (file équitable) : le harnais part de la définition de prod
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
