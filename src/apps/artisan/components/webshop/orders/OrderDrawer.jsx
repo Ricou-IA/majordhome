@@ -213,7 +213,7 @@ export default function OrderDrawer({
               type="button"
               onClick={saveFollowUp}
               disabled={!followUpDirty || saving}
-              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-700 text-white text-sm font-medium hover:bg-primary-800 disabled:opacity-50"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />} Enregistrer le suivi
             </button>

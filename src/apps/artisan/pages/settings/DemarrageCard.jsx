@@ -21,7 +21,7 @@ export default function DemarrageCard({ settings }) {
           <li key={e.cle}>
             <Link to={e.vers} className="flex items-center gap-3 py-2.5 hover:bg-secondary-50 -mx-2 px-2 rounded">
               <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${e.fait ? 'bg-primary-600 text-white' : 'border border-secondary-300'}`}
+                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${e.fait ? 'bg-primary-700 text-white' : 'border border-secondary-300'}`}
                 aria-hidden="true"
               >
                 {e.fait && <Check className="w-3.5 h-3.5" />}

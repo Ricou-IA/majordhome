@@ -53,7 +53,7 @@ export function PhoningPanel({ contacts, orgId, onClose }) {
               {status === 'idle' && (
                 <button
                   onClick={handleStart}
-                  className="px-6 py-2.5 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700"
+                  className="px-6 py-2.5 rounded-lg bg-primary-700 text-white font-medium hover:bg-primary-800"
                 >
                   Démarrer la séquence
                 </button>
@@ -71,7 +71,7 @@ export function PhoningPanel({ contacts, orgId, onClose }) {
               {status === 'paused' && (
                 <button
                   onClick={session.resume}
-                  className="px-6 py-2.5 rounded-lg bg-primary-600 text-white"
+                  className="px-6 py-2.5 rounded-lg bg-primary-700 text-white"
                 >
                   Reprendre
                 </button>

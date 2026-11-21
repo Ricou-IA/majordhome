@@ -124,7 +124,7 @@ function NotConnectedView({ orgId, onConnect, isConnecting }) {
         type="button"
         disabled={!orgId || isConnecting}
         onClick={() => onConnect({ orgId, returnTo: window.location.origin })}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+        className="inline-flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
       >
         {isConnecting ? (
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -308,7 +308,7 @@ function Header({ orgId, status }) {
           type="button"
           onClick={() => syncMutation.mutate({ orgId, monthsBack: 1 })}
           disabled={syncMutation.isPending}
-          className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm"
+          className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-700 text-white rounded-lg hover:bg-primary-800 disabled:opacity-50 text-sm"
         >
           {syncMutation.isPending ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -369,7 +369,7 @@ function PeriodAndFilters({
             onClick={() => setPeriodId(p.id)}
             className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
               periodId === p.id
-                ? 'bg-primary-600 text-white'
+                ? 'bg-primary-700 text-white'
                 : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
             }`}
           >

@@ -111,7 +111,7 @@ export default function PasswordChangeForm({ onSuccess }) {
       <button
         type="submit"
         disabled={loading || !password || !confirmPassword}
-        className="w-full py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+        className="w-full py-2.5 bg-primary-700 text-white font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
         {loading ? 'Mise à jour...' : 'Valider mon nouveau mot de passe'}

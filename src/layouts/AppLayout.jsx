@@ -189,7 +189,7 @@ export default function AppLayout() {
       {organization && (
         <div className="px-4 py-4 border-b border-secondary-800">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-primary-700 flex items-center justify-center">
               <Building2 className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -236,7 +236,7 @@ export default function AppLayout() {
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm font-medium transition-colors ${
                           isActive
-                            ? 'bg-primary-600 text-white'
+                            ? 'bg-primary-700 text-white'
                             : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
                         }`
                       }
@@ -263,7 +263,7 @@ export default function AppLayout() {
             className={({ isActive }) =>
               `flex-1 min-w-0 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-primary-600 text-white'
+                  ? 'bg-primary-700 text-white'
                   : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
               }`
             }
@@ -284,7 +284,7 @@ export default function AppLayout() {
             aria-expanded={userMenuOpen}
             aria-haspopup="menu"
             title={getUserDisplayName()}
-            className="h-11 w-11 lg:h-10 lg:w-10 rounded-full bg-primary-600 flex items-center justify-center ring-2 ring-transparent hover:ring-secondary-500 focus-visible:ring-white focus:outline-none transition-shadow"
+            className="h-11 w-11 lg:h-10 lg:w-10 rounded-full bg-primary-700 flex items-center justify-center ring-2 ring-transparent hover:ring-secondary-500 focus-visible:ring-white focus:outline-none transition-shadow"
           >
             <span className="text-sm font-medium text-white">
               {getUserInitials()}

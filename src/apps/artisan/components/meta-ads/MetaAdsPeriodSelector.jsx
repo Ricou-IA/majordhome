@@ -44,7 +44,7 @@ export function MetaAdsPeriodSelector({ presetKey, onPresetChange, startDate, en
             onClick={() => onPresetChange(p.key)}
             className={`px-3 py-1.5 text-sm font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
               presetKey === p.key
-                ? 'bg-primary-600 text-white'
+                ? 'bg-primary-700 text-white'
                 : 'text-secondary-700 hover:bg-secondary-50'
             }`}
           >
@@ -56,7 +56,7 @@ export function MetaAdsPeriodSelector({ presetKey, onPresetChange, startDate, en
           onClick={() => onPresetChange('custom')}
           className={`px-3 py-1.5 text-sm font-medium transition-colors rounded-r-lg flex items-center gap-1.5 ${
             presetKey === 'custom'
-              ? 'bg-primary-600 text-white'
+              ? 'bg-primary-700 text-white'
               : 'text-secondary-700 hover:bg-secondary-50'
           }`}
         >

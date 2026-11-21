@@ -59,7 +59,7 @@ function FormTarif({ edition, tarifs, onClose }) {
           type="button"
           onClick={enregistrer}
           disabled={isSavingRate || Object.keys(erreurs).length > 0 || !!chevauche}
-          className="px-3 py-1.5 rounded-md bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
+          className="px-3 py-1.5 rounded-md bg-primary-700 text-white text-sm font-medium disabled:opacity-50"
         >
           Enregistrer la tranche
         </button>

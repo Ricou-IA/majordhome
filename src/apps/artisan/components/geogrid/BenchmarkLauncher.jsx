@@ -489,7 +489,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
             <button
               onClick={handleLaunch}
               disabled={running || isLaunchBlocked}
-              className="flex items-center gap-2 px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-1.5 bg-primary-700 text-white text-sm font-medium rounded-md hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {running ? (
                 <>

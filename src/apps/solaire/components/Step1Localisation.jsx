@@ -494,7 +494,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
                         onClick={() => handleOrientationDir(dir)}
                         className={`h-11 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                           (panEditor ? orientationToAspect(dir) === Number(orientationVal) : selectedDir === dir)
-                            ? 'bg-primary-600 text-white border-primary-600'
+                            ? 'bg-primary-700 text-white border-primary-700'
                             : 'bg-white text-secondary-700 border-secondary-200 hover:border-secondary-400'
                         }`}
                       >

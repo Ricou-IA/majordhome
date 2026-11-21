@@ -93,7 +93,7 @@ export default function BorneTab() {
             <TextInput type="password" autoComplete="new-password" value={motDePasse} onChange={setMotDePasse} />
           </FormField>
           <button type="submit" disabled={!valide || creer.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50">
+            className="inline-flex items-center gap-2 rounded-lg bg-primary-700 px-4 py-2 text-sm font-medium text-white hover:bg-primary-800 disabled:opacity-50">
             {creer.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Créer le compte borne
           </button>
         </form>

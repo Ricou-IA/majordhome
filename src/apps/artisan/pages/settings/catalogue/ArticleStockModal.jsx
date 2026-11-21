@@ -96,7 +96,7 @@ export default function ArticleStockModal({ orgId, onClose, onCreated }) {
             const coche = !!coches[p.id];
             return (
               <button key={p.id} type="button" onClick={() => basculer(p)} className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg border ${coche ? 'border-primary-300 bg-primary-50/50' : 'border-secondary-100 hover:border-secondary-200'}`}>
-                <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${coche ? 'bg-primary-600 border-primary-600' : 'border-secondary-300'}`}>{coche && <Check className="w-3 h-3 text-white" />}</span>
+                <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${coche ? 'bg-primary-700 border-primary-700' : 'border-secondary-300'}`}>{coche && <Check className="w-3 h-3 text-white" />}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-secondary-900 break-words">{p.name}</p>
                   <p className="text-xs text-secondary-400 break-words">{[p.supplier_name, p.reference, p.brand].filter(Boolean).join(' · ')}{p.catalog_item_id ? ' · quittera son article actuel' : ''}</p>

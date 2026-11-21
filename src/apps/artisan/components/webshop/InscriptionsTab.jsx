@@ -184,7 +184,7 @@ export default function InscriptionsTab() {
             onClick={() => setCampaignFilter(c.key)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
               campaignFilter === c.key
-                ? 'bg-primary-600 text-white border-primary-600'
+                ? 'bg-primary-700 text-white border-primary-700'
                 : 'bg-white text-secondary-600 border-secondary-200 hover:border-secondary-400'
             }`}
           >
@@ -194,7 +194,7 @@ export default function InscriptionsTab() {
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={handleExport}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-primary-700 hover:bg-primary-800 rounded-lg transition-colors"
           >
             <Download className="w-3.5 h-3.5" /> Export CSV
           </button>

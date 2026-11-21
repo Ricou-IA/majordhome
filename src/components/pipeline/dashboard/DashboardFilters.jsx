@@ -97,7 +97,7 @@ const MonthPicker = ({ selectedMonths, onChange }) => {
                 futur && 'cursor-not-allowed text-secondary-300',
                 !futur && !choisi && !dansApercu && 'text-secondary-700 hover:bg-secondary-100',
                 dansApercu && 'bg-primary-400 text-white',
-                choisi && !dansApercu && 'bg-primary-600 text-white',
+                choisi && !dansApercu && 'bg-primary-700 text-white',
               )}
             >
               {label}

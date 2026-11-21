@@ -277,7 +277,7 @@ export default function PermissionsEditor({ embedded = false }) {
         <button
           type="button"
           onClick={() => setModal({ mode: 'create' })}
-          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-700 rounded-lg hover:bg-primary-800 transition-colors shadow-sm"
         >
           <Plus className="w-4 h-4" />
           Ajouter un profil

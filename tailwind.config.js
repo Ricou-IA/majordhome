@@ -38,6 +38,10 @@ export default {
 
           // Couleurs principales Majord'home
           primary: {
+            // Sans ces deux entrées, `bg-primary` / `text-primary-foreground` ne produisaient
+            // aucune règle : le bouton par défaut de components/ui n'avait ni fond ni couleur de texte.
+            DEFAULT: 'hsl(var(--primary))',
+            foreground: 'hsl(var(--primary-foreground))',
             50: '#f0f9ff',
             100: '#e0f2fe',
             200: '#bae6fd',

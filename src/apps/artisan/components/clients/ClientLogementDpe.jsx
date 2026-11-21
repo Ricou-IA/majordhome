@@ -30,7 +30,7 @@ import { DpeLogementCard } from './DpeLogementCard';
 import { resoudreExpediteur } from '@/lib/expediteur';
 
 const BOUTON = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-secondary-300 text-secondary-700 bg-white hover:bg-secondary-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
-const BOUTON_PRINCIPAL = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
+const BOUTON_PRINCIPAL = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg text-white bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 const LIEN = 'text-xs font-medium text-primary-700 hover:underline disabled:opacity-50 disabled:no-underline';
 
 const ORIGINES = {

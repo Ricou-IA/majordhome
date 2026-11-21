@@ -11,7 +11,7 @@ import { formatDateFR } from '@/lib/utils';
 import { INPUT_CLASS, SettingsSection, SettingsSurface } from './layout';
 
 const BOUTON = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50';
-const PRINCIPAL = `${BOUTON} bg-primary-600 text-white hover:bg-primary-700`;
+const PRINCIPAL = `${BOUTON} bg-primary-700 text-white hover:bg-primary-800`;
 const SECONDAIRE = `${BOUTON} border border-secondary-300 text-secondary-700 bg-white hover:bg-secondary-50`;
 
 /**

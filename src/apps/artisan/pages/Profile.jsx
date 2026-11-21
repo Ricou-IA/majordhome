@@ -233,7 +233,7 @@ export default function Profile() {
       <div className="card">
         <div className="flex items-center gap-6">
           <div className="relative">
-            <div className="w-20 h-20 rounded-full bg-primary-600 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-primary-700 flex items-center justify-center">
               <span className="text-2xl font-semibold text-white">
                 {formData.full_name
                   ? formData.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)

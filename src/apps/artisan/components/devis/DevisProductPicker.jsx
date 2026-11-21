@@ -143,7 +143,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
             <div className="flex flex-wrap gap-1.5">
               {filtres.map((f) => (
                 <button key={f.key} type="button" onClick={() => { setFiltreKey(f.key); setBrand(''); setGamme(''); }}
-                  className={`px-2.5 py-1 text-xs rounded-full border ${f.key === filtre.key ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-secondary-600 border-secondary-300 hover:bg-secondary-50'}`}>
+                  className={`px-2.5 py-1 text-xs rounded-full border ${f.key === filtre.key ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-secondary-600 border-secondary-300 hover:bg-secondary-50'}`}>
                   {f.label}
                 </button>
               ))}

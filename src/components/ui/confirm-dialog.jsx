@@ -37,7 +37,7 @@ export function ConfirmDialog({
 }) {
   const confirmButtonClass = variant === 'destructive'
     ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
-    : 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500';
+    : 'bg-primary-700 text-white hover:bg-primary-800 focus:ring-primary-500';
   const sizeClass = { md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl' }[size] || 'max-w-md';
 
   return (

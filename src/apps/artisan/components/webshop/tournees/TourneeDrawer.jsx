@@ -130,7 +130,7 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
           <div className="flex flex-wrap gap-2">
             {isTeamLeaderOrAbove && active && (
               <button type="button" disabled={busy || orders.length === 0} onClick={() => setConfirm('send')}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 rounded-lg"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-primary-700 hover:bg-primary-800 disabled:opacity-40 rounded-lg"
                 title={orders.length === 0 ? 'Aucune commande à livrer' : undefined}>
                 <Send className="w-4 h-4" /> {slot.route_sheet_sent_at ? 'Renvoyer au transporteur' : 'Envoyer au transporteur'}
               </button>
@@ -147,13 +147,13 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
             )}
             {isTeamLeaderOrAbove && canMarkDeparted && (
               <button type="button" disabled={busy} onClick={() => setConfirm('partie')}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 rounded-lg">
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-primary-700 hover:bg-primary-800 disabled:opacity-40 rounded-lg">
                 <Truck className="w-4 h-4" /> Marquer partie
               </button>
             )}
             {isTeamLeaderOrAbove && canMarkDelivered && (
               <button type="button" disabled={busy} onClick={() => setConfirm('livree')}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 rounded-lg">
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-primary-700 hover:bg-primary-800 disabled:opacity-40 rounded-lg">
                 <PackageCheck className="w-4 h-4" /> Marquer livrée
               </button>
             )}
