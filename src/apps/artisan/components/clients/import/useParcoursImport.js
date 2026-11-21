@@ -13,10 +13,8 @@
  * ============================================================================
  */
 
-import { useReducer, useMemo, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useReducer, useMemo } from 'react';
 import { useExistingClientsForImport } from '@hooks/useClientImports';
-import { clientImportKeys } from '@hooks/cacheKeys';
 import { LIGNES_MAX, trouverEntete, tableau } from '@/lib/importClients/lireFichier';
 import {
   estFichierType, proposerCorrespondance, validerCorrespondance, appliquerCorrespondance,
@@ -63,8 +61,10 @@ function reducteur(etat, action) {
         return { ...etat, lecture: 'repos', refus: 'Ce fichier ne contient aucune ligne de client.' };
       }
       const correspondance = proposerCorrespondance(fichier.entetes);
-      // Un fichier type n'a rien à faire pointer : on va droit à l'aperçu (sauf si sa correspondance a une erreur).
-      const direct = estFichierType(fichier.entetes) && validerCorrespondance(correspondance).erreurs.length === 0;
+      // Un fichier type n'a rien à faire pointer : on va droit à l'aperçu, sauf si une colonne reste à choisir
+      // (colonne en double) ou si la correspondance a une erreur — l'écran Correspondance le dit alors.
+      const { erreurs, aChoisir } = validerCorrespondance(correspondance);
+      const direct = estFichierType(fichier.entetes) && erreurs.length === 0 && aChoisir === 0;
       return {
         ...etat,
         lecture: 'repos',
@@ -111,7 +111,6 @@ function reducteur(etat, action) {
  * @param {string} orgId
  */
 export function useParcoursImport(orgId) {
-  const queryClient = useQueryClient();
   const [etat, dispatch] = useReducer(reducteur, ETAT_INITIAL);
   const { fichier, correspondance, choix } = etat;
 
@@ -120,23 +119,21 @@ export function useParcoursImport(orgId) {
 
   const validation = useMemo(() => validerCorrespondance(correspondance), [correspondance]);
 
+  // Classement calculé à l'étape Aperçu seulement : à l'étape Correspondance chaque choix de liste
+  // relancerait le contrôle de toutes les lignes pour rien. À l'étape Résultat, c'est la photo `envoi` qui sert.
+  const surApercu = etat.etape === 'apercu';
   const candidates = useMemo(
-    () => (fichier ? fichier.lignes.map((l) => appliquerCorrespondance(l, correspondance)) : []),
-    [fichier, correspondance],
+    () => (fichier && surApercu ? fichier.lignes.map((l) => appliquerCorrespondance(l, correspondance)) : null),
+    [fichier, correspondance, surApercu],
   );
 
   // Liste des clients existants inconnue ⇒ pas de classement (jamais « aucun doublon » supposé).
   const classees = useMemo(
-    () => (existants.clients ? classerLignes(candidates, existants.clients) : null),
+    () => (candidates && existants.clients ? classerLignes(candidates, existants.clients) : null),
     [candidates, existants.clients],
   );
 
   const bilan = useMemo(() => (classees ? bilanImport(classees, choix) : null), [classees, choix]);
-
-  const relireExistants = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: clientImportKeys.existants(orgId) }),
-    [queryClient, orgId],
-  );
 
   const actions = useMemo(() => ({
     debutLecture: () => dispatch({ type: 'lecture' }),
@@ -154,5 +151,5 @@ export function useParcoursImport(orgId) {
     retourApercu: () => dispatch({ type: 'retour_apercu' }),
   }), []);
 
-  return { etat, actions, existants, validation, classees, bilan, relireExistants };
+  return { etat, actions, existants, validation, classees, bilan, relireExistants: existants.refetch };
 }

@@ -10,7 +10,7 @@
 
 import { useEffect } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { logger } from '@lib/logger';
@@ -122,10 +122,19 @@ export default function ClientsImport() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-3">
-          <Link to="/clients" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
-            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-            Retour aux clients
-          </Link>
+          {/* Pendant l'envoi, aucun lien de la page : quitter démonterait l'écran qui suit l'import et sa reprise
+              (le routeur est un BrowserRouter, sans useBlocker possible). */}
+          {run.etat === 'en_cours' ? (
+            <p role="status" className="flex items-center gap-2 text-sm font-medium text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+              Import en cours : restez sur cette page jusqu&apos;à la fin.
+            </p>
+          ) : (
+            <Link to="/clients" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+              Retour aux clients
+            </Link>
+          )}
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Importer des clients</h1>
             <p className="text-gray-500 mt-1">Reprenez les clients de votre ancien logiciel depuis un fichier Excel ou CSV.</p>

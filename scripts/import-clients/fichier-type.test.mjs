@@ -21,6 +21,8 @@ test('mode d\'emploi : valeurs admises pour les listes, vide sinon', () => {
   assert.equal(type[3], 'particulier, entreprise, public');
   const nom = aide.lignes.find((l) => l[0] === 'Nom');
   assert.equal(nom[3], '');
+  assert.equal(aide.lignes.find((l) => l[0] === 'Accepte les e-mails')[3], 'oui, non');
+  assert.equal(aide.lignes.find((l) => l[0] === 'Accepte les SMS')[3], 'oui, non');
 });
 
 test('lignes écartées : colonnes d\'origine et raison', () => {

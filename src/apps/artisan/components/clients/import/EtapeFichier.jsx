@@ -16,8 +16,24 @@ export default function EtapeFichier({ lecture, refus, sourceLabel, onSource, on
     if (f) onFichier(f);
   };
 
+  // Le glisser-déposer est intercepté sur toute l'étape : un fichier lâché à côté de la zone (ou pendant une
+  // lecture) ne doit jamais être ouvert par le navigateur à la place de la page.
+  const surDragOver = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = enLecture ? 'none' : 'copy';
+    if (!enLecture) setSurvol(true);
+  };
+  const surDrop = (e) => {
+    e.preventDefault();
+    setSurvol(false);
+    if (!enLecture) choisir(e.dataTransfer?.files);
+  };
+  const surDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) setSurvol(false);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" onDragOver={surDragOver} onDrop={surDrop} onDragLeave={surDragLeave}>
       <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Votre fichier de clients</h2>
         <p className="text-sm text-gray-600">
@@ -27,15 +43,8 @@ export default function EtapeFichier({ lecture, refus, sourceLabel, onSource, on
 
         <button
           type="button"
-          disabled={enLecture}
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); if (!enLecture) setSurvol(true); }}
-          onDragLeave={() => setSurvol(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setSurvol(false);
-            if (!enLecture) choisir(e.dataTransfer?.files);
-          }}
+          aria-disabled={enLecture}
+          onClick={() => { if (!enLecture) inputRef.current?.click(); }}
           className={`w-full flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
             survol ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
           } ${enLecture ? 'cursor-wait' : 'cursor-pointer'}`}

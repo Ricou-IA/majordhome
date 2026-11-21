@@ -6,6 +6,7 @@
 import { useMemo } from 'react';
 import { ArrowLeft, Download, Loader2, AlertCircle, RefreshCw, Upload } from 'lucide-react';
 import { ListePretes, ListeDoublons, ListeEcartees } from './ListeLignes';
+import { phraseBilan } from '@/lib/importClients/libelles';
 
 const DOUBLONS = new Set(['doublon_fort', 'doublon_faible', 'doublon_fichier']);
 const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
@@ -33,17 +34,19 @@ export default function EtapeApercu({
   }, [classees]);
 
   const n = bilan?.importees ?? 0;
+  // Une relecture en cours prime sur l'erreur précédente (react-query la garde pendant la relecture).
+  const enErreur = !classees && !existants.isLoading && !!existants.error;
   const nonImportees = bilan ? bilan.doublons_ecartes + bilan.ecartees : 0;
 
   return (
     <div className="space-y-6">
-      {!classees && !existants.error && (
+      {!classees && !enErreur && (
         <p className="flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
           <Loader2 className="w-4 h-4 animate-spin text-blue-600" aria-hidden="true" />
           Lecture de vos clients existants…
         </p>
       )}
-      {!classees && existants.error && (
+      {enErreur && (
         <div role="alert" className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
           <p className="flex items-start gap-2">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
@@ -69,11 +72,7 @@ export default function EtapeApercu({
               <Compteur libelle="doublons écartés" valeur={bilan.doublons_ecartes} />
               <Compteur libelle="écartées" valeur={bilan.ecartees} />
             </div>
-            <p className="text-sm text-gray-700">
-              {pluriel(bilan.lues, 'ligne lue', 'lignes lues')} = {bilan.importees} à importer
-              + {pluriel(bilan.doublons_ecartes, 'doublon écarté', 'doublons écartés')}
-              + {pluriel(bilan.ecartees, 'écartée', 'écartées')}
-            </p>
+            <p className="text-sm text-gray-700">{phraseBilan(bilan)}</p>
           </div>
 
           <div className="space-y-3">
@@ -111,7 +110,7 @@ export default function EtapeApercu({
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Upload className="w-4 h-4" aria-hidden="true" />
-          Importer {pluriel(n, 'client', 'clients')}
+          {bilan ? `Importer ${pluriel(n, 'client', 'clients')}` : 'Importer'}
         </button>
       </div>
     </div>

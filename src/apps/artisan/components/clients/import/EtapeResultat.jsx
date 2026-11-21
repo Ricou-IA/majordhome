@@ -87,8 +87,9 @@ export default function EtapeResultat({
         </h2>
         <p role="alert" className="text-sm text-red-700">{erreur}</p>
         <p className="text-sm text-gray-700">
-          {progression.faits > 1 ? `${progression.faits} fiches sont déjà créées` : `${progression.faits} fiche est déjà créée`} sur {progression.total}.
-          Reprendre ne recrée pas celles-ci.
+          {progression.faits === 0
+            ? "Aucune fiche n'a encore été créée."
+            : `${pluriel(progression.faits, 'fiche est déjà créée', 'fiches sont déjà créées')} sur ${progression.total}. Reprendre ne les recrée pas.`}
         </p>
         <button
           type="button"
