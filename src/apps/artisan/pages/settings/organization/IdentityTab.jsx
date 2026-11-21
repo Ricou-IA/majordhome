@@ -1,73 +1,22 @@
 // Settings → Organisation → Identité : nom, mentions légales, signataire.
 // Les qualifications et les documents de l'entreprise ont leur onglet (DocumentsTab).
-import { useMemo } from 'react';
+// Règles (champs, formats, contrôles) : src/lib/organisation/identite.js. Raison sociale, SIRET et forme
+// juridique viennent de l'annuaire des entreprises, la TVA se calcule du SIRET (Eric 2026-11-21, comme
+// HésiaSun) ; la saisie à la main ne s'ouvre que si l'entreprise est introuvable.
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { Building2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
+import { CLES_IDENTITE, LEGAL_FORMS, formatSiret, formatTva, tvaDepuisSiret, validerSaisie } from '@/lib/organisation/identite';
+import { appliquerEntreprise, identiteEnregistree } from '@/lib/organisation/annuaire';
+import EntrepriseSearch from './components/EntrepriseSearch';
 import SignatureUpload from './components/SignatureUpload';
 import { useSettingsForm } from './components/useSettingsForm';
 import { Field, INPUT_CLASS, SaveBar, SettingsLoading, SettingsSection, SettingsSurface } from './components/layout';
 
-const LEGAL_FORMS = [
-  'SAS',
-  'SAS à associé unique',
-  'SARL',
-  'EURL',
-  'SA',
-  'SCI',
-  'EI',
-  'Autre',
-];
-
-const FIELDS = [
-  'brand_name',
-  'legal_name',
-  'legal_form',
-  'capital',
-  'siret',
-  'rcs',
-  'tva_intra',
-  'insurance',
-  // Signataire : mandats du dossier PV (mairie + Enedis) et attestations d'entretien
-  'signatory_name',
-  'signatory_role',
-  'signatory_signature_path',
-];
-
-// Formatage SIRET : groupes de 3 chiffres + 5 derniers
-function formatSiret(raw) {
-  const digits = (raw || '').replace(/\D/g, '').slice(0, 14);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)} ${digits.slice(3)}`;
-  if (digits.length <= 9) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-  return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
-}
-
-function formatTva(raw) {
-  const cleaned = (raw || '').replace(/\s/g, '').toUpperCase();
-  if (!cleaned) return '';
-  const withoutPrefix = cleaned.startsWith('FR') ? cleaned.slice(2) : cleaned;
-  const digits = withoutPrefix.replace(/\D/g, '').slice(0, 11);
-  if (!digits) return 'FR';
-  if (digits.length <= 2) return `FR ${digits}`;
-  return `FR ${digits.slice(0, 2)} ${digits.slice(2)}`;
-}
-
-function validate(form) {
-  const errors = {};
-  if (!form.brand_name?.trim()) errors.brand_name = 'Obligatoire';
-  if (form.brand_name && form.brand_name.length > 80) errors.brand_name = 'Maximum 80 caractères';
-  if (form.legal_name && form.legal_name.length > 120) errors.legal_name = 'Maximum 120 caractères';
-  if (form.siret && !/^\d{3}\s?\d{3}\s?\d{3}\s?\d{5}$/.test(form.siret)) {
-    errors.siret = 'Format attendu : 14 chiffres (ex. 100 288 224 00015)';
-  }
-  if (form.tva_intra && !/^FR\s?\d{2}\s?\d{9}$/.test(form.tva_intra)) {
-    errors.tva_intra = 'Format attendu : FR + 2 chiffres + 9 chiffres';
-  }
-  if (form.insurance && form.insurance.length > 200) errors.insurance = 'Maximum 200 caractères';
-  if (form.signatory_name && form.signatory_name.length > 80) errors.signatory_name = 'Maximum 80 caractères';
-  if (form.signatory_role && form.signatory_role.length > 60) errors.signatory_role = 'Maximum 60 caractères';
-  return errors;
-}
+// Signataire : mandats du dossier PV (mairie + Enedis) et attestations d'entretien
+const FIELDS = [...CLES_IDENTITE, 'signatory_signature_path'];
+const VERROUILLE = 'bg-secondary-50 text-secondary-700 cursor-default';
 
 function pickIdentityFields(settings) {
   const out = {};
@@ -81,19 +30,49 @@ export default function IdentityTab() {
   const { organization } = useAuth();
   const { form, setForm, initial, setInitial, isDirty, save, isSaving, isLoading } = useSettingsForm(pickIdentityFields);
 
-  const errors = useMemo(() => validate(form), [form]);
+  // Entreprise choisie dans l'annuaire, pas encore enregistrée : message et adresse du siège à joindre.
+  const [annuaire, setAnnuaire] = useState(null);
+  const [changer, setChanger] = useState(false);
+  const [saisieLibre, setSaisieLibre] = useState(false);
+
+  // Enregistré ou annulé : le préremplissage est consommé.
+  useEffect(() => {
+    if (!isDirty) setAnnuaire(null);
+  }, [isDirty]);
+
+  // La TVA suit le SIRET dès qu'il est complet ; sans SIRET complet elle reste ce qui est enregistré.
+  const tvaCalculee = formatTva(tvaDepuisSiret(form.siret));
+  const tva = tvaCalculee || form.tva_intra;
+  const errors = useMemo(() => validerSaisie({ ...form, tva_intra: tva }, CLES_IDENTITE), [form, tva]);
   const isValid = Object.keys(errors).length === 0;
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  const replie = identiteEnregistree(initial) && !changer;
+  // La forme juridique vient de l'annuaire ; elle se choisit à la main quand il n'a pas su la traduire
+  // (ou qu'aucune n'est enregistrée), et le reste tant que l'onglet n'est pas enregistré.
+  const formeAChoisir = annuaire ? !annuaire.form.legal_form : !initial.legal_form;
+  const formes = form.legal_form && !LEGAL_FORMS.includes(form.legal_form) ? [...LEGAL_FORMS, form.legal_form] : LEGAL_FORMS;
+
+  const choisirEntreprise = (entreprise) => {
+    const report = appliquerEntreprise(form, entreprise);
+    setForm(report.form);
+    setAnnuaire(report);
+    setSaisieLibre(false);
+  };
 
   const handleSave = async () => {
     if (!isValid) {
       toast.error('Corrigez les erreurs avant d’enregistrer.');
       return;
     }
+    const identite = { ...form, tva_intra: tva };
     try {
-      await save(form);
-      toast.success('Identité enregistrée');
-      setInitial(form);
+      // L'adresse du siège trouvée dans l'annuaire part avec l'identité (onglet Coordonnées).
+      await save({ ...identite, ...(annuaire?.siege || {}) });
+      toast.success(annuaire?.siege ? 'Identité et adresse du siège enregistrées' : 'Identité enregistrée');
+      setInitial(identite);
+      setForm(identite);
+      setChanger(false);
     } catch (err) {
       toast.error(err.message || 'Erreur lors de l’enregistrement');
     }
@@ -105,6 +84,43 @@ export default function IdentityTab() {
     <>
       <SettingsSurface>
         <SettingsSection title="Entreprise" description="Le nom affiché sur vos documents, vos e-mails et l’espace client.">
+          {replie ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-secondary-200 bg-secondary-50 px-3 py-2 text-sm">
+              <Building2 className="w-4 h-4 shrink-0 text-secondary-500" />
+              <span className="min-w-0 text-secondary-900">
+                <span className="font-medium">{initial.legal_name?.trim() || initial.brand_name?.trim()}</span>
+                <span className="tabular-nums text-secondary-600"> · SIRET {formatSiret(initial.siret)}</span>
+              </span>
+              <button type="button" onClick={() => setChanger(true)} className="ml-auto text-sm font-medium text-primary-700 hover:underline">
+                Changer d’entreprise
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Field
+                label="Retrouver votre entreprise"
+                hint="Par son nom ou son SIRET, dans l’annuaire des entreprises. Remplit les mentions légales et l’adresse du siège ; rien n’est enregistré avant « Enregistrer »."
+              >
+                <EntrepriseSearch onSelect={choisirEntreprise} autoFocus={changer} />
+              </Field>
+              {!saisieLibre && (
+                <button type="button" onClick={() => setSaisieLibre(true)} className="text-xs text-secondary-600 hover:text-secondary-900 underline">
+                  Entreprise introuvable dans l’annuaire ? Saisir à la main
+                </button>
+              )}
+            </div>
+          )}
+
+          {annuaire && isDirty && (
+            <div role="status" className="rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-secondary-900 space-y-1">
+              <p className="flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-primary-700" />
+                <span>{annuaire.detail}</span>
+              </p>
+              {annuaire.avertissement && <p className="pl-6 font-medium">{annuaire.avertissement}</p>}
+            </div>
+          )}
+
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Nom commercial" required error={errors.brand_name}>
               <input
@@ -112,17 +128,22 @@ export default function IdentityTab() {
                 value={form.brand_name}
                 onChange={(e) => set('brand_name', e.target.value)}
                 maxLength={80}
-                placeholder="Ex. Cimaj"
+                placeholder="Ex. Atelier du Chauffage"
                 className={INPUT_CLASS}
               />
             </Field>
-            <Field label="Raison sociale" hint="Reprend le nom commercial si vide." error={errors.legal_name}>
+            <Field
+              label="Raison sociale"
+              hint={saisieLibre ? 'Reprend le nom commercial si vide.' : 'Reprise de l’annuaire des entreprises.'}
+              error={errors.legal_name}
+            >
               <input
                 type="text"
                 value={form.legal_name}
                 onChange={(e) => set('legal_name', e.target.value)}
+                readOnly={!saisieLibre}
                 maxLength={120}
-                className={INPUT_CLASS}
+                className={`${INPUT_CLASS} ${saisieLibre ? '' : VERROUILLE}`}
               />
             </Field>
           </div>
@@ -130,10 +151,43 @@ export default function IdentityTab() {
 
         <SettingsSection title="Mentions légales" description="Imprimées en pied de page des devis, factures, certificats et attestations.">
           <div className="grid sm:grid-cols-2 gap-4">
-            <Field label="Forme juridique">
-              <select value={form.legal_form} onChange={(e) => set('legal_form', e.target.value)} className={INPUT_CLASS}>
+            <Field label="SIRET" error={errors.siret}>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={form.siret}
+                onChange={(e) => set('siret', formatSiret(e.target.value))}
+                readOnly={!saisieLibre}
+                placeholder={saisieLibre ? '123 456 789 00012' : ''}
+                className={`${INPUT_CLASS} tabular-nums ${saisieLibre ? '' : VERROUILLE}`}
+              />
+            </Field>
+            <Field
+              label="N° TVA intracommunautaire"
+              hint={tvaCalculee ? 'Calculé à partir du SIRET.' : undefined}
+              error={errors.tva_intra}
+            >
+              <input
+                type="text"
+                value={tva}
+                onChange={(e) => set('tva_intra', formatTva(e.target.value))}
+                readOnly={!!tvaCalculee || !saisieLibre}
+                className={`${INPUT_CLASS} tabular-nums ${tvaCalculee || !saisieLibre ? VERROUILLE : ''}`}
+              />
+            </Field>
+            <Field
+              label="Forme juridique"
+              hint={!saisieLibre && formeAChoisir && form.siret ? 'L’annuaire ne la précise pas : choisissez-la.' : undefined}
+            >
+              <select
+                value={form.legal_form}
+                onChange={(e) => set('legal_form', e.target.value)}
+                // Reprise de l'annuaire ; elle ne se choisit à la main que s'il n'a pas su la traduire.
+                disabled={!saisieLibre && !formeAChoisir}
+                className={INPUT_CLASS}
+              >
                 <option value="">Non renseignée</option>
-                {LEGAL_FORMS.map((f) => (
+                {formes.map((f) => (
                   <option key={f} value={f}>{f}</option>
                 ))}
               </select>
@@ -148,32 +202,13 @@ export default function IdentityTab() {
                 className={INPUT_CLASS}
               />
             </Field>
-            <Field label="SIRET" error={errors.siret}>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={form.siret}
-                onChange={(e) => set('siret', formatSiret(e.target.value))}
-                placeholder="100 288 224 00015"
-                className={`${INPUT_CLASS} tabular-nums`}
-              />
-            </Field>
-            <Field label="N° TVA intracommunautaire" error={errors.tva_intra}>
-              <input
-                type="text"
-                value={form.tva_intra}
-                onChange={(e) => set('tva_intra', formatTva(e.target.value))}
-                placeholder="FR 06 449776916"
-                className={`${INPUT_CLASS} tabular-nums`}
-              />
-            </Field>
-            <Field label="RCS" className="sm:col-span-2">
+            <Field label="RCS" className="sm:col-span-2" hint="SIREN et ville du greffe, tels qu’ils figurent sur votre extrait Kbis.">
               <input
                 type="text"
                 value={form.rcs}
                 onChange={(e) => set('rcs', e.target.value)}
                 maxLength={80}
-                placeholder="Ex. 100 288 224 R.C.S. Albi"
+                placeholder="Ex. 123 456 789 R.C.S. Albi"
                 className={INPUT_CLASS}
               />
             </Field>
@@ -232,7 +267,11 @@ export default function IdentityTab() {
         isSaving={isSaving}
         errorCount={Object.keys(errors).length}
         onSave={handleSave}
-        onReset={() => setForm(initial)}
+        onReset={() => {
+          setForm(initial);
+          setChanger(false);
+          setSaisieLibre(false);
+        }}
       />
     </>
   );

@@ -1,46 +1,15 @@
 // Settings → Organisation → Coordonnées : adresse du siège, téléphone, site web.
+// Règles (formats, contrôles) : src/lib/organisation/identite.js.
 // Emails (from_email, reply_to, domaine d'envoi) : Settings → Communication → Emails (communication/EmailsTab.jsx).
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Globe, Phone } from 'lucide-react';
 import { useSettingsForm } from './components/useSettingsForm';
+import { CLES_COORDONNEES, formatTelephone, prefixerHttps, validerSaisie } from '@/lib/organisation/identite';
 import { Field, INPUT_CLASS, SaveBar, SettingsLoading, SettingsSection, SettingsSurface } from './components/layout';
 
-const FIELDS = ['address', 'postal_code', 'city', 'phone', 'website_url'];
-
-function formatPhoneFR(raw) {
-  const digits = (raw || '').replace(/\D/g, '').slice(0, 10);
-  const groups = [];
-  for (let i = 0; i < digits.length; i += 2) {
-    groups.push(digits.slice(i, i + 2));
-  }
-  return groups.join(' ');
-}
-
-function autoPrefixHttps(url) {
-  if (!url) return '';
-  if (/^https?:\/\//i.test(url)) return url;
-  return `https://${url}`;
-}
-
-const URL_RE = /^https?:\/\/[^\s]+$/i;
-
-function validate(form) {
-  const errors = {};
-  if (!form.address?.trim()) errors.address = 'Obligatoire';
-  if (form.address && form.address.length > 200) errors.address = 'Maximum 200 caractères';
-  if (!form.postal_code?.trim()) errors.postal_code = 'Obligatoire';
-  if (form.postal_code && !/^\d{5}$/.test(form.postal_code)) errors.postal_code = '5 chiffres attendus';
-  if (!form.city?.trim()) errors.city = 'Obligatoire';
-  if (form.city && form.city.length > 80) errors.city = 'Maximum 80 caractères';
-  if (!form.phone?.trim()) errors.phone = 'Obligatoire';
-  if (form.phone && form.phone.replace(/\D/g, '').length !== 10) errors.phone = 'Téléphone français à 10 chiffres';
-  if (form.website_url && !URL_RE.test(autoPrefixHttps(form.website_url))) {
-    errors.website_url = 'Adresse invalide (ex. https://cimaj.fr ou cimaj.fr)';
-  }
-  return errors;
-}
+const FIELDS = CLES_COORDONNEES;
 
 function pickFields(settings) {
   const out = {};
@@ -53,7 +22,7 @@ function pickFields(settings) {
 export default function ContactTab() {
   const { form, setForm, initial, setInitial, isDirty, save, isSaving, isLoading } = useSettingsForm(pickFields);
 
-  const errors = useMemo(() => validate(form), [form]);
+  const errors = useMemo(() => validerSaisie(form, CLES_COORDONNEES), [form]);
   const isValid = Object.keys(errors).length === 0;
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -63,7 +32,7 @@ export default function ContactTab() {
       return;
     }
     try {
-      const payload = { ...form, website_url: autoPrefixHttps(form.website_url) };
+      const payload = { ...form, website_url: prefixerHttps(form.website_url) };
       await save(payload);
       toast.success('Coordonnées enregistrées');
       setInitial(payload);
@@ -127,7 +96,7 @@ export default function ContactTab() {
                 <input
                   type="tel"
                   value={form.phone}
-                  onChange={(e) => set('phone', formatPhoneFR(e.target.value))}
+                  onChange={(e) => set('phone', formatTelephone(e.target.value))}
                   placeholder="05 63 33 23 14"
                   className={`${INPUT_CLASS} pl-9 tabular-nums`}
                 />
@@ -140,7 +109,7 @@ export default function ContactTab() {
                   type="url"
                   value={form.website_url}
                   onChange={(e) => set('website_url', e.target.value)}
-                  placeholder="www.cimaj.fr"
+                  placeholder="www.votre-entreprise.fr"
                   className={`${INPUT_CLASS} pl-9`}
                 />
               </div>

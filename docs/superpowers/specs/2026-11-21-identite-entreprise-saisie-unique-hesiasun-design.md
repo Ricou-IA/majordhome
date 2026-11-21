@@ -238,13 +238,13 @@ Ce sont des choix de conception que j'ai faits, pas des décisions d'Eric :
 9. Le bloc de liaison est visible de tout org_admin, replié, sans module.
 10. Une entreprise HésiaSun n'est tenue que par une liaison à la fois (`liaison_id`).
 
-## 7 bis. Question ouverte, à trancher par Eric
+## 7 bis. Tranché par Eric le 2026-11-21 : « Oui, annuaire »
 
-HésiaSun tire raison sociale, SIRET et forme juridique de l'annuaire et calcule la TVA du SIREN ; Majord'home
-les laisse saisir. Tant que ce n'est pas tranché, l'entrée d'API accepte ces quatre champs tels qu'envoyés
-(sauf SIRET différent du SIRET vérifié), et « Reprendre la gestion ici » suivi d'un enregistrement dans
-HésiaSun recalcule la TVA. Proposition : avec le lot 5, Majord'home fait pareil que HésiaSun (annuaire +
-TVA calculée), avec saisie à la main seulement quand l'entreprise est introuvable dans l'annuaire.
+Majord'home fait comme HésiaSun : raison sociale, SIRET et forme juridique viennent de l'annuaire des
+entreprises, la TVA se calcule du SIREN ; la saisie à la main ne s'ouvre que par « Entreprise introuvable dans
+l'annuaire ? Saisir à la main ». Livré avec les lots 1 et 5 (plan
+`docs/superpowers/plans/2026-11-21-identite-entreprise-lots-1-et-5.md`). L'entrée d'API de HésiaSun (lot 2)
+peut donc exiger une TVA cohérente avec le SIREN quand le SIRET est renseigné.
 
 ## 8. Laissé au constructeur
 
