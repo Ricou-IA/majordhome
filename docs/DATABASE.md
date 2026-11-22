@@ -92,7 +92,7 @@ Table principale des clients CRM. 3393 rows. RLS activé (4 policies).
 | `dpe_rating` | char(1) | YES | — | A-G |
 | `access_instructions` | text | YES | — | Instructions d'accès pour technicien |
 | `client_category` | ENUM client_category | NO | 'particulier' | particulier, entreprise |
-| `client_number` | text | NO | auto (CLI-XXXXX) | Numéro séquentiel unique, auto-généré |
+| `client_number` | varchar(20) | NO | `majordhome.client_number_suivant()` | Numéro séquentiel unique, auto-généré : CLI- + cinq chiffres jusqu'à 99 999, le nombre entier au-delà (migration `20261122_2`). Ne jamais le fournir à l'insertion |
 | `lead_source` | text | YES | — | website, phone, walk_in, etc. |
 | `tags` | text[] | YES | '{}' | Tags libres |
 | `is_reliable` | boolean | YES | — | Client fiable |
