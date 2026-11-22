@@ -40,8 +40,9 @@ function Bascule({ actif, onClick, icone: Icone, libelle }) {
  * @param {string} props.corps
  * @param {Record<string, any> | null} props.reglages réglages de l'organisation
  * @param {string} props.nature
+ * @param {import('react').ReactNode} [props.children] sous l'aperçu (lien « Modifier l'habillage » de la page du mail)
  */
-export default function ApercuMail({ campagne, objet, corps, reglages, nature }) {
+export default function ApercuMail({ campagne, objet, corps, reglages, nature, children }) {
   const [telephone, setTelephone] = useState(false);
   const [ouvert, setOuvert] = useState(false);
   const objetDiffere = useDebounce(objet, 250);
@@ -100,6 +101,7 @@ export default function ApercuMail({ campagne, objet, corps, reglages, nature })
           />
         </div>
       </div>
+      {children}
     </aside>
   );
 }

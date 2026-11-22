@@ -83,6 +83,23 @@ Une page par mail, trois cartes lues de haut en bas, l'aperçu fidèle à droite
 - **Automatiquement** : interrupteur `is_automated` enregistré comme un autre champ. L'allumer (confirmé à l'enregistrement) pose `next_run_at` = maintenant : premier passage du planificateur dans les 10 minutes, puis `mail_campaign_mark_run` selon la cadence. L'éteindre suffit : `mail_campaigns_due` ne prend que `is_automated = true`, campagne et segment non archivés, objet et texte non vides, `next_run_at` nul ou passé (définition lue en base le 2026-11-22). Une cadence en minutes existante (`lead_bienvenue`) est affichée, jamais convertie ni écrite. L'allumage exige une cadence (sans elle, `mark_run` remet `next_run_at` à NULL et la campagne repasse à chaque passage).
 - **Autre rôle que l'administrateur** : campagnes manuelles non archivées seulement (`peutOuvrirMail`), message en lecture, segment choisi pour son envoi et jamais enregistré, « Une fois » seulement. Garde d'écran : la RLS de `mail_campaigns` (SELECT / INSERT / UPDATE / DELETE pour tout membre de l'organisation, lue le 2026-11-22) et `mailing-send` (appartenance seule, via `mail_fetch_recipients`) ne le distinguent pas. L'accès à `/mailing` reste sous `RouteGuard resource="settings"`.
 
+### Habillage des e-mails (Réglages → E-mails & SMS → E-mails, 2026-11-22)
+La « forme » de tous les e-mails, réglée une fois par l'administrateur (section `pages/settings/communication/HabillageSection.jsx`, affichée avec le module Communication ; lien « Modifier l'habillage » sous l'aperçu de la page d'un mail, vers `/settings/communication#habillage`). Choix à gauche, aperçu à droite (`ApercuMail` réutilisé, mail d'exemple `TEXTE_EXEMPLE` passé par `normaliser`), sur les réglages tels qu'ils seront enregistrés (`reglagesApresEnregistrement`) : c'est donc ce que `habillerMail` produira à l'envoi.
+
+| Réglage | Clé | Remarque |
+|---|---|---|
+| En-tête | `email_habillage.entete` (`logo` \| `logo_bandeau`) | le bandeau n'est dessiné qu'avec une phrase |
+| Phrase du bandeau | `email_tagline` | |
+| Couleur du bandeau | `secondary_color` | vide = `null` = `#334155` |
+| Couleur des boutons et des liens | `accent_color` | vide = `null` = `#64748b` ; aussi la couleur des pages publiques ; avertissement sous 4,5:1 avec une teinte plus foncée proposée |
+| Pied de page | `email_habillage.pied` | chaque choix fermé (avec sa raison et le lien vers Organisation) quand il n'y a rien à montrer ; désabonnement toujours présent |
+| Logo | `logo_url` | lecture seule ; seul un `https` est utilisé, sinon le nom est écrit |
+
+- L'écran enregistre **exactement** `email_habillage` (entier), `accent_color`, `secondary_color`, `email_tagline`. **`email_skeleton_html` (ancien habillage) n'est jamais écrit ni effacé.** Couleur mal formée : jamais envoyée (`patchAEnregistrer` lève), « Enregistrer » fermé avec sa raison ; sans changement, fermé aussi.
+- Entreprise avec un ancien habillage et aucun choix (Mayer au 2026-11-22) : écran prérempli (`choixDepuisReglages`), bandeau « habillage précédent » avec « Voir l'habillage actuel » (aperçu des réglages en base). Son **premier enregistrement remplace l'habillage de tous ses e-mails** : confirmation demandée. Ensuite, « Revenir à l'ancien habillage » = `save({ email_habillage: null })` ; les couleurs et la phrase restent (l'ancien habillage peut les lire), les choix d'en-tête et de pied sont perdus.
+- Un ancien habillage ne compte que s'il porte `{{EMAIL_BODY}}` (même test que `habillerMail`).
+- Règles : `src/lib/mailHabillageEcran.js` (pur, testé `scripts/mail-habillage-ecran.test.mjs`, **non** copié pour Deno — `mailHabillage.js`, lui, est déployé dans les edges et n'est pas touché par l'écran).
+
 ### Edge function `mailing-send` (P0.8 V2 — remplace ancien workflow N8n)
 Moteur d'envoi mailing centralisé. Le frontend appelle `supabase.functions.invoke('mailing-send', { body: {...} })`. Le scheduler N8n auto-campagnes appelle l'edge avec `service_role` au lieu d'un webhook public.
 

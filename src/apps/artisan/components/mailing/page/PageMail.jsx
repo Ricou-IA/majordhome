@@ -254,7 +254,13 @@ export default function PageMail({ mailId, onRetour, onCree }) {
           {avecEnvoi && <CarteEnvoi numero={numeroMessage + 1} e={envoi.envoi} nature={nature} />}
         </div>
 
-        <ApercuMail campagne={base} objet={form.subject} corps={form.html_body} reglages={settings} nature={nature} />
+        <ApercuMail campagne={base} objet={form.subject} corps={form.html_body} reglages={settings} nature={nature}>
+          {isOrgAdmin && (
+            <button type="button" onClick={() => aller('/settings/communication#habillage')} className="mt-2 text-sm text-secondary-600 hover:text-secondary-900 hover:underline">
+              Modifier l’habillage
+            </button>
+          )}
+        </ApercuMail>
       </div>
 
       <DialoguesEnvoi

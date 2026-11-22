@@ -18,6 +18,7 @@ import ResendDomainSection from './ResendDomainSection';
 import EmailAutoLigne from './EmailAutoLigne';
 import AccueilLeadMetaSection from './AccueilLeadMetaSection';
 import SequencesSection from './SequencesSection';
+import HabillageSection from './HabillageSection';
 import { leadWelcomeSettings } from '@/lib/leadWelcomeEmail';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
@@ -45,7 +46,7 @@ function pickFields(settings) {
 
 export default function EmailsTab() {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
-  const { organization } = useAuth();
+  const { organization, isOrgAdmin } = useAuth();
   const orgId = organization?.id;
   const [form, setForm] = useState(() => pickFields({}));
   const [initial, setInitial] = useState(() => pickFields({}));
@@ -160,6 +161,8 @@ export default function EmailsTab() {
           </button>
         </div>
       </div>
+      {/* L'habillage s'enregistre dans les réglages de l'organisation : administrateur seul. */}
+      {communicationActive && isOrgAdmin && <HabillageSection />}
       <ResendDomainSection />
     </>
   );
