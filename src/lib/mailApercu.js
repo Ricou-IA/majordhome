@@ -15,7 +15,7 @@
 import { habillerMail, valeursDeMarque } from './mailHabillage.js';
 import { emailOuSequence } from './emailsAutomatiques.js';
 import { GABARITS_HABILLES_PAR_LE_SITE, VARIABLES_MARQUE_DU_SITE } from './webshop/emailTemplates.js';
-import { nomDeLien, variablesProposees } from './mailVariables.js';
+import { nomDeLien, variablesProposees, variablesAccepteesDansLObjet } from './mailVariables.js';
 
 const JETON = /\{\{([A-Za-z0-9_]+)\}\}/g;
 const DESABONNEMENT = /mailto:[^"'\s>]*\?subject=D[eé]sabonnement/gi;
@@ -55,7 +55,11 @@ function resolveur(campagne, reglages, html) {
     ...(campagne?.key ? emailOuSequence(campagne.key)?.exemple : null) };
   const proposees = new Map(variablesProposees(campagne).map((v) => [v.nom, v]));
   const sortie = (v, sur = false) => (html && !sur ? echapper(v) : String(v));
+  // Objet : seules les variables que l'envoi remplace dans l'objet ; les autres se voient entre crochets,
+  // comme une variable inconnue (une campagne ne remplace pas la formule de politesse dans l'objet).
+  const dansLObjet = html ? null : new Set(variablesAccepteesDansLObjet(campagne));
   return (nom, j) => {
+    if (dansLObjet && !dansLObjet.has(j)) return `[${proposees.get(j)?.libelle ?? nom}]`;
     if (Object.prototype.hasOwnProperty.call(marque, j)) return sortie(marque[j]);
     const connue = proposees.get(j);
     if (connue && (connue.lien || nomDeLien(nom))) return '#';

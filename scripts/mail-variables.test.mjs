@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   natureDuMail, variablesProposees, libelleVariable, variablesManquantes, variablesInconnues, elementsPermis,
+  variablesAccepteesDansLObjet, variablesInconnuesDeLObjet,
 } from '../src/lib/mailVariables.js';
 import { EMAILS_AUTOMATIQUES, VARIABLES_MARQUE, variablesDe } from '../src/lib/emailsAutomatiques.js';
 import { SEQUENCES_EMAILS } from '../src/lib/sequencesEmails.js';
@@ -145,4 +146,40 @@ test('mails habillés par le site : seules BRAND_NAME, ORG_EMAIL et ORG_PHONE so
   assert.equal(noms(MANUELLE).filter((v) => VARIABLES_MARQUE.includes(v)).length, 7);
   assert.deepEqual(variablesInconnues(MANUELLE, '<p>{{ORG_WEBSITE_URL}} {{ACCENT_COLOR}}</p>'), []);
   assert.deepEqual(variablesInconnues({ key: 'webshop_ordre_colis' }, '<p>{{ACCENT_COLOR}}</p>'), []);
+});
+
+// ── Objet du mail ────────────────────────────────────────────────────────────
+
+test('variablesAccepteesDansLObjet : campagne = ce que mailing-send remplace dans l’objet (nom du client et marque)', () => {
+  for (const c of [MANUELLE, AUTO, { key: SEQUENCES_EMAILS[0].gabarit.key }]) {
+    const ok = variablesAccepteesDansLObjet(c);
+    assert.ok(ok.includes('{{CLIENT_NAME}}'), c.key);
+    for (const v of VARIABLES_MARQUE) assert.ok(ok.includes(v), `${c.key} ${v}`);
+    assert.ok(!ok.includes('{{SALUTATION}}'), c.key);
+    assert.ok(!ok.includes('{{lien_pellets}}'), c.key);
+  }
+});
+
+test('variablesAccepteesDansLObjet : e-mail de l’application et boutique = mêmes remplacements que le texte', () => {
+  for (const e of EMAILS_AUTOMATIQUES) {
+    const c = { key: e.gabarit.key };
+    assert.deepEqual(variablesInconnuesDeLObjet(c, e.gabarit.subject), [], e.gabarit.key);
+    // Les edges du registre appliquent à l'objet les remplacements du texte : même verdict, jeton par jeton.
+    for (const v of variablesDe(`${e.gabarit.html_body}{{SALUTATION}}{{PRENOM}}{{INCONNUE_X}}${VARIABLES_MARQUE.join('')}`)) {
+      assert.deepEqual(variablesInconnuesDeLObjet(c, v), variablesInconnues(c, v), `${e.gabarit.key} ${v}`);
+    }
+  }
+  for (const k of WEBSHOP_EMAIL_KEYS) {
+    assert.deepEqual(variablesInconnuesDeLObjet({ key: k }, WEBSHOP_EMAIL_DEFAULTS[k].subject), [], k);
+  }
+});
+
+test('variablesInconnuesDeLObjet : formule de politesse et lien pellets arriveraient tels quels dans l’objet d’une campagne', () => {
+  assert.deepEqual(
+    variablesInconnuesDeLObjet(MANUELLE, '{{SALUTATION}} {{CLIENT_NAME}} chez {{BRAND_NAME}} {{PRENOM}} {{lien_pellets}}'),
+    ['{{SALUTATION}}', '{{PRENOM}}', '{{lien_pellets}}'],
+  );
+  assert.deepEqual(variablesInconnuesDeLObjet(AUTO, 'Votre entretien, {{CLIENT_NAME}}'), []);
+  assert.deepEqual(variablesInconnuesDeLObjet(MANUELLE, ''), []);
+  assert.deepEqual(variablesInconnuesDeLObjet(MANUELLE, null), []);
 });

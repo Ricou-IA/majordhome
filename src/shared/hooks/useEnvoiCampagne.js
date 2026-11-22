@@ -16,6 +16,9 @@
  *  - page quittée pendant l'envoi : la vague déjà demandée va à son terme côté serveur (rien n'est annulé),
  *    puis la boucle s'arrête et le dit ; l'entrée du registre tombe à ce moment-là ;
  *  - un refus de `mailing-send` (adresse d'envoi) est dit en clair (`messageErreurEnvoi`) ;
+ *  - AUCUNE réponse du serveur pendant un envoi (réseau coupé, délai dépassé, passerelle — `sansReponse`) : la
+ *    vague demandée tourne peut-être encore ; la clé reste prise `DELAI_APRES_COUPURE_MS` (`retenir`) avant que
+ *    « Reprendre l'envoi » soit possible, et la page le dit. Une réponse du serveur, refus compris, libère tout de suite ;
  *  - à la fin d'un envoi en nombre, compteurs de destinataires et journal de la campagne sont relus.
  *
  * L'appelant passe ce qui est ENREGISTRÉ (objet, texte, nom) : ce qui part est ce qui est enregistré.
@@ -27,8 +30,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { resoudreExpediteur, EXPEDITEUR_REFUS } from '@/lib/expediteur';
-import { demarrer, enCours as registreEnCours, abonner } from '@/lib/envoiEnCours';
-import { cleEnvoi, messageErreurEnvoi } from '@/lib/mailPage';
+import {
+  demarrer, enCours as registreEnCours, abonner, retenir, retenueJusqua, sansReponse, DELAI_APRES_COUPURE_MS,
+} from '@/lib/envoiEnCours';
+import { cleEnvoi, messageErreurEnvoi, heureDeReprise } from '@/lib/mailPage';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { mailCampaignKeys, mailSegmentKeys, mailCampaignStatsKeys } from './cacheKeys';
 
@@ -40,7 +45,10 @@ const DEJA_EN_COURS = 'Un envoi de cette campagne est en cours : attendez que la
  * @typedef {{ vague: number, envoyes: number, echecs: number, reste: number | null }} Progression
  */
 
-/** Erreur d'un `functions.invoke` avec le code renvoyé par l'edge (`{ error }`) quand il est lisible. */
+/**
+ * Erreur d'un `functions.invoke` avec le code renvoyé par l'edge (`{ error }`) quand il est lisible, et
+ * `sansReponse` : vrai quand le serveur n'a rien répondu (la vague tourne peut-être encore).
+ */
 async function erreurEnvoi(error) {
   let code = null;
   try {
@@ -51,8 +59,11 @@ async function erreurEnvoi(error) {
   } catch {
     /* corps illisible → message reçu */
   }
-  return Object.assign(new Error(messageErreurEnvoi({ code, message: error?.message })), { code });
+  return Object.assign(new Error(messageErreurEnvoi({ code, message: error?.message })), { code, sansReponse: sansReponse(error) });
 }
+
+/** Refus explicite du serveur (réponse reçue) : la vague est terminée. @param {string} message */
+const refusDuServeur = (message) => Object.assign(new Error(message), { sansReponse: false });
 
 /**
  * Un envoi de cette campagne est-il en cours dans cet onglet (quelle que soit la page qui l'a lancé) ?
@@ -61,6 +72,15 @@ async function erreurEnvoi(error) {
  */
 export function useEnvoiEnCours(cle) {
   return useSyncExternalStore(abonner, () => registreEnCours(cle), () => false);
+}
+
+/**
+ * Après une coupure pendant un envoi de cette campagne : heure (ms) à partir de laquelle il peut reprendre, sinon null.
+ * @param {string} cle `cleEnvoi(orgId, nom)`
+ * @returns {number | null}
+ */
+export function useRepriseApres(cle) {
+  return useSyncExternalStore(abonner, () => retenueJusqua(cle), () => null);
 }
 
 /**
@@ -144,7 +164,7 @@ export function useEnvoiCampagne({ orgId }) {
         // Mode test : 1 destinataire, un seul appel. L'edge n'écrit pas l'essai au journal : personne n'est écarté.
         const { data, error } = await supabase.functions.invoke('mailing-send', { body });
         if (error) throw await erreurEnvoi(error);
-        if (data?.success === false) throw new Error(messageErreurEnvoi({ code: data?.error, message: 'Échec envoi test' }));
+        if (data?.success === false) throw refusDuServeur(messageErreurEnvoi({ code: data?.error, message: 'Échec envoi test' }));
         toast.success(`Essai envoyé à ${body.test_email}`);
         return true;
       } catch (err) {
@@ -174,7 +194,7 @@ export function useEnvoiCampagne({ orgId }) {
           wave += 1;
           const { data, error } = await supabase.functions.invoke('mailing-send', { body });
           if (error) throw await erreurEnvoi(error);
-          if (data?.success === false) throw new Error(messageErreurEnvoi({ code: data?.error, message: 'Échec envoi' }));
+          if (data?.success === false) throw refusDuServeur(messageErreurEnvoi({ code: data?.error, message: 'Échec envoi' }));
           totalSent += data?.sent ?? 0;
           totalFailed += data?.failed ?? 0;
           const remaining = data?.remaining ?? 0;
@@ -187,13 +207,13 @@ export function useEnvoiCampagne({ orgId }) {
             // Page quittée : la vague demandée a été traitée jusqu'au bout, on n'en demande pas d'autre.
             toast.warning(
               `Envoi arrêté après la vague ${wave} (page quittée) : ${totalSent} mail${totalSent > 1 ? 's' : ''} parti${totalSent > 1 ? 's' : ''}. `
-              + 'Rouvrez le mail et cliquez sur « Lancer » pour continuer (reprise sans doublon).',
+              + 'Rouvrez le mail et cliquez sur « Lancer » pour reprendre : ceux qui l’ont déjà reçu ne le recevront pas une seconde fois.',
             );
             return false;
           }
           if (wave >= MAX_WAVES) {
             toast.warning(
-              `Envoi interrompu après ${MAX_WAVES} vagues — cliquez de nouveau sur « Lancer » pour continuer (reprise sans doublon).`,
+              `Envoi interrompu après ${MAX_WAVES} vagues : cliquez de nouveau sur « Lancer » pour reprendre ; ceux qui l’ont déjà reçu ne le recevront pas une seconde fois.`,
             );
             return false;
           }
@@ -204,8 +224,20 @@ export function useEnvoiCampagne({ orgId }) {
         );
         return true;
       } catch (err) {
+        // Pas de réponse du serveur (ou erreur inattendue) : la vague demandée part peut-être encore. On garde
+        // l'envoi fermé le temps qu'elle se termine, sinon une reprise écrirait deux fois aux mêmes personnes.
+        if (err?.sansReponse !== false) {
+          const echeance = retenir(cleEnvoi(orgId, args.nomCampagne));
+          const minutes = Math.round(DELAI_APRES_COUPURE_MS / 60000);
+          toast.error(
+            `La connexion a été coupée pendant l'envoi : une partie de cet envoi peut encore partir. Attendez ${minutes} minutes`
+            + (echeance ? ` (vers ${heureDeReprise(echeance)})` : '')
+            + ', puis reprenez l’envoi depuis la page du mail : ceux qui l’ont déjà reçu ne le recevront pas une seconde fois.',
+          );
+          return false;
+        }
         toast.error(
-          `Erreur pendant l'envoi : ${err.message} — cliquez de nouveau sur « Lancer » pour reprendre là où c'était arrêté (aucun doublon).`,
+          `L'envoi s'est arrêté : ${err.message} — cliquez de nouveau sur « Lancer » pour reprendre là où c'était arrêté : ceux qui l'ont déjà reçu ne le recevront pas une seconde fois.`,
         );
         return false;
       } finally {

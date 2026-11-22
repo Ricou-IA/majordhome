@@ -11,6 +11,11 @@
 -- (`date + time` donne un horodatage sans fuseau, que `AT TIME ZONE 'Europe/Paris'` lit comme l'heure de Paris).
 -- Cadence en minutes et absence de cadence : inchangées.
 --
+-- Effet sur les campagnes automatiques existantes : elles partent désormais à l'heure qu'elles affichent,
+-- donc une heure (l'hiver) ou deux heures (l'été) PLUS TÔT qu'avant. Une date prévue (`next_run_at`) déjà
+-- enregistrée garde son ancienne heure pour un dernier passage : c'est ce passage, recalculé ici, qui la
+-- ramène à l'heure affichée.
+--
 -- Limite : un seul fuseau. Toutes les entreprises sont en France aujourd'hui ; une entreprise ailleurs aura
 -- besoin de son fuseau dans ses réglages (`core.organizations.settings`), lu ici.
 --

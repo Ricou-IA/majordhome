@@ -37,7 +37,7 @@ import { messageErreurRedaction } from '@/lib/mailRedaction';
 import {
   cartesDuMail, etatDuNom, champsAEnregistrer, estModifie, raisonsEnregistrement, raisonsRedaction, demandeRedaction,
   appliquerRedaction, refaireAvecNouvelEditeur, revenirALAncien, rappelObjet, avertissementsTexte,
-  etatEnregistrement, corpsVide, objetsSuggeres, sansElementsDe, miseEnFormeSimplifiee, peutOuvrirMail,
+  etatEnregistrement, corpsVide, objetsSuggeres, sansElementsDe, miseEnFormeSimplifiee, peutOuvrirMail, avertissementsObjet,
 } from '@/lib/mailPage';
 import { etatInitial, reducteurPageMail } from './etatPageMail';
 import EnTetePage from './EnTetePage';
@@ -107,6 +107,8 @@ export default function PageMail({ mailId, onRetour, onCree }) {
   // Mise en forme du texte ENREGISTRÉ que le premier enregistrement simplifiera (couleurs, alignements).
   const simplifiee = useMemo(() => miseEnFormeSimplifiee(initial?.html_body), [initial]);
   const avertissements = useMemo(() => avertissementsTexte(base, form.html_body), [base, form.html_body]);
+  // Ce que l'envoi ne remplace pas dans l'objet (la formule de politesse dans l'objet d'une campagne).
+  const avertissementsDeLObjet = useMemo(() => avertissementsObjet(base, form.subject), [base, form.subject]);
   const raisonsParConsigne = useMemo(() => Object.fromEntries(CONSIGNES_ECRAN.map((consigne) => [
     consigne, raisonsRedaction({ consigne, intention: form.blocks?.brief ?? '', objet: form.subject, corps: form.html_body }),
   ])), [form.blocks, form.subject, form.html_body]);
@@ -131,7 +133,7 @@ export default function PageMail({ mailId, onRetour, onCree }) {
     const patch = champsAEnregistrer(form, initial);
     try {
       const ligne = nouveau ? await createCampaign(patch) : await updateCampaign({ id: base.id, patch });
-      dispatch({ type: 'enregistre', campagne: ligne });
+      dispatch({ type: 'enregistre', campagne: ligne, envoye: form });
       if (nouveau) onCree(ligne.id);
       return ligne;
     } catch {
@@ -151,12 +153,12 @@ export default function PageMail({ mailId, onRetour, onCree }) {
     try {
       const reponse = await rediger(demandeRedaction({ consigne, form, campagne: base }));
       if (consigne === 'objets') {
-        const objets = objetsSuggeres(reponse);
+        const objets = objetsSuggeres(reponse, base);
         if (!objets.length) throw erreurRedaction('reponse_illisible');
         dispatch({ type: 'objetsProposes', objets });
         return;
       }
-      const texte = appliquerRedaction(reponse, { sansElements });
+      const texte = appliquerRedaction(reponse, { sansElements, campagne: base });
       if (!texte) throw erreurRedaction('reponse_illisible');
       dispatch({ type: 'redactionFin', ...texte });
     } catch (err) {
@@ -181,7 +183,7 @@ export default function PageMail({ mailId, onRetour, onCree }) {
   }), [demander, form, defaut]);
 
   const partir = (vers) => (vers ? navigate(vers) : onRetour());
-  const aller = (vers = null) => (modifie || envoi.enCours ? setQuitter({ vers, envoi: envoi.enCours }) : partir(vers));
+  const aller = (vers = null) => (modifie || envoi.enCours ? setQuitter({ vers, envoi: envoi.enCours, reprise: envoi.reprise }) : partir(vers));
 
   if (!ouvert) {
     return (
@@ -242,6 +244,7 @@ export default function PageMail({ mailId, onRetour, onCree }) {
             variables={variables}
             elements={elements}
             avertissements={avertissements}
+            avertissementsObjet={lecture ? [] : avertissementsDeLObjet}
             rappelObjet={rappelObjet(form.subject)}
             redaction={etat.redaction}
             raisonsRedaction={raisonsParConsigne}
@@ -278,9 +281,11 @@ export default function PageMail({ mailId, onRetour, onCree }) {
         open={!!quitter}
         onOpenChange={(o) => { if (!o) setQuitter(null); }}
         title={quitter?.envoi ? 'Quitter pendant l’envoi ?' : 'Quitter sans enregistrer ?'}
-        description={quitter?.envoi
-          ? 'La vague déjà demandée au serveur ira à son terme, la suivante ne partira pas. Ne relancez pas avant que la page du mail dise que l’envoi est terminé : relancer pendant cette vague écrirait une seconde fois à une partie des destinataires.'
-          : 'Les modifications de ce mail seront perdues.'}
+        description={quitter?.reprise
+          ? `La connexion a été coupée pendant l’envoi : une partie de cet envoi peut encore partir. Si vous fermez ou rechargez la page, elle ne s’en souviendra plus : ne cliquez pas sur « Reprendre l’envoi » avant ${quitter.reprise}.`
+          : (quitter?.envoi
+            ? 'L’envoi déjà demandé au serveur ira à son terme, la suite ne partira pas. Ne reprenez pas l’envoi avant que la page du mail dise qu’il est terminé : reprendre plus tôt écrirait une seconde fois à une partie des destinataires.'
+            : 'Les modifications de ce mail seront perdues.')}
         confirmLabel={quitter?.envoi ? 'Quitter quand même' : 'Quitter sans enregistrer'}
         cancelLabel="Rester sur le mail"
         onConfirm={() => { const vers = quitter?.vers ?? null; setQuitter(null); partir(vers); }}

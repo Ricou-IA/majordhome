@@ -97,8 +97,8 @@ test('une valeur n’est jamais relue comme une variable', () => {
 });
 
 test('objet : texte brut, valeurs non échappées', () => {
-  const r = rendreApercu({ campagne: { key: 'promo' }, objet: '{{BRAND_NAME}} & {{SALUTATION}}', corps: '', reglages: { brand_name: 'A<B' } });
-  assert.equal(r.objet, 'A<B & Bonjour Jean Dupont,');
+  const r = rendreApercu({ campagne: { key: 'promo' }, objet: '{{BRAND_NAME}} & {{CLIENT_NAME}}', corps: '', reglages: { brand_name: 'A<B' } });
+  assert.equal(r.objet, 'A<B & Jean Dupont');
 });
 
 test('toutes les variables de marque sont remplacées, y compris dans un href', () => {
@@ -143,4 +143,10 @@ test('mails habillés par le site : seules ses trois variables d’entreprise so
 test('variable de lien inconnue : [NOM], pas #', () => {
   const r = rendreApercu({ campagne: { key: 'promo' }, corps: '<p>{{LIEN_PELLETS}} {{FOO_URL}} {{lien_pellets}}</p>', reglages: REGLAGES });
   assert.ok(r.html.includes('[LIEN_PELLETS] [FOO_URL] #'), r.html);
+});
+
+test('objet d’une campagne : la formule de politesse et le lien pellets se voient entre crochets (l’envoi ne les remplace pas dans l’objet)', () => {
+  const r = rendreApercu({ campagne: { key: 'promo' }, objet: '{{SALUTATION}} {{CLIENT_NAME}} {{lien_pellets}}', corps: '<p>{{SALUTATION}}</p>', reglages: REGLAGES });
+  assert.equal(r.objet, '[Formule de politesse] Jean Dupont [Lien de l’offre pellets]');
+  assert.match(r.html, /Bonjour Jean Dupont,/);
 });

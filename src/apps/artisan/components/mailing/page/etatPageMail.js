@@ -10,7 +10,7 @@
  * Les règles (ce qui s'enregistre, ce qui est modifié…) sont dans `src/lib/mailPage.js`.
  * ============================================================================
  */
-import { formulaireDepuisCampagne, basculerAutomatisation } from '@/lib/mailPage';
+import { formulaireDepuisCampagne, formulaireApresEnregistrement, basculerAutomatisation } from '@/lib/mailPage';
 
 /**
  * État des cartes Destinataires et Envoi (rien de tout cela ne s'enregistre tel quel : le segment d'un
@@ -27,6 +27,7 @@ const envoiInitial = (campagne) => ({
   exemples: false,          // « Voir des exemples »
   essaiEnCours: false,      // « M'envoyer un essai » d'un e-mail automatique
   vuOccupe: false,          // un envoi de cette campagne lancé par une page quittée a été vu en cours
+  coupureVue: false,        // la connexion a été coupée pendant un envoi de cette campagne (attente avant reprise)
 });
 
 /**
@@ -127,13 +128,16 @@ export function reducteurPageMail(etat, action) {
     case 'choisirObjet':
       return { ...etat, form: { ...etat.form, subject: action.objet } };
     case 'enregistre':
-      // La photo enregistrée suit la ligne rendue par la base ; le formulaire n'est pas touché (une frappe
-      // faite pendant l'enregistrement reste « non enregistrée »).
+      // La photo enregistrée ET le formulaire suivent la ligne rendue par la base (heure « 09:00:00 », date
+      // « +00:00 »…), sinon la page se croirait encore modifiée. Seul un champ retouché pendant l'enregistrement
+      // (différent de `envoye`, le formulaire au moment du clic) garde la frappe, qui reste « non enregistrée ».
+      // `version` ne bouge pas : l'éditeur garde la main sur le texte.
       return {
         ...etat,
         chargeDe: action.campagne.id,
         base: action.campagne,
         initial: formulaireDepuisCampagne(action.campagne),
+        form: formulaireApresEnregistrement(etat.form, action.envoye ?? etat.form, action.campagne),
       };
     default:
       return etat;

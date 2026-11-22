@@ -248,6 +248,42 @@ export function variablesInconnues(campagne, html) {
 }
 
 /**
+ * Ce que `mailing-send` ne remplace PAS dans l'objet d'une campagne (il ne l'applique qu'au texte) : la formule
+ * de politesse et le lien pellets y arriveraient tels quels. Lu dans `mailing-send/index.ts` : l'objet ne reçoit
+ * que `{{CLIENT_NAME}}` et la marque (`buildRecipientReplacements`).
+ */
+const HORS_OBJET_DE_CAMPAGNE = Object.freeze(['{{SALUTATION}}', '{{lien_pellets}}']);
+
+/**
+ * Variables qu'un objet de ce mail peut citer : celles que son envoi remplace dans l'objet.
+ *  - campagne manuelle, automatique, séquence (`mailing-send`) : le nom du client et la marque ;
+ *  - e-mail de l'application et boutique : leurs edges appliquent à l'objet les remplacements du texte, donc
+ *    les mêmes variables que le texte.
+ * @param {CampagneMail | null | undefined} campagne
+ * @returns {string[]} jetons `{{X}}`
+ */
+export function variablesAccepteesDansLObjet(campagne) {
+  const nature = natureDuMail(campagne);
+  const duSite = GABARITS_HABILLES_PAR_LE_SITE.includes(campagne?.key ?? '');
+  const texte = [...jetonsProposes(campagne), ...(duSite ? [] : VARIABLES_MARQUE)];
+  if (nature === 'manuelle' || nature === 'automatique' || nature === 'sequence') {
+    return uniques(texte.filter((v) => !HORS_OBJET_DE_CAMPAGNE.includes(v)));
+  }
+  return uniques(texte);
+}
+
+/**
+ * Variables de l'objet que l'envoi ne remplacera pas : elles arriveraient telles quelles chez le client.
+ * @param {CampagneMail | null | undefined} campagne
+ * @param {string | null | undefined} objet
+ * @returns {string[]} jetons `{{X}}`, sans doublon
+ */
+export function variablesInconnuesDeLObjet(campagne, objet) {
+  const acceptees = new Set(variablesAccepteesDansLObjet(campagne));
+  return uniques(variablesDe(String(objet ?? '')).filter((v) => !acceptees.has(v)));
+}
+
+/**
  * Éléments que l'éditeur propose pour ce mail. Les deux e-mails habillés par le site ne remplacent pas
  * `{{ACCENT_COLOR}}` : ni titre, ni bouton, ni encadré (sinon leurs couleurs partiraient en clair).
  * @param {CampagneMail | null | undefined} campagne

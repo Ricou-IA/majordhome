@@ -10,7 +10,8 @@ import {
   prochainEnvoiEnMots, basculerAutomatisation, texteConfirmationLancement, peutOuvrirMail, raisonsEnvoiPage,
   dejaServis, metEnRoute, texteConfirmationActivation, raisonsReglageAutomatique, raisonsSauvegardePage,
   cleEnvoi, etatEnvoiCampagne, reglageAutomatiqueModifie, texteConfirmationReglage, phraseNombreInconnu,
-  messageErreurEnvoi,
+  messageErreurEnvoi, formulaireApresEnregistrement, ENVOIS_PAR_PASSAGE, heureDeReprise, avertissementsObjet,
+  objetSansFormuleInconnue,
 } from '../src/lib/mailPage.js';
 import { texteParDefaut } from '../src/lib/mailVariables.js';
 import { EMAILS_AUTOMATIQUES } from '../src/lib/emailsAutomatiques.js';
@@ -713,4 +714,135 @@ test('messageErreurEnvoi : refus d’expéditeur traduit, sinon le message reçu
   assert.equal(messageErreurEnvoi({ code: null, message: 'Panne' }), 'Panne');
   assert.equal(messageErreurEnvoi({ code: 'autre_chose', message: '' }), 'autre_chose');
   assert.ok(messageErreurEnvoi({}));
+});
+
+// ── Vague finale : page fidèle à ce qui est enregistré ───────────────────────
+
+/** Ligne telle que la base la rend : heure en `time` (secondes). */
+const LIGNE_BASE = { ...MANUELLE, auto_time_of_day: '09:00:00' };
+
+test('formulaireDepuisCampagne : l’heure enregistrée « 09:00:00 » devient « 09:00 » (champ heure)', () => {
+  assert.equal(formulaireDepuisCampagne(LIGNE_BASE).auto_time_of_day, '09:00');
+  assert.equal(formulaireDepuisCampagne({ ...MANUELLE, auto_time_of_day: '8:30' }).auto_time_of_day, '08:30');
+  assert.equal(formulaireDepuisCampagne({ ...MANUELLE, auto_time_of_day: null }).auto_time_of_day, '09:00');
+});
+
+test('champsAEnregistrer : « 09:00 » et « 09:00:00 » sont la même heure ; deux écritures du même instant aussi', () => {
+  const f = formulaireDepuisCampagne(MANUELLE);
+  assert.deepEqual(champsAEnregistrer({ ...f, auto_time_of_day: '09:00' }, { ...f, auto_time_of_day: '09:00:00' }), {});
+  assert.deepEqual(
+    champsAEnregistrer({ ...f, next_run_at: '2026-11-23T08:00:00.000Z' }, { ...f, next_run_at: '2026-11-23T08:00:00+00:00' }),
+    {},
+  );
+  assert.deepEqual(Object.keys(champsAEnregistrer({ ...f, auto_time_of_day: '10:00' }, { ...f, auto_time_of_day: '09:00:00' })), ['auto_time_of_day']);
+});
+
+test('création → enregistré : plus rien à enregistrer', () => {
+  const neuf = { ...formulaireDepuisCampagne(null), label: 'Promo hiver', subject: 'Objet', html_body: '<p>Bonjour</p>' };
+  const ligne = { id: 'n1', ...champsAEnregistrer(neuf, null), auto_time_of_day: '09:00:00', next_run_at: null };
+  const apres = formulaireApresEnregistrement(neuf, neuf, ligne);
+  const initial = formulaireDepuisCampagne(ligne);
+  assert.deepEqual(champsAEnregistrer(apres, initial), {});
+  assert.equal(estModifie(apres, initial), false);
+});
+
+test('mise en route → enregistrée : plus rien à enregistrer, et un enregistrement suivant ne réécrit pas la date prévue', () => {
+  const initial0 = formulaireDepuisCampagne(LIGNE_BASE);
+  const on = basculerAutomatisation(initial0, initial0, true, new Date('2026-11-22T10:00:00Z'));
+  assert.ok('next_run_at' in champsAEnregistrer(on, initial0));
+  const ligne = { ...LIGNE_BASE, ...champsAEnregistrer(on, initial0), auto_time_of_day: '09:00:00', next_run_at: '2026-11-22T10:00:00+00:00' };
+  const apres = formulaireApresEnregistrement(on, on, ligne);
+  const initial = formulaireDepuisCampagne(ligne);
+  assert.deepEqual(champsAEnregistrer(apres, initial), {});
+  assert.equal(reglageAutomatiqueModifie(apres, initial), false);
+  const plusTard = champsAEnregistrer({ ...apres, subject: 'Autre objet' }, initial);
+  assert.deepEqual(Object.keys(plusTard), ['subject']);
+});
+
+test('heure d’un mail automatique changée → enregistrée : le réglage n’est plus « modifié »', () => {
+  const auto = { ...LIGNE_BASE, is_automated: true, auto_cadence_days: 7, auto_segment_id: 's1', next_run_at: '2026-11-29T08:00:00+00:00' };
+  const initial0 = formulaireDepuisCampagne(auto);
+  const form = { ...initial0, auto_time_of_day: '10:00' };
+  assert.equal(reglageAutomatiqueModifie(form, initial0), true);
+  const ligne = { ...auto, auto_time_of_day: '10:00:00', next_run_at: '2026-11-29T09:00:00+00:00' };
+  const apres = formulaireApresEnregistrement(form, form, ligne);
+  const initial = formulaireDepuisCampagne(ligne);
+  assert.equal(reglageAutomatiqueModifie(apres, initial), false);
+  assert.deepEqual(champsAEnregistrer(apres, initial), {});
+});
+
+test('formulaireApresEnregistrement : une frappe faite pendant l’enregistrement reste à enregistrer', () => {
+  const initial0 = formulaireDepuisCampagne(LIGNE_BASE);
+  const envoye = { ...initial0, subject: 'Objet A' };
+  const actuel = { ...envoye, subject: 'Objet AB' };
+  const ligne = { ...LIGNE_BASE, subject: 'Objet A' };
+  const apres = formulaireApresEnregistrement(actuel, envoye, ligne);
+  assert.equal(apres.subject, 'Objet AB');
+  assert.deepEqual(champsAEnregistrer(apres, formulaireDepuisCampagne(ligne)), { subject: 'Objet AB' });
+});
+
+// ── Vague finale : reprise prudente après une coupure ────────────────────────
+
+test('etatEnvoiCampagne : coupure (attente avant reprise), puis reprise après coupure', () => {
+  assert.equal(etatEnvoiCampagne({ occupe: true, vuOccupe: false, ici: false, repriseVers: 1000 }), 'coupure');
+  assert.equal(etatEnvoiCampagne({ occupe: true, vuOccupe: true, ici: true, repriseVers: 1000 }), 'coupure');
+  assert.equal(etatEnvoiCampagne({ occupe: false, vuOccupe: true, ici: false, coupureVue: true }), 'reprendre_apres_coupure');
+  assert.equal(etatEnvoiCampagne({ occupe: false, vuOccupe: true, ici: false, coupureVue: false }), 'reprendre');
+});
+
+test('heureDeReprise : heure de Paris en mots, rien si inconnue', () => {
+  assert.equal(heureDeReprise(Date.parse('2026-11-22T13:32:00Z')), '14 h 32');
+  assert.equal(heureDeReprise(Date.parse('2026-07-01T07:05:00Z')), '9 h 05');
+  assert.equal(heureDeReprise(null), null);
+});
+
+test('raisonsEnvoiPage : après une coupure, tester, lancer et automatiser restent fermés jusqu’à l’heure de reprise', () => {
+  const base = { etat: PRET, archive: false, segment: { etat: 'ok', raison: null }, raisonsEnregistrement: [], modifie: false };
+  for (const geste of ['tester', 'lancer']) {
+    const r = raisonsEnvoiPage({ ...base, geste, coupure: '14 h 32' });
+    assert.ok(r.some((m) => /coupée/.test(m) && /14 h 32/.test(m)), geste);
+  }
+  assert.ok(raisonsEnvoiPage({ ...base, geste: 'automatiser', etat: PRET_AUTO, coupure: '14 h 32' }).some((m) => /14 h 32/.test(m)));
+});
+
+// ── Vague finale : objet sans formule non remplacée ─────────────────────────
+
+test('avertissementsObjet : ce qui arriverait tel quel dans l’objet, nommé sans accolades', () => {
+  const a = avertissementsObjet(MANUELLE, '{{SALUTATION}} votre poêle {{CLIENT_NAME}}');
+  assert.equal(a.length, 1);
+  assert.match(a[0], /Formule de politesse/);
+  assert.ok(!a[0].includes('{{'));
+  assert.deepEqual(avertissementsObjet(MANUELLE, 'Votre poêle, {{CLIENT_NAME}}'), []);
+});
+
+test('raisonsDeBlocage : une formule que l’envoi ne remplace pas dans l’objet ferme les trois gestes', () => {
+  for (const geste of ['tester', 'lancer', 'automatiser']) {
+    const r = raisonsDeBlocage({ ...PRET, variablesInconnuesObjet: ['{{SALUTATION}}'] }, geste);
+    assert.ok(r.some((m) => /objet/.test(m) && /tel quel/.test(m)), geste);
+  }
+  assert.deepEqual(raisonsDeBlocage({ ...PRET, variablesInconnuesObjet: [] }, 'lancer'), []);
+});
+
+test('objetSansFormuleInconnue / objetsSuggeres / appliquerRedaction : l’assistant ne propose jamais d’objet avec une formule non remplacée', () => {
+  assert.equal(objetSansFormuleInconnue(MANUELLE, '{{SALUTATION}} votre poêle vous attend'), 'Votre poêle vous attend');
+  assert.equal(objetSansFormuleInconnue(MANUELLE, '{{CLIENT_NAME}}, votre entretien'), '{{CLIENT_NAME}}, votre entretien');
+  assert.equal(objetSansFormuleInconnue(MANUELLE, 'Offre {{lien_pellets}} !'), 'Offre !');
+  assert.deepEqual(objetsSuggeres({ objets: ['{{SALUTATION}}', '{{SALUTATION}} Hiver au chaud', 'B'] }, MANUELLE), ['Hiver au chaud', 'B']);
+  const r = appliquerRedaction({ objet: '{{SALUTATION}}', objets: ['{{SALUTATION}} A'], corps: '<p>Bonjour</p>' }, { campagne: MANUELLE });
+  assert.equal(r.objet, '');
+  assert.deepEqual(r.objets, ['A']);
+});
+
+// ── Vague finale : la mise en route dit la vérité sur le nombre par passage ──
+
+test('texteConfirmationActivation : au-delà d’un passage, le premier envoi n’écrit qu’à ENVOIS_PAR_PASSAGE personnes', () => {
+  assert.equal(ENVOIS_PAR_PASSAGE, 300);
+  const t = texteConfirmationActivation({ segmentNom: 'Tous', nombre: 1200, cadence: 'toutes les semaines à 9 h' });
+  assert.match(t, /300/);
+  assert.match(t, /1\s200/);
+  assert.match(t, /passages suivants/);
+  assert.match(t, /toutes les semaines/);
+  const court = texteConfirmationActivation({ segmentNom: 'Tous', nombre: 300, cadence: 'toutes les semaines à 9 h' });
+  assert.ok(!/passages suivants/.test(court));
+  assert.match(texteConfirmationActivation({ segmentNom: 'X', nombre: undefined, cadence: null }), /300/);
 });

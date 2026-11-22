@@ -55,19 +55,41 @@ function Progression({ p }) {
         {texte}
       </p>
       <p className="mt-1 text-sm text-primary-700">
-        Gardez cette page ouverte jusqu’à la fin. En cas d’interruption, « Lancer » reprend là où c’était arrêté, sans envoyer deux fois.
+        Gardez cette page ouverte jusqu’à la fin. En cas d’interruption, l’envoi pourra reprendre là où il s’est arrêté, sans écrire deux fois à la même personne.
       </p>
     </div>
   );
 }
 
-/** Envoi de cette campagne lancé par une page quittée : en cours (tout fermé), puis terminé (reprise sûre). */
-function EtatCampagne({ etat }) {
+/**
+ * Envoi de cette campagne lancé par une page quittée : en cours (tout fermé), puis terminé (reprise sûre).
+ * Connexion coupée pendant l'envoi : attente jusqu'à l'heure de reprise, puis reprise possible.
+ */
+function EtatCampagne({ etat, reprise }) {
+  if (etat === 'coupure') {
+    return (
+      <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900" aria-live="polite">
+        <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" aria-hidden="true" />
+        <span>
+          La connexion a été coupée pendant l’envoi : une partie de cet envoi peut encore partir. Attendez quelques minutes
+          avant de reprendre, sinon certaines personnes le recevraient deux fois. Reprise possible vers {reprise}.
+          Gardez cette page ouverte : fermée ou rechargée, elle ne s’en souviendrait plus.
+        </span>
+      </p>
+    );
+  }
+  if (etat === 'reprendre_apres_coupure') {
+    return (
+      <p className="rounded-lg border border-secondary-200 bg-secondary-50 px-3 py-2.5 text-sm text-secondary-800" aria-live="polite">
+        L’envoi interrompu par la coupure a eu le temps de se terminer. S’il restait des destinataires, « Reprendre l’envoi » continue : ceux qui ont déjà reçu ce mail ne le recevront pas une seconde fois.
+      </p>
+    );
+  }
   if (etat === 'en_cours') {
     return (
       <p className="flex items-start gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-800" aria-live="polite">
         <Loader2 className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin" aria-hidden="true" />
-        Un envoi de cette campagne est en cours : la vague demandée au serveur se termine. Rien ne peut repartir avant ; la page vous dira quand c’est fini.
+        Un envoi de ce mail est en cours : la partie déjà demandée au serveur se termine. Rien ne peut repartir avant ; la page vous dira quand c’est fini.
       </p>
     );
   }
@@ -111,7 +133,7 @@ function UneFois({ e, bandeau }) {
       <div className="space-y-2 border-t border-secondary-100 pt-5">
         <button type="button" onClick={e.actions.lancer} disabled={e.occupe || e.raisons.lancer.length > 0} className={PRINCIPAL}>
           <Send className="h-4 w-4" aria-hidden="true" />
-          {e.etatCampagne === 'reprendre' ? 'Reprendre l’envoi' : 'Lancer'}
+          {e.etatCampagne === 'reprendre' || e.etatCampagne === 'reprendre_apres_coupure' ? 'Reprendre l’envoi' : 'Lancer'}
         </button>
         <p className="text-sm text-secondary-500">Envoie le mail enregistré aux destinataires choisis, après confirmation.</p>
         <Raisons liste={raisonsLancer} />
@@ -234,7 +256,7 @@ export default function CarteEnvoi({ numero, e, nature }) {
         </div>
       )}
 
-      <EtatCampagne etat={e.etatCampagne} />
+      <EtatCampagne etat={e.etatCampagne} reprise={e.reprise} />
 
       {e.modes.length > 1 && (
         <div role="radiogroup" aria-label="Façon d’envoyer" className="inline-flex rounded-lg border border-secondary-200 bg-secondary-50 p-1">

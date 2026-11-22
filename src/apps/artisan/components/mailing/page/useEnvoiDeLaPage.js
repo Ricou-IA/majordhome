@@ -15,16 +15,16 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { useMailSegments, useSegmentCount, useSegmentPreview } from '@hooks/useMailSegments';
-import { useEnvoiCampagne, useEnvoiEnCours } from '@hooks/useEnvoiCampagne';
+import { useEnvoiCampagne, useEnvoiEnCours, useRepriseApres } from '@hooks/useEnvoiCampagne';
 import { useDebounce } from '@hooks/useDebounce';
 import { mailCampaignsService } from '@services/mailCampaigns.service';
 import { resoudreExpediteur } from '@/lib/expediteur';
-import { variablesInconnues } from '@/lib/mailVariables';
+import { variablesInconnues, variablesInconnuesDeLObjet } from '@/lib/mailVariables';
 import { messageErreurEssai } from '@/lib/emailsAutomatiques';
 import {
   segmentsRanges, etatSegment, segmentSurLaCampagne, modesEnvoi, raisonsEnvoiPage, raisonsReglageAutomatique,
   cadenceEnMots, prochainEnvoiEnMots, raisonsSauvegardePage, texteConfirmationLancement, texteConfirmationActivation, metEnRoute, dejaServis,
-  cleEnvoi, etatEnvoiCampagne, reglageAutomatiqueModifie, texteConfirmationReglage, phraseNombreInconnu,
+  cleEnvoi, etatEnvoiCampagne, reglageAutomatiqueModifie, texteConfirmationReglage, phraseNombreInconnu, heureDeReprise,
 } from '@/lib/mailPage';
 
 /** Nombre lisible d'une requête : inconnu (chargement, erreur) ⇒ `undefined`, jamais 0. */
@@ -71,22 +71,31 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
   const objet = enregistre ? form.subject : (base?.subject ?? '');
   const corps = enregistre ? form.html_body : (base?.html_body ?? '');
   const inconnues = useMemo(() => [...new Set(variablesInconnues(base, corps))], [base, corps]);
+  const inconnuesObjet = useMemo(() => variablesInconnuesDeLObjet(base, objet), [base, objet]);
   const refusNombre = resoudreExpediteur(settings ?? {}, { usage: 'nombre' }).refus;
   const refusIndividuel = resoudreExpediteur(settings ?? {}, { usage: 'individuel' }).refus;
   // Un envoi de CETTE campagne lancé par une page quittée (registre du module) : tout reste fermé jusqu'à sa fin,
   // puis la page propose de reprendre (chacun de cette vague est alors journalisé).
   const cle = cleEnvoi(orgId, base?.label);
   const occupeRegistre = useEnvoiEnCours(cle);
-  const etatCampagne = etatEnvoiCampagne({ occupe: occupeRegistre, vuOccupe: !!envoi.vuOccupe, ici: envoyeur.enCours });
+  // Connexion coupée pendant un envoi : la clé reste prise quelques minutes (registre), la page dit jusqu'à quand.
+  const repriseVers = useRepriseApres(cle);
+  const etatCampagne = etatEnvoiCampagne({
+    occupe: occupeRegistre, vuOccupe: !!envoi.vuOccupe, ici: envoyeur.enCours, repriseVers, coupureVue: !!envoi.coupureVue,
+  });
   useEffect(() => {
     if (etatCampagne === 'en_cours' && !envoi.vuOccupe) dispatch({ type: 'envoi', patch: { vuOccupe: true } });
-  }, [etatCampagne, envoi.vuOccupe, dispatch]);
+    if (etatCampagne === 'coupure' && !envoi.coupureVue) dispatch({ type: 'envoi', patch: { vuOccupe: true, coupureVue: true } });
+  }, [etatCampagne, envoi.vuOccupe, envoi.coupureVue, dispatch]);
   const envoiAilleurs = etatCampagne === 'en_cours';
-  const occupe = envoyeur.enCours || isMutating || envoiAilleurs;
+  const coupure = etatCampagne === 'coupure' ? heureDeReprise(repriseVers) : null;
+  const occupeEnvoi = envoyeur.enCours || isMutating || envoiAilleurs;
+  // Après une coupure, tout reste fermé ; la raison dite est celle de la coupure (pas « un envoi est en cours »).
+  const occupe = occupeEnvoi || !!coupure;
   const automatiqueEnBase = !!base?.is_automated;
   const reglageAutoModifie = enregistre && reglageAutomatiqueModifie(form, initial);
 
-  const commun = { objet, corps, variablesInconnues: inconnues, segmentId, nombre, envoiEnCours: occupe };
+  const commun = { objet, corps, variablesInconnues: inconnues, variablesInconnuesObjet: inconnuesObjet, segmentId, nombre, envoiEnCours: occupeEnvoi };
   const etatAuto = {
     ...commun, refusExpediteur: refusNombre,
     cadenceJours: form.auto_cadence_days, cadenceMinutes: form.auto_cadence_minutes, heure: form.auto_time_of_day,
@@ -96,7 +105,7 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
   const miseEnRoute = enregistre && metEnRoute(form, initial);
   const cadre = {
     archive: !!base?.is_archived, segment: etatSeg, raisonsEnregistrement: raisonsSauvegarde,
-    modifie: enregistre && modifie, miseEnRoute, envoiAilleurs, automatiqueEnBase, reglageAutoModifie,
+    modifie: enregistre && modifie, miseEnRoute, envoiAilleurs, automatiqueEnBase, reglageAutoModifie, coupure,
   };
   const raisons = {
     tester: raisonsEnvoiPage({ ...cadre, geste: 'tester', etat: { ...commun, refusExpediteur: refusIndividuel, adresseTest: envoi.adresseTest } }),
@@ -149,7 +158,7 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
 
   const confirmerLancement = unSeul(async () => {
     if (!photoAJour || !texteLancement) return;
-    dispatch({ type: 'envoi', patch: { confirmation: null, vuOccupe: false } });
+    dispatch({ type: 'envoi', patch: { confirmation: null, vuOccupe: false, coupureVue: false } });
     await envoyeur.lancer({ ...photo, nombre });
   });
 
@@ -195,7 +204,9 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
   }
 
   return {
-    enCours: envoyeur.enCours || envoiAilleurs,
+    enCours: envoyeur.enCours || envoiAilleurs || !!coupure,
+    // Heure à partir de laquelle l'envoi peut reprendre après une coupure (« 14 h 32 »), sinon null.
+    reprise: coupure,
     raisonsSauvegarde,
     avantEnregistrement,
     destinataires: {
@@ -233,6 +244,7 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
       enCours: envoyeur.enCours,
       // 'en_cours' : lancé par une page quittée ; 'reprendre' : cet envoi-là vient de finir.
       etatCampagne,
+      reprise: coupure,
       occupe,
       essaiEnCours: !!envoi.essaiEnCours,
       // L'essai d'un e-mail du registre part avec le texte enregistré : un mail modifié qui ne peut pas l'être le ferme.

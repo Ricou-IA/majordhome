@@ -10,7 +10,7 @@
 // ============================================================================
 import { estEditable, normaliser, texteBrut } from './mailCorps.js';
 import {
-  natureDuMail, variablesProposees, variablesManquantes, variablesInconnues,
+  natureDuMail, variablesProposees, variablesManquantes, variablesInconnues, variablesInconnuesDeLObjet, libelleVariable,
 } from './mailVariables.js';
 import { CONSIGNES } from './mailRedaction.js';
 import { resoudreExpediteur, EXPEDITEUR_REFUS } from './expediteur.js';
@@ -93,6 +93,19 @@ export function cleDeCopie(cle, clesExistantes) {
 /** Nom brut d'une variable, sans accolades (une variable inconnue n'a pas de libellé fiable). @param {string} v */
 const nomBrut = (v) => String(v ?? '').replace(/^\{\{|\}\}$/g, '');
 
+/**
+ * Phrase d'un objet qui cite ce que l'envoi n'y remplace pas (libellé d'artisan, jamais d'accolades).
+ * @param {string[]} jetons
+ * @returns {string}
+ */
+function phraseObjet(jetons) {
+  const liste = [...new Set(jetons)];
+  const noms = liste.map((v) => `« ${libelleVariable(v)} »`).join(', ');
+  const verbe = liste.length > 1 ? 'ne sont pas remplacés' : 'n’est pas remplacé';
+  return `L’objet contient ${noms}, qui ${verbe} dans l’objet : il arriverait tel quel chez le client. `
+    + 'Retirez-le de l’objet (il reste possible dans le texte).';
+}
+
 /** Nom comparable : rogné, minuscules. @param {unknown} v @returns {string} */
 const nomComparable = (v) => String(v ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 
@@ -153,6 +166,24 @@ const CHAMPS = Object.freeze([
 ]);
 
 /**
+ * Heure « HH:MM » : la base rend une colonne `time` (« 09:00:00 »), le champ heure du navigateur tient « 09:00 ».
+ * Une valeur illisible est rendue telle quelle.
+ * @param {unknown} v
+ * @returns {unknown}
+ */
+function heureCourte(v) {
+  const m = String(v ?? '').match(/^(\d{1,2}):(\d{2})/);
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : v;
+}
+
+/** Instant en ms (« …+00:00 » et « ….000Z » sont le même instant), sinon la valeur telle quelle. @param {unknown} v */
+function instant(v) {
+  if (v == null || v === '') return null;
+  const t = Date.parse(String(v));
+  return Number.isNaN(t) ? v : t;
+}
+
+/**
  * Formulaire de la page à partir d'une campagne enregistrée (ou d'un mail neuf : campagne manuelle vide).
  * @param {Record<string, any> | null | undefined} campagne
  * @returns {FormulaireMail}
@@ -170,7 +201,7 @@ export function formulaireDepuisCampagne(campagne) {
     auto_cadence_days: c.auto_cadence_days ?? null,
     // Lu pour l'affichage seulement : absent de CHAMPS, la page ne l'écrit jamais (cadence en minutes conservée).
     auto_cadence_minutes: c.auto_cadence_minutes ?? null,
-    auto_time_of_day: c.auto_time_of_day ?? '09:00',
+    auto_time_of_day: heureCourte(c.auto_time_of_day ?? '09:00'),
     next_run_at: c.next_run_at ?? null,
     tracking_type_value: c.tracking_type_value ?? null,
   };
@@ -197,6 +228,7 @@ const sansVides = (v) => Object.fromEntries(Object.entries(v && typeof v === 'ob
 /** Valeur enregistrée d'un champ (nom et objet rognés). */
 function valeurEnregistree(champ, v) {
   if (champ === 'label' || champ === 'subject') return String(v ?? '').trim();
+  if (champ === 'auto_time_of_day') return heureCourte(v);
   return v;
 }
 
@@ -204,12 +236,15 @@ function valeurEnregistree(champ, v) {
 function egaux(champ, a, b) {
   if (champ === 'html_body') return memeCorps(a, b);
   if (champ === 'blocks') return stable(sansVides(a)) === stable(sansVides(b));
+  if (champ === 'next_run_at') return stable(instant(a)) === stable(instant(b));
   return stable(valeurEnregistree(champ, a)) === stable(valeurEnregistree(champ, b));
 }
 
 /**
  * Ce que la page écrit : seulement ses champs, et seulement ceux qui ont changé. Jamais `purpose`, `audience`,
  * `tone`, `notes`. À la création (`initial` nul) : tous ses champs, plus la clé et le marqueur de suivi dérivés du nom.
+ * La date prévue (`next_run_at`) ne part que pour une MISE EN ROUTE (le geste de cette séance d'édition) : jamais
+ * réécrite ensuite, le planificateur l'avance lui-même en base.
  * @param {FormulaireMail & Record<string, any>} formulaire
  * @param {FormulaireMail | null} initial
  * @returns {Record<string, any>}
@@ -223,10 +258,30 @@ export function champsAEnregistrer(formulaire, initial) {
     out.tracking_type_value = out.key;
     return out;
   }
+  const miseEnRoute = !!formulaire.is_automated && !initial.is_automated;
   for (const champ of CHAMPS) {
+    if (champ === 'next_run_at' && !miseEnRoute) continue;
     if (!egaux(champ, formulaire[champ], initial[champ])) out[champ] = valeurEnregistree(champ, formulaire[champ]);
   }
   return out;
+}
+
+/**
+ * Formulaire après un enregistrement réussi : la ligne rendue par la base fait foi (heure « 09:00:00 », date
+ * « +00:00 »…), sauf pour un champ retouché PENDANT l'enregistrement (différent de ce qui a été envoyé) : cette
+ * frappe reste, et reste « à enregistrer ».
+ * @param {Record<string, any>} actuel formulaire au retour de la base
+ * @param {Record<string, any>} envoye formulaire au moment de l'enregistrement
+ * @param {Record<string, any>} ligne ligne rendue par la base
+ * @returns {FormulaireMail}
+ */
+export function formulaireApresEnregistrement(actuel, envoye, ligne) {
+  /** @type {Record<string, any>} */
+  const out = { ...formulaireDepuisCampagne(ligne) };
+  for (const champ of CHAMPS) {
+    if (!egaux(champ, actuel?.[champ], envoye?.[champ])) out[champ] = actuel[champ];
+  }
+  return /** @type {FormulaireMail} */ (out);
 }
 
 /**
@@ -341,12 +396,17 @@ const ADRESSE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * `nombre` inconnu (chargement, erreur) ou nul ferme « Lancer », jamais « Tester ». Un essai d'une campagne
  * passe lui aussi par son segment (`mailing-send` en mode liste l'exige) : sans segment, « Tester » est fermé.
  * `adresseTest` n'est contrôlée que pour « Tester », et seulement si elle est fournie.
- * @param {{ objet?: string, corps?: string, variablesInconnues?: string[], segmentId?: string | null,
- *   nombre?: number | null, refusExpediteur?: string | null, envoiEnCours?: boolean, adresseTest?: string }} etat
+ * `variablesInconnuesObjet` : variables de l'objet que l'envoi n'y remplace pas (`variablesInconnuesDeLObjet`).
+ * @param {{ objet?: string, corps?: string, variablesInconnues?: string[], variablesInconnuesObjet?: string[],
+ *   segmentId?: string | null, nombre?: number | null, refusExpediteur?: string | null, envoiEnCours?: boolean,
+ *   adresseTest?: string }} etat
  * @param {'tester' | 'lancer' | 'automatiser'} geste
  * @returns {string[]}
  */
-export function raisonsDeBlocage({ objet, corps, variablesInconnues: inconnues = [], segmentId, nombre, refusExpediteur, envoiEnCours, adresseTest }, geste) {
+export function raisonsDeBlocage({
+  objet, corps, variablesInconnues: inconnues = [], variablesInconnuesObjet: inconnuesObjet = [], segmentId, nombre,
+  refusExpediteur, envoiEnCours, adresseTest,
+}, geste) {
   if (!['tester', 'lancer', 'automatiser'].includes(geste)) return ['Ce geste n’est pas possible ici.'];
   const raisons = [];
   if (envoiEnCours) raisons.push('Un envoi est déjà en cours : attendez qu’il se termine.');
@@ -356,6 +416,7 @@ export function raisonsDeBlocage({ objet, corps, variablesInconnues: inconnues =
     const noms = inconnues.map((v) => `« ${nomBrut(v)} »`).join(', ');
     raisons.push(`Le texte contient ${noms}, que rien ne remplace : il arriverait tel quel chez le client.`);
   }
+  if ((inconnuesObjet ?? []).length) raisons.push(phraseObjet(inconnuesObjet));
   if (refusExpediteur) raisons.push(EXPEDITEUR_REFUS[refusExpediteur] ?? 'L’adresse d’envoi de votre entreprise n’est pas prête.');
   if (!segmentId) raisons.push('Choisissez les destinataires.');
   if (geste === 'tester' && adresseTest !== undefined) {
@@ -573,16 +634,32 @@ export function raisonsSauvegardePage({ envoiEnCours, raisonsEnregistrement: r1,
 }
 
 /**
- * Phrase de la confirmation d'une mise en route automatique. Nombre inconnu ⇒ phrase sans nombre.
+ * Destinataires écrits par UN passage du planificateur : `mailing-scheduler` appelle `mailing-send` une fois par
+ * campagne due, qui s'arrête à `MAILING_MAX_PER_RUN` (300 par défaut) ; la date prévue avance quand même, les
+ * autres destinataires attendent le passage suivant, à la cadence de la campagne.
+ */
+export const ENVOIS_PAR_PASSAGE = 300;
+
+/**
+ * Phrase de la confirmation d'une mise en route automatique. Nombre inconnu ⇒ phrase sans nombre, avec le plafond.
  * @param {{ segmentNom: string, nombre: number | null | undefined, cadence: string | null }} entree
  * @returns {string}
  */
 export function texteConfirmationActivation({ segmentNom, nombre, cadence }) {
+  const rythme = cadence ?? 'selon sa cadence';
+  const plafond = ENVOIS_PAR_PASSAGE.toLocaleString('fr-FR');
+  if (typeof nombre === 'number' && nombre > ENVOIS_PAR_PASSAGE) {
+    return `Une fois enregistré, ce mail partira tout seul. Dans les 10 minutes, il part vers ${plafond} des `
+      + `${nombre.toLocaleString('fr-FR')} destinataires du groupe « ${segmentNom} » (${plafond} au plus à chaque envoi) ; `
+      + `les autres le recevront aux passages suivants, ${rythme}, avec les nouvelles personnes du groupe. `
+      + 'Personne ne le reçoit deux fois.';
+  }
   const qui = typeof nombre === 'number'
     ? `${nombre.toLocaleString('fr-FR')} destinataire${nombre > 1 ? 's' : ''} du groupe « ${segmentNom} »`
     : `le groupe « ${segmentNom} »`;
-  return `Une fois enregistré, ce mail partira tout seul dans les 10 minutes vers ${qui}, puis ${cadence ?? 'selon sa cadence'} `
-    + 'vers les nouvelles personnes du groupe. Personne ne le reçoit deux fois.';
+  const auPlus = typeof nombre === 'number' ? '' : ` Chaque envoi écrit à ${plafond} personnes au plus ; les autres attendent le suivant.`;
+  return `Une fois enregistré, ce mail partira tout seul dans les 10 minutes vers ${qui}, puis ${rythme} `
+    + `vers les nouvelles personnes du groupe. Personne ne le reçoit deux fois.${auPlus}`;
 }
 
 /**
@@ -603,14 +680,18 @@ export function peutOuvrirMail({ campagne, nouveau, isOrgAdmin }) {
  * être enregistré (ce qui part est ce qui est enregistré).
  * @param {{ geste: 'tester' | 'lancer' | 'automatiser', etat: Record<string, any>, archive: boolean,
  *   segment: { etat: string, raison: string | null }, raisonsEnregistrement: string[], modifie: boolean,
- *   miseEnRoute?: boolean, envoiAilleurs?: boolean, automatiqueEnBase?: boolean, reglageAutoModifie?: boolean }} entree
+ *   miseEnRoute?: boolean, envoiAilleurs?: boolean, automatiqueEnBase?: boolean, reglageAutoModifie?: boolean,
+ *   coupure?: string | null }} entree `coupure` : heure de reprise après une coupure (`heureDeReprise`), sinon `null`
  * @returns {string[]}
  */
 export function raisonsEnvoiPage({
   geste, etat, archive, segment, raisonsEnregistrement: aEnregistrer, modifie, miseEnRoute = false,
-  envoiAilleurs = false, automatiqueEnBase = false, reglageAutoModifie = false,
+  envoiAilleurs = false, automatiqueEnBase = false, reglageAutoModifie = false, coupure = null,
 }) {
   const raisons = [];
+  // Connexion coupée pendant l'envoi : la vague demandée part peut-être encore (chacun n'est journalisé qu'après
+  // son envoi) ; reprendre avant la fin du délai écrirait deux fois aux mêmes personnes.
+  if (coupure) raisons.push(`La connexion a été coupée pendant l’envoi : une partie peut encore partir. Reprise possible vers ${coupure}.`);
   // Une vague de cette campagne est encore chez le serveur : relancer écrirait de nouveau à ceux qu'elle n'a pas
   // encore journalisés (`mailing-send` n'a pas de verrou).
   if (envoiAilleurs) raisons.push('Un envoi de cette campagne est en cours : attendez que la page dise qu’il est terminé.');
@@ -647,15 +728,32 @@ export function cleEnvoi(orgId, nomCampagne) {
 }
 
 /**
- * Ce que la page peut faire selon le registre : `ici` (envoi lancé par cette page), `en_cours` (lancé avant, par
- * une page quittée : tout est fermé), `reprendre` (cet envoi-là vient de finir : chacun de sa vague est journalisé,
- * relancer est sûr), `libre`.
- * @param {{ occupe: boolean, vuOccupe: boolean, ici: boolean }} entree
- * @returns {'ici' | 'en_cours' | 'reprendre' | 'libre'}
+ * Ce que la page peut faire selon le registre : `coupure` (connexion coupée pendant l'envoi : tout reste fermé
+ * jusqu'à `repriseVers`), `ici` (envoi lancé par cette page), `en_cours` (lancé avant, par une page quittée : tout
+ * est fermé), `reprendre` (cet envoi-là vient de finir : chacun de sa vague est journalisé, relancer est sûr),
+ * `reprendre_apres_coupure` (le délai d'attente après une coupure est passé), `libre`.
+ * @param {{ occupe: boolean, vuOccupe: boolean, ici: boolean, repriseVers?: number | null, coupureVue?: boolean }} entree
+ * @returns {'coupure' | 'ici' | 'en_cours' | 'reprendre' | 'reprendre_apres_coupure' | 'libre'}
  */
-export function etatEnvoiCampagne({ occupe, vuOccupe, ici }) {
+export function etatEnvoiCampagne({ occupe, vuOccupe, ici, repriseVers = null, coupureVue = false }) {
+  if (typeof repriseVers === 'number') return 'coupure';
   if (occupe) return ici ? 'ici' : 'en_cours';
-  return vuOccupe ? 'reprendre' : 'libre';
+  if (!vuOccupe) return 'libre';
+  return coupureVue ? 'reprendre_apres_coupure' : 'reprendre';
+}
+
+/**
+ * Heure de reprise en mots, heure de Paris (« 14 h 32 »), `null` si inconnue.
+ * @param {number | null | undefined} ms
+ * @returns {string | null}
+ */
+export function heureDeReprise(ms) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms)) return null;
+  const parts = new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', minute: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Paris' })
+    .formatToParts(new Date(ms));
+  const h = Number(parts.find((p) => p.type === 'hour')?.value);
+  const mn = parts.find((p) => p.type === 'minute')?.value ?? '00';
+  return `${h} h ${mn}`;
 }
 
 /** Champs qui décident qui reçoit le mail automatique, et quand. */
@@ -754,25 +852,44 @@ export function demandeRedaction({ consigne, form, campagne }) {
  * @param {{ sansElements?: boolean }} [options]
  * @returns {{ objet: string, objets: string[], corps: string } | null}
  */
-export function appliquerRedaction(resultat, { sansElements = false } = {}) {
+export function appliquerRedaction(resultat, { sansElements = false, campagne = null } = {}) {
   if (!resultat || typeof resultat !== 'object') return null;
   const brut = typeof resultat.corps === 'string' ? resultat.corps : '';
   if (!brut.trim() || !estEditable(brut)) return null;
   const corps = normaliser(brut, { sansElements });
   if (!corps.trim()) return null;
-  const objet = typeof resultat.objet === 'string' ? resultat.objet.trim() : '';
-  const objets = Array.isArray(resultat.objets) ? resultat.objets.filter((o) => typeof o === 'string' && o.trim()).map((o) => o.trim()).slice(0, 3) : [];
-  return { objet, objets, corps };
+  const objet = typeof resultat.objet === 'string' ? objetSansFormuleInconnue(campagne, resultat.objet) : '';
+  return { objet, objets: objetsSuggeres(resultat, campagne), corps };
 }
 
 /**
- * Objets proposés par l'assistant : texte non vide, rognés, trois au plus.
+ * Un objet proposé par l'assistant, sans ce que l'envoi n'y remplacerait pas (la formule de politesse dans l'objet
+ * d'une campagne) : élément retiré, blancs réduits, ponctuation restée en tête retirée, majuscule reposée.
+ * @param {Record<string, any> | null | undefined} campagne
+ * @param {unknown} objet
+ * @returns {string}
+ */
+export function objetSansFormuleInconnue(campagne, objet) {
+  const brut = String(objet ?? '');
+  const aRetirer = variablesInconnuesDeLObjet(campagne, brut);
+  if (!aRetirer.length) return brut.trim();
+  let t = brut;
+  for (const v of aRetirer) t = t.split(v).join(' ');
+  t = t.replace(/\s+/g, ' ').trim().replace(/^[\s,;:.!?\-–—]+/, '').trim();
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+}
+
+/**
+ * Objets proposés par l'assistant : texte non vide, rognés, sans ce que l'envoi n'y remplacerait pas (une
+ * proposition vidée est écartée), trois au plus.
  * @param {{ objets?: unknown } | null | undefined} reponse
+ * @param {Record<string, any> | null} [campagne]
  * @returns {string[]}
  */
-export function objetsSuggeres(reponse) {
+export function objetsSuggeres(reponse, campagne = null) {
   const liste = Array.isArray(reponse?.objets) ? reponse.objets : [];
-  return liste.filter((o) => typeof o === 'string' && o.trim()).map((o) => o.trim()).slice(0, 3);
+  return liste.filter((o) => typeof o === 'string' && o.trim())
+    .map((o) => objetSansFormuleInconnue(campagne, o)).filter(Boolean).slice(0, 3);
 }
 
 /**
@@ -882,6 +999,17 @@ export function avertissementsTexte(campagne, html) {
     manquantes: manquantes.length ? `Ce mail n’affiche plus : ${manquantes.join(', ')}.` : null,
     inconnues: inconnues.map((v) => `« ${nomBrut(v)} » n’est remplacé par rien à l’envoi : il arriverait tel quel chez le client.`),
   };
+}
+
+/**
+ * Avertissements sous l'objet : ce que l'envoi n'y remplacera pas (libellés d'artisan, jamais d'accolades).
+ * @param {Record<string, any> | null} campagne
+ * @param {string} objet
+ * @returns {string[]}
+ */
+export function avertissementsObjet(campagne, objet) {
+  const inconnues = variablesInconnuesDeLObjet(campagne, objet);
+  return inconnues.length ? [phraseObjet(inconnues)] : [];
 }
 
 /** Envoi en nombre (domaine propre exigé) ou individuel, selon la nature. @param {string} nature */

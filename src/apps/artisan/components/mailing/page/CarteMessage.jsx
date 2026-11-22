@@ -61,6 +61,7 @@ function Avertissement({ children }) {
  * @param {Array} props.variables `variablesProposees`, d'identité stable
  * @param {{ titre: boolean, bouton: boolean, encadre: boolean }} props.elements
  * @param {{ manquantes: string | null, inconnues: string[] }} props.avertissements
+ * @param {string[]} [props.avertissementsObjet] ce que l'envoi ne remplacera pas dans l'objet
  * @param {string | null} props.rappelObjet
  * @param {string | null} props.redaction consigne en cours
  * @param {Record<string, string[]>} props.raisonsRedaction
@@ -73,7 +74,7 @@ function Avertissement({ children }) {
  * @param {object} props.actions { intention, objet, corps, demander, choisirObjet, annuler, garder, refaire, revenir }
  */
 export default function CarteMessage({
-  numero, form, version, lecture, assistant, editable, variables, elements, avertissements, rappelObjet,
+  numero, form, version, lecture, assistant, editable, variables, elements, avertissements, avertissementsObjet = [], rappelObjet,
   redaction, raisonsRedaction, aUnTexte, objetsProposes, annulable, aUnTexteParDefaut, ancienGarde, simplifiee, actions,
 }) {
   const occupe = !!redaction;
@@ -127,6 +128,11 @@ export default function CarteMessage({
           placeholder="Ce que vos clients verront dans leur boîte de réception"
           className={`${inputClass} mt-1.5`}
         />
+        {avertissementsObjet.length > 0 && (
+          <div className="mt-1.5 space-y-2">
+            {avertissementsObjet.map((a) => <Avertissement key={a}>{a}</Avertissement>)}
+          </div>
+        )}
         {rappelObjet && <p className="mt-1 text-sm text-secondary-500">{rappelObjet}</p>}
         {assistant && editable && !occupe && raisonsRedaction.objets.length > 0 && (
           <p className="mt-1 text-sm text-secondary-500">{raisonsRedaction.objets[0]}</p>
