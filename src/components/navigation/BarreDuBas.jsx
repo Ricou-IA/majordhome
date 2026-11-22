@@ -14,7 +14,7 @@ import { Menu } from 'lucide-react';
 import { pageDansEntree, libelleDeBarre } from '@/lib/menuGroupes';
 import { MenuCreer } from './MenuCreer';
 
-const CASE = 'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium focus:outline-none focus-visible:bg-secondary-100';
+const CASE = 'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-caption focus:outline-none focus-visible:bg-secondary-100';
 const ACTIVE = 'text-primary-700';
 const INACTIVE = 'text-secondary-500';
 
@@ -47,7 +47,7 @@ export function BarreDuBas({ raccourcis, creations, pathname, menuOuvert, onOuvr
       end={item.href === '/'}
       className={({ isActive }) => `${CASE} ${isActive ? ACTIVE : INACTIVE}`}
     >
-      <item.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
+      <item.icon className="h-[22px] w-[22px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
       <span className="max-w-full truncate">{libelleDeBarre(item)}</span>
     </NavLink>
   );
@@ -68,7 +68,7 @@ export function BarreDuBas({ raccourcis, creations, pathname, menuOuvert, onOuvr
           aria-expanded={menuOuvert}
           className={`${CASE} ${ailleurs ? ACTIVE : INACTIVE}`}
         >
-          <Menu className="h-6 w-6 shrink-0" aria-hidden="true" />
+          <Menu className="h-[22px] w-[22px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
           Plus
         </button>
       </div>

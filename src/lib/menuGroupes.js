@@ -17,9 +17,10 @@ export const GROUPES_MENU = Object.freeze([
   Object.freeze({ cle: 'quotidien', titre: null }),
   Object.freeze({ cle: 'ventes', titre: 'Clients & ventes' }),
   Object.freeze({ cle: 'terrain', titre: 'Terrain' }),
+  // Carte, visibilité locale, publicité : outils consultés de temps en temps (DA § 9).
+  Object.freeze({ cle: 'outils', titre: 'Outils', replie: true }),
   // Prospection et Cédants : à part des ventes du quotidien (Eric, recette du 2026-11-22).
   Object.freeze({ cle: 'developpement', titre: 'Développement', replie: true }),
-  Object.freeze({ cle: 'marketing', titre: 'Marketing', replie: true }),
   Object.freeze({ cle: 'etudes', titre: 'Études', replie: true }),
 ]);
 
@@ -117,4 +118,13 @@ export function lirePreferencesMenu(texte) {
   } catch {
     return {};
   }
+}
+
+/**
+ * Clé de stockage du choix « menu replié » (icônes seules), propre à chaque utilisateur.
+ * @param {string} userId
+ * @returns {string}
+ */
+export function cleMenuReplie(userId) {
+  return `mdh-menu-replie:${userId}`;
 }

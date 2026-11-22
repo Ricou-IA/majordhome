@@ -4,8 +4,10 @@
  * selon les droits : chacune mène à la page qui ouvre sa fenêtre de création. Une seule
  * création possible = un lien direct, sans menu.
  *
- * Deux habillages, une seule logique : `menu` (menu latéral, la liste s'ouvre dessous) et
- * `barre` (barre du bas du téléphone, la liste s'ouvre au-dessus).
+ * Trois habillages, une seule logique : `menu` (menu latéral, bouton secondaire, la liste
+ * s'ouvre dessous), `replie` (menu latéral replié, icône seule, la liste s'ouvre à droite) et
+ * `barre` (barre du bas du téléphone, seule action principale de cet écran : pastille cuivre,
+ * la liste s'ouvre au-dessus).
  */
 
 import { useState } from 'react';
@@ -13,29 +15,40 @@ import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 
 const LISTE = 'absolute z-50 w-48 rounded-lg border border-secondary-200 bg-white py-1 shadow-lg';
+const LIGNE = 'block px-4 py-2.5 lg:py-2 text-cell text-secondary-700 hover:bg-secondary-50 focus:bg-secondary-50 focus:outline-none';
+const SECONDAIRE = 'rounded-lg border border-secondary-300 bg-white text-cell font-medium text-secondary-800 shadow-xs hover:bg-secondary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30';
 
 const HABILLAGES = {
   menu: {
     cadre: 'relative shrink-0',
-    bouton: 'inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2.5 lg:py-2 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
+    bouton: `inline-flex shrink-0 items-center gap-1.5 px-3 py-2.5 lg:py-2 ${SECONDAIRE}`,
     liste: `${LISTE} right-0 top-full mt-2`,
-    ligne: 'block px-4 py-2.5 lg:py-2 text-sm text-secondary-700 hover:bg-secondary-50 focus:bg-secondary-50 focus:outline-none',
+    ligne: LIGNE,
+  },
+  replie: {
+    cadre: 'relative shrink-0',
+    bouton: `flex h-10 w-10 shrink-0 items-center justify-center ${SECONDAIRE}`,
+    liste: `${LISTE} left-full top-0 ml-2`,
+    ligne: LIGNE,
   },
   barre: {
     cadre: 'relative flex min-w-0 flex-1',
-    bouton: 'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-secondary-700 focus:outline-none focus-visible:bg-secondary-100',
+    bouton: 'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-caption text-secondary-700 focus:outline-none focus-visible:bg-secondary-100',
     liste: `${LISTE} bottom-full left-1/2 mb-2 -translate-x-1/2`,
-    ligne: 'block px-4 py-3 text-sm text-secondary-700 hover:bg-secondary-50 focus:bg-secondary-50 focus:outline-none',
+    ligne: 'block px-4 py-3 text-cell text-secondary-700 hover:bg-secondary-50 focus:bg-secondary-50 focus:outline-none',
   },
 };
 
-/** Contenu du bouton : « + Créer » dans le menu, pastille ronde et libellé dessous dans la barre. */
+/**
+ * Contenu du bouton : « + Créer » dans le menu, « + » seul (libellé lu) dans le menu replié,
+ * pastille ronde et libellé dessous dans la barre.
+ */
 function Contenu({ variante }) {
   if (variante === 'barre') {
     return (
       <>
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-600 text-white">
-          <Plus className="h-5 w-5" aria-hidden="true" />
+          <Plus className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
         </span>
         Créer
       </>
@@ -43,8 +56,8 @@ function Contenu({ variante }) {
   }
   return (
     <>
-      <Plus className="h-4 w-4" aria-hidden="true" />
-      Créer
+      <Plus className="h-4 w-4 text-primary-600" strokeWidth={2} aria-hidden="true" />
+      <span className={variante === 'replie' ? 'sr-only' : undefined}>Créer</span>
     </>
   );
 }
@@ -53,7 +66,7 @@ function Contenu({ variante }) {
  * @param {Object} props
  * @param {Array<{ cle: string, libelle: string, href: string }>} props.actions
  * @param {() => void} [props.onNaviguer]  appelé quand une création est choisie (ferme le tiroir mobile)
- * @param {'menu'|'barre'} [props.variante]  habillage : menu latéral (défaut) ou barre du bas
+ * @param {'menu'|'replie'|'barre'} [props.variante]  habillage : menu latéral (défaut), menu replié ou barre du bas
  */
 export function MenuCreer({ actions, onNaviguer, variante = 'menu' }) {
   const [ouvert, setOuvert] = useState(false);
@@ -77,6 +90,7 @@ export function MenuCreer({ actions, onNaviguer, variante = 'menu' }) {
         onClick={() => setOuvert((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={ouvert}
+        title={variante === 'replie' ? 'Créer' : undefined}
         className={habillage.bouton}
       >
         <Contenu variante={variante} />

@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   GROUPES_MENU, SEUIL_MENU_GROUPE, grouperMenu, pageDansEntree, etatDuGroupe, lirePreferencesMenu,
-  PRIORITE_BARRE, raccourcisBarre, libelleDeBarre,
+  PRIORITE_BARRE, raccourcisBarre, libelleDeBarre, cleMenuReplie,
 } from '../src/lib/menuGroupes.js';
 
 const entree = (href, groupe) => ({ href, groupe });
 const MENU_COMPLET = [
   entree('/', 'quotidien'), entree('/planning', 'quotidien'),
-  entree('/clients', 'ventes'), entree('/territoire', 'ventes'), entree('/pipeline', 'ventes'),
+  entree('/clients', 'ventes'), entree('/territoire', 'outils'), entree('/pipeline', 'ventes'),
   entree('/chantiers', 'terrain'), entree('/contrats', 'ventes'), entree('/entretiens', 'terrain'),
-  entree('/mailing', 'marketing'), entree('/solaire', 'etudes'),
+  entree('/mailing', 'ventes'), entree('/solaire', 'etudes'),
 ];
 
 test('grouperMenu : un menu court reste une liste simple, dans son ordre', () => {
@@ -25,14 +25,14 @@ test('grouperMenu : un menu court reste une liste simple, dans son ordre', () =>
 
 test('grouperMenu : au-delà du seuil, groupes dans l’ordre, entrées dans leur rang d’origine', () => {
   const groupes = grouperMenu(MENU_COMPLET);
-  assert.deepEqual(groupes.map((g) => g.cle), ['quotidien', 'ventes', 'terrain', 'marketing', 'etudes']);
-  assert.deepEqual(groupes[1].items.map((i) => i.href), ['/clients', '/territoire', '/pipeline', '/contrats']);
+  assert.deepEqual(groupes.map((g) => g.cle), ['quotidien', 'ventes', 'terrain', 'outils', 'etudes']);
+  assert.deepEqual(groupes[1].items.map((i) => i.href), ['/clients', '/pipeline', '/contrats', '/mailing']);
   assert.deepEqual(groupes[2].items.map((i) => i.href), ['/chantiers', '/entretiens']);
 });
 
-test('grouperMenu : Prospection et Cédants ont leur groupe « Développement », entre Terrain et Marketing', () => {
+test('grouperMenu : Prospection et Cédants ont leur groupe « Développement », entre Outils et Études', () => {
   const groupes = grouperMenu([...MENU_COMPLET, entree('/cedants', 'developpement'), entree('/prospection', 'developpement')]);
-  assert.deepEqual(groupes.map((g) => g.cle), ['quotidien', 'ventes', 'terrain', 'developpement', 'marketing', 'etudes']);
+  assert.deepEqual(groupes.map((g) => g.cle), ['quotidien', 'ventes', 'terrain', 'outils', 'developpement', 'etudes']);
   const developpement = groupes.find((g) => g.cle === 'developpement');
   assert.equal(developpement.titre, 'Développement');
   assert.deepEqual(developpement.items.map((i) => i.href), ['/cedants', '/prospection']);
@@ -41,11 +41,11 @@ test('grouperMenu : Prospection et Cédants ont leur groupe « Développement »
 });
 
 test('grouperMenu : aucune entrée perdue — groupe inconnu ou absent = premier groupe ; groupe vide absent', () => {
-  const items = [...MENU_COMPLET.filter((i) => i.groupe !== 'marketing'), entree('/nouveau'), entree('/autre', 'inconnu')];
+  const items = [...MENU_COMPLET.filter((i) => i.groupe !== 'outils'), entree('/nouveau'), entree('/autre', 'inconnu')];
   const groupes = grouperMenu(items);
   assert.equal(groupes.reduce((n, g) => n + g.items.length, 0), items.length);
   assert.deepEqual(groupes[0].items.map((i) => i.href), ['/', '/planning', '/nouveau', '/autre']);
-  assert.ok(!groupes.some((g) => g.cle === 'marketing'));
+  assert.ok(!groupes.some((g) => g.cle === 'outils'));
 });
 
 test('pageDansEntree : l’accueil ne vaut que pour lui-même, une fiche vaut pour sa liste', () => {
@@ -57,15 +57,27 @@ test('pageDansEntree : l’accueil ne vaut que pour lui-même, une fiche vaut po
 });
 
 test('etatDuGroupe : défaut du groupe, choix de la personne, page affichée toujours visible', () => {
-  const [, ventes, , marketing] = grouperMenu(MENU_COMPLET);
+  const [, ventes, , outils] = grouperMenu(MENU_COMPLET);
   const sansTitre = grouperMenu(MENU_COMPLET)[0];
   assert.deepEqual(etatDuGroupe(sansTitre, { preferences: { quotidien: false } }), { ouvert: true, force: true });
   assert.deepEqual(etatDuGroupe(ventes), { ouvert: true, force: false });
-  assert.deepEqual(etatDuGroupe(marketing), { ouvert: false, force: false });
-  assert.deepEqual(etatDuGroupe(marketing, { preferences: { marketing: true } }), { ouvert: true, force: false });
+  assert.deepEqual(etatDuGroupe(outils), { ouvert: false, force: false });
+  assert.deepEqual(etatDuGroupe(outils, { preferences: { outils: true } }), { ouvert: true, force: false });
   assert.deepEqual(etatDuGroupe(ventes, { preferences: { ventes: false } }), { ouvert: false, force: false });
   assert.deepEqual(etatDuGroupe(ventes, { preferences: { ventes: false }, pathname: '/clients/42' }), { ouvert: true, force: true });
-  assert.deepEqual(etatDuGroupe(marketing, { pathname: '/mailing' }), { ouvert: true, force: true });
+  assert.deepEqual(etatDuGroupe(outils, { pathname: '/territoire' }), { ouvert: true, force: true });
+});
+
+test('GROUPES_MENU : six groupes, « Outils » à la place de « Marketing », replié par défaut', () => {
+  assert.deepEqual(GROUPES_MENU.map((g) => g.cle),
+    ['quotidien', 'ventes', 'terrain', 'outils', 'developpement', 'etudes']);
+  assert.equal(GROUPES_MENU.find((g) => g.cle === 'outils').titre, 'Outils');
+  assert.equal(GROUPES_MENU.find((g) => g.cle === 'outils').replie, true);
+});
+
+test('cleMenuReplie : une clé de stockage par utilisateur', () => {
+  assert.equal(cleMenuReplie('u-1'), 'mdh-menu-replie:u-1');
+  assert.notEqual(cleMenuReplie('u-1'), cleMenuReplie('u-2'));
 });
 
 test('lirePreferencesMenu : absent ou illisible = aucun choix, seules les valeurs vrai / faux sont gardées', () => {

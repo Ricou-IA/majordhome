@@ -91,11 +91,11 @@ export function RechercheGlobale({ orgId, peutChercherClients, peutChercherLeads
         role="dialog"
         aria-modal="true"
         aria-label="Recherche"
-        className="flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+        className="flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-xl bg-white shadow-lg"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b border-secondary-200 px-4">
-          <Search className="h-5 w-5 shrink-0 text-secondary-400" aria-hidden="true" />
+          <Search className="h-5 w-5 shrink-0 text-secondary-400" strokeWidth={1.75} aria-hidden="true" />
           <input
             autoFocus
             type="text"
@@ -116,7 +116,7 @@ export function RechercheGlobale({ orgId, peutChercherClients, peutChercherLeads
             aria-label="Fermer la recherche"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-secondary-500 hover:bg-secondary-100"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
 
@@ -124,7 +124,7 @@ export function RechercheGlobale({ orgId, peutChercherClients, peutChercherLeads
           {lignes.map((ligne, index) => (
             <div key={ligne.cle}>
               {(index === 0 || lignes[index - 1].groupe !== ligne.groupe) && (
-                <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-secondary-500">
+                <p className="px-4 pb-1 pt-3 text-caption text-secondary-500">
                   {ligne.groupe}
                 </p>
               )}
@@ -138,8 +138,8 @@ export function RechercheGlobale({ orgId, peutChercherClients, peutChercherLeads
                 onClick={() => ouvrir(ligne)}
                 className={`flex w-full items-baseline gap-3 px-4 py-2.5 text-left ${index === indexActif ? 'bg-primary-50' : ''}`}
               >
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-secondary-900">{ligne.titre}</span>
-                {ligne.detail && <span className="shrink-0 truncate text-xs text-secondary-500 max-w-[55%]">{ligne.detail}</span>}
+                <span className="min-w-0 flex-1 truncate text-cell font-medium text-secondary-900">{ligne.titre}</span>
+                {ligne.detail && <span className="shrink-0 truncate text-caption text-secondary-500 max-w-[55%]">{ligne.detail}</span>}
               </button>
             </div>
           ))}
@@ -161,7 +161,7 @@ export function RechercheGlobale({ orgId, peutChercherClients, peutChercherLeads
           )}
         </div>
 
-        <p className="hidden border-t border-secondary-200 px-4 py-2 text-xs text-secondary-500 sm:block">
+        <p className="hidden border-t border-secondary-200 px-4 py-2 text-caption text-secondary-500 sm:block">
           ↑ ↓ pour choisir · Entrée pour ouvrir · Échap pour fermer
         </p>
       </div>

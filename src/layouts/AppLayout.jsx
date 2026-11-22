@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { moduleActif, peutOuvrirParametres } from '@/lib/modules';
-import { grouperMenu, etatDuGroupe, lirePreferencesMenu, raccourcisBarre } from '@/lib/menuGroupes';
+import { grouperMenu, lirePreferencesMenu, raccourcisBarre, cleMenuReplie } from '@/lib/menuGroupes';
 import { actionsCreer } from '@/lib/rechercheGlobale';
 import { RechercheGlobale } from '@components/navigation/RechercheGlobale';
-import { MenuCreer } from '@components/navigation/MenuCreer';
 import { BarreDuBas } from '@components/navigation/BarreDuBas';
+import { BarreLaterale } from './BarreLaterale';
 import { vocabulaire } from '@/lib/maintenance/vocabulaire';
 import { AppUpdateWatcher } from '@components/AppUpdateWatcher';
 import {
@@ -19,10 +19,6 @@ import {
   Kanban,
   HardHat,
   Wrench,
-  Settings,
-  LogOut,
-  Building2,
-  User,
   Factory,
   Target,
   Grid3x3,
@@ -35,7 +31,6 @@ import {
   ClipboardCheck,
   Snowflake,
   ClipboardList,
-  ChevronDown,
   Search,
 } from 'lucide-react';
 import { chantierGaillacVisible } from '@apps/chantier-gaillac/config';
@@ -48,20 +43,20 @@ import { chantierGaillacVisible } from '@apps/chantier-gaillac/config';
 // menu se range en groupes repliables ; en dessous il reste cette liste, dans cet ordre.
 // Toute nouvelle entrée porte son groupe (scripts/menu-groupes.test.mjs le vérifie).
 const navigation = [
-  { name: 'Dashboard',  href: '/',           icon: LayoutDashboard, resource: 'dashboard', groupe: 'quotidien' },
+  { name: 'Accueil',    href: '/',           icon: LayoutDashboard, resource: 'dashboard', groupe: 'quotidien' },
   { name: 'Planning',   href: '/planning',   icon: Calendar,        resource: 'planning', groupe: 'quotidien' },
   { name: 'Clients',    href: '/clients',    icon: Users,           resource: 'clients', groupe: 'ventes' },
-  { name: 'Territoire', href: '/territoire', icon: MapPin,          resource: 'territoire', groupe: 'ventes' },
-  { name: 'Pipeline',   href: '/pipeline',   icon: Kanban,          resource: 'pipeline', groupe: 'ventes' },
-  { name: 'Webshop',    href: '/webshop',    icon: ShoppingCart,    resource: 'pipeline', module: 'webshop', groupe: 'ventes' },
+  { name: 'Carte',      href: '/territoire', icon: MapPin,          resource: 'territoire', groupe: 'outils' },
+  { name: 'Leads',      href: '/pipeline',   icon: Kanban,          resource: 'pipeline', groupe: 'ventes' },
+  { name: 'Boutique',   href: '/webshop',    icon: ShoppingCart,    resource: 'pipeline', module: 'webshop', groupe: 'ventes' },
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,         resource: 'chantiers', groupe: 'terrain' },
   { name: 'Contrats',   href: '/contrats',   icon: FileText,        resource: 'entretiens', module: 'entretiens', groupe: 'ventes' },
   { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens', module: 'entretiens', groupe: 'terrain' },
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants', module: 'cedants', groupe: 'developpement' },
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale', module: 'prospection', groupe: 'developpement' },
-  { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings', module: 'geogrid', groupe: 'marketing' },
-  { name: 'Mailing',     href: '/mailing',     icon: Mail,          resource: 'settings', module: 'communication', groupe: 'marketing' },
-  { name: 'Meta Ads',    href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads', module: 'meta_ads', groupe: 'marketing' },
+  { name: 'Visibilité locale', href: '/geogrid', icon: Grid3x3,     resource: 'settings', module: 'geogrid', groupe: 'outils' },
+  { name: 'Messages',    href: '/mailing',     icon: Mail,          resource: 'settings', module: 'communication', groupe: 'ventes' },
+  { name: 'Publicité',   href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads', module: 'meta_ads', groupe: 'outils' },
   { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator', module: 'solaire', groupe: 'etudes' },
   { name: 'Thermique',   href: '/thermique',   icon: Thermometer,   resource: 'thermal_study', module: 'thermique', groupe: 'etudes' },
   // Dimensionnement clim : module activable, ouvert à qui voit les devis.
@@ -85,6 +80,18 @@ function lireReplisMenu(cle) {
     return lirePreferencesMenu(cle ? window.localStorage.getItem(cle) : null);
   } catch {
     return {};
+  }
+}
+
+/** Badge du rôle sous le nom de l'entreprise (rien pour un rôle inconnu). */
+const LIBELLES_ROLE = { org_admin: 'Admin', team_leader: 'Responsable', commercial: 'Commercial', technicien: 'Technicien' };
+
+/** Menu replié (icônes seules) ? Lu sur l'appareil ; déplié si le stockage est indisponible. */
+function lireMenuReplie(cle) {
+  try {
+    return Boolean(cle) && window.localStorage.getItem(cle) === 'true';
+  } catch {
+    return false;
   }
 }
 
@@ -115,6 +122,10 @@ export default function AppLayout() {
   // cette coque n'est montée qu'une fois la personne connue, et démontée à la déconnexion).
   const cleReplisMenu = user?.id ? `menu-groupes:${user.id}` : null;
   const [replisMenu, setReplisMenu] = useState(() => lireReplisMenu(cleReplisMenu));
+  // Menu replié à 64 px (icônes seules) : ordinateur et tablette, choix gardé par utilisateur.
+  const cleReplie = user?.id ? cleMenuReplie(user.id) : null;
+  const [menuReplie, setMenuReplie] = useState(() => lireMenuReplie(cleReplie));
+  const libelleEntree = (item) => (item.module === 'maintenance' ? vocabulaire(orgSettings).module : item.name);
 
   // Recherche globale (Ctrl K ou ⌘ K, bouton du menu) et menu « Créer ». Clients, leads et
   // RDV appartiennent au CRM : une entreprise sans ce module ne cherche que des pages.
@@ -122,7 +133,7 @@ export default function AppLayout() {
   const crmActif = moduleActif(orgSettings, 'crm');
   const pagesDuMenu = [
     ...groupesDuMenu.flatMap((groupe) => groupe.items).map((item) => ({
-      name: item.module === 'maintenance' ? vocabulaire(orgSettings).module : item.name,
+      name: libelleEntree(item),
       href: item.href,
     })),
     ...(peutOuvrirReglages ? [{ name: 'Paramètres', href: '/settings' }] : []),
@@ -158,6 +169,16 @@ export default function AppLayout() {
       if (cleReplisMenu) window.localStorage.setItem(cleReplisMenu, JSON.stringify(suivant));
     } catch {
       // Stockage indisponible (navigation privée) : le choix vaut pour cette visite.
+    }
+  };
+
+  const basculerMenuReplie = () => {
+    const suivant = !menuReplie;
+    setMenuReplie(suivant);
+    try {
+      if (cleReplie) window.localStorage.setItem(cleReplie, String(suivant));
+    } catch {
+      // Stockage indisponible : le choix vaut pour cette visite.
     }
   };
 
@@ -199,199 +220,29 @@ export default function AppLayout() {
       .slice(0, 2);
   };
 
-  const getRoleBadge = () => {
-    switch (effectiveRole) {
-      case 'org_admin':
-        return { label: 'Admin', color: 'bg-secondary-100 text-secondary-600' };
-      case 'team_leader':
-        return { label: 'Responsable', color: 'bg-secondary-100 text-secondary-600' };
-      case 'commercial':
-        return { label: 'Commercial', color: 'bg-secondary-100 text-secondary-600' };
-      case 'technicien':
-        return { label: 'Technicien', color: 'bg-secondary-100 text-secondary-600' };
-      default:
-        return null;
-    }
-  };
-
   // ===========================================================================
   // RENDER SIDEBAR
   // ===========================================================================
 
-  const renderSidebar = () => (
-    <div className="flex flex-col h-full bg-secondary-900">
-      {/* Logo */}
-      <div className="flex items-center h-16 px-6 border-b border-secondary-800">
-        <h1 className="text-xl font-bold text-white">
-          Majord&apos;home
-        </h1>
-      </div>
-
-      {/* Organisation */}
-      {organization && (
-        <div className="px-4 py-4 border-b border-secondary-800">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-10 h-10 rounded-lg bg-primary-700 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                {organization.name}
-              </p>
-              {getRoleBadge() && (
-                <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded ${getRoleBadge().color}`}>
-                  {getRoleBadge().label}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recherche (Ctrl K) et création rapide, d'où que l'on soit */}
-      <div className="flex items-center gap-2 px-4 pt-4">
-        <button
-          type="button"
-          onClick={ouvrirRecherche}
-          title="Rechercher un client, un lead, une page (Ctrl K)"
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-secondary-800 px-3 py-2.5 lg:py-2 text-sm text-secondary-300 hover:bg-secondary-700 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary-500"
-        >
-          <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">Rechercher</span>
-        </button>
-        <MenuCreer actions={creations} onNaviguer={closeSidebar} />
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 px-4 py-4 overflow-y-auto">
-        {groupesDuMenu.map((groupe, rang) => {
-          const { ouvert, force } = etatDuGroupe(groupe, { preferences: replisMenu, pathname });
-          return (
-            <div key={groupe.cle} className={rang > 0 ? 'mt-3' : ''}>
-              {groupe.titre && (
-                <button
-                  type="button"
-                  onClick={() => basculerGroupe(groupe.cle, ouvert)}
-                  disabled={force}
-                  aria-expanded={ouvert}
-                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-secondary-400 enabled:hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary-500"
-                >
-                  {groupe.titre}
-                  {!force && (
-                    <ChevronDown className={`w-4 h-4 transition-transform ${ouvert ? '' : '-rotate-90'}`} />
-                  )}
-                </button>
-              )}
-              {ouvert && (
-                <div className="space-y-1">
-                  {groupe.items.map((item) => (
-                    <NavLink
-                      key={item.name}
-                      to={item.href}
-                      onClick={closeSidebar}
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'bg-primary-600 text-white'
-                            : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
-                        }`
-                      }
-                    >
-                      <item.icon className="w-5 h-5" />
-                      {item.module === 'maintenance' ? vocabulaire(orgSettings).module : item.name}
-                    </NavLink>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* Pied du menu : Paramètres à gauche — admins (settings.view) ou tout rôle qui a au moins
-          une tuile de Paramètres (Fournisseurs & catalogue → articles.edit) — et profil en bas à
-          droite. Sans accès aux Paramètres, le nom de la personne prend la place du lien. */}
-      <div className="flex items-center gap-2 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-secondary-800">
-        {peutOuvrirReglages ? (
-          <NavLink
-            to="/settings"
-            onClick={closeSidebar}
-            className={({ isActive }) =>
-              `flex-1 min-w-0 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-primary-600 text-white'
-                  : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
-              }`
-            }
-          >
-            <Settings className="w-5 h-5" />
-            Paramètres
-          </NavLink>
-        ) : (
-          <p className="flex-1 min-w-0 px-3 text-sm font-medium text-secondary-300 truncate">
-            {getUserDisplayName()}
-          </p>
-        )}
-
-        <div className="relative shrink-0">
-          <button
-            onClick={() => setUserMenuOpen(!userMenuOpen)}
-            aria-label={`Menu du profil — ${getUserDisplayName()}`}
-            aria-expanded={userMenuOpen}
-            aria-haspopup="menu"
-            title={getUserDisplayName()}
-            className="h-11 w-11 lg:h-10 lg:w-10 rounded-full bg-primary-700 flex items-center justify-center ring-2 ring-transparent hover:ring-secondary-500 focus-visible:ring-white focus:outline-none transition-shadow"
-          >
-            <span className="text-sm font-medium text-white">
-              {getUserInitials()}
-            </span>
-          </button>
-
-          {userMenuOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setUserMenuOpen(false)}
-              />
-              <div
-                role="menu"
-                className="absolute right-0 bottom-full z-50 mb-2 w-56 bg-white rounded-lg shadow-lg border border-secondary-200 py-1 animate-fade-in"
-              >
-                <div className="px-4 py-3 border-b border-secondary-100">
-                  <p className="text-sm font-medium text-secondary-900 truncate">
-                    {getUserDisplayName()}
-                  </p>
-                  <p className="text-xs text-secondary-500 truncate">
-                    {user?.email}
-                  </p>
-                </div>
-
-                <NavLink
-                  to="/profile"
-                  role="menuitem"
-                  onClick={closeSidebar}
-                  className="flex items-center gap-3 px-4 py-2.5 lg:py-2 text-sm text-secondary-700 hover:bg-secondary-50"
-                >
-                  <User className="w-4 h-4" />
-                  Mon profil
-                </NavLink>
-
-                <div className="border-t border-secondary-100 mt-1 pt-1">
-                  <button
-                    role="menuitem"
-                    onClick={handleSignOut}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 lg:py-2 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Se déconnecter
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+  const renderSidebar = (options = {}) => (
+    <BarreLaterale
+      groupes={groupesDuMenu}
+      replisMenu={replisMenu}
+      onBasculerGroupe={basculerGroupe}
+      pathname={pathname}
+      libelleEntree={libelleEntree}
+      organization={organization}
+      libelleRole={LIBELLES_ROLE[effectiveRole] || null}
+      creations={creations}
+      onOuvrirRecherche={ouvrirRecherche}
+      onNaviguer={closeSidebar}
+      peutOuvrirReglages={peutOuvrirReglages}
+      profil={{ nom: getUserDisplayName(), initiales: getUserInitials(), email: user?.email }}
+      menuProfilOuvert={userMenuOpen}
+      onMenuProfil={setUserMenuOpen}
+      onSeDeconnecter={handleSignOut}
+      {...options}
+    />
   );
 
   // ===========================================================================
@@ -422,13 +273,13 @@ export default function AppLayout() {
         {renderSidebar()}
       </div>
 
-      {/* Sidebar Desktop */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-64 lg:block">
-        {renderSidebar()}
+      {/* Sidebar Desktop — repliable à 64 px (icônes seules) */}
+      <div className={`hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:block ${menuReplie ? 'lg:w-16' : 'lg:w-64'}`}>
+        {renderSidebar({ replie: menuReplie, onBasculerReplie: basculerMenuReplie })}
       </div>
 
       {/* Main Content */}
-      <div className="lg:pl-64">
+      <div className={menuReplie ? 'lg:pl-16' : 'lg:pl-64'}>
         {/* Bandeau du haut : téléphone seulement — le nom de l'entreprise et la recherche. Le
             menu s'ouvre par « Plus » dans la barre du bas. Dès que le menu est affiché en
             permanence (lg, tablettes comprises), bandeau et barre disparaissent. */}
