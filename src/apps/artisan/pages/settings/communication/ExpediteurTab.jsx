@@ -1,25 +1,15 @@
-// src/apps/artisan/pages/settings/communication/EmailsTab.jsx
+// src/apps/artisan/pages/settings/communication/ExpediteurTab.jsx
 // ============================================================================
-// Paramètres → E-mails & SMS (/settings/emails) : identité d'envoi des
-// emails de l'organisation — `from_email` (expéditeur, dont le domaine doit être
-// vérifié sur Resend) et `reply_to` — puis le domaine d'envoi (ResendDomainSection).
-// Sortis de Organisation → Coordonnées le 2026-09-13 (regroupement par module) :
-// mêmes clés `core.organizations.settings`, même canal `useOrgSettings().save`
-// (merge JSONB niveau 1 : on n'envoie que ces deux clés).
+// Réglages → E-mails & SMS → chapitre « Expéditeur et domaine » : l'adresse d'où partent les e-mails
+// de l'entreprise (`from_email`), l'adresse de réponse (`reply_to`), puis son propre domaine d'envoi
+// (`ResendDomainSection`). Mêmes clés `core.organizations.settings`, même canal `useOrgSettings().save`
+// (fusion de niveau 1 : on n'envoie que ces deux clés).
 // ============================================================================
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { useAuth } from '@contexts/AuthContext';
-import { moduleActif } from '@/lib/modules';
-import { emailsAffiches } from '@/lib/emailsAutomatiques';
 import { phraseEtatEnvoi } from '@/lib/expediteur';
 import ResendDomainSection from './ResendDomainSection';
-import EmailAutoLigne from './EmailAutoLigne';
-import AccueilLeadMetaSection from './AccueilLeadMetaSection';
-import SequencesSection from './SequencesSection';
-import HabillageSection from './HabillageSection';
-import { leadWelcomeSettings } from '@/lib/leadWelcomeEmail';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -44,14 +34,11 @@ function pickFields(settings) {
   return out;
 }
 
-export default function EmailsTab() {
+export default function ExpediteurTab() {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
-  const { organization, isOrgAdmin } = useAuth();
-  const orgId = organization?.id;
   const [form, setForm] = useState(() => pickFields({}));
   const [initial, setInitial] = useState(() => pickFields({}));
 
-  const communicationActive = moduleActif(settings, 'communication');
   // D'où partent les e-mails, d'après ce qui est ENREGISTRÉ (pas la saisie en cours).
   const etatEnvoi = phraseEtatEnvoi(settings);
 
@@ -67,12 +54,12 @@ export default function EmailsTab() {
 
   const handleSave = async () => {
     if (!isValid) {
-      toast.error('Corrige les erreurs avant d\'enregistrer.');
+      toast.error('Corrigez les erreurs avant d\'enregistrer.');
       return;
     }
     try {
       await save(form);
-      toast.success('Emails enregistrés');
+      toast.success('Adresses enregistrées');
       setInitial(form);
     } catch (err) {
       toast.error(err.message || 'Erreur lors de l\'enregistrement');
@@ -90,8 +77,9 @@ export default function EmailsTab() {
           <h3 className={SECTION_TITLE}>Identité d&apos;envoi</h3>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className={LABEL_CLASS}>Votre adresse e-mail *</label>
+              <label className={LABEL_CLASS} htmlFor="expediteur-from">Votre adresse e-mail *</label>
               <input
+                id="expediteur-from"
                 type="email"
                 value={form.from_email}
                 onChange={(e) => setForm({ ...form, from_email: e.target.value })}
@@ -102,8 +90,9 @@ export default function EmailsTab() {
               <p className={HINT_CLASS}>Les réponses de vos clients y arrivent.</p>
             </div>
             <div>
-              <label className={LABEL_CLASS}>Email de réponse (si différent)</label>
+              <label className={LABEL_CLASS} htmlFor="expediteur-reply">Email de réponse (si différent)</label>
               <input
+                id="expediteur-reply"
                 type="email"
                 value={form.reply_to}
                 onChange={(e) => setForm({ ...form, reply_to: e.target.value })}
@@ -116,31 +105,6 @@ export default function EmailsTab() {
           </div>
           {etatEnvoi && <p className="mt-3 text-sm text-secondary-700">{etatEnvoi}</p>}
         </section>
-
-        {communicationActive && (
-          <section>
-            <h3 className={SECTION_TITLE}>E-mails envoyés automatiquement</h3>
-            <p className={HINT_CLASS}>
-              Chaque e-mail part avec un texte par défaut tant que vous ne l&apos;avez pas modifié. Un essai arrive à
-              l&apos;adresse enregistrée ci-dessus, celle qui reçoit les réponses.
-            </p>
-            {emailsAffiches((cle) => moduleActif(settings, cle), { accueilMetaActif: leadWelcomeSettings(settings).enabled }).map((email) => (
-              email.interrupteur === 'lead_welcome_email'
-                ? <AccueilLeadMetaSection key={email.gabarit.key} orgId={orgId} />
-                : (
-                  <EmailAutoLigne
-                    key={email.gabarit.key}
-                    orgId={orgId}
-                    gabarit={email.gabarit}
-                    titre={email.titre}
-                    description={email.description}
-                  />
-                )
-            ))}
-          </section>
-        )}
-
-        {communicationActive && <SequencesSection orgId={orgId} />}
 
         <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">
           <button
@@ -161,8 +125,6 @@ export default function EmailsTab() {
           </button>
         </div>
       </div>
-      {/* L'habillage s'enregistre dans les réglages de l'organisation : administrateur seul. */}
-      {communicationActive && isOrgAdmin && <HabillageSection />}
       <ResendDomainSection />
     </>
   );

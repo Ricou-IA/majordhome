@@ -21,9 +21,11 @@ import { useCanAccess } from '@hooks/usePermissions';
  * @param {Array<{ key: string, label: string, icon: React.ComponentType }>} [p.tabs]
  * @param {string} [p.tab]  onglet actif
  * @param {(key: string) => void} [p.onTabChange]
+ * @param {'onglets' | 'menu'} [p.disposition]  `menu` : les onglets deviennent un menu vertical à gauche sur écran
+ *   large (pages à nombreux chapitres, ex. E-mails & SMS) ; onglets défilants sur écran étroit
  * @param {React.ReactNode} p.children
  */
-export default function SettingsPage({ title, description, acces, tabs, tab, onTabChange, children }) {
+export default function SettingsPage({ title, description, acces, tabs, tab, onTabChange, disposition = 'onglets', children }) {
   const { isOrgAdmin } = useAuth();
   const { can, permissionsLoading } = useCanAccess();
   const autorise = isOrgAdmin || (!!acces && can(acces.resource, acces.action) === true);
@@ -35,6 +37,9 @@ export default function SettingsPage({ title, description, acces, tabs, tab, onT
 
   if (refuse) return <Navigate to="/settings" replace />;
   if (!autorise) return null; // non-admin : on attend le verdict des droits avant d'afficher ou de rediriger
+
+  const aDesOnglets = Array.isArray(tabs) && tabs.length > 0;
+  const enMenu = aDesOnglets && disposition === 'menu';
 
   return (
     <div className="space-y-6">
@@ -49,7 +54,7 @@ export default function SettingsPage({ title, description, acces, tabs, tab, onT
         {description && <p className="text-secondary-600">{description}</p>}
       </div>
 
-      {tabs && tabs.length > 0 && (
+      {aDesOnglets && !enMenu && (
         <div className="flex border-b border-secondary-200 overflow-x-auto">
           {tabs.map((t) => (
             <button
@@ -69,7 +74,32 @@ export default function SettingsPage({ title, description, acces, tabs, tab, onT
         </div>
       )}
 
-      {children}
+      {enMenu ? (
+        <div className="space-y-6 lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-8 lg:space-y-0">
+          <nav
+            aria-label={title}
+            className="flex gap-1 overflow-x-auto border-b border-secondary-200 pb-2 lg:sticky lg:top-4 lg:flex-col lg:self-start lg:overflow-visible lg:border-b-0 lg:pb-0"
+          >
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => onTabChange?.(t.key)}
+                aria-current={tab === t.key ? 'page' : undefined}
+                className={`flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${
+                  tab === t.key
+                    ? 'bg-primary-50 text-primary-800'
+                    : 'text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900'
+                }`}
+              >
+                {t.icon && <t.icon className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                {t.label}
+              </button>
+            ))}
+          </nav>
+          <div className="min-w-0 space-y-6">{children}</div>
+        </div>
+      ) : children}
     </div>
   );
 }

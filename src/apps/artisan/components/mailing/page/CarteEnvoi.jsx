@@ -16,9 +16,9 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowRight, FlaskConical, Loader2, Send } from 'lucide-react';
 import { inputClass } from '@apps/artisan/components/FormFields';
 import { EXPEDITEUR_REFUS } from '@/lib/expediteur';
+import { lienChapitre } from '@/lib/chapitresCommunication';
 import Carte from './Carte';
 
-const REGLAGES = '/settings/communication';
 const PRINCIPAL = 'inline-flex h-10 items-center gap-2 rounded-lg bg-primary-700 px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 const SECONDAIRE = 'inline-flex h-10 items-center gap-2 rounded-lg border border-secondary-300 bg-white px-4 text-sm font-medium text-secondary-800 transition-colors hover:bg-secondary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50';
 const LIEN = 'inline-flex items-center gap-1 text-sm font-medium text-primary-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
@@ -32,9 +32,9 @@ function Raisons({ liste }) {
   );
 }
 
-function LienReglages({ children }) {
+function LienReglages({ chapitre, children }) {
   return (
-    <Link to={REGLAGES} className={LIEN}>
+    <Link to={lienChapitre(chapitre)} className={LIEN}>
       {children}
       <ArrowRight className="h-4 w-4" aria-hidden="true" />
     </Link>
@@ -219,7 +219,7 @@ export default function CarteEnvoi({ numero, e, nature }) {
             ? 'Ce mail part tout seul vers vos prospects : sa mise en route et son délai se règlent dans Réglages → E-mails & SMS.'
             : 'Ce mail part tout seul, selon la cadence réglée par l’administrateur.'}
         </p>
-        {nature === 'sequence' && <LienReglages>Ouvrir les réglages des e-mails</LienReglages>}
+        {nature === 'sequence' && <LienReglages chapitre="sequences">Ouvrir les réglages des séquences</LienReglages>}
       </Carte>
     );
   }
@@ -251,7 +251,7 @@ export default function CarteEnvoi({ numero, e, nature }) {
           <div className="space-y-1">
             <p>{bandeau}</p>
             <p>Tant que ce n’est pas fait, ce mail ne peut pas partir à un groupe de destinataires{e.refusNombre === 'domaine_requis' ? ' ; un essai à votre adresse reste possible' : ''}.</p>
-            <LienReglages>Ouvrir les réglages des e-mails</LienReglages>
+            <LienReglages chapitre="expediteur">Ouvrir les réglages de l&apos;expéditeur</LienReglages>
           </div>
         </div>
       )}

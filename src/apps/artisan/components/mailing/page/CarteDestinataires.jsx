@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowRight, Loader2, Plus, Users } from 'lucide-react';
 import { selectClass } from '@apps/artisan/components/FormFields';
 import SegmentBuilderDrawer from '../SegmentBuilderDrawer';
+import { lienChapitre } from '@/lib/chapitresCommunication';
 import Carte from './Carte';
 
 const LIEN = 'inline-flex items-center gap-1 text-sm font-medium text-primary-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50';
@@ -76,7 +77,7 @@ export default function CarteDestinataires({ numero, d }) {
       {lecture ? (
         <div className="space-y-3">
           <p className="text-sm text-secondary-800">{d.etatSegment.segment?.name || 'Aucun groupe réglé.'}</p>
-          <Link to="/settings/communication" className={LIEN}>
+          <Link to={lienChapitre('sequences')} className={LIEN}>
             Régler ce mail dans Réglages → E-mails & SMS
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>

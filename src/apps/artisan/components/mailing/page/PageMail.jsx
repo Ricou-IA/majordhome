@@ -39,6 +39,7 @@ import {
   appliquerRedaction, refaireAvecNouvelEditeur, revenirALAncien, rappelObjet, avertissementsTexte,
   etatEnregistrement, corpsVide, objetsSuggeres, sansElementsDe, miseEnFormeSimplifiee, peutOuvrirMail, avertissementsObjet,
 } from '@/lib/mailPage';
+import { lienChapitre } from '@/lib/chapitresCommunication';
 import { etatInitial, reducteurPageMail } from './etatPageMail';
 import EnTetePage from './EnTetePage';
 import CarteMessage from './CarteMessage';
@@ -261,7 +262,7 @@ export default function PageMail({ mailId, onRetour, onCree }) {
 
         <ApercuMail campagne={base} objet={form.subject} corps={form.html_body} reglages={settings} nature={nature}>
           {isOrgAdmin && (
-            <button type="button" onClick={() => aller('/settings/communication#habillage')} className="mt-2 text-sm text-secondary-600 hover:text-secondary-900 hover:underline">
+            <button type="button" onClick={() => aller(lienChapitre('habillage'))} className="mt-2 text-sm text-secondary-600 hover:text-secondary-900 hover:underline">
               Modifier l’habillage
             </button>
           )}
