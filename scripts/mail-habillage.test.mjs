@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   habillerMail, valeursDeMarque, couleurValide, lireHabillage, choixDepuisReglages, aDejaDesabonnement,
   HABILLAGE_DEFAUT, DEFAUTS_MARQUE,
@@ -99,4 +102,66 @@ test('choixDepuisReglages : réglages vides, ancien habillage seul, choix enregi
   });
   const enregistre = { entete: 'logo_bandeau', pied: { coordonnees: false, certifications: true, site: false } };
   assert.deepEqual(choixDepuisReglages({ email_skeleton_html: S, email_habillage: enregistre }), enregistre);
+});
+
+test('ancien habillage : un corps portant $& ou $$ sort intact', () => {
+  const corps = '<p>Prix : 5 $$ et $& et $1 et $`</p>';
+  assert.equal(habillerMail({ email_skeleton_html: S }, corps), S.replace('{{EMAIL_BODY}}', () => corps));
+  assert.ok(habillerMail({ email_skeleton_html: S }, corps).includes(corps));
+});
+
+test("habillage construit sans adresse d'entreprise : aucun lien de désabonnement", () => {
+  const h = habillerMail({ brand_name: 'Cimaj' }, '<p>a</p>');
+  assert.ok(!h.includes('mailto:'), 'lien mailto vide écrit');
+  assert.ok(!h.includes('Se désabonner'));
+  assert.ok(habillerMail({ brand_name: 'Cimaj', from_email: 'c@ex.fr' }, '<p>a</p>').includes('mailto:c@ex.fr?subject=Désabonnement'));
+});
+
+test('valeurs hostiles : rien de brut dans le HTML construit', () => {
+  const hostile = `<script>x</script>"onmouseover="y'`;
+  const r = {
+    brand_name: hostile, email_tagline: hostile, rge_certifications: [hostile], address: hostile,
+    phone: hostile, city: hostile, postal_code: hostile, from_email: hostile,
+    website_url: `https://ex.fr/${hostile}`, logo_url: `https://ex.fr/l.png${hostile}`,
+    email_habillage: { entete: 'logo_bandeau', pied: { coordonnees: true, certifications: true, site: true } },
+  };
+  const h = habillerMail(r, '<p>a</p>');
+  assert.ok(!h.includes('<script'), 'balise script brute');
+  // Aucun attribut cassé : chaque guillemet doublé brut de l'attribut est échappé.
+  for (const m of h.matchAll(/(?:href|src|alt)="([^"]*)"/g)) assert.ok(!/[<>'"]/.test(m[1]), `attribut non échappé : ${m[1]}`);
+  assert.ok(!h.includes('onmouseover="y'), 'attribut injecté');
+});
+
+// ---------------------------------------------------------------------------
+// Les edges délèguent : lecture des sources (tâche 2)
+// ---------------------------------------------------------------------------
+const RACINE = join(dirname(fileURLToPath(import.meta.url)), '..');
+const lireEdge = (...chemin) => readFileSync(join(RACINE, 'supabase', 'functions', ...chemin), 'utf8').replace(/\r\n/g, '\n');
+
+test("les edges d'habillage ne portent plus leur propre habillage ni leurs couleurs", () => {
+  for (const chemin of [['_shared', 'mail.ts'], ['mailing-send', 'index.ts'], ['contract-signed-notify', 'index.ts']]) {
+    const source = lireEdge(...chemin);
+    const nom = chemin.join('/');
+    assert.doesNotMatch(source, /email_skeleton_html/, `${nom} lit encore email_skeleton_html`);
+    assert.doesNotMatch(source, /#f97316/i, `${nom} porte encore #f97316`);
+    assert.doesNotMatch(source, /#1E4D8C/i, `${nom} porte encore #1E4D8C`);
+    assert.doesNotMatch(source, /habillageNeutre/, `${nom} porte encore habillageNeutre`);
+    assert.match(source, /mailHabillage\.js/, `${nom} n'importe pas mailHabillage.js`);
+  }
+});
+
+test('mail.ts : wrapWithSkeleton rend habillerMail, brandingReplacements rend valeursDeMarque', () => {
+  const source = lireEdge('_shared', 'mail.ts');
+  assert.match(source, /export function wrapWithSkeleton[\s\S]*?habillerMail\(b\.reglages, body\)/);
+  assert.match(source, /export function brandingReplacements[\s\S]*?valeursDeMarque\(b\.reglages\)/);
+});
+
+test('mailing-send et contract-signed-notify : habillage et marque viennent du module', () => {
+  const envoi = lireEdge('mailing-send', 'index.ts');
+  assert.match(envoi, /habillerMail\(branding\.reglages, htmlBody\)/);
+  assert.match(envoi, /valeursDeMarque\(/);
+  assert.doesNotMatch(envoi, /function wrapInSkeleton/);
+  const notif = lireEdge('contract-signed-notify', 'index.ts');
+  assert.match(notif, /habillerMail\(/);
+  assert.match(notif, /valeursDeMarque\(/);
 });

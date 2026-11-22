@@ -28,6 +28,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { chargerTexteEmail } from "../_shared/texteEmail.ts";
 import { expediteurDe } from "../_shared/mail.ts";
+import { habillerMail, valeursDeMarque } from "../_shared/mailHabillage.js";
 import { CONTRAT_SIGNE_TEMPLATE_KEY } from "../_shared/contratEmailTemplates.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -140,14 +141,9 @@ Deno.serve(async (req: Request) => {
     const settings = (org.settings as Record<string, string | null> | null) || {};
     const brandName = settings.brand_name || org.name;
     // Expéditeur : domaine de l'entreprise s'il est vérifié, sinon l'adresse commune (_shared/expediteur.js).
-    const expediteur = expediteurDe({ ...settings, brand_name: brandName });
-    const fromEmail = expediteur.contactEmail;
-    const accentColor = settings.accent_color || "#f97316";
-    const secondaryColor = settings.secondary_color || "#1E4D8C";
-    const emailTagline = settings.email_tagline || "";
-    const logoUrl = settings.logo_url || "";
-    const websiteUrl = settings.website_url || "";
-    const emailSkeleton = settings.email_skeleton_html || null;
+    // Réglages vus par l'habillage et les valeurs de marque : le nom retombe sur celui de l'organisation.
+    const reglages = { ...settings, brand_name: brandName };
+    const expediteur = expediteurDe(reglages);
 
     if (expediteur.refus) {
       return json(
@@ -184,27 +180,13 @@ Deno.serve(async (req: Request) => {
     const pdfBuffer = await pdfBlob.arrayBuffer();
     const pdfBase64 = arrayBufferToBase64(pdfBuffer);
 
-    // 5) Wrap dans le squelette commun si défini, puis remplacement placeholders.
-    // Skip wrap si le template contient déjà un HTML complet (rétrocompat).
-    const rawBody = template.html_body || "";
-    const isLegacyFullHtml = /<!doctype/i.test(rawBody) || /<html[\s>]/i.test(rawBody);
-    const wrappedBody = (emailSkeleton && !isLegacyFullHtml)
-      ? emailSkeleton.replace("{{EMAIL_BODY}}", rawBody)
-      : rawBody;
+    // 5) Habillage de l'entreprise (ou par défaut, `_shared/mailHabillage.js`), puis remplacement des
+    // placeholders. Un texte qui est déjà une page HTML complète (rétrocompat) reste tel quel.
+    const wrappedBody = habillerMail(reglages, template.html_body || "");
 
     const replacements: Record<string, string> = {
       "{{CLIENT_NAME}}": contract.client_name || "cher client",
-      "{{BRAND_NAME}}": brandName ?? "",
-      "{{ORG_EMAIL}}": fromEmail,
-      "{{ORG_PHONE}}": settings.phone || "",
-      "{{ORG_ADDRESS}}": settings.address || "",
-      "{{ORG_POSTAL_CODE}}": settings.postal_code || "",
-      "{{ORG_CITY}}": settings.city || "",
-      "{{ORG_WEBSITE_URL}}": websiteUrl,
-      "{{ACCENT_COLOR}}": accentColor,
-      "{{SECONDARY_COLOR}}": secondaryColor,
-      "{{EMAIL_TAGLINE}}": emailTagline,
-      "{{LOGO_URL}}": logoUrl,
+      ...valeursDeMarque(reglages),
     };
 
     const subject = applyPlaceholders(template.subject || "", replacements);

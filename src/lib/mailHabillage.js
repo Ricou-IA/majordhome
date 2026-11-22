@@ -162,9 +162,11 @@ function habillageConstruit(s, choix, corps) {
   if (choix.pied.site && /^https?:\/\//i.test(site)) {
     lignes.push(`<a href="${echapper(site)}" style="color:${accent};text-decoration:underline;">${echapper(site.replace(/^https?:\/\//i, '').replace(/\/$/, ''))}</a>`);
   }
-  // Le lien de désabonnement est toujours là, sauf si le corps porte déjà le sien.
-  if (!aDejaDesabonnement(corps)) {
-    lignes.push(`<a href="mailto:${echapper(v['{{ORG_EMAIL}}'])}?subject=Désabonnement" style="color:${accent};text-decoration:underline;">Se désabonner</a>`);
+  // Le lien de désabonnement est toujours là, sauf si le corps porte déjà le sien — ou si
+  // l'entreprise n'a aucune adresse (un `mailto:` vide ne mènerait nulle part).
+  const contact = v['{{ORG_EMAIL}}'];
+  if (contact && !aDejaDesabonnement(corps)) {
+    lignes.push(`<a href="mailto:${echapper(contact)}?subject=Désabonnement" style="color:${accent};text-decoration:underline;">Se désabonner</a>`);
   }
   const pied = lignes.join('<br>');
 
@@ -192,6 +194,8 @@ export function habillerMail(reglages, corps) {
   const choix = lireHabillage(s);
   if (choix) return habillageConstruit(s, choix, texteCorps);
   const ancien = typeof s.email_skeleton_html === 'string' ? s.email_skeleton_html : '';
+  // Fonction de remplacement et non chaîne : `$&`, `$$`… d'un corps resteraient tels quels (différence voulue
+  // avec l'ancien `String.replace(…, corps)` des edges, qui les interprétait).
   if (ancien.includes('{{EMAIL_BODY}}')) return ancien.replace('{{EMAIL_BODY}}', () => texteCorps);
   return habillageConstruit(s, { entete: HABILLAGE_DEFAUT.entete, pied: { ...HABILLAGE_DEFAUT.pied } }, texteCorps);
 }

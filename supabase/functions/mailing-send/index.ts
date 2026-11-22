@@ -22,7 +22,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { resoudreExpediteur } from "../_shared/expediteur.js";
 import { estSequence } from "../_shared/sequencesEmails.js";
-import { wrapWithSkeleton, orgBranding } from "../_shared/mail.ts";
+import { habillerMail, valeursDeMarque } from "../_shared/mailHabillage.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -213,20 +213,10 @@ type OrgBranding = {
   fromName: string;
   fromEmail: string;
   replyTo: string;
-  brandName: string;
   websiteUrl: string;
   pelletsOfferUrl: string | null;
   contactEmail: string;
-  phone: string;
-  address: string;
-  postalCode: string;
-  city: string;
-  accentColor: string;
-  secondaryColor: string;
-  emailTagline: string;
-  logoUrl: string;
-  emailSkeleton: string | null;
-  /** Réglages bruts de l'organisation (habillage neutre). */
+  /** Réglages bruts de l'organisation : habillage et valeurs de marque (`_shared/mailHabillage.js`). */
   reglages: Record<string, unknown>;
 };
 
@@ -245,31 +235,11 @@ async function loadOrgBranding(orgId: string, usage: "individuel" | "nombre"): P
     fromName: exp.fromName || "Majord'home",
     fromEmail: exp.fromEmail,
     replyTo: exp.replyTo,
-    brandName: s.brand_name || "Majord'home",
     websiteUrl: s.website_url || "",
     pelletsOfferUrl: s.pellets_offer_url || null,
     contactEmail,
-    phone: s.phone || "",
-    address: s.address || "",
-    postalCode: s.postal_code || "",
-    city: s.city || "",
-    accentColor: s.accent_color || "#f97316",
-    secondaryColor: s.secondary_color || "#1E4D8C",
-    emailTagline: s.email_tagline || "",
-    logoUrl: s.logo_url || "",
-    emailSkeleton: s.email_skeleton_html || null,
     reglages: s,
   };
-}
-
-// Habillage de l'entreprise, à défaut l'habillage neutre commun (`_shared/mail.ts`) : un texte sans
-// habillage ne part plus nu. Un HTML déjà complet est laissé tel quel.
-function wrapInSkeleton(body: string, branding: OrgBranding): string {
-  if (/<!doctype/i.test(body) || /<html[\s>]/i.test(body)) return body;
-  if (branding.emailSkeleton && branding.emailSkeleton.includes("{{EMAIL_BODY}}")) {
-    return branding.emailSkeleton.replace("{{EMAIL_BODY}}", body);
-  }
-  return wrapWithSkeleton(orgBranding(branding.reglages), body);
 }
 
 function applyPlaceholders(text: string, replacements: Record<string, string>): string {
@@ -401,17 +371,7 @@ function buildRecipientReplacements(
     "cher client";
   return {
     "{{CLIENT_NAME}}": clientName,
-    "{{BRAND_NAME}}": branding.brandName,
-    "{{ORG_EMAIL}}": branding.contactEmail,
-    "{{ORG_PHONE}}": branding.phone,
-    "{{ORG_ADDRESS}}": branding.address,
-    "{{ORG_POSTAL_CODE}}": branding.postalCode,
-    "{{ORG_CITY}}": branding.city,
-    "{{ORG_WEBSITE_URL}}": branding.websiteUrl,
-    "{{ACCENT_COLOR}}": branding.accentColor,
-    "{{SECONDARY_COLOR}}": branding.secondaryColor,
-    "{{EMAIL_TAGLINE}}": branding.emailTagline,
-    "{{LOGO_URL}}": branding.logoUrl,
+    ...valeursDeMarque(branding.reglages),
   };
 }
 
@@ -565,7 +525,8 @@ Deno.serve(async (req: Request) => {
       const brandingReplacements = buildRecipientReplacements(r, branding);
       const personalizedSubject = applyPlaceholders(subject, brandingReplacements);
 
-      const wrappedHtml = wrapInSkeleton(htmlBody, branding);
+      // Habillage de l'entreprise (ou par défaut) posé ici, juste avant les remplacements : un HTML déjà complet reste tel quel.
+      const wrappedHtml = habillerMail(branding.reglages, htmlBody);
 
       const html = personalizeHtml({
         htmlBody: wrappedHtml, salutation, lienPellets, unsubscribeUrl,

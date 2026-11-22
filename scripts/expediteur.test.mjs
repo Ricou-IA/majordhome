@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { messageriePublique, resoudreExpediteur, partieLocale, domaineVerifie, lireAdresse, domaineDe, EXPEDITEUR_REFUS } from '../src/lib/expediteur.js';
+import { valeursDeMarque } from '../src/lib/mailHabillage.js';
 
 const VERIFIE = {
   brand_name: 'Dupont Chauffage', from_email: 'contact@dupont.fr', reply_to: 'bureau@dupont.fr',
@@ -106,6 +107,11 @@ test('les edges ne fabriquent plus leur expéditeur à part', () => {
   for (const edge of ['mailing-send/index.ts', 'contract-signed-notify/index.ts']) {
     assert.match(lire(edge), /resoudreExpediteur|expediteurDe/, `${edge} passe par le module`);
   }
-  // Une edge qui passe par orgBranding n'écrit pas {{ORG_EMAIL}} avec l'adresse d'envoi.
-  assert.match(lire('_shared/mail.ts'), /"\{\{ORG_EMAIL\}\}": b\.contactEmail/);
+  // Une edge qui passe par orgBranding n'écrit pas {{ORG_EMAIL}} avec l'adresse d'envoi : ses valeurs de marque
+  // viennent de `valeursDeMarque`, où {{ORG_EMAIL}} est l'adresse de l'entreprise (`contactEmail`).
+  assert.match(lire('_shared/mail.ts'), /valeursDeMarque\(b\.reglages\)/);
+  assert.match(lire('../../src/lib/mailHabillage.js'), /'\{\{ORG_EMAIL\}\}': resoudreExpediteur\(s\)\.contactEmail/);
+  const sur = { from_email: 'contact@dupont.fr', resend: { status: 'verified', domain: 'dupont.fr' } };
+  assert.equal(valeursDeMarque(sur)['{{ORG_EMAIL}}'], 'contact@dupont.fr');
+  assert.equal(valeursDeMarque({ from_email: 'contact@cimaj.fr' })['{{ORG_EMAIL}}'], 'contact@cimaj.fr');
 });
