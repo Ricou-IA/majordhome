@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Mail, Send, Sparkles, Filter, BarChart3 } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
@@ -6,12 +6,31 @@ import SendTab from '@apps/artisan/components/mailing/SendTab';
 import EditorTab from '@apps/artisan/components/mailing/EditorTab';
 import SegmentsTab from '@apps/artisan/components/mailing/SegmentsTab';
 import StatsTab from '@apps/artisan/components/mailing/StatsTab';
+import PageMail from '@apps/artisan/components/mailing/page/PageMail';
+
+const ONGLETS = ['send', 'stats', 'segments', 'editor'];
 
 export default function Mailing() {
   const { isOrgAdmin } = useAuth();
   // ?tab=editor : ouverture directe de l'éditeur (lien « Modifier le texte » de Réglages → Emails).
-  const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => (searchParams.get('tab') === 'editor' ? 'editor' : 'send'));
+  // ?mail=<id> | nouveau : la page d'un mail, à la place des onglets.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ongletDemande = searchParams.get('tab');
+  const mailId = searchParams.get('mail');
+  const [tab, setTab] = useState(() => (ongletDemande === 'editor' ? 'editor' : 'send'));
+  useEffect(() => {
+    if (ONGLETS.includes(ongletDemande)) setTab(ongletDemande);
+  }, [ongletDemande]);
+
+  if (isOrgAdmin && mailId) {
+    return (
+      <PageMail
+        mailId={mailId}
+        onRetour={() => { setTab('editor'); setSearchParams({ tab: 'editor' }); }}
+        onCree={(id) => setSearchParams({ mail: id }, { replace: true })}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

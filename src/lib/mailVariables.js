@@ -140,7 +140,7 @@ export function natureDuMail(campagne) {
  * @param {CampagneMail | null | undefined} campagne
  * @returns {{ subject: string, html_body: string } | null}
  */
-function texteParDefaut(campagne) {
+export function texteParDefaut(campagne) {
   const cle = campagne?.key ?? '';
   if (!cle) return null;
   const defaut = emailOuSequence(cle)?.gabarit ?? WEBSHOP_EMAIL_DEFAULTS[cle] ?? null;

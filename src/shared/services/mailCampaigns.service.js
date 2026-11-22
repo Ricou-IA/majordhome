@@ -107,7 +107,25 @@ export const mailCampaignsService = {
     }
   },
 
-  async duplicate(campaign, newKey) {
+  /**
+   * Nombre d'envois au journal pour une campagne (même organisation, `campaign_name` = son nom) : tant qu'il est
+   * nul, le nom du mail peut changer. `data` nul sur une erreur — l'appelant le lit comme « inconnu ».
+   * @param {string} orgId
+   * @param {string} libelle
+   * @returns {Promise<{ data: number | null, error: any }>}
+   */
+  async compterEnvois(orgId, libelle) {
+    const { count, error } = await supabase
+      .from('majordhome_mailing_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .eq('campaign_name', libelle);
+    if (error) return { data: null, error };
+    return { data: typeof count === 'number' ? count : null, error: count === null ? new Error('compte_inconnu') : null };
+  },
+
+  /** Copie d'une campagne : clé et nom fournis par l'appelant (`cleDeCopie`, `libelleDeCopie` de `mailPage.js`). */
+  async duplicate(campaign, newKey, newLabel) {
     const {
       id: _id,
       created_at: _ca,
@@ -115,6 +133,6 @@ export const mailCampaignsService = {
       created_by: _cb,
       ...rest
     } = campaign;
-    return this.create({ ...rest, key: newKey, label: `${rest.label} (copie)` });
+    return this.create({ ...rest, key: newKey, label: newLabel || `${rest.label} (copie)` });
   },
 };

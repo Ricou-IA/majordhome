@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Plus, Edit, Copy, Archive, Loader2, Mail, Users, Clock, Play, Check, Zap, Target, Send, RefreshCw } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { useAuth } from '@contexts/AuthContext';
 import { useMailCampaigns } from '@hooks/useMailCampaigns';
 import { useMailSegments } from '@hooks/useMailSegments';
 import { formatRelativeFR } from '@/lib/utils';
-import CampaignWizard from './CampaignWizard';
+import { cleDeCopie, libelleDeCopie } from '@/lib/mailPage';
 
 // --- Natures de campagne -----------------------------------------------------
 // Une campagne tombe dans exactement un groupe, selon son mode d'envoi :
@@ -48,50 +49,43 @@ function formatCadence(c) {
 
 /**
  * Onglet Éditeur — vue d'ensemble des campagnes regroupées par mode d'envoi.
+ * « Éditer » et « Nouvelle campagne » ouvrent la page du mail (`?mail=<id>` / `?mail=nouveau`, `PageMail`).
  * Accessible en org_admin (gate appliqué au niveau page Mailing).
  */
 export default function EditorTab() {
   const { organization } = useAuth();
-  const { campaigns, isLoading, createCampaign, updateCampaign, duplicateCampaign, archiveCampaign, isMutating } = useMailCampaigns(organization?.id);
+  // Archivés compris pour les clés et noms déjà pris (contrainte unique et journal des envois) ; seuls les
+  // mails actifs sont listés.
+  const { campaigns: tous, isLoading, duplicateCampaign, archiveCampaign, isMutating } = useMailCampaigns(organization?.id, { includeArchived: true });
+  const campaigns = tous.filter((c) => !c.is_archived);
   const { segments } = useMailSegments(organization?.id);
-
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-
-  // Ouverture directe depuis Réglages → Emails (« Modifier le texte ») : /mailing?tab=editor&edit=<clé>.
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Ouverture directe depuis Réglages → E-mails & SMS (« Modifier le texte ») : /mailing?tab=editor&edit=<clé>.
   const editKey = searchParams.get('edit');
   useEffect(() => {
     if (!editKey || isLoading) return;
     const cible = campaigns.find((c) => c.key === editKey);
-    if (cible) { setEditing(cible); setWizardOpen(true); }
+    if (cible) {
+      setSearchParams({ mail: cible.id }, { replace: true });
+      return;
+    }
+    toast.info('Ce mail n’existe pas encore pour votre entreprise.');
     const next = new URLSearchParams(searchParams);
     next.delete('edit');
     setSearchParams(next, { replace: true });
   }, [editKey, isLoading, campaigns, searchParams, setSearchParams]);
 
-  const openCreate = () => { setEditing(null); setWizardOpen(true); };
-  const openEdit = (campaign) => { setEditing(campaign); setWizardOpen(true); };
-  const closeWizard = () => { setWizardOpen(false); setEditing(null); };
-
-  const handleSave = async (payload) => {
-    try {
-      if (editing) {
-        await updateCampaign({ id: editing.id, patch: payload });
-      } else {
-        await createCampaign(payload);
-      }
-      closeWizard();
-    } catch {
-      // toast déjà affiché par le hook
-    }
-  };
+  const openCreate = () => setSearchParams({ mail: 'nouveau' });
+  const openEdit = (campaign) => setSearchParams({ mail: campaign.id });
 
   const handleDuplicate = async (campaign) => {
-    const newKey = window.prompt(`Clé de la copie ?`, `${campaign.key}_copy`);
-    if (!newKey) return;
     try {
-      await duplicateCampaign({ campaign, newKey: newKey.trim() });
+      await duplicateCampaign({
+        campaign,
+        newKey: cleDeCopie(campaign.key, tous.map((c) => c.key)),
+        newLabel: libelleDeCopie(campaign.label, tous.map((c) => c.label)),
+      });
     } catch {
       // toast déjà affiché
     }
@@ -131,53 +125,42 @@ export default function EditorTab() {
   }
 
   return (
-    <>
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-secondary-900">Campagnes</h2>
-            <p className="text-sm text-secondary-500">Tout ce qui peut partir par email, regroupé par mode d&apos;envoi.</p>
-          </div>
-          <Button onClick={openCreate}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nouvelle campagne
-          </Button>
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-secondary-900">Campagnes</h2>
+          <p className="text-sm text-secondary-500">Tout ce qui peut partir par email, regroupé par mode d&apos;envoi.</p>
         </div>
-
-        {campaigns.length === 0 ? (
-          <div className="card p-8 text-center text-secondary-500">
-            <Mail className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>Aucune campagne pour l&apos;instant.</p>
-            <Button onClick={openCreate} className="mt-4">
-              <Plus className="w-4 h-4 mr-2" />
-              Créer la première
-            </Button>
-          </div>
-        ) : (
-          GROUPS.map((group) => (
-            <CampaignGroup
-              key={group.key}
-              group={group}
-              campaigns={grouped[group.key]}
-              segmentById={segmentById}
-              onEdit={openEdit}
-              onDuplicate={handleDuplicate}
-              onArchive={handleArchive}
-              disabled={isMutating}
-            />
-          ))
-        )}
+        <Button onClick={openCreate}>
+          <Plus className="w-4 h-4 mr-2" />
+          Nouvelle campagne
+        </Button>
       </div>
 
-      {wizardOpen && (
-        <CampaignWizard
-          initial={editing}
-          onClose={closeWizard}
-          onSave={handleSave}
-          isSaving={isMutating}
-        />
+      {campaigns.length === 0 ? (
+        <div className="card p-8 text-center text-secondary-500">
+          <Mail className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p>Aucune campagne pour l&apos;instant.</p>
+          <Button onClick={openCreate} className="mt-4">
+            <Plus className="w-4 h-4 mr-2" />
+            Créer la première
+          </Button>
+        </div>
+      ) : (
+        GROUPS.map((group) => (
+          <CampaignGroup
+            key={group.key}
+            group={group}
+            campaigns={grouped[group.key]}
+            segmentById={segmentById}
+            onEdit={openEdit}
+            onDuplicate={handleDuplicate}
+            onArchive={handleArchive}
+            disabled={isMutating}
+          />
+        ))
       )}
-    </>
+    </div>
   );
 }
 

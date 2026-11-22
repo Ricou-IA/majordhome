@@ -8,6 +8,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { mailCampaignsService } from '@services/mailCampaigns.service';
 import { mailCampaignKeys } from './cacheKeys';
+import { unwrapResult } from '@lib/serviceHelpers';
 import { toast } from 'sonner';
 
 export { mailCampaignKeys };
@@ -68,8 +69,8 @@ export function useMailCampaigns(orgId, { includeArchived = false } = {}) {
   });
 
   const duplicateMutation = useMutation({
-    mutationFn: async ({ campaign, newKey }) => {
-      const { data, error } = await mailCampaignsService.duplicate(campaign, newKey);
+    mutationFn: async ({ campaign, newKey, newLabel }) => {
+      const { data, error } = await mailCampaignsService.duplicate(campaign, newKey, newLabel);
       if (error) throw error;
       return data;
     },
@@ -95,4 +96,38 @@ export function useMailCampaigns(orgId, { includeArchived = false } = {}) {
       archiveMutation.isPending ||
       duplicateMutation.isPending,
   };
+}
+
+/**
+ * Nombre d'envois au journal d'une campagne (par son nom ENREGISTRÉ). `nombre` vaut `undefined` tant qu'il est
+ * inconnu (chargement, erreur) : la page fige alors le nom (`nomVerrouille`).
+ * @param {string | undefined} orgId
+ * @param {string | null | undefined} libelle
+ * @param {{ enabled?: boolean }} [options]
+ * @returns {{ nombre: number | undefined }}
+ */
+export function useNombreEnvois(orgId, libelle, { enabled = true } = {}) {
+  const query = useQuery({
+    queryKey: mailCampaignKeys.envois(orgId, libelle),
+    queryFn: async () => {
+      const { data, error } = await mailCampaignsService.compterEnvois(orgId, libelle);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!libelle && enabled,
+    staleTime: 60_000,
+  });
+  return { nombre: query.isError || typeof query.data !== 'number' ? undefined : query.data };
+}
+
+/**
+ * Rédaction assistée d'un mail (edge `mailing-rediger`). Rien n'est écrit en base : `rediger(demande)` résout avec
+ * `{ objet, objets, corps }` et REJETTE avec `{ code }` (message : `messageErreurRedaction(code)`).
+ * @param {string | undefined} orgId
+ */
+export function useRedactionMail(orgId) {
+  const mutation = useMutation({
+    mutationFn: (demande) => unwrapResult(mailCampaignsService.rediger(orgId, demande)),
+  });
+  return { rediger: mutation.mutateAsync, enCours: mutation.isPending };
 }

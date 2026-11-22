@@ -182,6 +182,8 @@ export const mailCampaignKeys = {
   // création) de « archivé » (lien de restauration) — évite de refaire buter la contrainte
   // unique `(org_id, key)` sur un create.
   archivedByKey: (orgId, key) => [...mailCampaignKeys.all(orgId), 'archived-by-key', key],
+  // Nombre d'envois au journal d'une campagne, par son nom (page du mail : le nom se fige au premier envoi).
+  envois: (orgId, libelle) => [...mailCampaignKeys.all(orgId), 'envois', libelle],
 };
 
 // --- Mail Segments (catalogue de ciblages réutilisables) ---
