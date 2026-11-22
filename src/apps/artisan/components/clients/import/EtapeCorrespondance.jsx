@@ -4,10 +4,12 @@
  */
 
 import { useMemo } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, Info } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Info, Lightbulb } from 'lucide-react';
 import {
   CHAMPS, CIBLES_COMPOSEES, CIBLE_NOTES, CIBLE_IGNORER, CIBLE_A_CHOISIR,
 } from '@/lib/importClients/champs';
+import { conseilsCorrespondance } from '@/lib/importClients/correspondance';
+import { texteAccentsRepares } from '@/lib/importClients/libelles';
 
 /** Trois premières valeurs non vides de chaque colonne. */
 function exemplesParColonne(lignes, nbColonnes) {
@@ -39,6 +41,12 @@ export default function EtapeCorrespondance({
     () => exemplesParColonne(fichier.lignes, fichier.entetes.length),
     [fichier],
   );
+  // Conseils lus sur les valeurs (adresse qui porte code postal et ville, nom qui porte le prénom) : ils ne bloquent rien.
+  const conseils = useMemo(
+    () => new Map(conseilsCorrespondance(correspondance, fichier.lignes).map((c) => [c.index, c])),
+    [correspondance, fichier],
+  );
+  const accents = texteAccentsRepares(fichier.reparees);
   const { erreurs, aChoisir } = validation;
 
   return (
@@ -51,6 +59,12 @@ export default function EtapeCorrespondance({
               {fichier.nom} · {fichier.lignes.length} ligne{fichier.lignes.length > 1 ? 's' : ''}. Vérifiez le champ choisi
               pour chaque colonne de votre fichier.
             </p>
+            {accents && (
+              <p className="mt-1 flex items-start gap-2 text-sm text-gray-700">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" aria-hidden="true" />
+                {accents}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="import-entete" className="block text-sm font-medium text-gray-700 mb-1">Ligne d&apos;en-tête</label>
@@ -80,6 +94,7 @@ export default function EtapeCorrespondance({
               {correspondance.map((col) => {
                 const aFaire = col.cible === CIBLE_A_CHOISIR;
                 const idSelect = `import-cible-${col.index}`;
+                const conseil = conseils.get(col.index);
                 return (
                   <tr key={col.index} className={`border-b border-gray-100 align-top ${aFaire ? 'bg-amber-50' : ''}`}>
                     <th scope="row" className="py-2 pr-4 font-medium text-gray-900 text-left">
@@ -113,6 +128,21 @@ export default function EtapeCorrespondance({
                           <option value={CIBLE_IGNORER}>Ignorer</option>
                         </optgroup>
                       </select>
+                      {conseil && (
+                        <div className="mt-2 flex items-start justify-between gap-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                          <span className="flex items-start gap-1.5">
+                            <Lightbulb className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+                            {conseil.message}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onCible(col.index, conseil.cible)}
+                            className="shrink-0 px-2 py-0.5 bg-white text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                          >
+                            Séparer
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );

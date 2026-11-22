@@ -13,6 +13,9 @@ import { ClientLogementDpe } from '@/apps/artisan/components/clients/ClientLogem
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { getOrgHeadquarters } from '@lib/territoire-config';
 
+/** Hauteur d'un champ de notes : autant de lignes que son texte, entre `min` et 12. */
+const lignesDeNote = (texte, min) => Math.min(12, Math.max(min, String(texte || '').split('\n').length));
+
 // ============================================================================
 // SOUS-COMPOSANT — Carte client lié
 // ============================================================================
@@ -479,10 +482,10 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onIn
           <FileText className="w-4 h-4 text-secondary-500" />
           Notes
         </h3>
-        <TextArea value={formData.notes} onChange={(v) => u('notes', v)} placeholder="Notes visibles par toute l'équipe..." rows={3} disabled={isLocked} />
+        <TextArea value={formData.notes} onChange={(v) => u('notes', v)} placeholder="Notes visibles par toute l'équipe..." rows={lignesDeNote(formData.notes, 3)} disabled={isLocked} />
         <div className="mt-4">
           <FormField label="Notes internes">
-            <TextArea value={formData.internalNotes} onChange={(v) => u('internalNotes', v)} placeholder="Notes internes (non visibles par le client)" rows={2} disabled={isLocked} />
+            <TextArea value={formData.internalNotes} onChange={(v) => u('internalNotes', v)} placeholder="Notes internes (non visibles par le client)" rows={lignesDeNote(formData.internalNotes, 2)} disabled={isLocked} />
           </FormField>
         </div>
       </section>

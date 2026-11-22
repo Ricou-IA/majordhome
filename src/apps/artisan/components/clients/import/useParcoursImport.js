@@ -27,7 +27,7 @@ const ETAT_INITIAL = {
   etape: 'fichier',
   lecture: 'repos', // 'repos' | 'en_cours'
   refus: null, // message affiché à l'étape Fichier
-  fichier: null, // { nom, matrice, indexEntete, entetes, lignes }
+  fichier: null, // { nom, matrice, reparees, indexEntete, entetes, lignes }
   sourceLabel: '',
   correspondance: [],
   choix: choixVides(),
@@ -35,10 +35,10 @@ const ETAT_INITIAL = {
   avis: null, // message affiché à l'aperçu après un import arrêté
 };
 
-/** Fichier découpé à partir de la ligne d'en-tête choisie. */
-function decouper(nom, matrice, indexEntete) {
+/** Fichier découpé à partir de la ligne d'en-tête choisie. `reparees` : cellules aux accents réparés à la lecture. */
+function decouper(nom, matrice, indexEntete, reparees) {
   const { entetes, lignes } = tableau(matrice, indexEntete);
-  return { nom, matrice, indexEntete, entetes, lignes };
+  return { nom, matrice, reparees, indexEntete, entetes, lignes };
 }
 
 function basculer(ensemble, numero) {
@@ -54,14 +54,14 @@ function reducteur(etat, action) {
     case 'refus':
       return { ...etat, lecture: 'repos', refus: action.message };
     case 'fichier_lu': {
-      const fichier = decouper(action.nom, action.matrice, trouverEntete(action.matrice));
+      const fichier = decouper(action.nom, action.matrice, trouverEntete(action.matrice), action.reparees || 0);
       if (fichier.lignes.length > LIGNES_MAX) {
         return { ...etat, lecture: 'repos', refus: 'Plus de 10 000 lignes : découpez le fichier.' };
       }
       if (fichier.lignes.length === 0) {
         return { ...etat, lecture: 'repos', refus: 'Ce fichier ne contient aucune ligne de client.' };
       }
-      const correspondance = proposerCorrespondance(fichier.entetes);
+      const correspondance = proposerCorrespondance(fichier.entetes, fichier.lignes);
       // Un fichier type n'a rien à faire pointer : on va droit à l'aperçu, sauf si une colonne reste à choisir
       // (colonne en double) ou si la correspondance a une erreur — l'écran Correspondance le dit alors.
       const { erreurs, aChoisir } = validerCorrespondance(correspondance);
@@ -80,8 +80,8 @@ function reducteur(etat, action) {
     }
     case 'entete': {
       if (!etat.fichier) return etat;
-      const fichier = decouper(etat.fichier.nom, etat.fichier.matrice, action.index);
-      return { ...etat, fichier, correspondance: proposerCorrespondance(fichier.entetes), choix: choixVides() };
+      const fichier = decouper(etat.fichier.nom, etat.fichier.matrice, action.index, etat.fichier.reparees);
+      return { ...etat, fichier, correspondance: proposerCorrespondance(fichier.entetes, fichier.lignes), choix: choixVides() };
     }
     case 'cible':
       return {
@@ -143,7 +143,7 @@ export function useParcoursImport(orgId) {
   const actions = useMemo(() => ({
     debutLecture: () => dispatch({ type: 'lecture' }),
     refuser: (message) => dispatch({ type: 'refus', message }),
-    fichierLu: (nom, matrice) => dispatch({ type: 'fichier_lu', nom, matrice }),
+    fichierLu: (nom, matrice, reparees) => dispatch({ type: 'fichier_lu', nom, matrice, reparees }),
     changerEntete: (index) => dispatch({ type: 'entete', index }),
     changerCible: (index, cible) => dispatch({ type: 'cible', index, cible }),
     changerSource: (valeur) => dispatch({ type: 'source', valeur }),

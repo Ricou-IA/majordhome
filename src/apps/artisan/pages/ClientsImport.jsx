@@ -87,7 +87,8 @@ export default function ClientsImport() {
     if (refus) { actions.refuser(refus); return; }
     actions.debutLecture();
     try {
-      actions.fichierLu(file.name, await lireFichierDepose(file));
+      const { matrice, reparees } = await lireFichierDepose(file);
+      actions.fichierLu(file.name, matrice, reparees);
     } catch (e) {
       logger.warn('[ClientsImport] lecture du fichier impossible', e);
       actions.refuser(LECTURE_IMPOSSIBLE);

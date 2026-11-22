@@ -6,8 +6,8 @@
 import { useMemo } from 'react';
 import { ArrowLeft, Download, Loader2, AlertCircle, RefreshCw, Upload, Info } from 'lucide-react';
 import { ListePretes, ListeDoublons, ListeEcartees } from './ListeLignes';
-import { phraseBilan, texteCorrections } from '@/lib/importClients/libelles';
-import { resumeCorrections } from '@/lib/importClients/controles';
+import { phraseBilan, texteCorrections, texteSansCodePostal } from '@/lib/importClients/libelles';
+import { resumeCorrections, fichesSansCodePostal } from '@/lib/importClients/controles';
 
 const DOUBLONS = new Set(['doublon_fort', 'doublon_faible', 'doublon_fichier']);
 const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
@@ -36,6 +36,7 @@ export default function EtapeApercu({
 
   // Valeurs illisibles des lignes qui seront importées : dites avant l'écriture, pas seulement dans les notes.
   const corrections = useMemo(() => (classees ? texteCorrections(resumeCorrections(classees, choix)) : null), [classees, choix]);
+  const sansCodePostal = useMemo(() => (classees ? texteSansCodePostal(fichesSansCodePostal(classees, choix)) : null), [classees, choix]);
 
   const n = bilan?.importees ?? 0;
   // Une relecture en cours prime sur l'erreur précédente (react-query la garde pendant la relecture).
@@ -87,6 +88,12 @@ export default function EtapeApercu({
               <p className="flex items-start gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
                 <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" aria-hidden="true" />
                 {corrections}
+              </p>
+            )}
+            {sansCodePostal && (
+              <p className="flex items-start gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" aria-hidden="true" />
+                {sansCodePostal}
               </p>
             )}
           </div>

@@ -7,7 +7,7 @@
  * ============================================================================
  */
 
-import { decoderTexte, lireCsv, celluleEnTexte } from '@/lib/importClients/lireFichier';
+import { decoderTexte, lireCsv, celluleEnTexte, reparerMatrice } from '@/lib/importClients/lireFichier';
 import { downloadBlob } from '@/lib/utils';
 
 async function chargerExcelJS() {
@@ -30,14 +30,8 @@ function matriceDeFeuille(feuille) {
 
 const nonVide = (matrice) => matrice.some((l) => l.some((c) => c !== ''));
 
-/**
- * Lit le fichier déposé en matrice de cellules texte.
- * `.csv` : décodage UTF-8 sinon Windows-1252 ; `.xlsx` : première feuille non vide.
- * Rejette si le fichier ne se lit pas.
- * @param {File} file
- * @returns {Promise<string[][]>}
- */
-export async function lireFichierDepose(file) {
+/** Matrice brute du fichier : `.csv` décodé, ou première feuille non vide du `.xlsx`. */
+async function lireMatrice(file) {
   const octets = new Uint8Array(await file.arrayBuffer());
   if (file.name.toLowerCase().endsWith('.csv')) return lireCsv(decoderTexte(octets));
   const ExcelJS = await chargerExcelJS();
@@ -48,6 +42,17 @@ export async function lireFichierDepose(file) {
     if (nonVide(matrice)) return matrice;
   }
   return [];
+}
+
+/**
+ * Lit le fichier déposé en matrice de cellules texte, accents abîmés par un tableur réparés (cf. reparerMatrice).
+ * `.csv` : décodage UTF-8 sinon Windows-1252 ; `.xlsx` : première feuille non vide.
+ * Rejette si le fichier ne se lit pas.
+ * @param {File} file
+ * @returns {Promise<{ matrice: string[][], reparees: number }>}
+ */
+export async function lireFichierDepose(file) {
+  return reparerMatrice(await lireMatrice(file));
 }
 
 /**
