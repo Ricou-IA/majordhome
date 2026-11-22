@@ -130,7 +130,7 @@ export default function Pipeline() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="w-full justify-start gap-1 bg-gray-100/80 p-1">
+        <TabsList className="w-full justify-start gap-1 bg-secondary-100/80 p-1">
           <TabsTrigger value="dashboard" className="gap-2 data-[state=active]:bg-white">
             <BarChart3 className="h-4 w-4" />
             Dashboard

@@ -117,7 +117,7 @@ export function PhotoDropZone({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      <label className="block text-sm font-medium text-secondary-700">{label}</label>
 
       {/* Grille de photos existantes */}
       {photos.length > 0 && (
@@ -127,7 +127,7 @@ export function PhotoDropZone({
               <button
                 type="button"
                 onClick={() => setPreviewUrl(photo.signed_url)}
-                className="w-full aspect-square rounded-lg border overflow-hidden bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full aspect-square rounded-lg border overflow-hidden bg-secondary-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <img
                   src={photo.signed_url}
@@ -156,8 +156,8 @@ export function PhotoDropZone({
               type="button"
               onClick={handleClickAdd}
               disabled={isUploading}
-              className="w-full aspect-square rounded-lg border-2 border-dashed border-gray-300
-                         flex flex-col items-center justify-center gap-1 text-gray-400
+              className="w-full aspect-square rounded-lg border-2 border-dashed border-secondary-300
+                         flex flex-col items-center justify-center gap-1 text-secondary-400
                          hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50
                          transition-colors disabled:opacity-50"
             >
@@ -186,7 +186,7 @@ export function PhotoDropZone({
                       transition-colors cursor-pointer min-h-[100px]
                       ${isDragging
                         ? 'border-blue-500 bg-blue-50 text-blue-600'
-                        : 'border-gray-300 bg-gray-50 text-gray-500 hover:border-blue-400 hover:bg-blue-50/50 hover:text-blue-600'
+                        : 'border-secondary-300 bg-secondary-50 text-secondary-500 hover:border-blue-400 hover:bg-blue-50/50 hover:text-blue-600'
                       }
                       ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
                       ${isUploading ? 'pointer-events-none' : ''}`}
@@ -202,7 +202,7 @@ export function PhotoDropZone({
               <span className="text-sm font-medium">
                 Glisser-déposer ou cliquer
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-secondary-400">
                 {maxFiles} photo{maxFiles > 1 ? 's' : ''} max
               </span>
             </>

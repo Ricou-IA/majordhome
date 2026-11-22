@@ -16,11 +16,11 @@ export default function Chantiers() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+        <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
           <HardHat className="w-7 h-7 text-amber-600" />
           Chantiers
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-secondary-500 mt-1">
           Suivi post-vente : commandes, planification et réalisation
         </p>
       </div>

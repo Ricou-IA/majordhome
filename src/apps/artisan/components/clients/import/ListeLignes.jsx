@@ -16,15 +16,15 @@ export function Repliable({ titre, icone: Icone, compte, limiteFixe, ouvert = fa
   if (compte === 0) return null;
   const affiches = Math.min(limite, compte);
   return (
-    <details open={ouvert} className="bg-white rounded-lg border border-gray-200 group">
-      <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none font-medium text-gray-900">
-        <Icone className="w-4 h-4 text-gray-500" aria-hidden="true" />
+    <details open={ouvert} className="bg-white rounded-lg border border-secondary-200 group">
+      <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none font-medium text-secondary-900">
+        <Icone className="w-4 h-4 text-secondary-500" aria-hidden="true" />
         {titre} ({compte})
       </summary>
-      <div className="border-t border-gray-100 px-4 py-3 space-y-2">
+      <div className="border-t border-secondary-100 px-4 py-3 space-y-2">
         {children(affiches)}
         {affiches < compte && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-secondary-500">
             {affiches} affichées sur {compte}.
             {!limiteFixe && (
               <button type="button" onClick={() => setLimite((l) => l + PAS)} className="ml-2 text-blue-700 underline">
@@ -44,9 +44,9 @@ const lieuDe = (fiche) => [fiche.postal_code, fiche.city].filter(Boolean).join('
 function LigneFichier({ ligne }) {
   return (
     <span>
-      <span className="text-gray-500">Ligne {ligne.numero} · </span>
-      <span className="font-medium text-gray-900">{nomDe(ligne.fiche)}</span>
-      {lieuDe(ligne.fiche) && <span className="text-gray-600"> · {lieuDe(ligne.fiche)}</span>}
+      <span className="text-secondary-500">Ligne {ligne.numero} · </span>
+      <span className="font-medium text-secondary-900">{nomDe(ligne.fiche)}</span>
+      {lieuDe(ligne.fiche) && <span className="text-secondary-600"> · {lieuDe(ligne.fiche)}</span>}
     </span>
   );
 }
@@ -59,7 +59,7 @@ export function ListePretes({ lignes }) {
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-gray-500">
+              <tr className="text-left text-xs text-secondary-500">
                 <th scope="col" className="py-1 pr-3 font-medium">Ligne</th>
                 <th scope="col" className="py-1 pr-3 font-medium">Nom</th>
                 <th scope="col" className="py-1 pr-3 font-medium">Téléphone</th>
@@ -67,14 +67,14 @@ export function ListePretes({ lignes }) {
                 <th scope="col" className="py-1 font-medium">Commune</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-secondary-100">
               {lignes.slice(0, n).map((l) => (
                 <tr key={l.numero}>
-                  <td className="py-1 pr-3 text-gray-500">{l.numero}</td>
-                  <td className="py-1 pr-3 font-medium text-gray-900">{nomDe(l.fiche)}</td>
-                  <td className="py-1 pr-3 text-gray-700 whitespace-nowrap">{l.fiche.phone || '—'}</td>
-                  <td className="py-1 pr-3 text-gray-700">{l.fiche.email || '—'}</td>
-                  <td className="py-1 text-gray-700">{lieuDe(l.fiche) || '—'}</td>
+                  <td className="py-1 pr-3 text-secondary-500">{l.numero}</td>
+                  <td className="py-1 pr-3 font-medium text-secondary-900">{nomDe(l.fiche)}</td>
+                  <td className="py-1 pr-3 text-secondary-700 whitespace-nowrap">{l.fiche.phone || '—'}</td>
+                  <td className="py-1 pr-3 text-secondary-700">{l.fiche.email || '—'}</td>
+                  <td className="py-1 text-secondary-700">{lieuDe(l.fiche) || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -94,11 +94,11 @@ const ETIQUETTE_DOUBLON = {
 function FicheExistante({ existant }) {
   const raisons = libellesRapprochement(existant);
   return (
-    <li className="text-gray-700">
+    <li className="text-secondary-700">
       {existant.display_name || '(sans nom)'}
-      {existant.client_number && <span className="text-gray-500"> · n° {existant.client_number}</span>}
-      {existant.city && <span className="text-gray-500"> · {existant.city}</span>}
-      {raisons.length > 0 && <span className="text-gray-500"> — {raisons.join(', ')}</span>}
+      {existant.client_number && <span className="text-secondary-500"> · n° {existant.client_number}</span>}
+      {existant.city && <span className="text-secondary-500"> · {existant.city}</span>}
+      {raisons.length > 0 && <span className="text-secondary-500"> — {raisons.join(', ')}</span>}
     </li>
   );
 }
@@ -108,7 +108,7 @@ function LigneDoublon({ ligne, choix, onImporter, onEcarter }) {
   const faible = ligne.statut === 'doublon_faible';
   const coche = faible ? choix.ecarter.has(ligne.numero) : choix.importer.has(ligne.numero);
   return (
-    <li className="border border-gray-100 rounded-lg p-3 text-sm space-y-2">
+    <li className="border border-secondary-100 rounded-lg p-3 text-sm space-y-2">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
         <div>
           <LigneFichier ligne={ligne} />
@@ -120,15 +120,15 @@ function LigneDoublon({ ligne, choix, onImporter, onEcarter }) {
             type="checkbox"
             checked={coche}
             onChange={() => (faible ? onEcarter(ligne.numero) : onImporter(ligne.numero))}
-            className="w-4 h-4 rounded border-gray-300"
+            className="w-4 h-4 rounded border-secondary-300"
           />
-          <label htmlFor={idCoche} className="text-gray-700">{faible ? 'Écarter' : 'Importer quand même'}</label>
+          <label htmlFor={idCoche} className="text-secondary-700">{faible ? 'Écarter' : 'Importer quand même'}</label>
         </div>
       </div>
       {ligne.statut === 'doublon_fichier' ? (
-        <p className="text-gray-600">Déjà présent ligne {ligne.doublons[0]?.numero} du fichier</p>
+        <p className="text-secondary-600">Déjà présent ligne {ligne.doublons[0]?.numero} du fichier</p>
       ) : (
-        <ul className="pl-3 border-l-2 border-gray-200 space-y-0.5">
+        <ul className="pl-3 border-l-2 border-secondary-200 space-y-0.5">
           {ligne.doublons.map((d) => <FicheExistante key={d.id} existant={d} />)}
         </ul>
       )}
@@ -157,8 +157,8 @@ export function ListeEcartees({ lignes }) {
         <ul className="text-sm space-y-1">
           {lignes.slice(0, n).map((l) => (
             <li key={l.numero}>
-              <span className="text-gray-500">Ligne {l.numero}</span>
-              <span className="text-gray-700"> — {raisonAffichee(l)}</span>
+              <span className="text-secondary-500">Ligne {l.numero}</span>
+              <span className="text-secondary-700"> — {raisonAffichee(l)}</span>
             </li>
           ))}
         </ul>

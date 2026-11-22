@@ -66,7 +66,7 @@ function PartsOrderBadge({ status }) {
   };
 
   return (
-    <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${colorMap[status] || 'bg-gray-100 text-gray-600'}`}>
+    <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${colorMap[status] || 'bg-secondary-100 text-secondary-600'}`}>
       {config.label}
     </span>
   );
@@ -198,7 +198,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
       tabIndex={0}
       onClick={() => onClick?.(item)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(item); }}
-      className="relative w-full text-left bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="relative w-full text-left bg-white rounded-lg border border-secondary-200 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
     >
       {item.workflow_status === 'a_planifier' && canRanger && (
         <button
@@ -234,7 +234,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
         <div className="flex-1 min-w-0 px-3 py-2 space-y-1">
           {/* Ligne 1 : Nom + montant */}
           <div className="flex items-center justify-between gap-2">
-            <span className="font-medium text-sm text-gray-900 truncate">
+            <span className="font-medium text-sm text-secondary-900 truncate">
               {name}
             </span>
             {(amount > 0 || Number(item.parts_total_ttc) > 0) && (
@@ -254,8 +254,8 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
           </div>
 
           {/* Ligne 2 : Code postal + ville */}
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+          <div className="flex items-center gap-1.5 text-xs text-secondary-500">
+            <MapPin className="w-3 h-3 text-secondary-400 flex-shrink-0" />
             <span className="truncate">
               {[item.client_postal_code, item.client_city].filter(Boolean).join(' ') || '—'}
             </span>
@@ -320,8 +320,8 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
 
           {/* Devis fléché vers la carte SAV : numéro + statut (le montant est sur la ligne 1) */}
           {devisFleche && (
-            <div className="flex items-center gap-1 text-xs text-gray-600">
-              <FileText className="w-3 h-3 text-gray-400 flex-shrink-0" />
+            <div className="flex items-center gap-1 text-xs text-secondary-600">
+              <FileText className="w-3 h-3 text-secondary-400 flex-shrink-0" />
               <span className="truncate">
                 {devisFleche.quote_number || 'Devis'}
                 {' · '}
@@ -332,7 +332,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
 
           {/* Ligne 4 : Numéro contrat */}
           {item.contract_number && (
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-secondary-500">
               {item.contract_number}
             </div>
           )}
@@ -430,7 +430,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setSendEmailOpen(true); }}
                     title="Envoyer la facture par e-mail au client"
-                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-gray-300 text-gray-600 bg-white hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 bg-white hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700"
                   >
                     <Mail className="w-3 h-3" />
                     Envoyer par e-mail
@@ -492,7 +492,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                   className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
                     item.invoiced_at
                       ? 'border-violet-300 text-violet-700 bg-violet-50'
-                      : 'border-gray-300 text-gray-600 bg-white hover:bg-violet-50 hover:border-violet-400 hover:text-violet-700'
+                      : 'border-secondary-300 text-secondary-600 bg-white hover:bg-violet-50 hover:border-violet-400 hover:text-violet-700'
                   }`}
                 >
                   {item.invoiced_at ? <Check className="w-3 h-3" /> : <Receipt className="w-3 h-3" />}
@@ -511,7 +511,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                   }
                   onRefresh?.();
                 }}
-                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-gray-300 text-gray-600 bg-white hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 bg-white hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition-colors"
                 title="Marquer comme encaissé (clôture la carte)"
               >
                 <Euro className="w-3 h-3" />
@@ -543,7 +543,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                 className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
                   smsSent
                     ? 'border-green-300 text-green-600 bg-green-50'
-                    : 'border-gray-300 text-gray-600 bg-white hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700'
+                    : 'border-secondary-300 text-secondary-600 bg-white hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700'
                 } disabled:opacity-60`}
               >
                 {smsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : smsSent ? <Check className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}

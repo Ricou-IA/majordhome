@@ -73,12 +73,12 @@ export default function CancelInvoiceDialog({ item, orgId, open, onOpenChange, o
       <div className="mt-4 space-y-2 text-sm">
         {invoice && invoice.status !== 'issued' && <p className="text-red-700">Cette facture n’est pas émise (statut {invoice.status}).</p>}
         {invoice && invoice.kind !== 'invoice' && <p className="text-red-700">Ce document est déjà un avoir : il ne peut pas être annulé.</p>}
-        <label className="block text-xs font-medium text-gray-600">Motif (optionnel, porté sur l’avoir)</label>
+        <label className="block text-xs font-medium text-secondary-600">Motif (optionnel, porté sur l’avoir)</label>
         <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Erreur de tarif, prestation non réalisée…" />
+          className="w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Erreur de tarif, prestation non réalisée…" />
         {originalNotImported
           ? <p className="text-red-700">La facture d’origine n’est pas importée dans Pennylane (statut : {invoice.import_status}) : importez-la d’abord depuis la carte, sinon l’avoir créerait une écriture négative isolée.</p>
-          : pennylaneEnabled && <p className="text-xs text-gray-500">L’avoir sera importé dans Pennylane, lié à la facture d’origine si elle y est.</p>}
+          : pennylaneEnabled && <p className="text-xs text-secondary-500">L’avoir sera importé dans Pennylane, lié à la facture d’origine si elle y est.</p>}
       </div>
     </ConfirmDialog>
   );

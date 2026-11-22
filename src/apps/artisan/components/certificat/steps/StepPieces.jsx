@@ -39,13 +39,13 @@ export function StepPieces({ formData, onChange }) {
       <SectionTitle>Pièces remplacées</SectionTitle>
 
       {pieces.length === 0 && (
-        <p className="text-sm text-gray-400 italic">Aucune pièce remplacée.</p>
+        <p className="text-sm text-secondary-400 italic">Aucune pièce remplacée.</p>
       )}
 
       {pieces.map((piece, index) => (
-        <div key={index} className="border border-gray-200 rounded-lg p-3 space-y-3">
+        <div key={index} className="border border-secondary-200 rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Pièce {index + 1}</span>
+            <span className="text-sm font-medium text-secondary-700">Pièce {index + 1}</span>
             <button
               type="button"
               onClick={() => removePiece(index)}

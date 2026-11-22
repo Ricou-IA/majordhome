@@ -65,7 +65,7 @@ export const LEAD_ACTIVITY_TYPES = {
 export const ACTIVITY_CONFIG = {
   lead_created: { icon: 'Plus', color: 'bg-emerald-100 text-emerald-700' },
   status_changed: { icon: 'ArrowRight', color: 'bg-blue-100 text-blue-700' },
-  note: { icon: 'MessageSquare', color: 'bg-gray-100 text-gray-700' },
+  note: { icon: 'MessageSquare', color: 'bg-secondary-100 text-secondary-700' },
   lead_assigned: { icon: 'UserPlus', color: 'bg-violet-100 text-violet-700' },
   lead_converted: { icon: 'CheckCircle', color: 'bg-emerald-100 text-emerald-700' },
   phone_call: { icon: 'Phone', color: 'bg-amber-100 text-amber-700' },

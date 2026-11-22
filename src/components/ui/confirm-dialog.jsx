@@ -50,7 +50,7 @@ export function ConfirmDialog({
           className={cn(
             'fixed left-[50%] top-[50%] z-50 w-full translate-x-[-50%] translate-y-[-50%]',
             sizeClass,
-            'max-h-[90vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-xl',
+            'max-h-[90vh] overflow-y-auto rounded-xl border border-secondary-200 bg-white p-6 shadow-xl',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -69,11 +69,11 @@ export function ConfirmDialog({
             'max-sm:data-[state=open]:slide-in-from-left-0 max-sm:data-[state=open]:slide-in-from-bottom-8',
           )}
         >
-          <AlertDialogPrimitive.Title className="text-lg font-semibold text-gray-900">
+          <AlertDialogPrimitive.Title className="text-lg font-semibold text-secondary-900">
             {title}
           </AlertDialogPrimitive.Title>
           {description && (
-            <AlertDialogPrimitive.Description className="mt-2 text-sm text-gray-500 leading-relaxed">
+            <AlertDialogPrimitive.Description className="mt-2 text-sm text-secondary-500 leading-relaxed">
               {description}
             </AlertDialogPrimitive.Description>
           )}
@@ -83,7 +83,7 @@ export function ConfirmDialog({
 
           <div className="mt-6 flex items-center justify-end gap-3">
             <AlertDialogPrimitive.Cancel
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 max-sm:flex-1 max-sm:py-3"
+              className="px-4 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors focus:outline-none focus:ring-2 focus:ring-secondary-300 max-sm:flex-1 max-sm:py-3"
               disabled={loading}
             >
               {cancelLabel}

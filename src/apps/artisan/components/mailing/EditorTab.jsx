@@ -37,7 +37,7 @@ const GROUPS = [
 const ACCENT = {
   amber: { bar: 'border-l-amber-400', chip: 'bg-amber-100 text-amber-700' },
   blue: { bar: 'border-l-blue-400', chip: 'bg-blue-100 text-blue-700' },
-  slate: { bar: 'border-l-slate-300', chip: 'bg-slate-100 text-slate-600' },
+  slate: { bar: 'border-l-secondary-300', chip: 'bg-secondary-100 text-secondary-600' },
 };
 
 function formatCadence(c) {

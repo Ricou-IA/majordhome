@@ -39,11 +39,11 @@ export const QuoteModal = ({ isOpen, onClose, onConfirm, loading = false, defaul
             <div className="h-8 w-8 rounded-lg bg-orange-100 flex items-center justify-center">
               <FileText className="h-4 w-4 text-orange-600" />
             </div>
-            <h3 className="text-base font-semibold text-gray-900">Devis envoyé</h3>
+            <h3 className="text-base font-semibold text-secondary-900">Devis envoyé</h3>
           </div>
           <button
             onClick={handleClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-1.5 text-secondary-400 hover:text-secondary-600 rounded-lg hover:bg-secondary-100 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -53,11 +53,11 @@ export const QuoteModal = ({ isOpen, onClose, onConfirm, loading = false, defaul
         <div className="px-5 py-4 space-y-4">
           {/* Montant */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Montant du devis HT
             </label>
             <div className="relative">
-              <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400" />
               <input
                 type="number"
                 min="0"
@@ -65,27 +65,27 @@ export const QuoteModal = ({ isOpen, onClose, onConfirm, loading = false, defaul
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Ex : 8 500"
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-colors"
+                className="w-full pl-9 pr-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-colors"
               />
             </div>
           </div>
 
           {/* Date d'envoi */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Date d&apos;envoi
             </label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-colors"
+              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-colors"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t bg-gray-50 rounded-b-xl">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t bg-secondary-50 rounded-b-xl">
           <Button variant="ghost" size="sm" onClick={handleClose} className="min-h-[36px]">
             Annuler
           </Button>

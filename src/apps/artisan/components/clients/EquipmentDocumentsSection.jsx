@@ -36,7 +36,7 @@ function DocumentRow({ doc, badge, canDelete, onDelete, onOpen }) {
   const Icon = TYPE_ICON[doc.document_type] || FileText;
   const titre = titreDocumentModele(doc, equipmentDocumentTypeLabel);
   return (
-    <div className="flex items-center gap-2 rounded-lg hover:bg-gray-50 group">
+    <div className="flex items-center gap-2 rounded-lg hover:bg-secondary-50 group">
       <button
         type="button"
         onClick={() => onOpen?.(doc)}
@@ -45,15 +45,15 @@ function DocumentRow({ doc, badge, canDelete, onDelete, onOpen }) {
         title={`Consulter ${doc.file_name || titre}`}
       >
         <Icon className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-        <span className="text-sm text-gray-800 group-hover:text-indigo-700 truncate">{titre}</span>
-        {badge && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">{badge}</span>}
-        <Eye className="w-3.5 h-3.5 text-gray-300 group-hover:text-indigo-500 flex-shrink-0 ml-auto" />
+        <span className="text-sm text-secondary-800 group-hover:text-indigo-700 truncate">{titre}</span>
+        {badge && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-secondary-100 text-secondary-500 flex-shrink-0">{badge}</span>}
+        <Eye className="w-3.5 h-3.5 text-secondary-300 group-hover:text-indigo-500 flex-shrink-0 ml-auto" />
       </button>
       {canDelete && (
         <button
           type="button"
           onClick={() => onDelete(doc)}
-          className="min-w-[36px] min-h-[36px] inline-flex items-center justify-center mr-1 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded"
+          className="min-w-[36px] min-h-[36px] inline-flex items-center justify-center mr-1 text-secondary-300 hover:text-red-600 hover:bg-red-50 rounded"
           title="Retirer ce document"
         >
           <Trash2 className="w-3.5 h-3.5" />
@@ -71,9 +71,9 @@ function Tiroir({ titre, nombre, ouvert, onToggle, children }) {
         type="button"
         onClick={onToggle}
         aria-expanded={ouvert}
-        className="w-full min-h-[44px] flex items-center gap-1.5 px-2 py-1 text-left text-xs font-medium text-gray-600 hover:text-gray-900"
+        className="w-full min-h-[44px] flex items-center gap-1.5 px-2 py-1 text-left text-xs font-medium text-secondary-600 hover:text-secondary-900"
       >
-        {ouvert ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+        {ouvert ? <ChevronDown className="w-3.5 h-3.5 text-secondary-400" /> : <ChevronRight className="w-3.5 h-3.5 text-secondary-400" />}
         {titre} ({nombre})
       </button>
       {ouvert && children}
@@ -172,9 +172,9 @@ export function EquipmentDocumentsSection({
             type="button"
             onClick={() => setProceduresOuvertes((v) => !v)}
             aria-expanded={proceduresOuvertes}
-            className="w-full min-h-[44px] flex items-center gap-2.5 p-2 text-left text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+            className="w-full min-h-[44px] flex items-center gap-2.5 p-2 text-left text-sm text-secondary-600 hover:bg-secondary-50 rounded-lg"
           >
-            <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <FileText className="w-4 h-4 text-secondary-400 flex-shrink-0" />
             Procédures ({rangesModele.procedures.length})
             <span className="ml-auto text-xs text-indigo-600">{proceduresOuvertes ? 'Masquer' : 'Afficher'}</span>
           </button>
@@ -188,9 +188,9 @@ export function EquipmentDocumentsSection({
   };
 
   return (
-    <div className="mt-3 pt-3 border-t border-gray-100">
+    <div className="mt-3 pt-3 border-t border-secondary-100">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Documents</span>
+        <span className="text-xs font-medium text-secondary-500 uppercase tracking-wide">Documents</span>
         {showUpload && (
           <button
             type="button"
@@ -218,7 +218,7 @@ export function EquipmentDocumentsSection({
           ))}
         </div>
       ) : (
-        <p className="mt-1 text-xs text-gray-400">Aucun document pour cet appareil.</p>
+        <p className="mt-1 text-xs text-secondary-400">Aucun document pour cet appareil.</p>
       )}
 
       {uploading && (

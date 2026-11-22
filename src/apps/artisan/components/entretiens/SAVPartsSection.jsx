@@ -32,11 +32,11 @@ function StatusButton({ statusValue, currentStatus, onChange, disabled }) {
       disabled={disabled}
       className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all disabled:opacity-50 ${
         isActive
-          ? 'border-gray-400 bg-gray-50 shadow-sm'
-          : 'border-gray-200 bg-white hover:bg-gray-50'
+          ? 'border-secondary-400 bg-secondary-50 shadow-sm'
+          : 'border-secondary-200 bg-white hover:bg-secondary-50'
       }`}
     >
-      <Icon className={`w-4 h-4 ${isActive ? color : 'text-gray-400'}`} />
+      <Icon className={`w-4 h-4 ${isActive ? color : 'text-secondary-400'}`} />
       {config.label}
     </button>
   );

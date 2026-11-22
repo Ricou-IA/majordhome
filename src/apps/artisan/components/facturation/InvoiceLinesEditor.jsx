@@ -9,7 +9,7 @@ import { Trash2, Plus } from 'lucide-react';
 import { VAT_CODES, newFreeLine } from '@/lib/entretienInvoiceModel';
 
 const VAT_OPTIONS = Object.keys(VAT_CODES).map(Number).sort((a, b) => b - a);
-const CELL = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500';
+const CELL = 'w-full px-2 py-1.5 border border-secondary-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500';
 
 /**
  * @param {object} p
@@ -25,7 +25,7 @@ export default function InvoiceLinesEditor({ lines, onChange, model }) {
     <div className="space-y-2">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-gray-500 border-b border-gray-200">
+          <tr className="text-secondary-500 border-b border-secondary-200">
             <th className="text-left font-medium py-1">Libellé / description</th>
             <th className="text-right font-medium py-1 w-20">Qté</th>
             <th className="text-right font-medium py-1 w-32">PU HT</th>
@@ -36,10 +36,10 @@ export default function InvoiceLinesEditor({ lines, onChange, model }) {
         </thead>
         <tbody>
           {lines.map((l, i) => (
-            <tr key={i} className="border-b border-gray-100 align-top">
+            <tr key={i} className="border-b border-secondary-100 align-top">
               <td className="py-1 pr-1 space-y-1">
                 <input type="text" value={l.label} onChange={(e) => patch(i, { label: e.target.value })} placeholder="Libellé" className={CELL} />
-                <input type="text" value={l.description || ''} onChange={(e) => patch(i, { description: e.target.value })} placeholder="Description (facultatif)" className={`${CELL} text-gray-600`} />
+                <input type="text" value={l.description || ''} onChange={(e) => patch(i, { description: e.target.value })} placeholder="Description (facultatif)" className={`${CELL} text-secondary-600`} />
               </td>
               <td className="py-1 px-0.5"><input type="number" min="0" step="0.01" value={l.quantity} onChange={(e) => patch(i, { quantity: e.target.value })} className={`${CELL} text-right`} /></td>
               <td className="py-1 px-0.5"><input type="number" min="0" step="0.01" value={l.unitPriceHt} onChange={(e) => patch(i, { unitPriceHt: e.target.value })} className={`${CELL} text-right`} /></td>
@@ -50,7 +50,7 @@ export default function InvoiceLinesEditor({ lines, onChange, model }) {
               </td>
               <td className="py-1 px-0.5"><input type="number" min="0" max="100" step="1" value={l.discountPercent} onChange={(e) => patch(i, { discountPercent: e.target.value })} className={`${CELL} text-right`} /></td>
               <td className="py-1 text-right">
-                <button type="button" onClick={() => remove(i)} title="Supprimer la ligne" className="text-gray-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                <button type="button" onClick={() => remove(i)} title="Supprimer la ligne" className="text-secondary-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
               </td>
             </tr>
           ))}

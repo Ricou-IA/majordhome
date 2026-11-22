@@ -83,7 +83,7 @@ export function CertificatConformeDialog({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block text-sm">
-            <span className="mb-1 block font-medium text-gray-700">Date de passage</span>
+            <span className="mb-1 block font-medium text-secondary-700">Date de passage</span>
             <input
               type="date"
               value={date || ''}
@@ -95,7 +95,7 @@ export function CertificatConformeDialog({
             {!dateValide && <span className="mt-1 block text-xs text-red-700">Date absente ou dans le futur.</span>}
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block font-medium text-gray-700">Intervention réalisée par</span>
+            <span className="mb-1 block font-medium text-secondary-700">Intervention réalisée par</span>
             <select
               value={technicienId}
               onChange={(e) => setTechnicienId(e.target.value)}
@@ -111,17 +111,17 @@ export function CertificatConformeDialog({
         </div>
 
         {showRamonage && (
-          <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 text-sm">
+          <label className="flex items-start gap-3 rounded-lg border border-secondary-200 p-3 text-sm">
             <input
               type="checkbox"
               checked={ramonage}
               onChange={(e) => setRamonage(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300"
+              className="mt-0.5 h-4 w-4 rounded border-secondary-300"
               disabled={!!blocage || loading}
             />
             <span>
-              <span className="font-medium text-gray-900">Ramonage mécanique effectué</span>
-              <span className="mt-0.5 block text-gray-600">
+              <span className="font-medium text-secondary-900">Ramonage mécanique effectué</span>
+              <span className="mt-0.5 block text-secondary-600">
                 Le certificat vaudra attestation de ramonage : il écrit que le conduit a été brossé au
                 hérisson sur toute sa longueur et qu&apos;il est vacant après test. À cocher seulement si
                 c&apos;est le cas.

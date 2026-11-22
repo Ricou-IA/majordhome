@@ -24,8 +24,8 @@ import { rapportDeCarte, messageErreurRapportSav } from '@/lib/rapportSav';
 import { contenuInitial, validerContenu, memeContenu, traceEnvoi } from '@/lib/rapportSavModel';
 import { editerRapportSav } from './rapportSavExport';
 
-const champ = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-50';
-const etiquette = 'block text-sm font-medium text-gray-700 mb-1.5';
+const champ = 'w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-secondary-50';
+const etiquette = 'block text-sm font-medium text-secondary-700 mb-1.5';
 
 const appareilDepuis = (eq, referentiel) => ({
   id: eq.id, libelle: libelleEquipement(eq, referentiel), marque: eq.brand || '', modele: eq.model || '', numeroSerie: eq.serial_number || '',
@@ -126,21 +126,21 @@ export function RapportSavDialog({ item, equipements = [], referentiel, membres 
               <FileText className="h-4 w-4 text-blue-700" />
             </div>
             <div className="min-w-0">
-              <h3 id="rapport-sav-titre" className="text-base font-semibold text-gray-900">Rapport d&apos;intervention</h3>
-              <p className="text-xs text-gray-500 truncate">{nom}</p>
+              <h3 id="rapport-sav-titre" className="text-base font-semibold text-secondary-900">Rapport d&apos;intervention</h3>
+              <p className="text-xs text-secondary-500 truncate">{nom}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1.5 text-secondary-400 hover:text-secondary-600 rounded-lg hover:bg-secondary-100 transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="px-5 py-4 space-y-4 overflow-y-auto">
           {trace && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 flex items-center justify-between gap-3">
+            <div className="rounded-lg border border-secondary-200 bg-secondary-50 px-3 py-2 text-sm text-secondary-700 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p>Rapport édité le {formatDateTimeFR(trace.edite_le)}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-secondary-500">
                   {trace.envoye_le ? `Envoyé le ${formatDateTimeFR(trace.envoye_le)} à ${trace.envoye_a}` : 'Pas encore envoyé au client'}
                 </p>
               </div>
@@ -157,14 +157,14 @@ export function RapportSavDialog({ item, equipements = [], referentiel, membres 
                 Les rendez-vous ou les pièces de la carte n&apos;ont pas pu être lus : fermez et rouvrez la fenêtre.
               </p>
             ) : (
-              <p className="text-sm text-gray-500 flex items-center gap-2">
+              <p className="text-sm text-secondary-500 flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Lecture des rendez-vous et des pièces de la carte…
               </p>
             )
           ) : (
             <>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-secondary-500">
                 Ce texte part chez le client. Les notes internes de la carte n&apos;y figurent pas.
               </p>
 
@@ -212,17 +212,17 @@ export function RapportSavDialog({ item, equipements = [], referentiel, membres 
               <div>
                 <span className={etiquette}>Pièces remplacées</span>
                 {contenu.pieces.length === 0 ? (
-                  <p className="text-sm text-gray-500">Aucune pièce identifiée sur cette carte.</p>
+                  <p className="text-sm text-secondary-500">Aucune pièce identifiée sur cette carte.</p>
                 ) : (
                   <ul className="space-y-1.5">
                     {contenu.pieces.map((p) => (
                       <li key={p.cle}>
-                        <label className="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
+                        <label className="flex items-start gap-2 text-sm text-secondary-800 cursor-pointer">
                           <input
                             type="checkbox" checked={p.retenue} className="mt-0.5 h-4 w-4"
                             onChange={(e) => set('pieces')(contenu.pieces.map((x) => (x.cle === p.cle ? { ...x, retenue: e.target.checked } : x)))}
                           />
-                          <span>{p.quantite} × {p.designation}{p.reference ? <span className="text-gray-500"> · réf. {p.reference}</span> : null}</span>
+                          <span>{p.quantite} × {p.designation}{p.reference ? <span className="text-secondary-500"> · réf. {p.reference}</span> : null}</span>
                         </label>
                       </li>
                     ))}
@@ -241,10 +241,10 @@ export function RapportSavDialog({ item, equipements = [], referentiel, membres 
           )}
         </div>
 
-        <div className="px-5 py-3 border-t bg-gray-50 rounded-b-xl space-y-2">
+        <div className="px-5 py-3 border-t bg-secondary-50 rounded-b-xl space-y-2">
           <p className="text-xs text-amber-700 min-h-[1rem]">{erreurs[0] || (email.visible ? motifEnvoi : '') || ''}</p>
           <div className="flex items-center justify-end gap-2 flex-wrap">
-            <button type="button" onClick={onClose} className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800">Fermer</button>
+            <button type="button" onClick={onClose} className="px-3 py-2 text-sm font-medium text-secondary-600 hover:text-secondary-800">Fermer</button>
             {email.visible && (
               <button
                 type="button" onClick={handleEnvoyer} disabled={Boolean(motifEnvoi) || envoiEnCours || edition}

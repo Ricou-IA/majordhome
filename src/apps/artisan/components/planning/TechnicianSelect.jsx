@@ -37,36 +37,36 @@ export function TechnicianSelect({ selectedIds, onChange, members, placeholder =
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-colors text-left"
+        className="w-full flex items-center justify-between px-3 py-2 border border-secondary-300 rounded-lg text-sm bg-white hover:bg-secondary-50 transition-colors text-left"
       >
-        <span className={selectedNames.length > 0 ? 'text-gray-900' : 'text-gray-400'}>
+        <span className={selectedNames.length > 0 ? 'text-secondary-900' : 'text-secondary-400'}>
           {selectedNames.length > 0
             ? selectedNames.join(', ')
             : placeholder
           }
         </span>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-secondary-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-48 overflow-y-auto">
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-secondary-200 rounded-lg shadow-lg z-20 py-1 max-h-48 overflow-y-auto">
             {members.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-gray-500">Aucun membre disponible</p>
+              <p className="px-3 py-2 text-sm text-secondary-500">Aucun membre disponible</p>
             ) : (
               members.map(member => (
                 <button
                   key={member.id}
                   type="button"
                   onClick={() => toggleTech(member.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-secondary-50"
                 >
                   <span
                     className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
                       selectedIds.includes(member.id)
                         ? 'bg-blue-600 border-blue-600'
-                        : 'border-gray-300'
+                        : 'border-secondary-300'
                     }`}
                   >
                     {selectedIds.includes(member.id) && (
@@ -77,7 +77,7 @@ export function TechnicianSelect({ selectedIds, onChange, members, placeholder =
                     className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{ backgroundColor: member.calendar_color || '#6B7280' }}
                   />
-                  <span className="text-gray-900">{member.display_name}</span>
+                  <span className="text-secondary-900">{member.display_name}</span>
                 </button>
               ))
             )}

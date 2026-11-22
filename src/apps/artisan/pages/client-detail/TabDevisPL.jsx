@@ -29,7 +29,7 @@ const STATUS_CONFIG = {
   },
   draft: {
     label: 'Brouillon',
-    color: 'bg-gray-100 text-gray-500 border border-gray-200',
+    color: 'bg-secondary-100 text-secondary-500 border border-secondary-200',
     hideSensitive: true,
   },
   expired: {
@@ -57,7 +57,7 @@ const STATUS_CONFIG = {
 function StatusBadge({ status }) {
   const config = STATUS_CONFIG[status] || {
     label: status || 'Inconnu',
-    color: 'bg-gray-100 text-gray-600 border border-gray-200',
+    color: 'bg-secondary-100 text-secondary-600 border border-secondary-200',
   };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${config.color}`}>

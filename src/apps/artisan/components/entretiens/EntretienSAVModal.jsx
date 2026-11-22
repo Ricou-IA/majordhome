@@ -528,7 +528,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
               style={{ backgroundColor: statusConfig.color }}
             />
             <div className="min-w-0 flex items-center gap-2">
-              <h2 className="text-base font-semibold text-gray-900 truncate">{name}</h2>
+              <h2 className="text-base font-semibold text-secondary-900 truncate">{name}</h2>
               <span className={`text-xs font-semibold px-2 py-0.5 rounded ${typeConfig.bgClass}`}>
                 {typeConfig.label}
               </span>
@@ -543,7 +543,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg transition-colors"
+            className="p-2 text-secondary-400 hover:text-secondary-600 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -558,8 +558,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
               <div className={colonneClass}>
               {/* Infos client */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <User className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-2 text-sm text-secondary-700">
+                  <User className="w-4 h-4 text-secondary-400" />
                   <span>{name}</span>
                   {/* Lien vers la fiche client */}
                   {item.client_id && (
@@ -579,19 +579,19 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                     adresse={formaterAdresse({ address: item.client_address, postalCode: item.client_postal_code, city: item.client_city })}
                     lat={item.client_latitude}
                     lng={item.client_longitude}
-                    className="text-sm text-gray-500 [&>svg]:text-gray-400 [&>svg]:h-4 [&>svg]:w-4"
+                    className="text-sm text-secondary-500 [&>svg]:text-secondary-400 [&>svg]:h-4 [&>svg]:w-4"
                   />
                 )}
                 {/* Téléphone et e-mail cliquables (appel / messagerie depuis le téléphone) */}
                 {item.client_phone && (
                   <a href={`tel:${item.client_phone.replace(/[^\d+]/g, '')}`} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 w-fit">
-                    <Phone className="w-4 h-4 text-gray-400" />
+                    <Phone className="w-4 h-4 text-secondary-400" />
                     <span>{item.client_phone}</span>
                   </a>
                 )}
                 {item.client_email && (
                   <a href={`mailto:${item.client_email}`} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 w-fit break-all">
-                    <Mail className="w-4 h-4 text-gray-400" />
+                    <Mail className="w-4 h-4 text-secondary-400" />
                     <span>{item.client_email}</span>
                   </a>
                 )}
@@ -601,8 +601,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                     d'équipement : impossible de distinguer, tout part dans « Équipements ». */}
                 {item.contract_number && (
                   <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <FileText className="w-4 h-4 text-gray-400" />
+                    <div className="flex items-center gap-2 text-sm text-secondary-500">
+                      <FileText className="w-4 h-4 text-secondary-400" />
                       <span>Contrat {item.contract_number}</span>
                       {item.contract_amount > 0 && (
                         <span className="ml-auto text-sm font-semibold text-emerald-700">
@@ -621,8 +621,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                 {!item.contract_number && <DernierEntretien date={lastEntretienDate} icone />}
 
                 {autresEquipements.length > 0 && (
-                  <div className="flex items-start gap-2 text-sm text-gray-500">
-                    <Wrench className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                  <div className="flex items-start gap-2 text-sm text-secondary-500">
+                    <Wrench className="w-4 h-4 text-secondary-400 mt-0.5 shrink-0" />
                     <div className="space-y-1">
                       <span>{idsSousContrat && item.contract_number ? 'Autres équipements' : 'Équipements'}</span>
                       <ChipsEquipements equipements={autresEquipements} referentiel={referentiel} />
@@ -747,7 +747,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                     Anomalie constatée
                   </h3>
                   {/* Lecture seule : le bouton « Voir certificat » vit dans la section Certificats (recette Eric 2026-10-10, pas de doublon) */}
-                  <p className="text-xs text-gray-400">Relevée par le technicien sur le certificat d&apos;entretien (section Certificats ci-dessous). Se corrige dans le certificat.</p>
+                  <p className="text-xs text-secondary-400">Relevée par le technicien sur le certificat d&apos;entretien (section Certificats ci-dessous). Se corrige dans le certificat.</p>
                   {anomalies.map((a) => (
                     <div key={a.certificatId} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                       {a.equipement && <div className="text-xs font-medium text-amber-800">{a.equipement}</div>}
@@ -773,7 +773,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                   <FileText className="w-4 h-4" />
                   Notes internes
                 </h3>
-                <p className="text-xs text-gray-400">Visibles dans la fiche client (Notes internes)</p>
+                <p className="text-xs text-secondary-400">Visibles dans la fiche client (Notes internes)</p>
                 <FormField>
                   <TextArea
                     value={notes}
@@ -795,7 +795,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
         </div>
 
         {/* Footer : Enregistrer + transitions */}
-          <div className={`px-5 py-3 border-t bg-gray-50 rounded-b-xl space-y-2 ${MODAL_FOOTER_PHONE}`}>
+          <div className={`px-5 py-3 border-t bg-secondary-50 rounded-b-xl space-y-2 ${MODAL_FOOTER_PHONE}`}>
             {/* CTA Envoyer par mail (entretien réalisé avec email client) */}
             {isEntretien && item.workflow_status === 'realise' && item.client_email && (
               <div className="flex items-center justify-center">
@@ -824,7 +824,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                       type="button"
                       onClick={() => handleTransition(targetStatus)}
                       disabled={isUpdatingStatus}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-500 bg-white transition-colors hover:shadow-sm hover:bg-gray-100 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-secondary-300 text-secondary-500 bg-white transition-colors hover:shadow-sm hover:bg-secondary-100 disabled:opacity-50"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
                       {col.label}
@@ -839,7 +839,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                     onClick={handleRanger}
                     disabled={isUpdatingStatus}
                     title="Ranger la carte (la retirer de « À planifier »)"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-500 bg-white transition-colors hover:shadow-sm hover:bg-gray-100 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-secondary-300 text-secondary-500 bg-white transition-colors hover:shadow-sm hover:bg-secondary-100 disabled:opacity-50"
                   >
                     <Archive className="w-3.5 h-3.5" />
                     Ranger
@@ -853,7 +853,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                     onClick={handleCopierLien}
                     disabled={lienBusy}
                     title="Copier le lien de la page où le client choisit sa demi-journée"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-600 bg-white transition-colors hover:shadow-sm hover:bg-gray-100 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-secondary-300 text-secondary-600 bg-white transition-colors hover:shadow-sm hover:bg-secondary-100 disabled:opacity-50"
                   >
                     {lienBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
                     Lien de RDV client
@@ -882,7 +882,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg border transition-all ${
                     isDirty
                       ? 'bg-primary-600 border-blue-600 text-white hover:bg-primary-700 shadow-sm'
-                      : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-secondary-100 border-secondary-200 text-secondary-400 cursor-not-allowed'
                   }`}
                 >
                   {isSavingFields ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -983,7 +983,7 @@ function ChipsEquipements({ equipements, referentiel }) {
       {equipements.map((eq) => {
         const marqueModele = [eq.brand, eq.model].filter(Boolean).join(' ');
         return (
-          <span key={eq.id} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+          <span key={eq.id} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary-100 text-secondary-700">
             {libelleEquipement(eq, referentiel)}
             {marqueModele && <span className="font-normal">&nbsp;· {marqueModele}</span>}
           </span>
@@ -996,13 +996,13 @@ function ChipsEquipements({ equipements, referentiel }) {
 /** « Dernier entretien : date » (icône calendrier hors bloc contrat). */
 function DernierEntretien({ date, icone = false }) {
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-500">
-      {icone && <Calendar className="w-4 h-4 text-gray-400" />}
+    <div className="flex items-center gap-2 text-sm text-secondary-500">
+      {icone && <Calendar className="w-4 h-4 text-secondary-400" />}
       <span>
         Dernier entretien :{' '}
         {date
-          ? <span className="font-medium text-gray-700">{formatDateShortFR(date)}</span>
-          : <span className="italic text-gray-400">Aucun</span>}
+          ? <span className="font-medium text-secondary-700">{formatDateShortFR(date)}</span>
+          : <span className="italic text-secondary-400">Aucun</span>}
       </span>
     </div>
   );

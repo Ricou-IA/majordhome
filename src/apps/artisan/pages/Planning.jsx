@@ -231,11 +231,11 @@ export default function Planning() {
   if (error) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+        <h1 className="text-2xl font-bold text-secondary-900">Planning</h1>
+        <div className="bg-white rounded-lg border border-secondary-200 p-12 text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Erreur de chargement</h3>
-          <p className="text-gray-500 mb-4">{error?.message || 'Impossible de charger le planning'}</p>
+          <h3 className="text-lg font-medium text-secondary-900 mb-2">Erreur de chargement</h3>
+          <p className="text-secondary-500 mb-4">{error?.message || 'Impossible de charger le planning'}</p>
           <button onClick={refresh} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
             <RefreshCw className="w-4 h-4 inline mr-2" />
             Réessayer
@@ -247,10 +247,10 @@ export default function Planning() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
+      <h1 className="text-2xl font-bold text-secondary-900">Planning</h1>
 
       {/* Toolbar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 space-y-3">
+      <div className="bg-white rounded-lg border border-secondary-200 p-3 sm:p-4 space-y-3">
         <CalendarToolbar
           calendarRef={calendarRef}
           currentView={currentView}
@@ -285,9 +285,9 @@ export default function Planning() {
       </div>
 
       {/* Calendrier */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-lg border border-secondary-200 shadow-sm overflow-hidden">
         {isLoading && events.length === 0 && (
-          <div className="flex items-center justify-center py-4 border-b border-gray-200 bg-blue-50">
+          <div className="flex items-center justify-center py-4 border-b border-secondary-200 bg-blue-50">
             <Loader2 className="w-4 h-4 animate-spin text-blue-500 mr-2" />
             <span className="text-sm text-blue-600">Chargement du planning...</span>
           </div>

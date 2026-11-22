@@ -488,17 +488,17 @@ export function SchedulingAssistant({
         /* Barre d'action collante : titre + type à gauche, validation à droite. Reste visible
            pendant le défilement de la grille (Eric 2026-11-03 : le bouton « Planifier » en pied
            de fiche était hors de vue, on quittait la fiche sans poser le RDV). */
-        <div className="sticky top-0 z-30 bg-white rounded-lg border border-gray-200 shadow-sm px-3 py-2 flex items-center justify-between gap-3">
+        <div className="sticky top-0 z-30 bg-white rounded-lg border border-secondary-200 shadow-sm px-3 py-2 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <h3 className="text-base font-semibold text-secondary-900 flex items-center gap-2">
               <CalendarCheck className="w-5 h-5 text-blue-600 shrink-0" />
               Planifier le RDV
             </h3>
-            <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5 min-w-0">
+            <div className="flex items-center gap-2 text-xs text-secondary-600 mt-0.5 min-w-0">
               <span className="font-medium">{appointmentTypeLabel}</span>
-              <span className="text-gray-300">•</span>
+              <span className="text-secondary-300">•</span>
               <User className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              <span className="text-gray-500 truncate">{assigneeDisplay}</span>
+              <span className="text-secondary-500 truncate">{assigneeDisplay}</span>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -527,9 +527,9 @@ export function SchedulingAssistant({
               onClick={onCancel}
               disabled={isLoading}
               title="Annuler"
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+              className="p-2 rounded-lg hover:bg-secondary-100 transition-colors disabled:opacity-50"
             >
-              <X className="w-4 h-4 text-gray-500" />
+              <X className="w-4 h-4 text-secondary-500" />
             </button>
           </div>
         </div>
@@ -606,7 +606,7 @@ export function SchedulingAssistant({
         <>
           {/* Objet */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+            <label className="block text-sm font-medium text-secondary-700 mb-1 flex items-center gap-1">
               <FileText className="w-3.5 h-3.5" />
               Objet
             </label>
@@ -615,19 +615,19 @@ export function SchedulingAssistant({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Objet du RDV"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
           {/* Notes internes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes internes (optionnel)</label>
+            <label className="block text-sm font-medium text-secondary-700 mb-1">Notes internes (optionnel)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Notes pour l'équipe..."
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
             />
           </div>
         </>

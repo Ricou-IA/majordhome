@@ -170,13 +170,13 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
       <div className="fixed inset-0 bg-black/40 z-40 transition-opacity" onClick={onClose} />
       <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-secondary-200 bg-secondary-50">
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 truncate">{journee.technicienNom}</h3>
-            <p className="text-sm text-gray-500">
+            <h3 className="text-lg font-semibold text-secondary-900 truncate">{journee.technicienNom}</h3>
+            <p className="text-sm text-secondary-500">
               {formatDateFR(journee.date)}
               {etat && (
-                <span className="text-gray-400">
+                <span className="text-secondary-400">
                   {' '}· {LIBELLES_ETAT[etat.etat]}
                   {etat.etiquette ? ` · secteur ${etat.etiquette}` : ''}
                 </span>
@@ -186,9 +186,9 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors flex-shrink-0"
+            className="p-1.5 rounded-lg hover:bg-secondary-200 transition-colors flex-shrink-0"
           >
-            <X className="h-5 w-5 text-gray-500" />
+            <X className="h-5 w-5 text-secondary-500" />
           </button>
         </div>
 
@@ -204,13 +204,13 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
             place — et qu'on peut pousser un RDV pour en faire. */}
         <div className="px-5 pt-4">
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-xs font-medium text-gray-600">
+            <p className="text-xs font-medium text-secondary-600">
               Journée actuelle
               {/* Rien à ajuster sur une journée vide : la consigne ne s'affiche
                   que quand elle a un objet. Écrite ICI et nulle part ailleurs —
                   la répéter sur chaque bloc noyait la donnée sous la notice. */}
               {journeeAjustee.rdvs?.length > 0 && (
-                <span className="text-gray-400 font-normal">
+                <span className="text-secondary-400 font-normal">
                   {' '}· glisser un RDV pour le décaler, son bord droit pour le raccourcir
                 </span>
               )}
@@ -232,7 +232,7 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
                 type="button"
                 onClick={reinitialiser}
                 disabled={posing || calculatingReel}
-                className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900 disabled:opacity-50"
+                className="inline-flex items-center gap-1 text-xs font-medium text-secondary-500 hover:text-secondary-900 disabled:opacity-50"
               >
                 <RotateCcw className="h-3 w-3" />
                 Annuler les ajustements
@@ -260,7 +260,7 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          <div className="mb-4 pb-4 border-b border-gray-200">
+          <div className="mb-4 pb-4 border-b border-secondary-200">
             <FeuilleDeRouteSection date={journee.date} memberIds={membresFeuille} person={personneFeuille} />
           </div>
           {candidatsError ? (
@@ -268,7 +268,7 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
               Erreur de chargement des contrats dus : {candidatsError?.message || 'échec inconnu'}
             </div>
           ) : afficherChargement ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-500 gap-2">
+            <div className="flex flex-col items-center justify-center py-16 text-secondary-500 gap-2">
               <Loader2 className="h-6 w-6 animate-spin" />
               <p className="text-sm">Calcul des trajets…</p>
             </div>
@@ -284,13 +284,13 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
               </div>
             )
           ) : !propositions || propositions.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-500">
+            <div className="py-8 text-center text-sm text-secondary-500">
               <p>Aucun entretien à proposer sur cette journée.</p>
               {/* Le motif dominant, pas un silence : « plus de trou » et
                   « budget atteint » n'appellent pas la même réaction — et
                   décaler un RDV peut débloquer le premier. */}
               {motifDominant && (
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-secondary-400">
                   Motif principal : {RAISON_LABELS[motifDominant] || motifDominant}.
                 </p>
               )}
@@ -316,9 +316,9 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
 
         {/* Footer récapitulatif + action */}
         {propositions?.length > 0 && (
-          <div className="border-t border-gray-200 bg-gray-50 px-5 py-4 space-y-3">
+          <div className="border-t border-secondary-200 bg-secondary-50 px-5 py-4 space-y-3">
             {selectedIds.size > 0 && recalcul && (
-              <div className="text-sm text-gray-700 space-y-1">
+              <div className="text-sm text-secondary-700 space-y-1">
                 {/* Un candidat coché que l'ensemble ne place plus n'est pas une
                     erreur globale : les autres tiennent toujours. On nomme
                     celui qui saute plutôt que d'annuler tout le panneau. */}
@@ -344,7 +344,7 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
                         {formatDuree(recalcul.chargeMinutes)} / {formatDuree(journee.budgetMinutes)}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-secondary-400">
                       Aperçu local, distances estimées à vol d&apos;oiseau.
                       Les horaires réels sont recalculés à la pose.
                     </p>

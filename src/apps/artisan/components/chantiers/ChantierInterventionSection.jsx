@@ -82,7 +82,7 @@ export function ChantierInterventionSection({
         <CalendarDays className="w-4 h-4" />
         Installation
         {libelle && (
-          <span className="normal-case tracking-normal font-medium text-xs text-gray-500">
+          <span className="normal-case tracking-normal font-medium text-xs text-secondary-500">
             · commande {libelle}
           </span>
         )}
@@ -106,7 +106,7 @@ export function ChantierInterventionSection({
       )}
 
       {appointments.length === 0 ? (
-        <p className="text-sm text-gray-400 italic py-1">Aucun jour d&apos;installation planifié</p>
+        <p className="text-sm text-secondary-400 italic py-1">Aucun jour d&apos;installation planifié</p>
       ) : (
         <div className="space-y-2">
           {appointments.map((apt) => {
@@ -167,18 +167,18 @@ function AppointmentRow({ apt, dayLabel, teamSize = null, onDelete, disabled }) 
     apt.technician_names?.length > 0 ? apt.technician_names.join(', ') : null;
 
   return (
-    <div className="flex items-center gap-3 p-2.5 bg-white border border-gray-200 rounded-lg group">
+    <div className="flex items-center gap-3 p-2.5 bg-white border border-secondary-200 rounded-lg group">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <CalendarDays className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-          <span className="text-sm font-medium text-gray-900">{dateStr}</span>
+          <CalendarDays className="w-3.5 h-3.5 text-secondary-400 shrink-0" />
+          <span className="text-sm font-medium text-secondary-900">{dateStr}</span>
           {dayLabel && (
             <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-bold">
               {dayLabel}
             </span>
           )}
           {timeStr && (
-            <span className="text-xs text-gray-500 flex items-center gap-1">
+            <span className="text-xs text-secondary-500 flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {timeStr}
             </span>
@@ -186,7 +186,7 @@ function AppointmentRow({ apt, dayLabel, teamSize = null, onDelete, disabled }) 
           {teamSize && personnes != null && (
             <span
               className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
-                sousEffectif ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+                sousEffectif ? 'bg-amber-100 text-amber-700' : 'bg-secondary-100 text-secondary-600'
               }`}
               title={`${personnes} personne(s) sur ${teamSize} attendue(s)`}
             >
@@ -195,14 +195,14 @@ function AppointmentRow({ apt, dayLabel, teamSize = null, onDelete, disabled }) 
           )}
         </div>
         {techNames && (
-          <p className="text-xs text-gray-500 mt-0.5 ml-5.5 truncate">{techNames}</p>
+          <p className="text-xs text-secondary-500 mt-0.5 ml-5.5 truncate">{techNames}</p>
         )}
       </div>
       <button
         type="button"
         onClick={onDelete}
         disabled={disabled}
-        className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all disabled:cursor-not-allowed"
+        className="p-1.5 text-secondary-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all disabled:cursor-not-allowed"
         title="Supprimer ce jour"
       >
         <Trash2 className="w-4 h-4" />

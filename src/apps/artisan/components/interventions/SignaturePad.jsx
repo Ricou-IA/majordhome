@@ -85,7 +85,7 @@ export function SignaturePad({
             alt="Signature client"
             className="max-h-32 mx-auto"
           />
-          <p className="text-sm text-gray-600 mt-2">
+          <p className="text-sm text-secondary-600 mt-2">
             Signé par <strong>{signedByName}</strong>
           </p>
         </div>
@@ -110,7 +110,7 @@ export function SignaturePad({
 
       {/* Champ nom signataire */}
       <div>
-        <Label htmlFor="signed_by_name" className="text-sm text-gray-600">
+        <Label htmlFor="signed_by_name" className="text-sm text-secondary-600">
           Nom du signataire
         </Label>
         <Input
@@ -127,7 +127,7 @@ export function SignaturePad({
       <div className="relative">
         <div
           className={`border-2 rounded-lg bg-white ${
-            disabled ? 'border-gray-200 opacity-50' : 'border-gray-300'
+            disabled ? 'border-secondary-200 opacity-50' : 'border-secondary-300'
           }`}
         >
           <SignatureCanvas
@@ -143,7 +143,7 @@ export function SignaturePad({
 
         {/* Texte guide */}
         {isEmpty && !disabled && (
-          <p className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm pointer-events-none">
+          <p className="absolute inset-0 flex items-center justify-center text-secondary-400 text-sm pointer-events-none">
             Signez ici avec le doigt
           </p>
         )}

@@ -65,7 +65,7 @@ export function StepEquipementType({ formData, onChange, equipment, clientEquipm
       {/* Recherche dans le parc client */}
       {clientEquipments && clientEquipments.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-700">Ou sélectionner dans le parc client :</p>
+          <p className="text-sm font-medium text-secondary-700">Ou sélectionner dans le parc client :</p>
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {clientEquipments.map(eq => (
               <button
@@ -84,12 +84,12 @@ export function StepEquipementType({ formData, onChange, equipment, clientEquipm
                     onChange('equipement_annee', new Date(eq.install_date).getFullYear());
                   }
                 }}
-                className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full text-left p-3 border border-secondary-200 rounded-lg hover:bg-secondary-50 transition-colors"
               >
-                <p className="text-sm font-medium text-gray-800">
+                <p className="text-sm font-medium text-secondary-800">
                   {labelDe(eq)}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-secondary-500">
                   {[eq.brand, eq.model].filter(Boolean).join(' ') || 'Non renseigné'}
                   {eq.serial_number && ` — N° ${eq.serial_number}`}
                 </p>

@@ -32,13 +32,13 @@ export function JourneesAArbitrer({ coreOrgId }) {
       <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-1">
         <AlertTriangle className="w-5 h-5 text-red-500" />
         Journées pleines à arbitrer
-        <span className="text-sm font-normal text-gray-400">({journees.length})</span>
+        <span className="text-sm font-normal text-secondary-400">({journees.length})</span>
       </h2>
       <p className="text-xs text-secondary-500 mb-3">
         Pleines, mais impossibles à ordonnancer dans les tolérances : le figeage automatique les laisse de côté.
         Trajets estimés à vol d’oiseau — ouvrez la journée dans le Planning pour les chiffres réels.
       </p>
-      <ul className="divide-y divide-gray-100">
+      <ul className="divide-y divide-secondary-100">
         {journees.map(({ journee: j, sequence }) => {
           const d = sequence?.diagnostic;
           const motifs = [];
@@ -50,7 +50,7 @@ export function JourneesAArbitrer({ coreOrgId }) {
               <button
                 type="button"
                 onClick={() => navigate(lienJourneePlanning(j))}
-                className="w-full flex items-center justify-between gap-3 text-left px-2 py-2 rounded hover:bg-gray-50"
+                className="w-full flex items-center justify-between gap-3 text-left px-2 py-2 rounded hover:bg-secondary-50"
               >
                 <span className="min-w-0">
                   <span className="block text-sm font-medium text-secondary-900 truncate">

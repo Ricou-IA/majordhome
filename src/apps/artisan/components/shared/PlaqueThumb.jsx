@@ -26,7 +26,7 @@ export function PlaqueThumb({ path, label = 'Plaque signalétique', className = 
         type="button"
         onClick={() => url && setPleinEcran(true)}
         title={label}
-        className={`${className} shrink-0 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        className={`${className} shrink-0 rounded-lg border border-secondary-200 bg-secondary-50 overflow-hidden flex items-center justify-center text-secondary-400 focus:outline-none focus:ring-2 focus:ring-blue-500`}
       >
         {state === 'ok' && url
           ? <img src={url} alt={label} className="w-full h-full object-cover" />

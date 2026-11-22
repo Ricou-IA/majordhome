@@ -87,7 +87,7 @@ export default function App() {
         <Route
           path="/gaillac/:token"
           element={(
-            <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+            <Suspense fallback={<div className="min-h-screen bg-secondary-50" />}>
               <ChantierGaillacPartage />
             </Suspense>
           )}
@@ -148,7 +148,7 @@ export default function App() {
           <ClientRoute>
             <Suspense
               fallback={
-                <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="min-h-screen flex items-center justify-center bg-secondary-50">
                   <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
                 </div>
               }

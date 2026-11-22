@@ -62,9 +62,9 @@ export default function GaillacBoard({
       <TechSummaryCards taches={taches} planning={planning} techniciens={techniciens} readOnly={readOnly} />
 
       {!readOnly && (
-        <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-          <span><b className="text-slate-700">L1 à L7</b> demi-journées Ludovic à programmer</span>
-          <span><b className="text-slate-700">A1 à A11</b> demi-journées Antoine à programmer</span>
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary-500">
+          <span><b className="text-secondary-700">L1 à L7</b> demi-journées Ludovic à programmer</span>
+          <span><b className="text-secondary-700">A1 à A11</b> demi-journées Antoine à programmer</span>
           <span>4 h maximum par code, 20 min par site comptées pour trajet, accès et rangement</span>
         </p>
       )}
@@ -72,7 +72,7 @@ export default function GaillacBoard({
       <GaillacFilters filters={filters} onChange={handleFilters} techniciens={techniciens} options={options} readOnly={readOnly} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex items-center gap-2 text-xs text-secondary-500">
           <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} aria-hidden />
           Actualisé automatiquement toutes les minutes
           {dataUpdatedAt ? ` · dernière mise à jour ${new Date(dataUpdatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}
@@ -90,15 +90,15 @@ export default function GaillacBoard({
         )}
       </div>
 
-      <div className="xl:overflow-hidden xl:rounded-xl xl:border xl:border-slate-200 xl:bg-white">
-        <div className={`hidden border-b border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 ${grid}`} aria-hidden>
+      <div className="xl:overflow-hidden xl:rounded-xl xl:border xl:border-secondary-200 xl:bg-white">
+        <div className={`hidden border-b border-secondary-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-secondary-500 ${grid}`} aria-hidden>
           <span>{readOnly ? 'Statut' : 'Fait'}</span><span>N°</span><span>Site</span><span>Action</span><span>Thème</span><span>Tech.</span>
           {!readOnly && (<><span className="text-right">Durée</span><span>Achat</span></>)}
           <span>Planning</span>
           {!readOnly && (<><span>Observations</span><span>Commentaire terrain</span></>)}
         </div>
         {groups.length === 0 ? (
-          <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 xl:border-0">
+          <p className="rounded-xl border border-secondary-200 bg-white p-6 text-center text-sm text-secondary-500 xl:border-0">
             Aucune tâche ne correspond aux filtres.
           </p>
         ) : (
@@ -122,7 +122,7 @@ export default function GaillacBoard({
         )}
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-secondary-500">
         Les relevés (« ↳ Relevé ») préparent la commande unique : étiquettes, flèches, peinture RAL 1023, antirouille et pièces.
         Les lignes en italique sont hors périmètre Mayer Énergie et restent visibles pour le compte rendu à Veolia.
       </p>

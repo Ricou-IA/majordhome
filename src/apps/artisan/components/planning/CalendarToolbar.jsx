@@ -70,7 +70,7 @@ export function CalendarToolbar({
       <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={goToday}
-          className="h-10 sm:h-auto px-3 py-1.5 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="h-10 sm:h-auto px-3 py-1.5 text-sm font-medium bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors"
         >
           Aujourd&apos;hui
         </button>
@@ -78,14 +78,14 @@ export function CalendarToolbar({
           <button
             onClick={goPrev}
             aria-label="Période précédente"
-            className="h-10 w-10 sm:h-auto sm:w-auto flex items-center justify-center sm:p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="h-10 w-10 sm:h-auto sm:w-auto flex items-center justify-center sm:p-1.5 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <button
             onClick={goNext}
             aria-label="Période suivante"
-            className="h-10 w-10 sm:h-auto sm:w-auto flex items-center justify-center sm:p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="h-10 w-10 sm:h-auto sm:w-auto flex items-center justify-center sm:p-1.5 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -98,7 +98,7 @@ export function CalendarToolbar({
             S{weekNumber}
           </span>
         )}
-        <h2 className="text-base sm:text-lg font-semibold text-gray-900 sm:min-w-[200px] first-letter:uppercase">
+        <h2 className="text-base sm:text-lg font-semibold text-secondary-900 sm:min-w-[200px] first-letter:uppercase">
           {title}
         </h2>
         {caCumul > 0 && (
@@ -117,15 +117,15 @@ export function CalendarToolbar({
       {/* Actions */}
       <div className="flex items-center gap-2 flex-wrap">
         {/* Sélecteur de vue */}
-        <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+        <div className="flex items-center bg-secondary-100 rounded-lg p-0.5">
           {views.map(v => (
             <button
               key={v.value}
               onClick={() => onViewChange(v.value)}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 currentView === v.value
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-secondary-900 shadow-sm'
+                  : 'text-secondary-600 hover:text-secondary-900'
               }`}
             >
               {v.label}
@@ -136,7 +136,7 @@ export function CalendarToolbar({
         <button
           onClick={onRefresh}
           disabled={isLoading}
-          className="h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          className="h-10 w-10 flex items-center justify-center text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
           title="Rafraîchir"
           aria-label="Rafraîchir le planning"
         >
@@ -146,7 +146,7 @@ export function CalendarToolbar({
         <button
           onClick={onPrint}
           disabled={!!printHint || isPrinting}
-          className="hidden sm:inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="hidden sm:inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title={printHint || printLabel}
         >
           {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}

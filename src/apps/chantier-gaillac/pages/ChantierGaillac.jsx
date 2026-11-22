@@ -110,8 +110,8 @@ export default function ChantierGaillac() {
   return (
     <div className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 sm:px-6">
       <header>
-        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Chantier Gaillac – Préconisations P2</h1>
-        <p className="mt-1 text-sm text-slate-600">Mayer Énergie pour Veolia · devis D-2026-09452 et D-2026-09411</p>
+        <h1 className="text-2xl font-bold text-secondary-900 sm:text-3xl">Chantier Gaillac – Préconisations P2</h1>
+        <p className="mt-1 text-sm text-secondary-600">Mayer Énergie pour Veolia · devis D-2026-09452 et D-2026-09411</p>
       </header>
 
       {isOrgAdmin && <SharePanel orgId={orgId} />}
@@ -123,7 +123,7 @@ export default function ChantierGaillac() {
       )}
 
       {!ready ? (
-        <div className="flex items-center gap-2 py-12 text-slate-500">
+        <div className="flex items-center gap-2 py-12 text-secondary-500">
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> Chargement du chantier…
         </div>
       ) : (

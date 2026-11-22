@@ -67,11 +67,11 @@ export function SAVLinkedQuotes({ item, canEdit = true, onUpdated, onCardSynced,
   return (
     <div className="space-y-2">
       {isLoading && (
-        <div className="flex items-center gap-2 text-xs text-gray-400"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Chargement des devis…</div>
+        <div className="flex items-center gap-2 text-xs text-secondary-400"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Chargement des devis…</div>
       )}
 
       {quotes.length > 0 && (
-        <ul className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+        <ul className="rounded-lg border border-secondary-200 divide-y divide-secondary-100">
           {quotes.map((quote) => {
             const statut = QUOTE_STATUSES.find((s) => s.value === quote.status);
             return (
@@ -79,16 +79,16 @@ export function SAVLinkedQuotes({ item, canEdit = true, onUpdated, onCardSynced,
                 <button
                   type="button"
                   onClick={() => setOpenQuoteId(quote.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-secondary-50 transition-colors"
                   title="Ouvrir le devis"
                 >
-                  <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                  <FileText className="w-4 h-4 text-secondary-400 shrink-0" />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-gray-900 truncate">
+                    <span className="block text-sm font-medium text-secondary-900 truncate">
                       {quote.quote_number || 'Devis'}
-                      {quote.subject ? <span className="font-normal text-gray-500"> · {quote.subject}</span> : null}
+                      {quote.subject ? <span className="font-normal text-secondary-500"> · {quote.subject}</span> : null}
                     </span>
-                    <span className="block text-xs text-gray-400">
+                    <span className="block text-xs text-secondary-400">
                       {formatDateShortFR(quote.created_at)}
                       {quote.pennylane_quote_id ? ' · envoyé dans Pennylane' : ''}
                     </span>
@@ -96,7 +96,7 @@ export function SAVLinkedQuotes({ item, canEdit = true, onUpdated, onCardSynced,
                   {statut && (
                     <span className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded border ${statut.color}`}>{statut.label}</span>
                   )}
-                  <span className="shrink-0 text-sm font-semibold text-gray-900">{formatEuro(Number(quote.total_ht) || 0)} HT</span>
+                  <span className="shrink-0 text-sm font-semibold text-secondary-900">{formatEuro(Number(quote.total_ht) || 0)} HT</span>
                 </button>
               </li>
             );

@@ -46,21 +46,21 @@ export default function ClientLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-secondary-50">
       {/* ================================================================= */}
       {/* HEADER                                                            */}
       {/* ================================================================= */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-white border-b border-secondary-200 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14">
             {/* Logo + nav desktop */}
             <div className="flex items-center gap-6">
-              <NavLink to="/client" className="text-sm font-medium text-gray-400">
+              <NavLink to="/client" className="text-sm font-medium text-secondary-400">
                 Espace client
               </NavLink>
 
               {/* Nav desktop intégrée */}
-              <nav className="hidden md:flex items-center gap-1 border-l border-gray-200 pl-6">
+              <nav className="hidden md:flex items-center gap-1 border-l border-secondary-200 pl-6">
                 {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
                   <NavLink
                     key={to}
@@ -70,7 +70,7 @@ export default function ClientLayout() {
                       `flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                         isActive
                           ? 'bg-primary-50 text-primary-600'
-                          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                          : 'text-secondary-500 hover:text-secondary-700 hover:bg-secondary-50'
                       }`
                     }
                   >
@@ -83,12 +83,12 @@ export default function ClientLayout() {
 
             {/* Desktop: user + actions */}
             <div className="hidden md:flex items-center gap-4">
-              <span className="text-sm text-gray-600">{displayName}</span>
+              <span className="text-sm text-secondary-600">{displayName}</span>
               <NavLink
                 to="/client/mot-de-passe"
                 className={({ isActive }) =>
                   `inline-flex items-center gap-1.5 text-sm transition-colors ${
-                    isActive ? 'text-primary-600' : 'text-gray-500 hover:text-gray-700'
+                    isActive ? 'text-primary-600' : 'text-secondary-500 hover:text-secondary-700'
                   }`
                 }
               >
@@ -97,7 +97,7 @@ export default function ClientLayout() {
               </NavLink>
               <button
                 onClick={handleSignOut}
-                className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                className="inline-flex items-center gap-1.5 text-sm text-secondary-500 hover:text-secondary-700 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 Déconnexion
@@ -107,7 +107,7 @@ export default function ClientLayout() {
             {/* Mobile: hamburger */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-gray-500 hover:text-gray-700"
+              className="md:hidden p-2 text-secondary-500 hover:text-secondary-700"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -118,7 +118,7 @@ export default function ClientLayout() {
         {/* MENU MOBILE                                                       */}
         {/* ================================================================= */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-100 bg-white">
+          <div className="md:hidden border-t border-secondary-100 bg-white">
             <div className="px-4 py-2 space-y-1">
               {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
                 <NavLink
@@ -130,7 +130,7 @@ export default function ClientLayout() {
                     `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-primary-50 text-primary-600'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        : 'text-secondary-600 hover:bg-secondary-50'
                     }`
                   }
                 >
@@ -138,14 +138,14 @@ export default function ClientLayout() {
                   {label}
                 </NavLink>
               ))}
-              <div className="pt-2 mt-2 border-t border-gray-100">
-                <div className="px-3 py-1 text-xs text-gray-400">{user?.email}</div>
+              <div className="pt-2 mt-2 border-t border-secondary-100">
+                <div className="px-3 py-1 text-xs text-secondary-400">{user?.email}</div>
                 <NavLink
                   to="/client/mot-de-passe"
                   onClick={() => setMobileMenuOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      isActive ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-gray-50'
+                      isActive ? 'bg-primary-50 text-primary-600' : 'text-secondary-600 hover:bg-secondary-50'
                     }`
                   }
                 >
@@ -154,7 +154,7 @@ export default function ClientLayout() {
                 </NavLink>
                 <button
                   onClick={handleSignOut}
-                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-secondary-600 hover:bg-secondary-50"
                 >
                   <LogOut className="w-4 h-4" />
                   Déconnexion

@@ -19,11 +19,11 @@ export const CHANNEL_CONFIG = {
   email:   { label: 'Email',      icon: Mail,          color: 'bg-blue-100 text-blue-700' },
   sms:     { label: 'SMS',        icon: MessageSquare, color: 'bg-cyan-100 text-cyan-700' },
   meeting: { label: 'Rendez-vous', icon: Users,        color: 'bg-violet-100 text-violet-700' },
-  note:    { label: 'Note',       icon: StickyNote,    color: 'bg-gray-100 text-gray-700' },
+  note:    { label: 'Note',       icon: StickyNote,    color: 'bg-secondary-100 text-secondary-700' },
 };
 
 export function getChannelConfig(channel) {
-  return CHANNEL_CONFIG[channel] || { label: channel, icon: HelpCircle, color: 'bg-gray-100 text-gray-600' };
+  return CHANNEL_CONFIG[channel] || { label: channel, icon: HelpCircle, color: 'bg-secondary-100 text-secondary-600' };
 }
 
 /**
@@ -40,9 +40,9 @@ export function computeFreshness(lastInteractionAt, longTermStartedAt) {
       days: null,
       label: '—',
       hasInteraction: false,
-      classes: 'text-gray-400 bg-gray-50 border-gray-200',
+      classes: 'text-secondary-400 bg-secondary-50 border-secondary-200',
       rowClasses: '',
-      dot: 'bg-gray-300',
+      dot: 'bg-secondary-300',
     };
   }
   const days = Math.floor((Date.now() - new Date(ref).getTime()) / (1000 * 60 * 60 * 24));

@@ -71,11 +71,11 @@ export function StepBilan({
               type="button"
               onClick={() => onChange('bilan_conformite', option.value)}
               className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-colors text-left ${
-                isActive ? option.bgClass : 'border-gray-200 bg-white hover:bg-gray-50'
+                isActive ? option.bgClass : 'border-secondary-200 bg-white hover:bg-secondary-50'
               }`}
             >
-              <option.Icon className={`w-6 h-6 shrink-0 ${isActive ? option.iconClass : 'text-gray-400'}`} />
-              <span className={`text-sm font-semibold ${isActive ? option.textClass : 'text-gray-600'}`}>
+              <option.Icon className={`w-6 h-6 shrink-0 ${isActive ? option.iconClass : 'text-secondary-400'}`} />
+              <span className={`text-sm font-semibold ${isActive ? option.textClass : 'text-secondary-600'}`}>
                 {option.label}
               </span>
             </button>
@@ -109,7 +109,7 @@ export function StepBilan({
             <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-3">
               <div className="flex items-start gap-2">
                 <Camera className="w-4 h-4 mt-0.5 text-orange-600 shrink-0" />
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-secondary-600">
                   {photoRequise
                     ? 'Un devis va suivre : la photo de la plaque est jointe à la demande SAV pour identifier l’appareil.'
                     : 'Facultative ici ; utile si un devis est établi plus tard.'}
@@ -126,10 +126,10 @@ export function StepBilan({
 
               {photoRequise && !aPhoto && (
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm text-gray-700 min-h-[44px] cursor-pointer">
+                  <label className="flex items-center gap-2 text-sm text-secondary-700 min-h-[44px] cursor-pointer">
                     <input
                       type="checkbox"
-                      className="w-5 h-5 rounded border-gray-300"
+                      className="w-5 h-5 rounded border-secondary-300"
                       checked={shunt}
                       onChange={(e) => onChange('photo_plaque_absence', e.target.checked ? '' : null)}
                     />

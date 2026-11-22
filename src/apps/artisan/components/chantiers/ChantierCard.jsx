@@ -120,19 +120,19 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
       <div className="flex-1 min-w-0 p-2.5 flex flex-col">
         {/* Ligne 1 : nom + montant */}
         <div className="flex items-start justify-between gap-2">
-          <p className="font-medium text-sm leading-5 text-gray-900 truncate">{name}</p>
-          <span className={`text-xs leading-5 font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
+          <p className="font-medium text-sm leading-5 text-secondary-900 truncate">{name}</p>
+          <span className={`text-xs leading-5 font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-secondary-400'}`}>
             {formatEuroCeil(amount)}
           </span>
         </div>
 
         {/* Ligne 2 : objet du chantier */}
-        <p className="h-4 mt-0.5 text-xs leading-4 text-gray-500 truncate" title={objet || undefined}>{objet}</p>
+        <p className="h-4 mt-0.5 text-xs leading-4 text-secondary-500 truncate" title={objet || undefined}>{objet}</p>
 
         {/* Lignes 3-4 : adresse complète */}
         <div className="mt-1.5 flex items-start gap-1 min-w-0" title={[voie, commune].filter(Boolean).join(', ') || undefined}>
-          <MapPin className={`h-3 w-3 mt-0.5 shrink-0 ${voie || commune ? 'text-gray-400' : 'text-gray-200'}`} />
-          <div className="min-w-0 flex-1 text-xs leading-4 text-gray-600">
+          <MapPin className={`h-3 w-3 mt-0.5 shrink-0 ${voie || commune ? 'text-secondary-400' : 'text-secondary-200'}`} />
+          <div className="min-w-0 flex-1 text-xs leading-4 text-secondary-600">
             <p className="h-4 truncate">{voie || (commune ? '' : 'Adresse non renseignée')}</p>
             <p className="h-4 truncate">{commune}</p>
           </div>
@@ -186,8 +186,8 @@ const REPERE_STYLES = {
   fait: { css: 'bg-emerald-500 text-white border-emerald-500', Icone: Check },
   en_cours: { css: 'bg-blue-50 text-blue-700 border-blue-200', Icone: Clock },
   attention: { css: 'bg-amber-100 text-amber-800 border-amber-300', Icone: AlertTriangle },
-  a_faire: { css: 'bg-white text-gray-400 border-gray-200', Icone: null },
-  inconnu: { css: 'bg-gray-50 text-gray-300 border-dashed border-gray-200', Icone: null },
+  a_faire: { css: 'bg-white text-secondary-400 border-secondary-200', Icone: null },
+  inconnu: { css: 'bg-secondary-50 text-secondary-300 border-dashed border-secondary-200', Icone: null },
 };
 
 function Repere({ repere }) {
@@ -203,11 +203,11 @@ function Repere({ repere }) {
 const ORDER_STYLES = {
   recu: { css: 'bg-emerald-500 text-white', etat: 'reçu' },
   commande: { css: 'bg-st-info text-white', etat: 'commandé' },
-  na: { css: 'bg-gray-200 text-gray-400', etat: 'rien à recevoir' },
+  na: { css: 'bg-secondary-200 text-secondary-400', etat: 'rien à recevoir' },
 };
 
 function OrderIndicator({ label, nom, status }) {
-  const style = ORDER_STYLES[status] || { css: 'bg-gray-50 text-gray-300 border border-gray-200', etat: 'non renseigné' };
+  const style = ORDER_STYLES[status] || { css: 'bg-secondary-50 text-secondary-300 border border-secondary-200', etat: 'non renseigné' };
   return (
     <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${style.css}`} title={`${nom} : ${style.etat}`}>
       {label}

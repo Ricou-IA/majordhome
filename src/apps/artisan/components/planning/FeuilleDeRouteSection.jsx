@@ -46,7 +46,7 @@ function Simulation({ cote, simule, onSimuler }) {
         <button
           type="button"
           onClick={() => onSimuler(cote, null)}
-          className="text-gray-400 hover:text-gray-700"
+          className="text-secondary-400 hover:text-secondary-700"
           aria-label={`Annuler la simulation (${LIBELLE_COTE[cote]})`}
         >
           <X className="h-3.5 w-3.5" />
@@ -59,7 +59,7 @@ function Simulation({ cote, simule, onSimuler }) {
       <button
         type="button"
         onClick={() => setOuvert(true)}
-        className="inline-flex items-center gap-0.5 font-normal text-gray-400 hover:text-primary-700"
+        className="inline-flex items-center gap-0.5 font-normal text-secondary-400 hover:text-primary-700"
       >
         <Crosshair className="h-3.5 w-3.5" /> Simuler
       </button>
@@ -75,7 +75,7 @@ function Simulation({ cote, simule, onSimuler }) {
           autoFocus
         />
       </span>
-      <button type="button" onClick={() => setOuvert(false)} className="text-gray-400 hover:text-gray-700" aria-label="Fermer">
+      <button type="button" onClick={() => setOuvert(false)} className="text-secondary-400 hover:text-secondary-700" aria-label="Fermer">
         <X className="h-4 w-4" />
       </button>
     </span>
@@ -91,10 +91,10 @@ function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange,
   const perso = resoudreExtremites({ siege: null, membre })[cote];
   const libelle = point?.label || 'Agence';
   const simulation = sansReglage ? null : <Simulation cote={cote} simule={simule} onSimuler={onSimuler} />;
-  const heureEl = heure ? <span className="tabular-nums font-semibold text-gray-800">{heure}</span> : null;
+  const heureEl = heure ? <span className="tabular-nums font-semibold text-secondary-800">{heure}</span> : null;
   if (sansReglage || simule || !peutChoisir || !perso) {
     return (
-      <li className="flex items-center gap-1.5 text-xs font-medium text-gray-600 flex-wrap">
+      <li className="flex items-center gap-1.5 text-xs font-medium text-secondary-600 flex-wrap">
         <Home className="h-3.5 w-3.5" /> {heureEl} {LIBELLE_COTE[cote]} · {!simule && <>{libelle} </>}{simulation}
       </li>
     );
@@ -116,16 +116,16 @@ function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange,
       disabled={disabled}
       aria-pressed={actif === choix}
       className={`px-2 py-0.5 rounded-md border text-xs disabled:opacity-50 ${actif === choix
-        ? 'bg-white border-gray-300 text-gray-900 font-medium shadow-sm'
-        : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+        ? 'bg-white border-secondary-300 text-secondary-900 font-medium shadow-sm'
+        : 'border-transparent text-secondary-500 hover:text-secondary-800'}`}
     >
       {texte}
     </button>
   );
   return (
-    <li className="flex items-center gap-1.5 text-xs font-medium text-gray-600 flex-wrap">
+    <li className="flex items-center gap-1.5 text-xs font-medium text-secondary-600 flex-wrap">
       <Home className="h-3.5 w-3.5" /> {heureEl} {LIBELLE_COTE[cote]}
-      <span className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5">
+      <span className="inline-flex items-center gap-0.5 rounded-lg bg-secondary-100 p-0.5">
         {bouton('perso', perso.label)}
         {bouton('agence', 'Agence')}
       </span>
@@ -138,7 +138,7 @@ function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange,
 function Troncon({ troncon, label, estime, compact = false }) {
   if (!troncon) return null;
   return (
-    <div className={`flex items-center gap-1.5 pl-3 text-gray-500 ${compact ? 'py-0.5 text-[11px] leading-tight' : 'py-1 text-xs'}`}>
+    <div className={`flex items-center gap-1.5 pl-3 text-secondary-500 ${compact ? 'py-0.5 text-[11px] leading-tight' : 'py-1 text-xs'}`}>
       <Car className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
       {label} {formatDureeRoute(troncon.minutes)} · {formatKm(troncon.km)}
       {estime && <span className="text-amber-700">(estimé)</span>}
@@ -250,7 +250,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
   }
   if (isLoading || !feuille) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-500 py-3">
+      <div className="flex items-center gap-2 text-sm text-secondary-500 py-3">
         <Loader2 className="h-4 w-4 animate-spin" /> Calcul de l&apos;itinéraire…
       </div>
     );
@@ -262,20 +262,20 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
       src={carteSrc}
       alt={`Itinéraire de ${feuille.personName}`}
       onError={carteEnErreur}
-      className={`w-full rounded-lg border border-gray-200 ${carteACote ? 'md:order-2 md:sticky md:top-0' : ''}`}
+      className={`w-full rounded-lg border border-secondary-200 ${carteACote ? 'md:order-2 md:sticky md:top-0' : ''}`}
     />
   ) : null;
   // Carte seule (fenêtre « Nouveau RDV » : la liste est dans sa propre colonne)
   if (partie === 'carte') {
-    return imageCarte || <p className="text-xs text-gray-500">Carte indisponible pour cette journée.</p>;
+    return imageCarte || <p className="text-xs text-secondary-500">Carte indisponible pour cette journée.</p>;
   }
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <p className="text-xs font-medium text-gray-600">
+        <p className="text-xs font-medium text-secondary-600">
           Feuille de route · {n === 0 ? 'aucune intervention' : `${n} intervention${n > 1 ? 's' : ''}`}
           {feuille.totaux && (
-            <span className="text-gray-400 font-normal">
+            <span className="text-secondary-400 font-normal">
               {' '}· route {formatDureeRoute(feuille.totaux.minutes)} · {formatKm(feuille.totaux.km)}
             </span>
           )}
@@ -296,7 +296,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
               type="button"
               onClick={imprimer}
               disabled={isPrinting}
-              className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50"
+              className="inline-flex items-center gap-1 text-xs font-medium text-secondary-600 hover:text-secondary-900 disabled:opacity-50"
             >
               {isPrinting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
               Imprimer
@@ -377,27 +377,27 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
                     <MapPin className="h-3.5 w-3.5" /> Adresse non localisée — hors itinéraire
                   </div>
                 )}
-              <div className={`flex gap-2 rounded-lg border ${compact ? 'px-1.5 py-1 items-center' : 'p-2'} ${it.nouveau ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200' : 'border-gray-200 bg-gray-50'}`}>
+              <div className={`flex gap-2 rounded-lg border ${compact ? 'px-1.5 py-1 items-center' : 'p-2'} ${it.nouveau ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200' : 'border-secondary-200 bg-secondary-50'}`}>
                 <span
-                  className={`flex ${compact ? 'h-5 w-5 text-[11px]' : 'h-6 w-6 text-xs'} flex-shrink-0 items-center justify-center rounded-full font-semibold text-white ${it.localise ? 'bg-primary-600' : 'bg-gray-400'}`}
+                  className={`flex ${compact ? 'h-5 w-5 text-[11px]' : 'h-6 w-6 text-xs'} flex-shrink-0 items-center justify-center rounded-full font-semibold text-white ${it.localise ? 'bg-primary-600' : 'bg-secondary-400'}`}
                 >
                   {it.rang}
                 </span>
                 <div className="min-w-0 flex-1">
                   {/* Compact : une ligne (heure + client), le type en infobulle */}
-                  <p className={`font-medium text-gray-900 ${compact ? 'text-xs truncate' : ''}`} title={compact ? `${it.time} · ${it.typeLabel}${it.clientName ? ` · ${it.clientName}` : ''}` : undefined}>
+                  <p className={`font-medium text-secondary-900 ${compact ? 'text-xs truncate' : ''}`} title={compact ? `${it.time} · ${it.typeLabel}${it.clientName ? ` · ${it.clientName}` : ''}` : undefined}>
                     <span className="tabular-nums">{it.time}</span>
                     {it.nouveau ? <span className="text-primary-800"> · Ce RDV</span> : !compact && <> · {it.typeLabel}</>}
                     {it.clientName && <span> · {it.clientName}</span>}
                   </p>
-                  {!compact && it.address && <p className="text-xs text-gray-600">{it.address}</p>}
+                  {!compact && it.address && <p className="text-xs text-secondary-600">{it.address}</p>}
                   {!compact && (
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-secondary-500">
                       {[it.phone, it.sector && `Secteur ${it.sector}`].filter(Boolean).join(' · ')}
                     </p>
                   )}
                   {!compact && it.equipments.length > 0 && (
-                    <p className="text-xs text-gray-500">Équipements : {it.equipments.join(' · ')}</p>
+                    <p className="text-xs text-secondary-500">Équipements : {it.equipments.join(' · ')}</p>
                   )}
                   {it.retard && (
                     <p className={`flex items-center gap-1 ${it.retard.statut === 'souple' ? 'text-amber-700' : 'text-red-700'} ${compact ? 'text-[11px] leading-tight' : 'text-xs'}`}>

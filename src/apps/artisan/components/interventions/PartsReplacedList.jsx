@@ -63,7 +63,7 @@ export function PartsReplacedList({
       </div>
 
       {parts.length === 0 ? (
-        <p className="text-sm text-gray-500 italic py-2">
+        <p className="text-sm text-secondary-500 italic py-2">
           Aucune pièce remplacée
         </p>
       ) : (
@@ -74,7 +74,7 @@ export function PartsReplacedList({
               className="bg-white rounded-lg border p-3 space-y-2"
             >
               <div className="flex items-start justify-between gap-2">
-                <span className="text-xs font-medium text-gray-500 mt-2">
+                <span className="text-xs font-medium text-secondary-500 mt-2">
                   Pièce {index + 1}
                 </span>
                 {!disabled && (

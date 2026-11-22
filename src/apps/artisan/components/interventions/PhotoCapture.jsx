@@ -84,7 +84,7 @@ export function PhotoCapture({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      <label className="block text-sm font-medium text-secondary-700">{label}</label>
 
       {/* Zone d'affichage / capture */}
       {displayUrl ? (
@@ -93,7 +93,7 @@ export function PhotoCapture({
           <button
             type="button"
             onClick={() => setShowPreview(true)}
-            className="w-full aspect-[4/3] rounded-lg border overflow-hidden bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full aspect-[4/3] rounded-lg border overflow-hidden bg-secondary-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <img
               src={displayUrl}
@@ -141,8 +141,8 @@ export function PhotoCapture({
           type="button"
           onClick={handleCapture}
           disabled={disabled || isUploading}
-          className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-gray-300 bg-gray-50
-                     flex flex-col items-center justify-center gap-2 text-gray-500
+          className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-secondary-300 bg-secondary-50
+                     flex flex-col items-center justify-center gap-2 text-secondary-500
                      hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600
                      active:bg-blue-100
                      disabled:opacity-50 disabled:cursor-not-allowed

@@ -26,8 +26,8 @@ import { logger } from '@lib/logger';
 export const CONTRACT_STATUSES = [
   { value: 'active', label: 'Actif', color: 'bg-green-100 text-green-700 border-green-200' },
   { value: 'pending', label: 'En attente', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { value: 'cancelled', label: 'Clos', color: 'bg-gray-100 text-gray-600 border-gray-200' },
-  { value: 'archived', label: 'Archivé', color: 'bg-slate-100 text-slate-500 border-slate-200' },
+  { value: 'cancelled', label: 'Clos', color: 'bg-secondary-100 text-secondary-600 border-secondary-200' },
+  { value: 'archived', label: 'Archivé', color: 'bg-secondary-100 text-secondary-500 border-secondary-200' },
 ];
 
 /**

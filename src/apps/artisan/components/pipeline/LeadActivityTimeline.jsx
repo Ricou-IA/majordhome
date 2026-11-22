@@ -80,7 +80,7 @@ export function LeadActivityTimeline({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-secondary-400" />
       </div>
     );
   }
@@ -140,20 +140,20 @@ export function LeadActivityTimeline({
 
       {/* Liste des activités */}
       {entries.length === 0 ? (
-        <p className="text-sm text-gray-400 italic py-4 text-center">
+        <p className="text-sm text-secondary-400 italic py-4 text-center">
           Aucune activité enregistrée
         </p>
       ) : (
         <div className="relative">
           {/* Ligne verticale */}
-          <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200" />
+          <div className="absolute left-4 top-0 bottom-0 w-px bg-secondary-200" />
 
           <div className="space-y-4">
             {entries.map((activity) => {
               if (activity.kind === 'audit') {
                 return (
                   <div key={activity.id} className="relative flex gap-3 pl-1">
-                    <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                    <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary-100 text-secondary-600">
                       <History className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
@@ -177,7 +177,7 @@ export function LeadActivityTimeline({
 
                   {/* Contenu */}
                   <div className="flex-1 min-w-0 pt-0.5">
-                    <p className="text-sm text-gray-800">
+                    <p className="text-sm text-secondary-800">
                       {activity.description}
                     </p>
 
@@ -190,7 +190,7 @@ export function LeadActivityTimeline({
                         >
                           {activity.old_status.label}
                         </span>
-                        <ArrowRight className="h-3 w-3 text-gray-400" />
+                        <ArrowRight className="h-3 w-3 text-secondary-400" />
                         <span
                           className="text-xs px-1.5 py-0.5 rounded text-white"
                           style={{ backgroundColor: activity.new_status.color }}
@@ -200,7 +200,7 @@ export function LeadActivityTimeline({
                       </div>
                     )}
 
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-secondary-400 mt-1">
                       {new Date(activity.created_at).toLocaleDateString('fr-FR', {
                         day: 'numeric',
                         month: 'short',
@@ -209,7 +209,7 @@ export function LeadActivityTimeline({
                         minute: '2-digit',
                       })}
                       {activity.user_full_name && (
-                        <span className="ml-1.5 text-gray-300">— {activity.user_full_name}</span>
+                        <span className="ml-1.5 text-secondary-300">— {activity.user_full_name}</span>
                       )}
                     </p>
                   </div>

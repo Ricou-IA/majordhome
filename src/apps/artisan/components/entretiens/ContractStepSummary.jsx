@@ -37,14 +37,14 @@ export function Step3Contract({
   return (
     <div className="space-y-5">
       {/* Résumé client */}
-      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+      <div className="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg border border-secondary-200">
         <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
           <User className="w-5 h-5 text-blue-600" />
         </div>
         <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">{clientName || 'Nouveau client'}</p>
+          <p className="font-medium text-secondary-900 truncate">{clientName || 'Nouveau client'}</p>
           {clientLocation && (
-            <p className="text-sm text-gray-500 truncate">{clientLocation}</p>
+            <p className="text-sm text-secondary-500 truncate">{clientLocation}</p>
           )}
           {clientMode === 'create' && (
             <p className="text-xs text-blue-600 mt-0.5">Nouveau client — sera créé automatiquement</p>
@@ -84,9 +84,9 @@ export function Step3Contract({
 
       {/* Séparateur */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 border-t border-gray-200" />
-        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Détails du contrat</span>
-        <div className="flex-1 border-t border-gray-200" />
+        <div className="flex-1 border-t border-secondary-200" />
+        <span className="text-xs font-medium text-secondary-500 uppercase tracking-wider">Détails du contrat</span>
+        <div className="flex-1 border-t border-secondary-200" />
       </div>
 
       {/* Date de début + Mois de maintenance */}

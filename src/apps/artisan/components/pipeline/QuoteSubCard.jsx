@@ -24,24 +24,24 @@ import { ExternalLink } from 'lucide-react';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
 
 export function QuoteSubCard({ quote, refused = false }) {
-  const baseClass = 'flex items-center justify-between gap-2 px-2 py-1 bg-white border border-gray-100 rounded text-xs transition-colors';
+  const baseClass = 'flex items-center justify-between gap-2 px-2 py-1 bg-white border border-secondary-100 rounded text-xs transition-colors';
   const content = (
     <>
       <div className="flex items-center gap-2 min-w-0">
         {quote.quote_date && (
-          <span className="text-gray-500 shrink-0">{formatDateShortFR(quote.quote_date)}</span>
+          <span className="text-secondary-500 shrink-0">{formatDateShortFR(quote.quote_date)}</span>
         )}
         {refused && (
-          <span className="text-[11px] px-1.5 py-0.5 rounded font-medium bg-gray-200 text-gray-600 shrink-0">
+          <span className="text-[11px] px-1.5 py-0.5 rounded font-medium bg-secondary-200 text-secondary-600 shrink-0">
             Refusé
           </span>
         )}
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <span className={`font-semibold ${refused ? 'text-gray-400' : 'text-gray-900'}`}>
+        <span className={`font-semibold ${refused ? 'text-secondary-400' : 'text-secondary-900'}`}>
           {quote.quote_amount_ht != null ? formatEuro(Math.round(Number(quote.quote_amount_ht))) : '—'}
         </span>
-        <ExternalLink className="w-3 h-3 text-gray-400" />
+        <ExternalLink className="w-3 h-3 text-secondary-400" />
       </div>
     </>
   );
@@ -64,7 +64,7 @@ export function QuoteSubCard({ quote, refused = false }) {
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      className={`${baseClass} hover:bg-gray-50`}
+      className={`${baseClass} hover:bg-secondary-50`}
     >
       {content}
     </a>

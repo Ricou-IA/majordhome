@@ -343,13 +343,13 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
         <div className="relative w-full max-w-3xl max-h-[90vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
 
           {/* Header sticky */}
-          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
+          <div className="sticky top-0 z-10 bg-white border-b border-secondary-200 px-6 py-4 flex items-center gap-3">
             <FileText className="h-5 w-5 text-blue-600 shrink-0" />
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-semibold text-gray-900 truncate">
+              <h2 className="text-lg font-semibold text-secondary-900 truncate">
                 Fiche technique terrain
               </h2>
-              <p className="text-sm text-gray-500 truncate">{clientName}</p>
+              <p className="text-sm text-secondary-500 truncate">{clientName}</p>
             </div>
 
             {/* Badge statut */}
@@ -365,7 +365,7 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
                 size="sm"
                 onClick={handleGeneratePdf}
                 disabled={isGeneratingPdf}
-                className="h-8 gap-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 shrink-0"
+                className="h-8 gap-1.5 text-secondary-600 hover:text-blue-600 hover:bg-blue-50 shrink-0"
               >
                 {isGeneratingPdf ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -401,7 +401,7 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+              className="h-8 w-8 p-0 text-secondary-400 hover:text-secondary-600"
             >
               <X className="h-5 w-5" />
             </Button>

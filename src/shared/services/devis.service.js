@@ -17,7 +17,7 @@ import { logger } from '@lib/logger';
 // ============================================================================
 
 export const QUOTE_STATUSES = [
-  { value: 'brouillon', label: 'Brouillon', color: 'bg-gray-100 text-gray-700 border-gray-200', icon: 'FileEdit' },
+  { value: 'brouillon', label: 'Brouillon', color: 'bg-secondary-100 text-secondary-700 border-secondary-200', icon: 'FileEdit' },
   { value: 'envoye', label: 'Envoyé', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: 'Send' },
   { value: 'accepte', label: 'Accepté', color: 'bg-green-100 text-green-700 border-green-200', icon: 'CheckCircle' },
   { value: 'refuse', label: 'Refusé', color: 'bg-red-100 text-red-700 border-red-200', icon: 'XCircle' },

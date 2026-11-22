@@ -31,13 +31,13 @@ export default function ClientInterventions() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Mes interventions</h1>
+      <h1 className="text-2xl font-bold text-secondary-900">Mes interventions</h1>
 
       {parentInterventions.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <ClipboardList className="w-12 h-12 text-gray-300 mx-auto" />
-          <h2 className="mt-4 text-lg font-semibold text-gray-900">Aucune intervention</h2>
-          <p className="mt-2 text-sm text-gray-500">
+        <div className="bg-white rounded-xl border border-secondary-200 p-12 text-center">
+          <ClipboardList className="w-12 h-12 text-secondary-300 mx-auto" />
+          <h2 className="mt-4 text-lg font-semibold text-secondary-900">Aucune intervention</h2>
+          <p className="mt-2 text-sm text-secondary-500">
             Vos interventions apparaîtront ici après chaque passage de votre technicien.
           </p>
         </div>
@@ -52,7 +52,7 @@ export default function ClientInterventions() {
               <Link
                 key={intervention.id}
                 to={`/client/interventions/${intervention.id}`}
-                className="block bg-white rounded-xl border border-gray-200 p-5 hover:border-primary-300 hover:shadow-sm transition-all"
+                className="block bg-white rounded-xl border border-secondary-200 p-5 hover:border-primary-300 hover:shadow-sm transition-all"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -60,8 +60,8 @@ export default function ClientInterventions() {
                       <ClipboardList className="w-5 h-5 text-amber-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">{typeLabel}</h3>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+                      <h3 className="font-semibold text-secondary-900">{typeLabel}</h3>
+                      <div className="flex items-center gap-3 mt-1 text-sm text-secondary-500">
                         {intervention.scheduled_date && (
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3.5 h-3.5" />
@@ -83,7 +83,7 @@ export default function ClientInterventions() {
                       <StatusIcon className="w-3 h-3" />
                       {statusCfg.label}
                     </span>
-                    <ChevronRight className="w-5 h-5 text-gray-300" />
+                    <ChevronRight className="w-5 h-5 text-secondary-300" />
                   </div>
                 </div>
               </Link>

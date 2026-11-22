@@ -51,14 +51,14 @@ export function DuplicateLeadDialog({
         </div>
 
         {/* Candidats */}
-        <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
+        <div className="max-h-72 overflow-y-auto divide-y divide-secondary-100">
           {candidates.map((c) => (
             <div key={c.id} className="px-5 py-3 flex items-center gap-3">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-secondary-900 truncate">
                   {c.display_name || `${c.last_name || ''} ${c.first_name || ''}`.trim() || 'Sans nom'}
                 </p>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-xs text-secondary-500 truncate">
                   {[
                     c.status_label,
                     c.city,
@@ -84,11 +84,11 @@ export function DuplicateLeadDialog({
         </div>
 
         {/* Footer : créer quand même reste possible (homonymes légitimes) */}
-        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-secondary-200 bg-secondary-50">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-200 rounded-lg transition-colors"
           >
             Retour
           </button>

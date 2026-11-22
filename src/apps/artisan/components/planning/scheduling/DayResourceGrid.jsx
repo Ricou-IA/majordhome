@@ -372,20 +372,20 @@ export function DayResourceGrid({
   }, [onDateChange]);
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+    <div className="border border-secondary-200 rounded-lg overflow-hidden bg-white">
       {/* Bande semaine + navigation jour */}
-      <div className="flex items-center justify-between px-2 py-2 bg-gray-50 border-b gap-1">
+      <div className="flex items-center justify-between px-2 py-2 bg-secondary-50 border-b gap-1">
         {/* Mois affiché en évidence (repère de période) */}
-        <span className="text-sm font-bold text-gray-900 shrink-0 pl-1 whitespace-nowrap">
+        <span className="text-sm font-bold text-secondary-900 shrink-0 pl-1 whitespace-nowrap">
           {formatMonthLabel(date)}
         </span>
         <button
           type="button"
           onClick={() => shiftDay(-1)}
-          className="p-1 rounded hover:bg-gray-200 transition-colors shrink-0"
+          className="p-1 rounded hover:bg-secondary-200 transition-colors shrink-0"
           title="Jour précédent"
         >
-          <ChevronLeft className="w-4 h-4 text-gray-600" />
+          <ChevronLeft className="w-4 h-4 text-secondary-600" />
         </button>
 
         <div className="flex items-center gap-1 flex-1 justify-center">
@@ -399,7 +399,7 @@ export function DayResourceGrid({
                   ? 'bg-primary-600 text-white'
                   : d.isToday
                   ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                  : 'text-gray-600 hover:bg-gray-200'
+                  : 'text-secondary-600 hover:bg-secondary-200'
               }`}
             >
               <span className="text-[10px] leading-none">{d.label}</span>
@@ -418,10 +418,10 @@ export function DayResourceGrid({
           </button>
           {/* Sélecteur de date — saut direct vers une période lointaine */}
           <label
-            className="relative p-1 rounded hover:bg-gray-200 transition-colors cursor-pointer shrink-0"
+            className="relative p-1 rounded hover:bg-secondary-200 transition-colors cursor-pointer shrink-0"
             title="Aller à une date"
           >
-            <CalendarDays className="w-4 h-4 text-gray-600" />
+            <CalendarDays className="w-4 h-4 text-secondary-600" />
             <input
               type="date"
               value={date || ''}
@@ -433,26 +433,26 @@ export function DayResourceGrid({
           <button
             type="button"
             onClick={() => shiftDay(1)}
-            className="p-1 rounded hover:bg-gray-200 transition-colors"
+            className="p-1 rounded hover:bg-secondary-200 transition-colors"
             title="Jour suivant"
           >
-            <ChevronRight className="w-4 h-4 text-gray-600" />
+            <ChevronRight className="w-4 h-4 text-secondary-600" />
           </button>
         </div>
       </div>
 
       {/* Libellé du jour sélectionné */}
-      <div className="px-3 py-1.5 bg-white border-b text-xs font-medium text-gray-700 capitalize">
+      <div className="px-3 py-1.5 bg-white border-b text-xs font-medium text-secondary-700 capitalize">
         {date ? formatDayLabel(date) : '—'}
       </div>
 
       {members.length === 0 ? (
-        <div className="px-3 py-8 text-center text-sm text-gray-400">Aucun membre assignable</div>
+        <div className="px-3 py-8 text-center text-sm text-secondary-400">Aucun membre assignable</div>
       ) : (
         <div className="overflow-x-auto">
           <div className={`grid ${dragState ? 'select-none' : ''}`} style={{ gridTemplateColumns }}>
             {/* Header colonnes membres */}
-            <div className="border-b border-r bg-gray-50" />
+            <div className="border-b border-r bg-secondary-50" />
             {members.map((m) => {
               const posee = fullDayClick && (draftsByMember.get(m.id) || []).length > 0;
               const entete = (
@@ -462,7 +462,7 @@ export function DayResourceGrid({
                     style={{ backgroundColor: m.calendar_color || '#6B7280' }}
                   />
                   {/* Prénom seul (colonnes étroites) — même convention que les chips du planning ; nom complet en `title` */}
-                  <span className="text-xs font-medium text-gray-700 truncate">
+                  <span className="text-xs font-medium text-secondary-700 truncate">
                     {(m.display_name || '').trim().split(' ')[0] || m.display_name}
                   </span>
                   {posee && <Check className="w-3 h-3 text-blue-600 shrink-0" />}
@@ -474,7 +474,7 @@ export function DayResourceGrid({
                   key={m.id}
                   type="button"
                   onClick={() => toggleDay(m.id)}
-                  className={`border-b border-r px-1 py-1.5 text-center transition-colors hover:bg-blue-50 ${posee ? 'bg-blue-50' : 'bg-gray-50'}`}
+                  className={`border-b border-r px-1 py-1.5 text-center transition-colors hover:bg-blue-50 ${posee ? 'bg-blue-50' : 'bg-secondary-50'}`}
                   title={`${posee ? 'Retirer' : 'Poser'} la journée de ${m.display_name}`}
                 >
                   <div className="flex items-center justify-center gap-1">{entete}</div>
@@ -485,13 +485,13 @@ export function DayResourceGrid({
                   type="button"
                   onClick={() => onMemberClick(m.id)}
                   aria-pressed={[].concat(selectedMemberId).includes(m.id)}
-                  className={`border-b border-r px-1 py-1.5 text-center transition-colors hover:bg-blue-50 ${[].concat(selectedMemberId).includes(m.id) ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : 'bg-gray-50'}`}
+                  className={`border-b border-r px-1 py-1.5 text-center transition-colors hover:bg-blue-50 ${[].concat(selectedMemberId).includes(m.id) ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : 'bg-secondary-50'}`}
                   title={`Comparer la tournée de ${m.display_name} (re-cliquer pour retirer)`}
                 >
                   <div className="flex items-center justify-center gap-1">{entete}</div>
                 </button>
               ) : (
-                <div key={m.id} className="border-b border-r bg-gray-50 px-1 py-1.5 text-center" title={m.display_name}>
+                <div key={m.id} className="border-b border-r bg-secondary-50 px-1 py-1.5 text-center" title={m.display_name}>
                   <div className="flex items-center justify-center gap-1">{entete}</div>
                 </div>
               );
@@ -507,7 +507,7 @@ export function DayResourceGrid({
                 >
                   {/* Libellé SOUS le trait, dans sa ligne (comme le Planning) : remonté à cheval
                       sur le trait, il était barré et un RDV de 8 h semblait entre deux lignes. */}
-                  <span className="text-[10px] leading-none pt-0.5 text-gray-400 select-none">{slot.label}</span>
+                  <span className="text-[10px] leading-none pt-0.5 text-secondary-400 select-none">{slot.label}</span>
                 </div>
 
                 {/* Cellules par membre */}
@@ -530,7 +530,7 @@ export function DayResourceGrid({
                   let cellClass = 'group border-b border-r relative transition-colors';
                   if (occupied) cellClass += ' cursor-default';
                   else if (inDrag) cellClass += ' bg-blue-200 cursor-row-resize';
-                  else if (off) cellClass += ' bg-gray-100 hover:bg-blue-50/60 cursor-pointer';
+                  else if (off) cellClass += ' bg-secondary-100 hover:bg-blue-50/60 cursor-pointer';
                   else cellClass += ' hover:bg-blue-50 cursor-pointer';
 
                   return (
@@ -607,13 +607,13 @@ export function DayResourceGrid({
       )}
 
       {/* Légende */}
-      <div className="px-3 py-1.5 bg-gray-50 border-t flex items-center gap-3 text-[10px] text-gray-500 flex-wrap">
+      <div className="px-3 py-1.5 bg-secondary-50 border-t flex items-center gap-3 text-[10px] text-secondary-500 flex-wrap">
         <span className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 bg-blue-500 rounded-sm" />
           Créneau à planifier
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 bg-gray-300 rounded-sm opacity-70" />
+          <span className="w-2.5 h-2.5 bg-secondary-300 rounded-sm opacity-70" />
           Occupé
         </span>
         <span className="flex items-center gap-1">
@@ -621,9 +621,9 @@ export function DayResourceGrid({
           Conflit (planif. quand même)
         </span>
         {onMoveAppointment && (
-          <span className="text-gray-400 italic">Glisser un RDV existant pour le déplacer ·</span>
+          <span className="text-secondary-400 italic">Glisser un RDV existant pour le déplacer ·</span>
         )}
-        <span className="text-gray-400 italic">
+        <span className="text-secondary-400 italic">
           {fullDayClick
             ? 'Cliquer sur une personne = sa journée · glisser = une partie de journée'
             : 'Cliquer-glisser dans une colonne'}

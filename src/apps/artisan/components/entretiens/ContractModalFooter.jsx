@@ -9,8 +9,8 @@
 
 import { ArrowLeft, ArrowRight, FileText, Loader2, Send } from 'lucide-react';
 
-const SECONDARY = 'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors';
-const OUTLINE = 'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
+const SECONDARY = 'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-secondary-700 hover:text-secondary-900 transition-colors';
+const OUTLINE = 'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-secondary-300 text-secondary-700 bg-white hover:bg-secondary-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 const PRIMARY = 'inline-flex items-center gap-2 px-5 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 
 /**
@@ -32,7 +32,7 @@ export function ContractModalFooter({
   step, hasPreSelectedClient, canGoToStep1, canGoToStep2, total, isCreating, isProposal, isSending = false, onStep, onClose, onSubmit, onSubmitAndSend,
 }) {
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
+    <div className="flex items-center justify-between px-6 py-4 border-t border-secondary-200 bg-secondary-50">
       {step === 0 && (
         <>
           <button type="button" onClick={onClose} className={SECONDARY}>Annuler</button>
@@ -51,7 +51,7 @@ export function ContractModalFooter({
           </button>
           <div className="flex items-center gap-3">
             {total != null && (
-              <span className="text-sm font-semibold text-gray-900">{total.toFixed(2)} €</span>
+              <span className="text-sm font-semibold text-secondary-900">{total.toFixed(2)} €</span>
             )}
             <button type="button" onClick={() => onStep(2)} disabled={!canGoToStep2} className={PRIMARY}>
               Suivant

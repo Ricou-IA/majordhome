@@ -36,7 +36,7 @@ export function InviteClientButton({ client }) {
     return (
       <button
         disabled
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-400 bg-gray-100 px-2.5 py-1.5 rounded-lg cursor-not-allowed"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-secondary-400 bg-secondary-100 px-2.5 py-1.5 rounded-lg cursor-not-allowed"
         title="Le client doit avoir un email pour être invité"
       >
         <UserPlus className="w-3.5 h-3.5" />

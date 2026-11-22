@@ -35,7 +35,7 @@ const STATUS_BADGES = {
   pending: { label: 'À faire', className: 'bg-amber-100 text-amber-700' },
   done:    { label: 'Rempli',  className: 'bg-green-100 text-green-700' },
   conforme: { label: 'Conforme', className: 'bg-sky-100 text-sky-800' },
-  neant:   { label: 'Néant',   className: 'bg-gray-100 text-gray-500' },
+  neant:   { label: 'Néant',   className: 'bg-secondary-100 text-secondary-500' },
 };
 
 // ============================================================================
@@ -67,19 +67,19 @@ export function CertificatEquipmentRow({
 
   return (
     <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 p-3 rounded-lg border transition-colors ${
-      status === 'neant' ? 'bg-gray-50 border-gray-200 opacity-60' :
+      status === 'neant' ? 'bg-secondary-50 border-secondary-200 opacity-60' :
       status === 'done'  ? 'bg-green-50/50 border-green-200' :
       status === 'conforme' ? 'bg-sky-50/50 border-sky-200' :
-                           'bg-white border-gray-200'
+                           'bg-white border-secondary-200'
     }`}>
       {/* Info équipement */}
       <div className="flex-1 min-w-[8rem]">
-        <p className="text-sm font-medium text-gray-900 truncate">{categoryLabel}</p>
+        <p className="text-sm font-medium text-secondary-900 truncate">{categoryLabel}</p>
         {detail && (
-          <p className="text-xs text-gray-500 truncate">{detail}</p>
+          <p className="text-xs text-secondary-500 truncate">{detail}</p>
         )}
         {equipment?.serial_number && (
-          <p className="text-[11px] text-gray-400 truncate">S/N : {equipment.serial_number}</p>
+          <p className="text-[11px] text-secondary-400 truncate">S/N : {equipment.serial_number}</p>
         )}
       </div>
 
@@ -113,7 +113,7 @@ export function CertificatEquipmentRow({
             <button
               onClick={() => onMarkNeant?.(childIntervention.id)}
               disabled={isLoading}
-              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 hover:bg-secondary-100 transition-colors disabled:opacity-50"
               title="Équipement non entretenu"
             >
               {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
@@ -148,7 +148,7 @@ export function CertificatEquipmentRow({
           <button
             onClick={() => onAnnulerConforme?.(childIntervention)}
             disabled={isLoading}
-            className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 hover:bg-secondary-100 transition-colors disabled:opacity-50"
             title="Retirer le certificat conforme et remettre la ligne à faire"
           >
             <Undo2 className="w-3 h-3" />
@@ -160,7 +160,7 @@ export function CertificatEquipmentRow({
           <button
             onClick={() => onUnmarkNeant?.(childIntervention.id)}
             disabled={isLoading}
-            className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 hover:bg-secondary-100 transition-colors disabled:opacity-50"
             title="Annuler néant"
           >
             {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Undo2 className="w-3 h-3" />}

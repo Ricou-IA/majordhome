@@ -78,8 +78,8 @@ function NotesEditor({ leadId, initialNotes, onSaved }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <label className="block text-sm font-medium text-gray-700">Notes contextuelles</label>
-        <span className="text-xs text-gray-400">
+        <label className="block text-sm font-medium text-secondary-700">Notes contextuelles</label>
+        <span className="text-xs text-secondary-400">
           {saving && <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />sauvegarde…</span>}
           {savedFlash && !saving && <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" />sauvegardé</span>}
         </span>
@@ -90,7 +90,7 @@ function NotesEditor({ leadId, initialNotes, onSaved }) {
         onBlur={handleSave}
         placeholder="Ex: client doit boucler son financement, attente fin de chantier voisin, décision en famille…"
         rows={4}
-        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none"
+        className="w-full px-3 py-2 border border-secondary-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none"
       />
     </div>
   );
@@ -180,7 +180,7 @@ export function LongTermLeadDrawer({
       {/* Drawer panel */}
       <div className="absolute right-0 top-0 bottom-0 w-full max-w-xl bg-white shadow-xl overflow-y-auto flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
+        <div className="sticky top-0 bg-white border-b border-secondary-200 px-6 py-4 z-10">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -205,9 +205,9 @@ export function LongTermLeadDrawer({
                   </button>
                 )}
               </div>
-              <h2 className="text-xl font-bold text-gray-900 truncate">{name}</h2>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-500">
-                <span className={`font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
+              <h2 className="text-xl font-bold text-secondary-900 truncate">{name}</h2>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-secondary-500">
+                <span className={`font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-secondary-400'}`}>
                   {formatEuroCeil(amount)}
                 </span>
                 {lead.source_name && (
@@ -225,7 +225,7 @@ export function LongTermLeadDrawer({
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors shrink-0"
+              className="p-1.5 text-secondary-400 hover:text-secondary-600 rounded-lg hover:bg-secondary-100 transition-colors shrink-0"
               aria-label="Fermer"
             >
               <X className="h-5 w-5" />
@@ -234,7 +234,7 @@ export function LongTermLeadDrawer({
 
           {/* Contacts en ligne */}
           {(lead.phone || lead.email || lead.city) && (
-            <div className="flex flex-wrap gap-3 mt-3 text-xs text-gray-600">
+            <div className="flex flex-wrap gap-3 mt-3 text-xs text-secondary-600">
               {lead.phone && (
                 <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1 hover:text-blue-600">
                   <Phone className="h-3 w-3" />
@@ -274,7 +274,7 @@ export function LongTermLeadDrawer({
           {/* Timeline interactions */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-700">
+              <h3 className="text-sm font-semibold text-secondary-700">
                 Interactions ({interactions.length})
               </h3>
               <button
@@ -298,16 +298,16 @@ export function LongTermLeadDrawer({
 
         {/* Footer : Réactiver seulement. Gagné / Perdu = Pennylane (devis accepté /
             tous refusés), la carte quitte le suivi MT-LT toute seule (LongTermTab). */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-3">
+        <div className="sticky bottom-0 bg-white border-t border-secondary-200 px-6 py-3">
           <div className="flex flex-wrap gap-2 justify-between items-center">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-secondary-500">
               Gagné / Perdu se décident dans Pennylane (devis accepté ou refusé).
             </p>
             <button
               type="button"
               onClick={handleReactivate}
               disabled={isBusy}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-secondary-700 bg-secondary-100 hover:bg-secondary-200 rounded-lg transition-colors disabled:opacity-50"
               title="Remettre en Devis envoyé dans le pipeline"
             >
               {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}

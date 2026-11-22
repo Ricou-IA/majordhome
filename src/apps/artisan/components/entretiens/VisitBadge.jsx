@@ -18,7 +18,7 @@ const VISIT_CONFIG = {
   },
   skipped: {
     label: 'Non effectué',
-    className: 'bg-gray-100 text-gray-600',
+    className: 'bg-secondary-100 text-secondary-600',
     Icon: Minus,
   },
   cancelled: {
@@ -43,13 +43,13 @@ const VISIT_CONFIG = {
   },
   non_realise: {
     label: 'Non réalisé',
-    className: 'bg-gray-100 text-gray-600',
+    className: 'bg-secondary-100 text-secondary-600',
     Icon: Minus,
   },
   // Entretien de l'année refusé par le client : à ne pas faire, à ne pas relancer.
   refuse: {
     label: 'Refusé',
-    className: 'bg-gray-200 text-gray-700',
+    className: 'bg-secondary-200 text-secondary-700',
     Icon: Ban,
   },
 };

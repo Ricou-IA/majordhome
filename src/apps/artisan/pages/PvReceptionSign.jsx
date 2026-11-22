@@ -225,17 +225,17 @@ export default function PvReceptionSign() {
     <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6 pb-20">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link to="/chantiers" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        <Link to="/chantiers" className="p-2 hover:bg-secondary-100 rounded-lg transition-colors">
+          <ArrowLeft className="w-5 h-5 text-secondary-600" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">PV de Réception des Travaux</h1>
-          <p className="text-sm text-gray-500">{clientName}</p>
+          <h1 className="text-xl font-bold text-secondary-900">PV de Réception des Travaux</h1>
+          <p className="text-sm text-secondary-500">{clientName}</p>
         </div>
       </div>
 
       {/* Résumé chantier */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-secondary-200 rounded-xl shadow-sm overflow-hidden">
         <div className="bg-[#F97316] text-white px-6 py-4">
           <h2 className="text-lg font-bold">Procès-verbal de Réception</h2>
           <p className="text-sm text-orange-100">{company.name} — Réception des travaux</p>
@@ -244,18 +244,18 @@ export default function PvReceptionSign() {
         <div className="p-6 space-y-6">
           {/* Informations client */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Client</h3>
+            <h3 className="text-sm font-semibold text-secondary-900 mb-2">Client</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-              <div><span className="text-gray-500">Nom : </span><span className="font-medium">{clientName}</span></div>
-              <div><span className="text-gray-500">Téléphone : </span><span className="font-medium">{chantier.phone || '-'}</span></div>
-              <div><span className="text-gray-500">Adresse : </span><span className="font-medium">{chantier.address || '-'}</span></div>
-              <div><span className="text-gray-500">Ville : </span><span className="font-medium">{chantier.postal_code} {chantier.city}</span></div>
+              <div><span className="text-secondary-500">Nom : </span><span className="font-medium">{clientName}</span></div>
+              <div><span className="text-secondary-500">Téléphone : </span><span className="font-medium">{chantier.phone || '-'}</span></div>
+              <div><span className="text-secondary-500">Adresse : </span><span className="font-medium">{chantier.address || '-'}</span></div>
+              <div><span className="text-secondary-500">Ville : </span><span className="font-medium">{chantier.postal_code} {chantier.city}</span></div>
             </div>
           </div>
 
           {/* Objet des travaux */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Objet des travaux</h3>
+            <h3 className="text-sm font-semibold text-secondary-900 mb-2">Objet des travaux</h3>
             <div className="text-sm space-y-1">
               <p>Installation et mise en service : <span className="font-medium">{chantier.equipment_type_label || 'Équipement'}</span></p>
               {amount > 0 && <p>Montant HT : <span className="font-medium">{formatEuro(amount)}</span></p>}
@@ -264,9 +264,9 @@ export default function PvReceptionSign() {
 
           {/* Type de réception */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Déclaration de réception</h3>
+            <h3 className="text-sm font-semibold text-secondary-900 mb-3">Déclaration de réception</h3>
             <div className="space-y-3">
-              <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-gray-50"
+              <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-secondary-50"
                      style={receptionType === 'sans_reserves' ? { borderColor: '#16a34a', backgroundColor: '#f0fdf4' } : {}}>
                 <input
                   type="radio"
@@ -278,11 +278,11 @@ export default function PvReceptionSign() {
                 />
                 <div>
                   <p className="text-sm font-medium">Accepter la réception sans réserves</p>
-                  <p className="text-xs text-gray-500">Les travaux sont conformes et terminés</p>
+                  <p className="text-xs text-secondary-500">Les travaux sont conformes et terminés</p>
                 </div>
               </label>
 
-              <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-gray-50"
+              <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-secondary-50"
                      style={receptionType === 'avec_reserves' ? { borderColor: '#F59E0B', backgroundColor: '#FFFBEB' } : {}}>
                 <input
                   type="radio"
@@ -294,30 +294,30 @@ export default function PvReceptionSign() {
                 />
                 <div>
                   <p className="text-sm font-medium">Accepter la réception avec réserves</p>
-                  <p className="text-xs text-gray-500">Des points restent à corriger</p>
+                  <p className="text-xs text-secondary-500">Des points restent à corriger</p>
                 </div>
               </label>
 
               {receptionType === 'avec_reserves' && (
                 <div className="ml-7 space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nature des réserves</label>
+                    <label className="block text-sm font-medium text-secondary-700 mb-1">Nature des réserves</label>
                     <textarea
                       value={reservesNature}
                       onChange={(e) => setReservesNature(e.target.value)}
                       placeholder="Décrivez les réserves..."
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                      className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Travaux à exécuter</label>
+                    <label className="block text-sm font-medium text-secondary-700 mb-1">Travaux à exécuter</label>
                     <textarea
                       value={reservesTravaux}
                       onChange={(e) => setReservesTravaux(e.target.value)}
                       placeholder="Décrivez les travaux restants..."
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                      className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                     />
                   </div>
                 </div>
@@ -327,7 +327,7 @@ export default function PvReceptionSign() {
 
           {/* Confirmations */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Le client reconnaît avoir reçu</h3>
+            <h3 className="text-sm font-semibold text-secondary-900 mb-3">Le client reconnaît avoir reçu</h3>
             <div className="space-y-2">
               {[
                 { label: 'Les informations nécessaires pour le fonctionnement des matériels installés', value: infoRecues, set: setInfoRecues },
@@ -339,9 +339,9 @@ export default function PvReceptionSign() {
                     type="checkbox"
                     checked={item.value}
                     onChange={(e) => item.set(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    className="mt-0.5 h-4 w-4 rounded border-secondary-300 text-green-600 focus:ring-green-500"
                   />
-                  <span className="text-sm text-gray-700">{item.label}</span>
+                  <span className="text-sm text-secondary-700">{item.label}</span>
                 </label>
               ))}
             </div>
@@ -349,7 +349,7 @@ export default function PvReceptionSign() {
 
           {/* Signature technicien */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Signature du technicien</h3>
+            <h3 className="text-sm font-semibold text-secondary-900 mb-3">Signature du technicien</h3>
             <CertificatSignaturePad
               onSign={setSigTechBase64}
               onClear={() => setSigTechBase64(null)}
@@ -363,7 +363,7 @@ export default function PvReceptionSign() {
 
           {/* Signature client */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Signature du client</h3>
+            <h3 className="text-sm font-semibold text-secondary-900 mb-3">Signature du client</h3>
             <CertificatSignaturePad
               onSign={setSigClientBase64}
               onClear={() => setSigClientBase64(null)}
@@ -397,7 +397,7 @@ export default function PvReceptionSign() {
           )}
         </Button>
         {!canSubmit && (
-          <p className="text-center text-xs text-gray-500 mt-2">
+          <p className="text-center text-xs text-secondary-500 mt-2">
             Les deux signatures sont requises pour générer le PV
           </p>
         )}

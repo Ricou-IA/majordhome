@@ -32,24 +32,24 @@ export default function TextWithRefs({ text, byNumero, planningIndex, className 
         )))}
       </span>
       {opened && (
-        <ul className="mt-2 space-y-1.5 rounded-lg border border-[#BBD5F5] bg-white p-2 text-sm font-normal not-italic text-slate-800">
+        <ul className="mt-2 space-y-1.5 rounded-lg border border-[#BBD5F5] bg-white p-2 text-sm font-normal not-italic text-secondary-800">
           {opened.numeros.map((n) => {
             const t = byNumero.get(n);
             if (!t) return null;
             const p = planningIndex.get(t.planning_code);
             return (
               <li key={n} className="flex gap-2">
-                <span className="w-9 shrink-0 font-mono text-slate-500">{n}</span>
+                <span className="w-9 shrink-0 font-mono text-secondary-500">{n}</span>
                 <span className="min-w-0 flex-1">
-                  <span className={t.fait ? 'line-through decoration-slate-400' : ''}>{t.action}</span>
-                  <span className="block text-xs text-slate-500">
+                  <span className={t.fait ? 'line-through decoration-secondary-400' : ''}>{t.action}</span>
+                  <span className="block text-xs text-secondary-500">
                     {t.site}
                     {' · '}
                     {p?.date_prevue ? `${formatDateCourte(p.date_prevue)} · ${t.planning_code}` : `Code ${t.planning_code || '–'}`}
                     {t.duree_min ? ` · ${formatDuree(t.duree_min)}` : ''}
                   </span>
                 </span>
-                <span className={`shrink-0 text-xs font-semibold ${t.fait ? 'text-[#0D47A1]' : 'text-slate-500'}`}>
+                <span className={`shrink-0 text-xs font-semibold ${t.fait ? 'text-[#0D47A1]' : 'text-secondary-500'}`}>
                   {t.fait ? (
                     <span className="inline-flex items-center gap-0.5"><Check className="h-3.5 w-3.5" aria-hidden />Fait</span>
                   ) : 'À faire'}

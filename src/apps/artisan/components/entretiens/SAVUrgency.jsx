@@ -9,8 +9,8 @@ import { SAV_URGENCES, urgenceDe, urgenceVisible, libelleUrgence } from '@/lib/s
 
 const VISUELS = {
   urgent: { Icon: Zap, actif: 'bg-red-600 text-white border-red-600', pastille: 'bg-red-600 text-white' },
-  normal: { Icon: Minus, actif: 'bg-gray-700 text-white border-gray-700', pastille: 'bg-gray-100 text-gray-600' },
-  peut_attendre: { Icon: Hourglass, actif: 'bg-slate-500 text-white border-slate-500', pastille: 'bg-slate-100 text-slate-600' },
+  normal: { Icon: Minus, actif: 'bg-secondary-700 text-white border-secondary-700', pastille: 'bg-secondary-100 text-secondary-600' },
+  peut_attendre: { Icon: Hourglass, actif: 'bg-secondary-500 text-white border-secondary-500', pastille: 'bg-secondary-100 text-secondary-600' },
 };
 
 /**
@@ -33,7 +33,7 @@ export function SAVUrgencySelect({ value, onChange, disabled = false }) {
             disabled={disabled}
             title={niveau.description}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all disabled:opacity-50 ${
-              estActif ? actif : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+              estActif ? actif : 'bg-white text-secondary-600 border-secondary-200 hover:bg-secondary-50'
             }`}
           >
             <Icon className="w-3.5 h-3.5" />

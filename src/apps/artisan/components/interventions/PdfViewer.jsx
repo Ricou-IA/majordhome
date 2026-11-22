@@ -28,9 +28,9 @@ export function PdfViewer({
   // État : chargement
   if (isLoading) {
     return (
-      <div className="w-full aspect-[3/4] rounded-lg border bg-gray-50 flex flex-col items-center justify-center gap-3">
+      <div className="w-full aspect-[3/4] rounded-lg border bg-secondary-50 flex flex-col items-center justify-center gap-3">
         <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-        <p className="text-sm text-gray-600">Génération du PV en cours...</p>
+        <p className="text-sm text-secondary-600">Génération du PV en cours...</p>
       </div>
     );
   }
@@ -48,10 +48,10 @@ export function PdfViewer({
   // État : pas de PDF
   if (!pdfUrl) {
     return (
-      <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed bg-gray-50 flex flex-col items-center justify-center gap-3">
-        <FileText className="h-10 w-10 text-gray-400" />
-        <p className="text-sm text-gray-500">Aucun PV généré</p>
-        <p className="text-xs text-gray-400">
+      <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed bg-secondary-50 flex flex-col items-center justify-center gap-3">
+        <FileText className="h-10 w-10 text-secondary-400" />
+        <p className="text-sm text-secondary-500">Aucun PV généré</p>
+        <p className="text-xs text-secondary-400">
           Cliquez sur &quot;Générer le PV&quot; une fois le rapport complété
         </p>
       </div>
@@ -90,9 +90,9 @@ export function PdfViewer({
           onError={() => setIframeError(true)}
         />
       ) : (
-        <div className="w-full aspect-[3/4] rounded-lg border bg-gray-50 flex flex-col items-center justify-center gap-3">
-          <FileText className="h-10 w-10 text-gray-400" />
-          <p className="text-sm text-gray-500">
+        <div className="w-full aspect-[3/4] rounded-lg border bg-secondary-50 flex flex-col items-center justify-center gap-3">
+          <FileText className="h-10 w-10 text-secondary-400" />
+          <p className="text-sm text-secondary-500">
             Impossible d&apos;afficher le PDF dans le navigateur
           </p>
           <a href={pdfUrl} target="_blank" rel="noopener noreferrer" download>

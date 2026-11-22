@@ -18,7 +18,7 @@ export function QuoteExplorerCard({
   const isOrphan = row.is_orphan && !row.is_dismissed;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-sm transition-shadow">
+    <div className="bg-white rounded-lg border border-secondary-200 p-3 hover:shadow-sm transition-shadow">
       <div className="flex items-start gap-2">
         {isOrphan && (
           <input
@@ -26,7 +26,7 @@ export function QuoteExplorerCard({
             checked={selected}
             onChange={(e) => { e.stopPropagation(); onToggleSelect?.(row.id); }}
             onClick={(e) => e.stopPropagation()}
-            className="mt-1 rounded border-gray-300"
+            className="mt-1 rounded border-secondary-300"
             aria-label={`Sélectionner le devis ${row.quote_number || row.id}`}
           />
         )}
@@ -40,7 +40,7 @@ export function QuoteExplorerCard({
             </span>
           </div>
 
-          <p className="text-xs text-gray-500 mt-0.5 truncate">
+          <p className="text-xs text-secondary-500 mt-0.5 truncate">
             {row.quote_number || `#${row.id}`}
             {row.date ? ` · ${formatDateShortFR(row.date)}` : ''}
           </p>
@@ -70,7 +70,7 @@ export function QuoteExplorerCard({
               </a>
             ) : (
               <span
-                className="inline-flex items-center gap-1 text-xs text-gray-300 cursor-not-allowed"
+                className="inline-flex items-center gap-1 text-xs text-secondary-300 cursor-not-allowed"
                 title="PDF non synchronisé (prochain cycle < 15 min)"
               >
                 <ExternalLink className="w-3 h-3" /> PDF
@@ -88,7 +88,7 @@ export function QuoteExplorerCard({
                   <Plus className="w-3 h-3" /> Créer le lead
                 </button>
                 <button type="button" onClick={(e) => { e.stopPropagation(); onDismiss?.(row); }}
-                  className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-secondary-50 text-gray-500">
+                  className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-secondary-50 text-secondary-500">
                   <EyeOff className="w-3 h-3" /> Écarter
                 </button>
               </>

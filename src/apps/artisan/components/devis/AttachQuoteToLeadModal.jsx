@@ -131,7 +131,7 @@ export function AttachQuoteToLeadModal({ quote = null, quotes = null, onClose, o
 
         <div className="p-4 border-b border-secondary-200">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
             <input
               type="text"
               value={query}
@@ -143,11 +143,11 @@ export function AttachQuoteToLeadModal({ quote = null, quotes = null, onClose, o
         </div>
 
         <div className="flex-1 overflow-y-auto p-2">
-          {isFetching && <p className="text-sm text-gray-400 p-3">Recherche...</p>}
+          {isFetching && <p className="text-sm text-secondary-400 p-3">Recherche...</p>}
           {/* Gaté sur `canSearch` : ne jamais annoncer « aucun lead » quand aucune
               requête n'a été lancée. */}
           {!isFetching && canSearch && leads.length === 0 && (
-            <p className="text-sm text-gray-400 p-3">
+            <p className="text-sm text-secondary-400 p-3">
               Aucun lead trouvé. Utilise « Créer le lead » depuis la carte.
             </p>
           )}

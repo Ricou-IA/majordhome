@@ -71,19 +71,19 @@ export default function ImportsPrecedents({ orgId }) {
 
   if (isLoading) return null;
   if (error) {
-    return <p className="text-sm text-gray-600">Les imports précédents n&apos;ont pas pu être lus.</p>;
+    return <p className="text-sm text-secondary-600">Les imports précédents n&apos;ont pas pu être lus.</p>;
   }
   if (!imports || imports.length === 0) return null;
 
   return (
-    <section aria-labelledby="imports-precedents" className="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
-      <h2 id="imports-precedents" className="text-lg font-semibold text-gray-900">Imports précédents</h2>
-      <ul className="divide-y divide-gray-100">
+    <section aria-labelledby="imports-precedents" className="bg-white rounded-lg border border-secondary-200 p-6 space-y-3">
+      <h2 id="imports-precedents" className="text-lg font-semibold text-secondary-900">Imports précédents</h2>
+      <ul className="divide-y divide-secondary-100">
         {imports.map((imp) => (
           <li key={imp.id} className="py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <div className="min-w-0 text-sm">
-              <p className="font-medium text-gray-900 truncate">{imp.file_name}</p>
-              <p className="text-gray-600">
+              <p className="font-medium text-secondary-900 truncate">{imp.file_name}</p>
+              <p className="text-secondary-600">
                 {formatDateTimeFR(imp.created_at)}
                 {imp.created_by_name ? ` · ${imp.created_by_name}` : ''}
                 {` · ${libelleLigne(imp)}`}

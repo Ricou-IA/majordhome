@@ -45,10 +45,10 @@ function FilEtapes({ etape }) {
         const actif = i === courant;
         return (
           <li key={e.cle} className="flex items-center gap-2">
-            {i > 0 && <span className="text-gray-300" aria-hidden="true">·</span>}
+            {i > 0 && <span className="text-secondary-300" aria-hidden="true">·</span>}
             <span
               aria-current={actif ? 'step' : undefined}
-              className={`inline-flex items-center gap-1 ${actif ? 'font-semibold text-blue-700' : fait ? 'text-gray-700' : 'text-gray-400'}`}
+              className={`inline-flex items-center gap-1 ${actif ? 'font-semibold text-blue-700' : fait ? 'text-secondary-700' : 'text-secondary-400'}`}
             >
               {fait ? <Check className="w-4 h-4" aria-hidden="true" /> : <span aria-hidden="true">{i + 1}.</span>}
               {e.libelle}
@@ -129,8 +129,8 @@ export default function ClientsImport() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-secondary-50">
+      <div className="bg-white border-b border-secondary-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-3">
           {/* Pendant l'envoi, aucun lien de la page : quitter démonterait l'écran qui suit l'import et sa reprise
               (le routeur est un BrowserRouter, sans useBlocker possible). */}
@@ -140,14 +140,14 @@ export default function ClientsImport() {
               Import en cours : restez sur cette page jusqu&apos;à la fin.
             </p>
           ) : (
-            <Link to="/clients" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
+            <Link to="/clients" className="inline-flex items-center gap-1 text-sm text-secondary-600 hover:text-secondary-900">
               <ArrowLeft className="w-4 h-4" aria-hidden="true" />
               Retour aux clients
             </Link>
           )}
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Importer des clients</h1>
-            <p className="text-gray-500 mt-1">Reprenez les clients de votre ancien logiciel depuis un fichier Excel ou CSV.</p>
+            <h1 className="text-2xl font-bold text-secondary-900">Importer des clients</h1>
+            <p className="text-secondary-500 mt-1">Reprenez les clients de votre ancien logiciel depuis un fichier Excel ou CSV.</p>
           </div>
           <FilEtapes etape={etat.etape} />
         </div>

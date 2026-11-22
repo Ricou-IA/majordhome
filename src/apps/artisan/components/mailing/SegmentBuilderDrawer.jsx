@@ -124,7 +124,7 @@ export default function SegmentBuilderDrawer({ initial = null, onClose, onSaved 
               Builder de ciblage — le segment sera enregistré dans le catalogue et réutilisable en envoi manuel ou campagne automatique.
             </p>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded" aria-label="Fermer">
+          <button onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -141,7 +141,7 @@ export default function SegmentBuilderDrawer({ initial = null, onClose, onSaved 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex: Clients DPE E/F chauffage gaz"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                  className="w-full rounded-lg border border-secondary-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 />
               </div>
               <div>
@@ -151,7 +151,7 @@ export default function SegmentBuilderDrawer({ initial = null, onClose, onSaved 
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Note libre pour retrouver ce segment plus tard…"
                   rows={2}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                  className="w-full rounded-lg border border-secondary-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 />
               </div>
               <RadioGroup
@@ -206,7 +206,7 @@ export default function SegmentBuilderDrawer({ initial = null, onClose, onSaved 
         </div>
 
         {/* Footer actions */}
-        <div className="p-4 border-t bg-gray-50 flex items-center justify-between gap-3">
+        <div className="p-4 border-t bg-secondary-50 flex items-center justify-between gap-3">
           <div className="text-sm text-secondary-600">
             {countLoading ? (
               <span className="inline-flex items-center gap-1">
@@ -243,7 +243,7 @@ function Section({ title, icon, defaultOpen = false, children }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary-50 transition-colors"
       >
         <span className="flex items-center gap-2 text-sm font-semibold text-secondary-800">
           {icon}
@@ -262,7 +262,7 @@ function RadioGroup({ label, options, value, onChange, disabled = false }) {
       <label className="block text-sm font-medium text-secondary-700 mb-1">{label}</label>
       <div className="flex gap-3">
         {options.map((opt) => (
-          <label key={opt.value} className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg cursor-pointer text-sm ${value === opt.value ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 hover:bg-gray-50'} ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+          <label key={opt.value} className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg cursor-pointer text-sm ${value === opt.value ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-secondary-300 hover:bg-secondary-50'} ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
             <input
               type="radio"
               checked={value === opt.value}
@@ -297,7 +297,7 @@ function CheckboxList({ label, options, values, onChange }) {
               key={v}
               type="button"
               onClick={() => toggle(v)}
-              className={`px-2.5 py-1 rounded-full border text-xs transition-colors ${checked ? 'bg-primary-100 border-primary-400 text-primary-700' : 'bg-white border-gray-300 text-secondary-700 hover:bg-gray-50'}`}
+              className={`px-2.5 py-1 rounded-full border text-xs transition-colors ${checked ? 'bg-primary-100 border-primary-400 text-primary-700' : 'bg-white border-secondary-300 text-secondary-700 hover:bg-secondary-50'}`}
             >
               {l}
             </button>
@@ -338,7 +338,7 @@ function EquipmentTypePicker({ groupedTypes, values, onChange, audience }) {
                     key={t.id}
                     type="button"
                     onClick={() => toggle(t.id)}
-                    className={`px-2.5 py-1 rounded-full border text-xs transition-colors ${checked ? 'bg-primary-100 border-primary-400 text-primary-700' : 'bg-white border-gray-300 text-secondary-700 hover:bg-gray-50'}`}
+                    className={`px-2.5 py-1 rounded-full border text-xs transition-colors ${checked ? 'bg-primary-100 border-primary-400 text-primary-700' : 'bg-white border-secondary-300 text-secondary-700 hover:bg-secondary-50'}`}
                   >
                     {t.label}
                   </button>
@@ -361,7 +361,7 @@ function NumberInput({ label, value, onChange, placeholder }) {
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+        className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
       />
     </div>
   );
@@ -376,7 +376,7 @@ function TextInputRow({ label, value, onChange, placeholder }) {
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+        className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
       />
     </div>
   );
@@ -415,7 +415,7 @@ function ClientsBaseFields({ filters, set }) {
               type="checkbox"
               checked={!!base.exclude_with_active}
               onChange={(e) => set(['base', 'exclude_with_active'], e.target.checked || null)}
-              className="rounded border-gray-300"
+              className="rounded border-secondary-300"
             />
             Exclure les clients ayant aussi un contrat actif
           </label>
@@ -620,7 +620,7 @@ function AttributesFields({ filters, set, audience, leadSources, leadCommercials
             type="date"
             value={a.created_between?.from || ''}
             onChange={(e) => set(['attributes', 'created_between', 'from'], e.target.value || null)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm"
           />
         </div>
         <div>
@@ -629,7 +629,7 @@ function AttributesFields({ filters, set, audience, leadSources, leadCommercials
             type="date"
             value={a.created_between?.to || ''}
             onChange={(e) => set(['attributes', 'created_between', 'to'], e.target.value || null)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm"
           />
         </div>
       </div>
@@ -653,7 +653,7 @@ function MailingHistoryFields({ filters, set, campaigns }) {
           type="checkbox"
           checked={h.exclude_current_campaign !== false}
           onChange={(e) => set(['mailing_history', 'exclude_current_campaign'], e.target.checked)}
-          className="rounded border-gray-300"
+          className="rounded border-secondary-300"
         />
         Exclure les destinataires ayant déjà reçu la <strong>campagne courante</strong>
       </label>
@@ -682,7 +682,7 @@ function MailingHistoryFields({ filters, set, campaigns }) {
           <select
             value={h.include_opened_campaign || ''}
             onChange={(e) => set(['mailing_history', 'include_opened_campaign'], e.target.value || null)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm"
           >
             <option value="">—</option>
             {campaignOptions.map((c) => (
@@ -695,7 +695,7 @@ function MailingHistoryFields({ filters, set, campaigns }) {
           <select
             value={h.include_clicked_campaign || ''}
             onChange={(e) => set(['mailing_history', 'include_clicked_campaign'], e.target.value || null)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm"
           >
             <option value="">—</option>
             {campaignOptions.map((c) => (
@@ -721,7 +721,7 @@ function PreviewFields({ filters, set, count, countLoading, previewRows, preview
           <select
             value={limits.order_by || 'recency_desc'}
             onChange={(e) => set(['limits', 'order_by'], e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm"
           >
             {ORDER_BY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -762,7 +762,7 @@ function PreviewFields({ filters, set, count, countLoading, previewRows, preview
             <div className="p-4 text-center text-sm text-secondary-500">Aucun destinataire</div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs text-secondary-600 uppercase">
+              <thead className="bg-secondary-50 text-xs text-secondary-600 uppercase">
                 <tr>
                   <th className="text-left px-3 py-2">Nom</th>
                   <th className="text-left px-3 py-2">Email</th>

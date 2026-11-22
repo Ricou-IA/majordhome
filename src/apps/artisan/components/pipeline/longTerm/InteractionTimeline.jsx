@@ -20,14 +20,14 @@ export function InteractionTimeline({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-secondary-400" />
       </div>
     );
   }
 
   if (!interactions.length) {
     return (
-      <p className="text-sm text-gray-400 italic py-6 text-center">
+      <p className="text-sm text-secondary-400 italic py-6 text-center">
         Aucune interaction enregistrée pour ce projet.
       </p>
     );
@@ -36,7 +36,7 @@ export function InteractionTimeline({
   return (
     <div className="relative">
       {/* Ligne verticale */}
-      <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200" />
+      <div className="absolute left-4 top-0 bottom-0 w-px bg-secondary-200" />
 
       <div className="space-y-4">
         {interactions.map((it) => {
@@ -54,7 +54,7 @@ export function InteractionTimeline({
               {/* Contenu */}
               <div className="flex-1 min-w-0 pt-0.5">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
+                  <p className="text-sm text-secondary-800 whitespace-pre-wrap break-words">
                     {it.summary}
                   </p>
                   {onDelete && (
@@ -62,7 +62,7 @@ export function InteractionTimeline({
                       type="button"
                       onClick={() => onDelete(it.id)}
                       disabled={isDeleting}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-red-500 rounded shrink-0"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-secondary-400 hover:text-red-500 rounded shrink-0"
                       title="Supprimer cette interaction"
                     >
                       {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
@@ -83,10 +83,10 @@ export function InteractionTimeline({
                   </div>
                 )}
 
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-secondary-400 mt-1">
                   {formatInteractionDate(it.created_at)}
                   {it.created_by_name && (
-                    <span className="ml-1.5 text-gray-300">— {it.created_by_name}</span>
+                    <span className="ml-1.5 text-secondary-300">— {it.created_by_name}</span>
                   )}
                 </p>
               </div>

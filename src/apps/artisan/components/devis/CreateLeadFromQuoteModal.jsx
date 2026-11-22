@@ -43,7 +43,7 @@ function Field({ id, label, children }) {
       </label>
       <div className="relative">
         {children}
-        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
       </div>
     </div>
   );

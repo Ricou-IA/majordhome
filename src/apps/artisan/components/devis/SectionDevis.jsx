@@ -57,7 +57,7 @@ function SectionDevisContent({ leadId, onCreateDevis, onOpenDevis, onSendDevis }
           Erreur : {error?.message || JSON.stringify(error)}
         </div>
       ) : isLoading ? (
-        <div className="flex items-center gap-2 py-3 text-sm text-gray-400">
+        <div className="flex items-center gap-2 py-3 text-sm text-secondary-400">
           <Loader2 className="w-4 h-4 animate-spin" />
         </div>
       ) : (
@@ -68,17 +68,17 @@ function SectionDevisContent({ leadId, onCreateDevis, onOpenDevis, onSendDevis }
               key={quote.id}
               type="button"
               onClick={() => onOpenDevis(quote.id)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 bg-white
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-secondary-200 bg-white
                          hover:border-blue-300 hover:bg-blue-50/50 transition-colors group text-left"
             >
               <FileText className="h-5 w-5 text-blue-500 shrink-0" />
               <div className="flex-1 min-w-0">
-                <span className="text-sm font-medium text-gray-900 group-hover:text-blue-700">
+                <span className="text-sm font-medium text-secondary-900 group-hover:text-blue-700">
                   {quote.quote_number}
                 </span>
               </div>
-              <span className="text-sm font-medium text-gray-900 shrink-0">{formatEuro(quote.total_ttc)}</span>
-              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500 shrink-0" />
+              <span className="text-sm font-medium text-secondary-900 shrink-0">{formatEuro(quote.total_ttc)}</span>
+              <ChevronRight className="h-4 w-4 text-secondary-400 group-hover:text-blue-500 shrink-0" />
             </button>
           ))}
 
@@ -107,7 +107,7 @@ function SectionDevisContent({ leadId, onCreateDevis, onOpenDevis, onSendDevis }
           {climOuverte && (
             <Link
               to={`/clim?lead=${leadId}`}
-              className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-secondary-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
             >
               <Snowflake className="w-3.5 h-3.5" /> Dimensionner une climatisation
             </Link>

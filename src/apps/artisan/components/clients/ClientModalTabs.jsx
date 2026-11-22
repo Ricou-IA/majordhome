@@ -59,7 +59,7 @@ function InterventionCard({ intervention }) {
   const statusConfig = {
     completed: { label: 'Terminé', className: 'bg-green-100 text-green-700' },
     scheduled: { label: 'Planifié', className: 'bg-blue-100 text-blue-700' },
-    cancelled: { label: 'Annulé', className: 'bg-gray-100 text-gray-700' },
+    cancelled: { label: 'Annulé', className: 'bg-secondary-100 text-secondary-700' },
     in_progress: { label: 'En cours', className: 'bg-amber-100 text-amber-700' },
     // Workflow statuses (entretien/sav)
     a_planifier: { label: 'À planifier', className: 'bg-amber-100 text-amber-700' },
@@ -71,7 +71,7 @@ function InterventionCard({ intervention }) {
   };
 
   const effectiveStatus = workflow_status || status;
-  const statusInfo = statusConfig[effectiveStatus] || { label: effectiveStatus, className: 'bg-gray-100 text-gray-700' };
+  const statusInfo = statusConfig[effectiveStatus] || { label: effectiveStatus, className: 'bg-secondary-100 text-secondary-700' };
 
   // Certificat = enfant-équipement uniquement (même règle que TabInterventions).
   // Ouvrir le wizard sur le parent produit un certificat orphelin (equipment_id NULL)
@@ -82,19 +82,19 @@ function InterventionCard({ intervention }) {
   const TypeIcon = typeIcons[intervention_type] || null;
 
   return (
-    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+    <div className="p-3 bg-secondary-50 rounded-lg border border-secondary-200">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            {TypeIcon && <TypeIcon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
-            <span className="font-medium text-gray-900">
+            {TypeIcon && <TypeIcon className="w-3.5 h-3.5 text-secondary-400 flex-shrink-0" />}
+            <span className="font-medium text-secondary-900">
               {typeLabels[intervention_type] || intervention_type}
             </span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.className}`}>
               {statusInfo.label}
             </span>
           </div>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-secondary-500 mt-0.5">
             {formatDateFR(scheduled_date)}
             {technician_name && ` • ${technician_name}`}
             {contract_number && ` • ${contract_number}`}
@@ -119,7 +119,7 @@ function InterventionCard({ intervention }) {
         )}
       </div>
       {report_notes && (
-        <p className="text-sm text-gray-600 mt-2 line-clamp-2">{report_notes}</p>
+        <p className="text-sm text-secondary-600 mt-2 line-clamp-2">{report_notes}</p>
       )}
     </div>
   );
@@ -138,8 +138,8 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
     <div className="space-y-6">
       {/* Section Identité */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <User className="w-4 h-4 text-gray-500" />
+        <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+          <User className="w-4 h-4 text-secondary-500" />
           Identité
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -173,8 +173,8 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
 
       {/* Section Adresse */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-gray-500" />
+        <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-secondary-500" />
           Adresse
         </h3>
         {/* Saisie assistée BAN : une adresse choisie est localisée à l'enregistrement
@@ -201,8 +201,8 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
 
       {/* Section Contact */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <Phone className="w-4 h-4 text-gray-500" />
+        <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+          <Phone className="w-4 h-4 text-secondary-500" />
           Contact
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -223,23 +223,23 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
             />
           </FormField>
         </div>
-        <label className="flex items-center gap-2 mt-3 text-sm text-gray-700 cursor-pointer select-none">
+        <label className="flex items-center gap-2 mt-3 text-sm text-secondary-700 cursor-pointer select-none">
           <input
             type="checkbox"
             checked={formData.mailOptin !== false}
             onChange={(e) => updateField('mailOptin', e.target.checked)}
             disabled={isLocked}
-            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+            className="rounded border-secondary-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
           />
           Accepte de recevoir des emails (optin mailing)
         </label>
-        <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 cursor-pointer select-none">
+        <label className="flex items-center gap-2 mt-2 text-sm text-secondary-700 cursor-pointer select-none">
           <input
             type="checkbox"
             checked={formData.smsOptin !== false}
             onChange={(e) => updateField('smsOptin', e.target.checked)}
             disabled={isLocked}
-            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+            className="rounded border-secondary-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
           />
           Accepte de recevoir des SMS
         </label>
@@ -247,8 +247,8 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
 
       {/* Section Habitat */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <Home className="w-4 h-4 text-gray-500" />
+        <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+          <Home className="w-4 h-4 text-secondary-500" />
           Habitat
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -296,8 +296,8 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
 
       {/* Section Commercial */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-gray-500" />
+        <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-secondary-500" />
           Commercial
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -311,7 +311,7 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
             />
           </FormField>
           <FormField label="Date de création">
-            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
+            <div className="px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg text-secondary-600">
               {formatDateFR(formData.createdAt)}
             </div>
           </FormField>
@@ -320,8 +320,8 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
 
       {/* Notes */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-gray-500" />
+        <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-secondary-500" />
           Notes
         </h3>
         <TextArea
@@ -378,9 +378,9 @@ export function TabHistory({ interventions = [], loading = false }) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map(i => (
-          <div key={i} className="p-3 bg-gray-50 rounded-lg animate-pulse">
-            <div className="h-5 w-32 bg-gray-200 rounded mb-2" />
-            <div className="h-4 w-48 bg-gray-200 rounded" />
+          <div key={i} className="p-3 bg-secondary-50 rounded-lg animate-pulse">
+            <div className="h-5 w-32 bg-secondary-200 rounded mb-2" />
+            <div className="h-4 w-48 bg-secondary-200 rounded" />
           </div>
         ))}
       </div>
@@ -390,17 +390,17 @@ export function TabHistory({ interventions = [], loading = false }) {
   if (interventions.length === 0) {
     return (
       <div className="text-center py-8">
-        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-          <History className="w-6 h-6 text-gray-400" />
+        <div className="w-12 h-12 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <History className="w-6 h-6 text-secondary-400" />
         </div>
-        <p className="text-gray-500">Aucune intervention enregistrée</p>
+        <p className="text-secondary-500">Aucune intervention enregistrée</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-secondary-500 mb-4">
         {interventions.length} intervention{interventions.length !== 1 ? 's' : ''}
       </p>
       {interventions.map(intervention => (

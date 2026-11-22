@@ -34,13 +34,13 @@ export function PennylaneDoublonsClients() {
       <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-1">
         <CopyIcon className="w-5 h-5 text-amber-500" />
         Clients en double dans Pennylane
-        <span className="text-sm font-normal text-gray-400">({duplicates.length})</span>
+        <span className="text-sm font-normal text-secondary-400">({duplicates.length})</span>
       </h2>
       <p className="text-xs text-secondary-500 mb-3">
         Une seconde fiche Pennylane correspond à un client déjà lié. À fusionner dans Pennylane en gardant la fiche
         liée à Majord’home ; la ligne disparaît au passage suivant du cron.
       </p>
-      <ul className="divide-y divide-gray-100">
+      <ul className="divide-y divide-secondary-100">
         {duplicates.map((d) => (
           <li key={d.pennylaneId} className="flex items-start justify-between gap-3 px-2 py-2">
             <div className="min-w-0">
@@ -51,7 +51,7 @@ export function PennylaneDoublonsClients() {
               >
                 {d.clientName || 'Client sans nom'}
                 {d.clientNumber != null && (
-                  <span className="ml-1 text-xs font-normal text-gray-400">n° {d.clientNumber}</span>
+                  <span className="ml-1 text-xs font-normal text-secondary-400">n° {d.clientNumber}</span>
                 )}
               </button>
               <div className="text-xs text-secondary-500">
@@ -62,7 +62,7 @@ export function PennylaneDoublonsClients() {
                 {d.plEmail ? ` (${d.plEmail})` : ''}
               </div>
             </div>
-            <span className="shrink-0 text-xs text-gray-400 whitespace-nowrap">
+            <span className="shrink-0 text-xs text-secondary-400 whitespace-nowrap">
               vu le {formatDateShortFR(d.firstSeenAt)}
             </span>
           </li>

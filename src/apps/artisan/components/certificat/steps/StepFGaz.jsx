@@ -55,24 +55,24 @@ export function StepFGaz({ formData, onChange }) {
       <div className="space-y-3">
         <SectionTitle>Vérifications</SectionTitle>
 
-        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+        <label className="flex items-center gap-3 p-3 border border-secondary-200 rounded-lg cursor-pointer hover:bg-secondary-50">
           <input
             type="checkbox"
             checked={!!fgaz.certificat_aptitude_verifie}
             onChange={(e) => updateFGaz({ certificat_aptitude_verifie: e.target.checked })}
-            className="w-5 h-5 rounded border-gray-300 text-blue-600"
+            className="w-5 h-5 rounded border-secondary-300 text-blue-600"
           />
-          <span className="text-sm text-gray-800">Certificat d&apos;aptitude vérifié</span>
+          <span className="text-sm text-secondary-800">Certificat d&apos;aptitude vérifié</span>
         </label>
 
-        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+        <label className="flex items-center gap-3 p-3 border border-secondary-200 rounded-lg cursor-pointer hover:bg-secondary-50">
           <input
             type="checkbox"
             checked={!!fgaz.enregistrement_carnet}
             onChange={(e) => updateFGaz({ enregistrement_carnet: e.target.checked })}
-            className="w-5 h-5 rounded border-gray-300 text-blue-600"
+            className="w-5 h-5 rounded border-secondary-300 text-blue-600"
           />
-          <span className="text-sm text-gray-800">Enregistrement au carnet de l&apos;équipement</span>
+          <span className="text-sm text-secondary-800">Enregistrement au carnet de l&apos;équipement</span>
         </label>
       </div>
 

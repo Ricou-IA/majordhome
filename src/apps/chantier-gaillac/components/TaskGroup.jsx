@@ -8,7 +8,7 @@ function DatePrevueInput({ planning, onSave }) {
   const [value, setValue] = useState(planning.date_prevue || '');
   useEffect(() => setValue(planning.date_prevue || ''), [planning.date_prevue]);
   return (
-    <label className="inline-flex items-center gap-2 text-sm font-normal text-slate-700">
+    <label className="inline-flex items-center gap-2 text-sm font-normal text-secondary-700">
       <CalendarDays className="h-4 w-4 text-[#1565C0]" aria-hidden />
       <span className="sr-only">Date prévue pour {planning.code}</span>
       <input
@@ -18,7 +18,7 @@ function DatePrevueInput({ planning, onSave }) {
           setValue(e.target.value);
           onSave(planning.code, e.target.value || null);
         }}
-        className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-2 text-sm"
+        className="min-h-[40px] rounded-lg border border-secondary-300 bg-white px-2 text-sm"
       />
     </label>
   );
@@ -35,12 +35,12 @@ export default function TaskGroup({
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-[#0D47A1]">{group.label}</h3>
           {p?.date_prevue && !isAdmin && (
-            <p className="text-sm text-slate-700">Prévu le {formatDateCourte(p.date_prevue)}</p>
+            <p className="text-sm text-secondary-700">Prévu le {formatDateCourte(p.date_prevue)}</p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {p && isAdmin && <DatePrevueInput planning={p} onSave={onDatePrevue} />}
-          <span className="font-mono text-sm tabular-nums text-slate-700">
+          <span className="font-mono text-sm tabular-nums text-secondary-700">
             {group.count} ligne{group.count > 1 ? 's' : ''} · {group.done} validée{group.done > 1 ? 's' : ''}
             {group.isHorsPerimetre || readOnly ? '' : ` · ${formatDuree(group.totalMin)} accès compris`}
           </span>

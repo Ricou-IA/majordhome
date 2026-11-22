@@ -34,24 +34,24 @@ export default function SharePanel({ orgId }) {
   };
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white">
+    <section className="rounded-xl border border-secondary-200 bg-white">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold text-slate-800"
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold text-secondary-800"
       >
         <span className="inline-flex items-center gap-2"><Share2 className="h-4 w-4 text-[#1565C0]" aria-hidden />Partage externe (lecture seule)</span>
         <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
       </button>
       {open && (
-        <div className="space-y-3 border-t border-slate-200 px-4 py-3 text-sm">
-          <p className="text-slate-600">
+        <div className="space-y-3 border-t border-secondary-200 px-4 py-3 text-sm">
+          <p className="text-secondary-600">
             Le lien ouvre le suivi sans compte : n°, site, action, thème, technicien, journée et statut.
             Durées, achats, observations et commentaires terrain ne sont jamais envoyés.
           </p>
           {isLoading ? (
-            <p className="flex items-center gap-2 text-slate-500"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Chargement…</p>
+            <p className="flex items-center gap-2 text-secondary-500"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Chargement…</p>
           ) : token ? (
             <>
               <input
@@ -59,16 +59,16 @@ export default function SharePanel({ orgId }) {
                 value={shareUrl(token)}
                 onFocus={(e) => e.target.select()}
                 aria-label="Lien de partage"
-                className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-2 font-mono text-xs"
+                className="w-full rounded-lg border border-secondary-300 bg-secondary-50 px-2 py-2 font-mono text-xs"
               />
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={copy} className={`${btn} border-[#1565C0] bg-[#1565C0] text-white`}>
                   <Copy className="h-4 w-4" aria-hidden />Copier le lien
                 </button>
-                <button type="button" disabled={gerer.isPending} onClick={() => run('generer', 'Nouveau lien créé, l\'ancien ne fonctionne plus')} className={`${btn} border-slate-300 text-slate-700`}>
+                <button type="button" disabled={gerer.isPending} onClick={() => run('generer', 'Nouveau lien créé, l\'ancien ne fonctionne plus')} className={`${btn} border-secondary-300 text-secondary-700`}>
                   <RefreshCw className="h-4 w-4" aria-hidden />Régénérer
                 </button>
-                <button type="button" disabled={gerer.isPending} onClick={() => run('revoquer', 'Lien révoqué')} className={`${btn} border-slate-300 text-slate-700`}>
+                <button type="button" disabled={gerer.isPending} onClick={() => run('revoquer', 'Lien révoqué')} className={`${btn} border-secondary-300 text-secondary-700`}>
                   <Ban className="h-4 w-4" aria-hidden />Révoquer
                 </button>
               </div>

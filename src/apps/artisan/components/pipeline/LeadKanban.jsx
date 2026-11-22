@@ -93,7 +93,7 @@ function MonthFilterDropdown({ value, onChange }) {
           inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors min-h-[40px]
           ${hasValue
             ? 'bg-blue-50 border-blue-200 text-blue-700'
-            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            : 'bg-white border-secondary-300 text-secondary-700 hover:bg-secondary-50'
           }
         `}
       >
@@ -107,7 +107,7 @@ function MonthFilterDropdown({ value, onChange }) {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
+          <div className="absolute left-0 top-full mt-1 w-52 bg-white border border-secondary-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
             {MONTH_OPTIONS.map((option) => (
               <button
                 key={option.value ?? 'null'}
@@ -119,7 +119,7 @@ function MonthFilterDropdown({ value, onChange }) {
                   w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors
                   ${option.value === value
                     ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    : 'text-secondary-700 hover:bg-secondary-50'
                   }
                 `}
               >
@@ -156,7 +156,7 @@ function CommercialFilterDropdown({ value, onChange, commercials }) {
           inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors min-h-[40px]
           ${hasValue
             ? 'bg-blue-50 border-blue-200 text-blue-700'
-            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            : 'bg-white border-secondary-300 text-secondary-700 hover:bg-secondary-50'
           }
         `}
       >
@@ -170,7 +170,7 @@ function CommercialFilterDropdown({ value, onChange, commercials }) {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
+          <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-secondary-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
             {options.map((option) => (
               <button
                 key={option.value ?? 'all'}
@@ -182,7 +182,7 @@ function CommercialFilterDropdown({ value, onChange, commercials }) {
                   w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors
                   ${option.value === value
                     ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    : 'text-secondary-700 hover:bg-secondary-50'
                   }
                 `}
               >
@@ -219,7 +219,7 @@ function SourceFilterDropdown({ value, onChange, sources }) {
           inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors min-h-[40px]
           ${hasValue
             ? 'bg-blue-50 border-blue-200 text-blue-700'
-            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            : 'bg-white border-secondary-300 text-secondary-700 hover:bg-secondary-50'
           }
         `}
       >
@@ -237,7 +237,7 @@ function SourceFilterDropdown({ value, onChange, sources }) {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
+          <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-secondary-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
             {options.map((option) => (
               <button
                 key={option.value ?? 'all'}
@@ -249,7 +249,7 @@ function SourceFilterDropdown({ value, onChange, sources }) {
                   w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors
                   ${option.value === value
                     ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    : 'text-secondary-700 hover:bg-secondary-50'
                   }
                 `}
               >
@@ -807,7 +807,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
       columnAmount={columnAmount}
       emptyMessage="Aucun lead"
       headerLeft={
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-secondary-500">
           {allLeads.length} lead{allLeads.length !== 1 ? 's' : ''} actif{allLeads.length !== 1 ? 's' : ''}
         </p>
       }
@@ -828,7 +828,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
           <MonthFilterDropdown value={selectedMonth} onChange={setSelectedMonth} />
           <button
             onClick={fetchLeads}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
             title="Rafraichir"
           >
             <RefreshCw className="h-4 w-4" />

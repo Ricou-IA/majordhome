@@ -639,12 +639,12 @@ export default function ClientDetail() {
         loading={isHardDeleting}
         onConfirm={handleConfirmHardDelete}
       >
-        <div className="mt-4 rounded-lg border border-red-100 bg-red-50/60 p-3 text-sm text-gray-700">
+        <div className="mt-4 rounded-lg border border-red-100 bg-red-50/60 p-3 text-sm text-secondary-700">
           <p className="font-medium text-red-700 mb-2">
             Données de <strong>{displayName}</strong> qui seront supprimées :
           </p>
           {hardDeleteCounts === null ? (
-            <p className="text-gray-500 italic">Calcul en cours…</p>
+            <p className="text-secondary-500 italic">Calcul en cours…</p>
           ) : (
             <ul className="space-y-1 list-disc list-inside text-xs">
               <li>
@@ -673,7 +673,7 @@ export default function ClientDetail() {
               </li>
             </ul>
           )}
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-secondary-500">
             Les fiches liées (locataire / propriétaire, filleuls) et les leads pipeline rattachés seront détachés, pas supprimés.
           </p>
         </div>

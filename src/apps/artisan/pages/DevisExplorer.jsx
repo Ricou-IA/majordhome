@@ -131,7 +131,7 @@ export default function DevisExplorer() {
           acceptable, pas un ornement. */}
       {!isLoading && !error && (
         syncedAt ? (
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-secondary-400">
             Dernière synchronisation {formatRelativeFR(syncedAt)}
           </p>
         ) : (
@@ -170,7 +170,7 @@ export default function DevisExplorer() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-12 text-gray-400">Chargement des devis...</div>
+        <div className="flex justify-center py-12 text-secondary-400">Chargement des devis...</div>
       ) : (
         <KanbanBoard
           items={visibleRows}
@@ -217,7 +217,7 @@ export default function DevisExplorer() {
                 </button>
               </div>
             ) : (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-secondary-500">
                 {visibleRows.length} devis · {formatEuro(visibleRows.reduce((s, r) => s + (Number(r.amount_ht) || 0), 0))}
               </p>
             )

@@ -11,7 +11,7 @@ export function LienACopier({ url, id }) {
   if (!url) return null;
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="block text-xs text-gray-600">
+      <label htmlFor={id} className="block text-xs text-secondary-600">
         Lien à copier à la main (sélectionnez-le, puis copiez) :
       </label>
       <input
@@ -21,7 +21,7 @@ export function LienACopier({ url, id }) {
         value={url}
         onFocus={(e) => e.target.select()}
         onClick={(e) => e.target.select()}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-800"
+        className="w-full border border-secondary-300 rounded-lg px-3 py-2 text-sm bg-secondary-50 text-secondary-800"
       />
     </div>
   );

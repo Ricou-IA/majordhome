@@ -33,22 +33,22 @@ export function PropositionRow({
 
   return (
     <li
-      className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 hover:border-blue-200 transition-colors"
+      className="flex items-start gap-3 rounded-lg border border-secondary-200 p-3 hover:border-blue-200 transition-colors"
       onMouseEnter={() => onSurvol?.(candidat.id)}
       onMouseLeave={() => onSurvol?.(null)}
     >
       <Checkbox checked={checked} onCheckedChange={onToggle} disabled={disabled} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="font-medium text-gray-900 truncate">{meta.clientName || 'Client'}</p>
-          <span className="text-xs text-gray-400 flex-shrink-0">+{Math.round(detourMinutes)} min</span>
+          <p className="font-medium text-secondary-900 truncate">{meta.clientName || 'Client'}</p>
+          <span className="text-xs text-secondary-400 flex-shrink-0">+{Math.round(detourMinutes)} min</span>
         </div>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-secondary-500">
           {meta.ville || '—'} · {candidat.dureeMinutes} min d&apos;intervention
         </p>
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
           {passage && (
-            <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+            <span className="inline-flex items-center gap-1 text-xs text-secondary-500">
               <Clock className="h-3 w-3" />
               passage prévu {minutesEnHHMM(passage.arriveeMinutes)}
               {/* Le détour et l'heure de passage ne mesurent pas la même chose :
@@ -56,7 +56,7 @@ export function PropositionRow({
                   qu'y aller tout de suite supprimerait la pause déjeuner. Non
                   dit, cela se lit comme une incohérence du classement. */}
               {passage.attenteMinutes > 0 && (
-                <span className="text-gray-400">· après la pause</span>
+                <span className="text-secondary-400">· après la pause</span>
               )}
             </span>
           )}
@@ -66,7 +66,7 @@ export function PropositionRow({
             </span>
           )}
           {horsFenetre && (
-            <span className="inline-flex items-center rounded-full font-medium px-2 py-0.5 text-xs bg-gray-100 text-gray-600">
+            <span className="inline-flex items-center rounded-full font-medium px-2 py-0.5 text-xs bg-secondary-100 text-secondary-600">
               Hors fenêtre anniversaire
             </span>
           )}

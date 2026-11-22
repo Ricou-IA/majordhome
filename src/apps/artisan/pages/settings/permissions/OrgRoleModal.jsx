@@ -39,7 +39,7 @@ export function OrgRoleModal({ open, onClose, onSubmit, initial = null, isSaving
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+      <div className="relative z-10 w-full max-w-lg rounded-xl border border-secondary-200 bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2">
             <UserCog className="w-5 h-5 text-primary-600" />

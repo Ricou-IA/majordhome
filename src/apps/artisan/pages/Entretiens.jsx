@@ -72,7 +72,7 @@ const StatCard = ({ icon: Icon, label, value, subtitle, color = 'blue' }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white rounded-lg border border-secondary-200 p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
@@ -83,12 +83,12 @@ const StatCard = ({ icon: Icon, label, value, subtitle, color = 'blue' }) => {
             <Icon className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-2xl font-semibold text-gray-900">{value ?? '—'}</p>
-            <p className="text-sm text-gray-500">{label}</p>
+            <p className="text-2xl font-semibold text-secondary-900">{value ?? '—'}</p>
+            <p className="text-sm text-secondary-500">{label}</p>
           </div>
         </div>
         {subtitle && (
-          <p className="text-xs font-medium text-gray-400 whitespace-nowrap">{subtitle}</p>
+          <p className="text-xs font-medium text-secondary-400 whitespace-nowrap">{subtitle}</p>
         )}
       </div>
     </div>
@@ -382,7 +382,7 @@ export default function Entretiens() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Entretiens & SAV</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-secondary-500 mt-1">
             {contractStats
               ? `${contractStats.openContracts} contrats actifs`
               : '...'}{' '}
@@ -435,7 +435,7 @@ export default function Entretiens() {
 
       {/* ===== TABS ===== */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full justify-start gap-1 bg-gray-100/80 p-1">
+        <TabsList className="w-full justify-start gap-1 bg-secondary-100/80 p-1">
           <TabsTrigger value="kanban" className="gap-2 data-[state=active]:bg-white">
             <Columns3 className="h-4 w-4" />
             Kanban
@@ -448,7 +448,7 @@ export default function Entretiens() {
                 dès qu'on l'ouvrait. */}
             {contractStats?.openContracts > 0 && (
               <span
-                className="ml-1 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full"
+                className="ml-1 text-xs bg-secondary-100 text-secondary-600 px-1.5 py-0.5 rounded-full"
                 title="Contrats actifs"
               >
                 {contractStats.openContracts}
@@ -475,7 +475,7 @@ export default function Entretiens() {
             <Archive className="h-4 w-4" />
             Clos
             {cancelledCount != null && (
-              <span className="ml-1 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+              <span className="ml-1 text-xs bg-secondary-100 text-secondary-600 px-1.5 py-0.5 rounded-full">
                 {cancelledCount}
               </span>
             )}

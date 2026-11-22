@@ -66,20 +66,20 @@ export function PlanificationJournal({ coreOrgId, job = 'tournees-figer' }) {
   const { data: runs, isLoading, error } = usePlanificationRuns(coreOrgId, job);
   const lignes = runs || [];
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5">
+    <div className="bg-white rounded-lg border border-secondary-200 p-5">
       <div className="flex items-center gap-2 mb-1">
         <Clock className="w-4 h-4 text-secondary-500" />
-        <h3 className="text-sm font-medium text-gray-900">{cfg.titre}</h3>
+        <h3 className="text-sm font-medium text-secondary-900">{cfg.titre}</h3>
       </div>
-      <p className="text-xs text-gray-500 mb-3">{cfg.description} Chaque passage laisse une trace ici.</p>
+      <p className="text-xs text-secondary-500 mb-3">{cfg.description} Chaque passage laisse une trace ici.</p>
       {error && <p className="text-sm text-red-600">Journal illisible : {error.message}</p>}
-      {!error && isLoading && <p className="text-sm text-gray-500">Chargement…</p>}
+      {!error && isLoading && <p className="text-sm text-secondary-500">Chargement…</p>}
       {!error && !isLoading && lignes.length === 0 && (
-        <p className="text-sm text-gray-500">Aucun passage enregistré. S’il ne laisse aucune trace, le cron ne tourne pas.</p>
+        <p className="text-sm text-secondary-500">Aucun passage enregistré. S’il ne laisse aucune trace, le cron ne tourne pas.</p>
       )}
       {!error && lignes.length > 0 && (
         <table className="w-full text-sm">
-          <thead className="text-xs text-gray-500">
+          <thead className="text-xs text-secondary-500">
             <tr>
               <th className="text-left py-1 font-medium">Passage</th>
               {cfg.colonnes.map(([label]) => <th key={label} className="text-right font-medium">{label}</th>)}
@@ -88,10 +88,10 @@ export function PlanificationJournal({ coreOrgId, job = 'tournees-figer' }) {
           </thead>
           <tbody>
             {lignes.map((r) => (
-              <tr key={r.id} className="border-t border-gray-100">
+              <tr key={r.id} className="border-t border-secondary-100">
                 <td className="py-1">{formatDateTimeFR(r.ran_at)}{r.dry_run ? ' (essai)' : ''}</td>
                 {cfg.colonnes.map(([label, calcul]) => <td key={label} className="text-right">{calcul(r.rapport)}</td>)}
-                <td className="pl-3 text-xs text-gray-500">
+                <td className="pl-3 text-xs text-secondary-500">
                   {r.erreur || (r.rapport?.skipped ? (REMARQUES[r.rapport.skipped] || r.rapport.skipped) : (cfg.remarque?.(r.rapport) || ''))}
                 </td>
               </tr>

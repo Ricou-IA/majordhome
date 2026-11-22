@@ -22,8 +22,8 @@ import { SAVUrgencySelect, SAVUrgencyBadge } from '../entretiens/SAVUrgency';
 export function DemandeSavSection({ mode, description = '', urgence = null, onDescription, onUrgence, error = null, sansFiche = false }) {
   return (
     <div className="rounded-lg border border-secondary-200 p-3 space-y-2">
-      <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
-        <LifeBuoy className="h-4 w-4 text-gray-500" /> Demande SAV
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-secondary-900">
+        <LifeBuoy className="h-4 w-4 text-secondary-500" /> Demande SAV
       </p>
       {mode === 'lecture' ? (
         <>

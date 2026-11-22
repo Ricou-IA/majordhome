@@ -87,11 +87,11 @@ export function ChantierPvReserves({ chantier, pv, canEdit, communicationOuverte
 
   const handleVoirLevee = () => ouvrirLevee(chantier);
 
-  const champ = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white disabled:bg-gray-50';
+  const champ = 'w-full border border-secondary-300 rounded-lg px-3 py-2 text-sm bg-white disabled:bg-secondary-50';
 
   return (
-    <div className="p-3 border border-gray-200 rounded-lg bg-white space-y-3">
-      <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+    <div className="p-3 border border-secondary-200 rounded-lg bg-white space-y-3">
+      <h4 className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
         {leveeSignee ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <AlertTriangle className="w-4 h-4 text-amber-600" />}
         Suite des réserves
       </h4>
@@ -102,8 +102,8 @@ export function ChantierPvReserves({ chantier, pv, canEdit, communicationOuverte
             Réserves levées le {formatDateTimeFR(pv.levee_signed_at)}
             {pv.levee_signataire_nom ? ` par ${pv.levee_signataire_nom}` : ''}
           </p>
-          {pv.reserves_reponse && <p className="text-sm text-gray-700"><span className="font-medium">Réponse de l&apos;entreprise : </span>{pv.reserves_reponse}</p>}
-          {pv.reserves_echeance && <p className="text-sm text-gray-700"><span className="font-medium">Engagement : </span>levées avant le {dateLongue(pv.reserves_echeance)}</p>}
+          {pv.reserves_reponse && <p className="text-sm text-secondary-700"><span className="font-medium">Réponse de l&apos;entreprise : </span>{pv.reserves_reponse}</p>}
+          {pv.reserves_echeance && <p className="text-sm text-secondary-700"><span className="font-medium">Engagement : </span>levées avant le {dateLongue(pv.reserves_echeance)}</p>}
           <button type="button" onClick={handleVoirLevee} disabled={leveeEnOuverture} className={BOUTON_NEUTRE}>
             {leveeEnOuverture ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
             Voir le PV de levée
@@ -112,16 +112,16 @@ export function ChantierPvReserves({ chantier, pv, canEdit, communicationOuverte
       ) : (
         <>
           <form onSubmit={handleRepondre} className="space-y-2" noValidate>
-            <p className="text-sm font-medium text-gray-800">Répondre aux réserves</p>
+            <p className="text-sm font-medium text-secondary-800">Répondre aux réserves</p>
             <div>
-              <label htmlFor={`pv-rep-${chantier.id}`} className="block text-xs text-gray-600 mb-1">Ce que l&apos;entreprise va faire</label>
+              <label htmlFor={`pv-rep-${chantier.id}`} className="block text-xs text-secondary-600 mb-1">Ce que l&apos;entreprise va faire</label>
               <textarea
                 id={`pv-rep-${chantier.id}`} rows={3} value={reponse} disabled={!canEdit}
                 onChange={(e) => setReponse(e.target.value)} className={champ}
               />
             </div>
             <div>
-              <label htmlFor={`pv-ech-${chantier.id}`} className="block text-xs text-gray-600 mb-1">Réserves levées avant le</label>
+              <label htmlFor={`pv-ech-${chantier.id}`} className="block text-xs text-secondary-600 mb-1">Réserves levées avant le</label>
               <input
                 id={`pv-ech-${chantier.id}`} type="date" value={echeance} disabled={!canEdit} min={jourSignature || undefined}
                 onChange={(e) => setEcheance(e.target.value)} className={`${champ} sm:w-auto`}
@@ -137,7 +137,7 @@ export function ChantierPvReserves({ chantier, pv, canEdit, communicationOuverte
           </form>
 
           {suite === 'levee_demandee' && (
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-secondary-700">
               Levée demandée le {formatDateTimeFR(pv.levee_demandee_at)}
               {pv.levee_sent_to ? ` à ${pv.levee_sent_to}` : ''}
               {pv.levee_sent_count > 1 ? ` (${pv.levee_sent_count} envois)` : ''}

@@ -48,7 +48,7 @@ export function SouplesseDialog({ open, slot, defaut = 30, demiJournee, onConfir
     >
       <div className="mt-4 space-y-3">
         <SouplesseSelect value={flex} onChange={setFlex} defaut={defaut} />
-        <p className="text-sm text-gray-700">
+        <p className="text-sm text-secondary-700">
           Vous lui annoncez : <span className="font-medium">{phraseAnnonce(slot, effectif, formatDateShortFR(slot.date), { demiJournee })}</span>
           {slot.technicianNom ? ` — ${slot.technicianNom}` : ''}
         </p>

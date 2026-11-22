@@ -48,7 +48,7 @@ export function StepControles({ formData, onChange }) {
   return (
     <div className="space-y-4">
       <SectionTitle>Contrôles de sécurité</SectionTitle>
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-secondary-500">
         Vérifiez chaque point et indiquez le résultat.
       </p>
 

@@ -53,44 +53,44 @@ export function MoveToLongTermModal({
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-2">
             <Hourglass className="h-5 w-5 text-purple-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Passer en Projet MT-LT</h3>
+            <h3 className="text-lg font-semibold text-secondary-900">Passer en Projet MT-LT</h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+            className="p-1 text-secondary-400 hover:text-secondary-600 rounded transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Carte d'identité du lead */}
-        <div className="bg-gray-50 rounded-lg p-3 mb-4 border border-gray-200">
+        <div className="bg-secondary-50 rounded-lg p-3 mb-4 border border-secondary-200">
           <div className="flex items-center justify-between">
-            <p className="font-medium text-gray-900">{name}</p>
-            <span className={`text-sm font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
+            <p className="font-medium text-secondary-900">{name}</p>
+            <span className={`text-sm font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-secondary-400'}`}>
               {formatEuroCeil(amount)}
             </span>
           </div>
           {lead.city && (
-            <p className="text-xs text-gray-500 mt-1">{lead.city}</p>
+            <p className="text-xs text-secondary-500 mt-1">{lead.city}</p>
           )}
         </div>
 
-        <p className="text-sm text-gray-600 mb-3">
+        <p className="text-sm text-secondary-600 mb-3">
           Le lead sortira du pipeline et apparaîtra dans l&apos;onglet <strong>Suivi MT-LT</strong>.
           Vous pourrez ajouter des interactions et le réactiver à tout moment.
         </p>
 
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Notes contextuelles <span className="text-gray-400 font-normal">(optionnel)</span>
+          <label className="block text-sm font-medium text-secondary-700">
+            Notes contextuelles <span className="text-secondary-400 font-normal">(optionnel)</span>
           </label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Ex: client doit boucler son financement, attente fin de chantier voisin, décision en famille..."
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none"
+            className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none"
             autoFocus
           />
         </div>
@@ -99,7 +99,7 @@ export function MoveToLongTermModal({
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm text-secondary-700 bg-secondary-100 rounded-lg hover:bg-secondary-200 transition-colors disabled:opacity-50"
           >
             Annuler
           </button>

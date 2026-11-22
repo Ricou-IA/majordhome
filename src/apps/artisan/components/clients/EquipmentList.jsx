@@ -93,7 +93,7 @@ const getEquipmentColor = (type) => {
     ballon_ecs: 'bg-teal-100 text-teal-600',
     poele: 'bg-red-100 text-red-600',
   };
-  return colors[type] || 'bg-gray-100 text-gray-600';
+  return colors[type] || 'bg-secondary-100 text-secondary-600';
 };
 
 // formatDate alias → formatDateShortFR from utils
@@ -104,7 +104,7 @@ const formatDate = formatDateShortFR;
  */
 const getMaintenanceStatus = (nextDate) => {
   if (!nextDate) {
-    return { status: 'none', label: 'Non planifié', className: 'text-gray-400 bg-gray-50' };
+    return { status: 'none', label: 'Non planifié', className: 'text-secondary-400 bg-secondary-50' };
   }
 
   const today = new Date();
@@ -170,7 +170,7 @@ const ContractStatusBadge = ({ status }) => {
     },
     none: { 
       label: 'Hors contrat', 
-      className: 'bg-gray-100 text-gray-500 border-gray-200' 
+      className: 'bg-secondary-100 text-secondary-500 border-secondary-200' 
     },
   };
 
@@ -239,7 +239,7 @@ const EquipmentCard = ({
   const categoryLabel = equipment.category_id ? referentiel.labelCategorie(equipment.category_id) : null;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow relative">
+    <div className="bg-white border border-secondary-200 rounded-lg hover:shadow-sm transition-shadow relative">
       {/* En-tête */}
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
@@ -250,11 +250,11 @@ const EquipmentCard = ({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h4 className="font-medium text-gray-900">
+                <h4 className="font-medium text-secondary-900">
                   {libelleEquipement(equipment, referentiel)}
                 </h4>
                 {pricingType && categoryLabel && (
-                  <span className="text-xs text-gray-400">{categoryLabel}</span>
+                  <span className="text-xs text-secondary-400">{categoryLabel}</span>
                 )}
                 {!equipment.equipment_type_id && (
                   // Sans type : durée de repli dans les tournées, compétence par catégorie seulement.
@@ -269,12 +269,12 @@ const EquipmentCard = ({
                 )}
               </div>
               {(brand || model || equipment.installation_year || equipment.installation_type) && (
-                <p className="text-sm text-gray-600 truncate">
+                <p className="text-sm text-secondary-600 truncate">
                   {[brand, model, equipment.installation_year, equipment.installation_type === 'ventouse' ? 'Pose ventouse' : equipment.installation_type === 'verticale' ? 'Pose verticale' : null].filter(Boolean).join(' · ')}
                 </p>
               )}
               {serial_number && (
-                <p className="text-xs text-gray-400 font-mono truncate">
+                <p className="text-xs text-secondary-400 font-mono truncate">
                   N° Série : {serial_number}
                 </p>
               )}
@@ -293,7 +293,7 @@ const EquipmentCard = ({
             <div className="relative">
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 text-secondary-400 hover:text-secondary-600 hover:bg-secondary-100 rounded-lg transition-colors"
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
@@ -304,10 +304,10 @@ const EquipmentCard = ({
                     className="fixed inset-0 z-[60]"
                     onClick={() => setShowMenu(false)}
                   />
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[70] py-1">
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-secondary-200 rounded-lg shadow-lg z-[70] py-1">
                     <button
                       onClick={() => { onEdit?.(equipment); setShowMenu(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-secondary-700 hover:bg-secondary-50"
                     >
                       <Pencil className="w-4 h-4" />
                       Modifier
@@ -334,7 +334,7 @@ const EquipmentCard = ({
                     )}
 
                     {/* Séparateur */}
-                    <div className="border-t border-gray-100 my-1" />
+                    <div className="border-t border-secondary-100 my-1" />
 
                     <button
                       onClick={() => { onDelete?.(equipment); setShowMenu(false); }}
@@ -409,7 +409,7 @@ const EquipmentCard = ({
         {/* Bouton détails */}
         <button
           onClick={onToggleExpand}
-          className="mt-3 flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+          className="mt-3 flex items-center gap-1 text-sm text-secondary-500 hover:text-secondary-700"
         >
           {expanded ? (
             <>
@@ -427,21 +427,21 @@ const EquipmentCard = ({
 
       {/* Détails (expandable) */}
       {expanded && (
-        <div className="px-4 pb-4 pt-0 border-t border-gray-100 bg-gray-50 rounded-b-lg">
+        <div className="px-4 pb-4 pt-0 border-t border-secondary-100 bg-secondary-50 rounded-b-lg">
           <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
             {/* Date installation */}
             {installation_date && (
               <div>
-                <span className="text-gray-500">Installation</span>
-                <p className="text-gray-900">{formatDate(installation_date)}</p>
+                <span className="text-secondary-500">Installation</span>
+                <p className="text-secondary-900">{formatDate(installation_date)}</p>
               </div>
             )}
 
             {/* Fin garantie */}
             {warranty_end_date && (
               <div>
-                <span className="text-gray-500">Fin garantie</span>
-                <p className={hasWarranty ? 'text-green-600' : 'text-gray-900'}>
+                <span className="text-secondary-500">Fin garantie</span>
+                <p className={hasWarranty ? 'text-green-600' : 'text-secondary-900'}>
                   {formatDate(warranty_end_date)}
                 </p>
               </div>
@@ -450,16 +450,16 @@ const EquipmentCard = ({
             {/* Dernier entretien */}
             {last_maintenance_date && (
               <div>
-                <span className="text-gray-500">Dernier entretien</span>
-                <p className="text-gray-900">{formatDate(last_maintenance_date)}</p>
+                <span className="text-secondary-500">Dernier entretien</span>
+                <p className="text-secondary-900">{formatDate(last_maintenance_date)}</p>
               </div>
             )}
 
             {/* Prochain entretien */}
             {next_maintenance_date && (
               <div>
-                <span className="text-gray-500">Prochain entretien</span>
-                <p className={maintenanceStatus.status === 'overdue' ? 'text-red-600 font-medium' : 'text-gray-900'}>
+                <span className="text-secondary-500">Prochain entretien</span>
+                <p className={maintenanceStatus.status === 'overdue' ? 'text-red-600 font-medium' : 'text-secondary-900'}>
                   {formatDate(next_maintenance_date)}
                 </p>
               </div>
@@ -468,9 +468,9 @@ const EquipmentCard = ({
 
           {/* Notes */}
           {notes && (
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              <span className="text-sm text-gray-500">Notes</span>
-              <p className="text-sm text-gray-700 mt-1">{notes}</p>
+            <div className="mt-3 pt-3 border-t border-secondary-200">
+              <span className="text-sm text-secondary-500">Notes</span>
+              <p className="text-sm text-secondary-700 mt-1">{notes}</p>
             </div>
           )}
 
@@ -531,10 +531,10 @@ export function EquipmentList({
   if (!loading && equipments.length === 0) {
     return (
       <div className="text-center py-8">
-        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-          <Wrench className="w-6 h-6 text-gray-400" />
+        <div className="w-12 h-12 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <Wrench className="w-6 h-6 text-secondary-400" />
         </div>
-        <p className="text-gray-500 mb-4">Aucun équipement enregistré</p>
+        <p className="text-secondary-500 mb-4">Aucun équipement enregistré</p>
         {!readOnly && onAdd && (
           <button
             onClick={onAdd}
@@ -553,14 +553,14 @@ export function EquipmentList({
     return (
       <div className="space-y-3">
         {[1, 2].map(i => (
-          <div key={i} className="bg-white border border-gray-200 rounded-lg p-4 animate-pulse">
+          <div key={i} className="bg-white border border-secondary-200 rounded-lg p-4 animate-pulse">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-gray-200 rounded-lg" />
+              <div className="w-10 h-10 bg-secondary-200 rounded-lg" />
               <div className="flex-1">
-                <div className="h-5 w-32 bg-gray-200 rounded mb-2" />
-                <div className="h-4 w-48 bg-gray-200 rounded" />
+                <div className="h-5 w-32 bg-secondary-200 rounded mb-2" />
+                <div className="h-4 w-48 bg-secondary-200 rounded" />
               </div>
-              <div className="h-6 w-24 bg-gray-200 rounded-full" />
+              <div className="h-6 w-24 bg-secondary-200 rounded-full" />
             </div>
           </div>
         ))}
@@ -573,7 +573,7 @@ export function EquipmentList({
       {/* En-tête avec bouton ajouter */}
       {!readOnly && onAdd && (
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-gray-700">
+          <h3 className="text-sm font-medium text-secondary-700">
             {equipments.length} équipement{equipments.length !== 1 ? 's' : ''}
           </h3>
           <button

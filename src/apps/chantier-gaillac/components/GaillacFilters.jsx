@@ -9,7 +9,7 @@ const GROUPS = [
 
 function Segmented({ label, options, value, onChange }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex overflow-hidden rounded-lg border border-slate-300 bg-white">
+    <div role="group" aria-label={label} className="inline-flex overflow-hidden rounded-lg border border-secondary-300 bg-white">
       {options.map((o, i) => (
         <button
           key={o.value || 'all'}
@@ -17,8 +17,8 @@ function Segmented({ label, options, value, onChange }) {
           aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
           className={`min-h-[44px] px-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F5C542] ${
-            i ? 'border-l border-slate-300' : ''
-          } ${value === o.value ? 'bg-[#1565C0] text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+            i ? 'border-l border-secondary-300' : ''
+          } ${value === o.value ? 'bg-[#1565C0] text-white' : 'text-secondary-700 hover:bg-secondary-50'}`}
         >
           {o.label}
         </button>
@@ -41,12 +41,12 @@ export default function GaillacFilters({ filters, onChange, techniciens, options
         value={filters.techId}
         onChange={(techId) => set({ techId, planningCode: '' })}
       />
-      <label className="flex min-w-0 max-w-full items-center gap-2 text-sm text-slate-700">
+      <label className="flex min-w-0 max-w-full items-center gap-2 text-sm text-secondary-700">
         <span className="shrink-0">Journée / code</span>
         <select
           value={filters.planningCode}
           onChange={(e) => set({ planningCode: e.target.value })}
-          className="min-h-[44px] min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+          className="min-h-[44px] min-w-0 max-w-full rounded-lg border border-secondary-300 bg-white px-2 text-sm"
         >
           <option value="">Toutes</option>
           {options.map((o) => (
@@ -57,7 +57,7 @@ export default function GaillacFilters({ filters, onChange, techniciens, options
           ))}
         </select>
       </label>
-      <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-slate-700">
+      <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-secondary-700">
         <input
           type="checkbox"
           checked={filters.hideDone}
@@ -67,21 +67,21 @@ export default function GaillacFilters({ filters, onChange, techniciens, options
         Masquer les tâches validées
       </label>
       <div className="relative w-full sm:w-64">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" aria-hidden />
         <input
           type="search"
           value={filters.q}
           onChange={(e) => set({ q: e.target.value })}
           placeholder="Site, tâche, n°…"
           aria-label="Rechercher"
-          className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white pl-9 pr-9 text-sm"
+          className="min-h-[44px] w-full rounded-lg border border-secondary-300 bg-white pl-9 pr-9 text-sm"
         />
         {filters.q && (
           <button
             type="button"
             onClick={() => set({ q: '' })}
             aria-label="Effacer la recherche"
-            className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center text-slate-400 hover:text-slate-700"
+            className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center text-secondary-400 hover:text-secondary-700"
           >
             <X className="h-4 w-4" />
           </button>

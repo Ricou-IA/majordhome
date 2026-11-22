@@ -24,7 +24,7 @@ export function StepMesures({ formData, onChange, profil }) {
   return (
     <div className="space-y-4">
       <SectionTitle>Mesures et performances</SectionTitle>
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-secondary-500">
         Tous les champs sont optionnels. Renseignez les mesures effectuées.
       </p>
 

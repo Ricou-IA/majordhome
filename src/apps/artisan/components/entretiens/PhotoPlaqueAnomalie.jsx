@@ -55,7 +55,7 @@ export function PhotoPlaqueAnomalie({ anomalie }) {
             className="block w-full rounded-md overflow-hidden border border-amber-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
             title="Agrandir"
           >
-            <img src={url} alt={`Plaque signalétique${anomalie?.equipement ? ` — ${anomalie.equipement}` : ''}`} className="w-full max-h-72 object-contain bg-gray-50" />
+            <img src={url} alt={`Plaque signalétique${anomalie?.equipement ? ` — ${anomalie.equipement}` : ''}`} className="w-full max-h-72 object-contain bg-secondary-50" />
           </button>
           <a
             href={url}

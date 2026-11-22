@@ -39,8 +39,8 @@ import { BOUTON_NEUTRE, BOUTON_PRINCIPAL } from './pvBoutons';
 import { LienACopier } from './LienACopier';
 import { copierDansPressePapiers, MESSAGE_COPIE_ECHOUEE } from './pvPressePapiers';
 
-const RADIO = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 bg-white cursor-pointer '
-  + 'hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-300';
+const RADIO = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border border-secondary-300 bg-white cursor-pointer '
+  + 'hover:bg-secondary-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-300';
 
 /** Réponses déjà données, limitées aux points qui existent dans le gabarit. */
 function reponsesDuGabarit(reponses, gabarit) {
@@ -165,19 +165,19 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
       <AlertDialogPrimitive.Portal>
         <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
         <AlertDialogPrimitive.Content
-          className="fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-5 shadow-xl max-sm:max-h-[90dvh]"
+          className="fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto rounded-xl border border-secondary-200 bg-white p-5 shadow-xl max-sm:max-h-[90dvh]"
         >
-          <AlertDialogPrimitive.Title className="text-lg font-semibold text-gray-900">Préparer le PV de réception</AlertDialogPrimitive.Title>
-          <AlertDialogPrimitive.Description className="mt-1 text-sm text-gray-500">
+          <AlertDialogPrimitive.Title className="text-lg font-semibold text-secondary-900">Préparer le PV de réception</AlertDialogPrimitive.Title>
+          <AlertDialogPrimitive.Description className="mt-1 text-sm text-secondary-500">
             Le client lit cette déclaration avant de signer. Vous pouvez la reprendre tant qu&apos;il n&apos;a pas signé.
           </AlertDialogPrimitive.Description>
 
           <div className="mt-4 space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-medium text-gray-700">Équipement :</span>
+              <span className="font-medium text-secondary-700">Équipement :</span>
               {libelleType && !changerType ? (
                 <>
-                  <span className="text-gray-900">{libelleType}</span>
+                  <span className="text-secondary-900">{libelleType}</span>
                   {canEdit && !donneesInconnues && (
                     <button type="button" disabled={occupe} onClick={() => setChangerType(true)} className="text-blue-700 underline text-sm disabled:opacity-50">changer</button>
                   )}
@@ -189,7 +189,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                     value=""
                     disabled={!canEdit || donneesInconnues || isUpdatingEquipmentType || occupe}
                     onChange={(e) => choisirType(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                    className="border border-secondary-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                   >
                     <option value="">{libelleType ? 'Choisir un autre type…' : 'Choisir le type d\'équipement…'}</option>
                     {groupes.map((g) => (
@@ -198,20 +198,20 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                       </optgroup>
                     ))}
                   </select>
-                  {isUpdatingEquipmentType && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-                  {!libelleType && <span className="text-xs text-gray-500">Facultatif : sans type, les points sont ceux d&apos;un PV générique.</span>}
+                  {isUpdatingEquipmentType && <Loader2 className="w-4 h-4 animate-spin text-secondary-400" />}
+                  {!libelleType && <span className="text-xs text-secondary-500">Facultatif : sans type, les points sont ceux d&apos;un PV générique.</span>}
                 </>
               )}
             </div>
             {!donneesInconnues && (type || gabaritServeur) && (
-              <p className="text-xs text-gray-500">Points du gabarit : {LIBELLES_GABARIT[gabarit]}.</p>
+              <p className="text-xs text-secondary-500">Points du gabarit : {LIBELLES_GABARIT[gabarit]}.</p>
             )}
             {gabaritServeur && !deja && (
               <p className="text-sm text-amber-800" role="alert">{messagePv('gabarit_different')}</p>
             )}
 
             {pvEnChargement || refEnChargement ? (
-              <p className="flex items-center gap-2 text-sm text-gray-500" role="status">
+              <p className="flex items-center gap-2 text-sm text-secondary-500" role="status">
                 <Loader2 className="w-4 h-4 animate-spin" /> Chargement de la déclaration…
               </p>
             ) : donneesInconnues ? (
@@ -219,11 +219,11 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                 La déclaration n&apos;a pas pu être chargée : fermez cette fenêtre et rouvrez-la.
               </p>
             ) : deja ? (
-              <p className="text-sm text-gray-700" role="status">Le client a déjà signé ce PV : la déclaration n&apos;est plus modifiable.</p>
+              <p className="text-sm text-secondary-700" role="status">Le client a déjà signé ce PV : la déclaration n&apos;est plus modifiable.</p>
             ) : (
               <section aria-labelledby="pv-declaration" className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 id="pv-declaration" className="text-sm font-semibold text-gray-900">L&apos;entreprise déclare</h3>
+                  <h3 id="pv-declaration" className="text-sm font-semibold text-secondary-900">L&apos;entreprise déclare</h3>
                   <button
                     type="button"
                     disabled={!canEdit || occupe}
@@ -236,9 +236,9 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                 </div>
                 <div className="space-y-2">
                   {points.entreprise.map((pt) => (
-                    <fieldset key={pt.cle} className="border border-gray-200 rounded-lg px-3 py-2">
+                    <fieldset key={pt.cle} className="border border-secondary-200 rounded-lg px-3 py-2">
                       <legend className="sr-only">{pt.texte}</legend>
-                      <p className="text-sm text-gray-800 mb-1.5" aria-hidden="true">{pt.texte}</p>
+                      <p className="text-sm text-secondary-800 mb-1.5" aria-hidden="true">{pt.texte}</p>
                       <div className="flex flex-wrap gap-2">
                         {REPONSES_ENTREPRISE.map((rep) => (
                           <label key={rep} className={RADIO}>
@@ -258,7 +258,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                     </fieldset>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500">Le client verra ces réponses avant de signer.</p>
+                <p className="text-xs text-secondary-500">Le client verra ces réponses avant de signer.</p>
               </section>
             )}
           </div>
@@ -267,7 +267,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
             <p className="mt-3 text-sm text-amber-800" role="status">Répondez à chaque point pour envoyer le PV.</p>
           )}
           {communicationOuverte && chantier.email && !donneesInconnues && !deja && (
-            <p className="mt-1 text-xs text-gray-500">L&apos;e-mail part à {chantier.email}.</p>
+            <p className="mt-1 text-xs text-secondary-500">L&apos;e-mail part à {chantier.email}.</p>
           )}
           {lienManuel && <div className="mt-3"><LienACopier url={lienManuel} id={`pv-lien-${chantier.id}`} /></div>}
 

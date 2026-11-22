@@ -21,7 +21,7 @@ export default function PavePin({ valeur, onChange, onComplet, desactive }) {
         {[0, 1, 2, 3].map((i) => (
           <span
             key={i}
-            className={`w-6 h-6 rounded-full border-2 ${i < valeur.length ? 'bg-blue-600 border-blue-600' : 'border-slate-400'}`}
+            className={`w-6 h-6 rounded-full border-2 ${i < valeur.length ? 'bg-blue-600 border-blue-600' : 'border-secondary-400'}`}
           />
         ))}
       </div>
@@ -32,8 +32,8 @@ export default function PavePin({ valeur, onChange, onComplet, desactive }) {
             type="button"
             disabled={desactive}
             onClick={() => appuyer(t)}
-            className="w-24 h-20 rounded-2xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-3xl font-semibold
-              text-slate-900 flex items-center justify-center disabled:opacity-40"
+            className="w-24 h-20 rounded-2xl bg-secondary-100 hover:bg-secondary-200 active:bg-secondary-300 text-3xl font-semibold
+              text-secondary-900 flex items-center justify-center disabled:opacity-40"
             aria-label={t === 'effacer' ? 'Effacer' : t}
           >
             {t === 'effacer' ? <Delete className="w-8 h-8" /> : t}

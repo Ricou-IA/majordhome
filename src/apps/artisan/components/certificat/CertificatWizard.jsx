@@ -589,7 +589,7 @@ export function CertificatWizard({
 
       {/* Navigation */}
       {!pdfUrl && (
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between pt-4 border-t border-secondary-200">
           {/* Précédent */}
           <div>
             {!isFirstStep && (
@@ -617,7 +617,7 @@ export function CertificatWizard({
           </div>
 
           {/* Indicateur sauvegarde */}
-          <div className="text-xs text-gray-400 flex items-center gap-1">
+          <div className="text-xs text-secondary-400 flex items-center gap-1">
             {isSaving && <><Loader2 className="w-3 h-3 animate-spin" /> Sauvegarde...</>}
             {!isSaving && certificatId && <><Save className="w-3 h-3" /> Brouillon sauvegardé</>}
           </div>

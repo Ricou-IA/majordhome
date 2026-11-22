@@ -114,7 +114,7 @@ export function ChantierKanban() {
 
   // Sous le titre de chaque colonne : ce que l'étape veut dire.
   const headerExtra = useCallback(
-    (column) => (column.hint ? <p className="text-xs leading-4 text-gray-500">{column.hint}</p> : null),
+    (column) => (column.hint ? <p className="text-xs leading-4 text-secondary-500">{column.hint}</p> : null),
     [],
   );
 
@@ -141,7 +141,7 @@ export function ChantierKanban() {
       headerRight={
         <button
           onClick={refresh}
-          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
           title="Rafraîchir"
         >
           <RefreshCw className="h-4 w-4" />

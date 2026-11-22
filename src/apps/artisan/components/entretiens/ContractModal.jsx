@@ -45,10 +45,10 @@ import { construireReglages } from '@/lib/tournee/reglages.js';
 
 function Section({ title, icon: Icon, children }) {
   return (
-    <div className="py-4 border-b border-gray-100 last:border-0">
+    <div className="py-4 border-b border-secondary-100 last:border-0">
       <div className="flex items-center gap-2 mb-3">
-        <Icon className="h-4 w-4 text-gray-400" />
-        <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">{title}</h4>
+        <Icon className="h-4 w-4 text-secondary-400" />
+        <h4 className="text-sm font-semibold text-secondary-700 uppercase tracking-wide">{title}</h4>
       </div>
       <div className="space-y-2">{children}</div>
     </div>
@@ -58,7 +58,7 @@ function Section({ title, icon: Icon, children }) {
 function InfoRow({ label, value, isLink = false, href = null }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <span className="text-sm text-gray-500 flex-shrink-0">{label}</span>
+      <span className="text-sm text-secondary-500 flex-shrink-0">{label}</span>
       {isLink && href ? (
         <a
           href={href}
@@ -68,7 +68,7 @@ function InfoRow({ label, value, isLink = false, href = null }) {
           {value}
         </a>
       ) : (
-        <span className="text-sm text-gray-900 text-right truncate">{value || '-'}</span>
+        <span className="text-sm text-secondary-900 text-right truncate">{value || '-'}</span>
       )}
     </div>
   );
@@ -255,15 +255,15 @@ export function ContractModal({ contractId, isOpen, onClose }) {
       {/* Panel */}
       <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-gray-50">
-          <h3 className="text-lg font-semibold text-gray-900 truncate">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-secondary-200 bg-secondary-50">
+          <h3 className="text-lg font-semibold text-secondary-900 truncate">
             {isLoading ? 'Chargement...' : contract?.client_name || 'Détail contrat'}
           </h3>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-secondary-200 transition-colors"
           >
-            <X className="h-5 w-5 text-gray-500" />
+            <X className="h-5 w-5 text-secondary-500" />
           </button>
         </div>
 
@@ -274,7 +274,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
               <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
             </div>
           ) : !contract ? (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+            <div className="flex flex-col items-center justify-center py-20 text-secondary-500">
               <AlertCircle className="h-10 w-10 mb-3" />
               <p>Contrat introuvable</p>
             </div>
@@ -303,7 +303,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
 
               {/* Carte Client lié */}
               {contract.client_id && (
-                <div className="py-4 border-b border-gray-100">
+                <div className="py-4 border-b border-secondary-100">
                   <LinkedClientCard
                     name={contract.client_name}
                     clientNumber={contract.client_number}
@@ -340,7 +340,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
               {/* Section Visite en cours */}
               <Section title={`Visite ${currentYear}`} icon={Calendar}>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Statut</span>
+                  <span className="text-sm text-secondary-500">Statut</span>
                   <VisitBadge status={badgeStatus} size="md" />
                 </div>
                 {nextVisitDate && (
@@ -382,27 +382,27 @@ export function ContractModal({ contractId, isOpen, onClose }) {
               <Section title="Historique visites" icon={History}>
                 {loadingVisits ? (
                   <div className="flex justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                    <Loader2 className="h-5 w-5 animate-spin text-secondary-400" />
                   </div>
                 ) : visits.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic">Aucune visite enregistrée</p>
+                  <p className="text-sm text-secondary-400 italic">Aucune visite enregistrée</p>
                 ) : (
-                  <div className="overflow-hidden rounded-lg border border-gray-200">
+                  <div className="overflow-hidden rounded-lg border border-secondary-200">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-gray-50">
-                          <th className="text-left px-3 py-2 font-medium text-gray-600">Année</th>
-                          <th className="text-left px-3 py-2 font-medium text-gray-600">Date</th>
-                          <th className="text-left px-3 py-2 font-medium text-gray-600">Statut</th>
+                        <tr className="bg-secondary-50">
+                          <th className="text-left px-3 py-2 font-medium text-secondary-600">Année</th>
+                          <th className="text-left px-3 py-2 font-medium text-secondary-600">Date</th>
+                          <th className="text-left px-3 py-2 font-medium text-secondary-600">Statut</th>
                         </tr>
                       </thead>
                       <tbody>
                         {visits.map((visit) => {
                           const done = visit.status === 'completed';
                           return (
-                            <tr key={visit.id} className="border-t border-gray-100">
-                              <td className="px-3 py-2 text-gray-900">{visit.visit_year}</td>
-                              <td className="px-3 py-2 text-gray-600">{done ? formatDateFR(visit.visit_date) : '—'}</td>
+                            <tr key={visit.id} className="border-t border-secondary-100">
+                              <td className="px-3 py-2 text-secondary-900">{visit.visit_year}</td>
+                              <td className="px-3 py-2 text-secondary-600">{done ? formatDateFR(visit.visit_date) : '—'}</td>
                               <td className="px-3 py-2">
                                 <VisitBadge status={done ? 'completed' : visit.status === 'cancelled' ? 'refuse' : 'non_realise'} />
                               </td>

@@ -21,7 +21,7 @@ const NATURES = [
 
 /** Flèche entre deux étages de l'entonnoir (bureau seulement). */
 function EtageSuivant() {
-  return <ChevronRight className="hidden sm:block w-4 h-4 text-gray-300 shrink-0" aria-hidden="true" />;
+  return <ChevronRight className="hidden sm:block w-4 h-4 text-secondary-300 shrink-0" aria-hidden="true" />;
 }
 
 /**
@@ -65,14 +65,14 @@ export function CalendarFilters({ filters, setFilters, teamList }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {/* Étage 1 — nature */}
-      <div className="flex items-center bg-gray-100 rounded-lg p-0.5" role="group" aria-label="Nature des rendez-vous">
+      <div className="flex items-center bg-secondary-100 rounded-lg p-0.5" role="group" aria-label="Nature des rendez-vous">
         {NATURES.map(({ value, label, icon: Icon, kinds: k }) => (
           <button
             key={value}
             onClick={() => appliquer({ kinds: k })}
             aria-pressed={nature === value}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-              nature === value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              nature === value ? 'bg-white text-secondary-900 shadow-sm' : 'text-secondary-600 hover:text-secondary-900'
             }`}
           >
             {Icon && <Icon className="w-4 h-4" />}
@@ -95,8 +95,8 @@ export function CalendarFilters({ filters, setFilters, teamList }) {
               aria-pressed={isSel}
               className={`inline-flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 sm:py-1 rounded-full border text-sm transition-colors ${
                 isSel
-                  ? 'border-gray-400 bg-gray-100 text-gray-900'
-                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'border-secondary-400 bg-secondary-100 text-secondary-900'
+                  : 'border-secondary-200 bg-white text-secondary-600 hover:bg-secondary-50'
               }`}
             >
               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: h.color }} />
@@ -115,7 +115,7 @@ export function CalendarFilters({ filters, setFilters, teamList }) {
           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
             filters.appointmentType
               ? 'bg-blue-50 border-blue-200 text-blue-700'
-              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              : 'bg-white border-secondary-300 text-secondary-700 hover:bg-secondary-50'
           }`}
         >
           <CalendarIcon className="w-4 h-4" />
@@ -125,10 +125,10 @@ export function CalendarFilters({ filters, setFilters, teamList }) {
         {showTypeDropdown && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setShowTypeDropdown(false)} />
-            <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+            <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-secondary-200 rounded-lg shadow-lg z-20 py-1">
               <button
                 onClick={() => { setFilters(f => ({ ...f, appointmentType: null })); setShowTypeDropdown(false); }}
-                className={`w-full flex items-center px-3 py-2 text-sm text-left ${!filters.appointmentType ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                className={`w-full flex items-center px-3 py-2 text-sm text-left ${!filters.appointmentType ? 'bg-blue-50 text-blue-700' : 'text-secondary-700 hover:bg-secondary-50'}`}
               >
                 Tous les types
               </button>
@@ -137,7 +137,7 @@ export function CalendarFilters({ filters, setFilters, teamList }) {
                   key={type.value}
                   onClick={() => { setFilters(f => ({ ...f, appointmentType: type.value })); setShowTypeDropdown(false); }}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left ${
-                    filters.appointmentType === type.value ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                    filters.appointmentType === type.value ? 'bg-blue-50 text-blue-700' : 'text-secondary-700 hover:bg-secondary-50'
                   }`}
                 >
                   <span className={`w-3 h-3 rounded-full ${type.bgClass}`} />
@@ -169,7 +169,7 @@ export function CalendarFilters({ filters, setFilters, teamList }) {
           className={`hidden sm:inline-flex sm:ml-auto items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
             filters.showTolerance
               ? 'bg-blue-50 border-blue-200 text-blue-700'
-              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+              : 'bg-white border-secondary-300 text-secondary-500 hover:bg-secondary-50'
           }`}
         >
           <MoveHorizontal className="w-4 h-4" />

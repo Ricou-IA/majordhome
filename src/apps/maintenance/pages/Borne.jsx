@@ -63,23 +63,23 @@ export default function Borne() {
   const rienAujourdhui = !chargement && tableau.enRetard.length === 0 && tableau.unites.length === 0;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white">
-      <header className="flex items-center justify-between gap-6 px-8 py-5 border-b border-slate-700">
+    <div className="min-h-screen bg-secondary-900 text-white">
+      <header className="flex items-center justify-between gap-6 px-8 py-5 border-b border-secondary-700">
         <div className="flex items-center gap-4">
           {!estCompteBorne && (
-            <Link to="/maintenance" className="p-2 rounded-lg hover:bg-slate-800" aria-label="Retour au suivi">
-              <ArrowLeft className="w-6 h-6 text-slate-400" />
+            <Link to="/maintenance" className="p-2 rounded-lg hover:bg-secondary-800" aria-label="Retour au suivi">
+              <ArrowLeft className="w-6 h-6 text-secondary-400" />
             </Link>
           )}
           {company.logoUrl && <img src={company.logoUrl} alt="" className="h-12 w-auto rounded bg-white p-1" />}
           <div>
             <p className="text-2xl font-bold">{settings?.brand_name || organization?.name}</p>
-            <p className="text-lg text-slate-400">{vocabulaire(settings).module} — tâches du jour</p>
+            <p className="text-lg text-secondary-400">{vocabulaire(settings).module} — tâches du jour</p>
           </div>
         </div>
         <div className="text-right">
           <p className="text-4xl font-bold tabular-nums">{HEURE.format(maintenant)}</p>
-          <p className="text-lg text-slate-300 first-letter:uppercase">{DATE_LONGUE.format(maintenant)}</p>
+          <p className="text-lg text-secondary-300 first-letter:uppercase">{DATE_LONGUE.format(maintenant)}</p>
         </div>
       </header>
 
@@ -92,7 +92,7 @@ export default function Borne() {
 
       <main className="px-8 py-6 space-y-8">
         {chargement && (
-          <div className="flex justify-center py-24"><Loader2 className="w-12 h-12 animate-spin text-slate-400" /></div>
+          <div className="flex justify-center py-24"><Loader2 className="w-12 h-12 animate-spin text-secondary-400" /></div>
         )}
 
         {tableau.enRetard.length > 0 && (
@@ -118,7 +118,7 @@ export default function Borne() {
 
         {tableau.unites.map((g) => (
           <section key={g.unite.id}>
-            <h2 className="text-2xl font-bold text-slate-100 mb-4">{g.unite.name}</h2>
+            <h2 className="text-2xl font-bold text-secondary-100 mb-4">{g.unite.name}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {g.aFaire.map((x) => (
                 <TuileTache
@@ -136,7 +136,7 @@ export default function Borne() {
         ))}
 
         {rienAujourdhui && !horsLigne && (
-          <p className="py-24 text-center text-3xl text-slate-300">✓ Aucune tâche prévue aujourd&apos;hui.</p>
+          <p className="py-24 text-center text-3xl text-secondary-300">✓ Aucune tâche prévue aujourd&apos;hui.</p>
         )}
       </main>
 

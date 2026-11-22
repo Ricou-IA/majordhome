@@ -255,15 +255,15 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
               style={{ backgroundColor: statusConfig.color }}
             />
             <div className="min-w-0">
-              <h2 className="text-base font-semibold text-gray-900 truncate">{name}</h2>
-              <p className="text-xs text-gray-500">{statusConfig.label}</p>
-              {chantier.label && <p className="text-xs text-gray-500 truncate">{chantier.label}</p>}
+              <h2 className="text-base font-semibold text-secondary-900 truncate">{name}</h2>
+              <p className="text-xs text-secondary-500">{statusConfig.label}</p>
+              {chantier.label && <p className="text-xs text-secondary-500 truncate">{chantier.label}</p>}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg transition-colors"
+            className="p-2 text-secondary-400 hover:text-secondary-600 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -276,8 +276,8 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
           {!showScheduler && (<>
           {/* Infos client */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-gray-700">
-              <User className="w-4 h-4 text-gray-400" />
+            <div className="flex items-center gap-2 text-sm text-secondary-700">
+              <User className="w-4 h-4 text-secondary-400" />
               <span>{name}</span>
               {amount > 0 && (
                 <span className="ml-auto text-sm font-semibold text-emerald-700">
@@ -286,22 +286,22 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
               )}
             </div>
             {(chantier.address || chantier.postal_code || chantier.city) && (
-              <div className="flex items-start gap-2 text-sm text-gray-500">
-                <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 text-sm text-secondary-500">
+                <MapPin className="w-4 h-4 text-secondary-400 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <AdresseItineraire
                     sansIcone
                     adresse={formaterAdresse({ address: chantier.address, postalCode: chantier.postal_code, city: chantier.city })}
-                    className="text-sm text-gray-500"
+                    className="text-sm text-secondary-500"
                   />
                   {isLoadingDriving && (
-                    <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                    <div className="text-xs text-secondary-400 mt-0.5 flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       Calcul du trajet…
                     </div>
                   )}
                   {!isLoadingDriving && drivingInfo && (
-                    <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                    <div className="text-xs text-secondary-400 mt-0.5 flex items-center gap-1">
                       <Car className="w-3 h-3" />
                       {drivingInfo.durationMinutes} min · {drivingInfo.distanceKm} km{orgHq?.label ? ` depuis ${orgHq.label}` : ''}
                     </div>
@@ -413,7 +413,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
           });
 
           return (
-            <div className={`px-5 py-3 border-t bg-gray-50 rounded-b-xl flex items-center gap-2 flex-wrap ${MODAL_FOOTER_PHONE}`}>
+            <div className={`px-5 py-3 border-t bg-secondary-50 rounded-b-xl flex items-center gap-2 flex-wrap ${MODAL_FOOTER_PHONE}`}>
               {/* Retour arrière à gauche */}
               {backTransitions.map((targetStatus) => {
                 const config = getChantierStatusConfig(targetStatus);
@@ -423,7 +423,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                     type="button"
                     onClick={() => handleTransition(targetStatus)}
                     disabled={isUpdatingStatus}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-500 bg-white transition-colors hover:shadow-sm hover:bg-gray-100 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-secondary-300 text-secondary-500 bg-white transition-colors hover:shadow-sm hover:bg-secondary-100 disabled:opacity-50"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     {config.label}
@@ -433,7 +433,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
               {canGroup && (
                 <button type="button" onClick={() => setShowGroup(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-100">
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-secondary-300 text-secondary-600 bg-white hover:bg-secondary-100">
                   <Layers className="w-3.5 h-3.5" /> Grouper avec…
                 </button>
               )}

@@ -67,39 +67,39 @@ function GrandSecteurHeader({ group, isExpanded, onToggle, canPlan, onPlanGroup,
   const isNonLocalise = group.id === 'non-localise';
 
   return (
-    <div className="flex items-center gap-1 bg-gray-50">
+    <div className="flex items-center gap-1 bg-secondary-50">
       <button onClick={onToggle} className="flex-1 flex items-center gap-3 px-4 py-3 text-left min-w-0">
-        <div className="flex-shrink-0 text-gray-400">
+        <div className="flex-shrink-0 text-secondary-400">
           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </div>
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <MapPin className={`h-4 w-4 flex-shrink-0 ${isNonLocalise ? 'text-gray-400' : 'text-indigo-500'}`} />
-          <span className="font-semibold text-gray-900 truncate uppercase">{group.name}</span>
-          <span className="text-xs text-gray-400 flex-shrink-0">
+          <MapPin className={`h-4 w-4 flex-shrink-0 ${isNonLocalise ? 'text-secondary-400' : 'text-indigo-500'}`} />
+          <span className="font-semibold text-secondary-900 truncate uppercase">{group.name}</span>
+          <span className="text-xs text-secondary-400 flex-shrink-0">
             {group.totalContracts} contrat{group.totalContracts > 1 ? 's' : ''}
           </span>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="hidden sm:flex items-center gap-2">
-            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="w-20 h-2 bg-secondary-200 rounded-full overflow-hidden">
               <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${completionPct}%` }} />
             </div>
-            <span className="text-xs text-gray-500 w-8 text-right">{completionPct}%</span>
+            <span className="text-xs text-secondary-500 w-8 text-right">{completionPct}%</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="inline-flex items-center gap-1 text-green-600">
               <CheckCircle2 className="h-3.5 w-3.5" />
               {group.visitsDone}
             </span>
-            <span className="text-gray-300">|</span>
+            <span className="text-secondary-300">|</span>
             <span className="inline-flex items-center gap-1 text-amber-600">
               <Clock className="h-3.5 w-3.5" />
               {group.visitsPending}
             </span>
             {group.visitsRefused > 0 && (
               <>
-                <span className="text-gray-300">|</span>
-                <span className="inline-flex items-center gap-1 text-gray-500" title="Refusés par le client cette année">
+                <span className="text-secondary-300">|</span>
+                <span className="inline-flex items-center gap-1 text-secondary-500" title="Refusés par le client cette année">
                   <Ban className="h-3.5 w-3.5" />
                   {group.visitsRefused}
                 </span>
@@ -181,13 +181,13 @@ function ContractRow({
   return (
     <div
       className={`flex items-center gap-3 px-4 py-2.5 pl-11 transition-colors group ${
-        isDone ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-100'
+        isDone ? 'opacity-50 bg-secondary-50' : 'hover:bg-secondary-100'
       }`}
     >
       {/* Nom (cliquable) */}
       <span
         onClick={() => onContractClick?.(contract)}
-        className="font-medium text-gray-900 truncate min-w-0 cursor-pointer hover:text-blue-600 transition-colors"
+        className="font-medium text-secondary-900 truncate min-w-0 cursor-pointer hover:text-blue-600 transition-colors"
       >
         {contract.client_name || 'Sans nom'}
       </span>
@@ -200,14 +200,14 @@ function ContractRow({
 
       {/* Commune réelle du client */}
       {contract.client_city && (
-        <span className="text-xs text-gray-400 flex-shrink-0 hidden sm:inline">
+        <span className="text-xs text-secondary-400 flex-shrink-0 hidden sm:inline">
           {contract.client_city}
         </span>
       )}
 
       {/* Mois de référence */}
       {monthLabel && (
-        <span className="text-xs text-gray-400 flex-shrink-0 hidden sm:inline">
+        <span className="text-xs text-secondary-400 flex-shrink-0 hidden sm:inline">
           {monthLabel}
         </span>
       )}
@@ -241,7 +241,7 @@ function ContractRow({
           className={`inline-flex items-center justify-center p-1.5 rounded border transition-colors flex-shrink-0 ${
             smsSent
               ? 'border-green-300 text-green-600 bg-green-50'
-              : 'border-gray-300 text-gray-600 bg-white hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700'
+              : 'border-secondary-300 text-secondary-600 bg-white hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700'
           } disabled:opacity-60`}
         >
           {smsLoading ? (
@@ -291,8 +291,8 @@ function SectorContracts({
   canSendReminder,
 }) {
   return (
-    <div className="bg-white border-t border-gray-100">
-      <div className="divide-y divide-gray-100">
+    <div className="bg-white border-t border-secondary-100">
+      <div className="divide-y divide-secondary-100">
         {contracts.map((contract) => (
           <ContractRow
             key={contract.id}
@@ -448,10 +448,10 @@ export function SectorGroupView({
 
   if (!sectors || sectors.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-        <MapIcon className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-        <p className="text-gray-700 font-medium">Aucun secteur trouvé</p>
-        <p className="text-sm text-gray-500 mt-1">
+      <div className="bg-white rounded-xl border border-secondary-200 p-12 text-center">
+        <MapIcon className="h-10 w-10 text-secondary-300 mx-auto mb-3" />
+        <p className="text-secondary-700 font-medium">Aucun secteur trouvé</p>
+        <p className="text-sm text-secondary-500 mt-1">
           Les contrats seront groupés par grand secteur géographique ici.
         </p>
       </div>
@@ -476,27 +476,27 @@ export function SectorGroupView({
 
       {/* Header stats + filtre mois + actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-4 text-sm text-gray-600">
+        <div className="flex items-center gap-4 text-sm text-secondary-600">
           <span>
             <strong>{grandSecteurs.length}</strong> secteur
             {grandSecteurs.length > 1 ? 's' : ''}
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-secondary-300">|</span>
           <span>
             <strong>{totalContracts}</strong> contrat{totalContracts > 1 ? 's' : ''}
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-secondary-300">|</span>
           <span className="text-green-600">
             <strong>{totalDone}</strong> fait{totalDone > 1 ? 's' : ''}
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-secondary-300">|</span>
           <span className="text-amber-600">
             <strong>{totalPending}</strong> à faire
           </span>
           {totalRefused > 0 && (
             <>
-              <span className="text-gray-300">|</span>
-              <span className="text-gray-500" title="Entretien de l'année refusé par le client : ni à planifier, ni à relancer">
+              <span className="text-secondary-300">|</span>
+              <span className="text-secondary-500" title="Entretien de l'année refusé par le client : ni à planifier, ni à relancer">
                 <strong>{totalRefused}</strong> refusé{totalRefused > 1 ? 's' : ''}
               </span>
             </>
@@ -506,11 +506,11 @@ export function SectorGroupView({
         <div className="flex items-center gap-3">
           {/* Filtre mois de référence */}
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-400" />
+            <Calendar className="h-4 w-4 text-secondary-400" />
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+              className="text-sm border border-secondary-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
             >
               <option value="">Tous les mois</option>
               {MONTHS.map((m) => (
@@ -529,7 +529,7 @@ export function SectorGroupView({
             >
               Tout déplier
             </button>
-            <span className="text-gray-300">|</span>
+            <span className="text-secondary-300">|</span>
             <button
               onClick={collapseAll}
               className="text-xs text-blue-600 hover:underline"
@@ -542,9 +542,9 @@ export function SectorGroupView({
 
       {/* Message si filtre actif et aucun résultat */}
       {(selectedMonth || searchQuery.trim()) && filteredSectors.length === 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-          <Calendar className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-gray-500 text-sm">
+        <div className="bg-white rounded-xl border border-secondary-200 p-8 text-center">
+          <Calendar className="h-8 w-8 text-secondary-300 mx-auto mb-2" />
+          <p className="text-secondary-500 text-sm">
             Aucun contrat trouvé
             {selectedMonth && (
               <> pour le mois <strong>{MONTHS.find((m) => m.value === parseInt(selectedMonth))?.label}</strong></>
@@ -567,7 +567,7 @@ export function SectorGroupView({
             );
             const groupPlannable = plannable.length;
             return (
-              <div key={group.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div key={group.id} className="bg-white rounded-xl border border-secondary-200 overflow-hidden">
                 <GrandSecteurHeader
                   group={group}
                   isExpanded={isGroupExpanded}

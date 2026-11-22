@@ -9,7 +9,7 @@ const KpiCard = ({ icon: Icon, label, value, subtitle, color = 'blue', hint }) =
     violet: 'bg-violet-100 text-violet-700',
     rose: 'bg-rose-100 text-rose-700',
     indigo: 'bg-indigo-100 text-indigo-700',
-    gray: 'bg-gray-100 text-gray-700',
+    gray: 'bg-secondary-100 text-secondary-700',
   };
 
   return (

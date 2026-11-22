@@ -125,15 +125,15 @@ export function MergeLeadDialog({ open, onOpenChange, lead, orgId, onMerged }) {
       onConfirm={handleConfirm}
     >
       <div className="mt-4 space-y-3">
-        <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-          <GitMerge className="h-4 w-4 text-gray-500" />
+        <p className="text-sm font-medium text-secondary-700 flex items-center gap-1.5">
+          <GitMerge className="h-4 w-4 text-secondary-500" />
           Carte à absorber
         </p>
 
-        {loadingCandidates && <p className="text-sm text-gray-500 italic">Recherche des doublons…</p>}
+        {loadingCandidates && <p className="text-sm text-secondary-500 italic">Recherche des doublons…</p>}
 
         {!loadingCandidates && candidates.length === 0 && (
-          <p className="text-sm text-gray-500 italic">
+          <p className="text-sm text-secondary-500 italic">
             Aucune autre carte active ne partage le client, le téléphone, l&apos;email ou le nom de celle-ci.
           </p>
         )}
@@ -148,13 +148,13 @@ export function MergeLeadDialog({ open, onOpenChange, lead, orgId, onMerged }) {
                   type="button"
                   onClick={() => setSelected(c)}
                   className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                    isSel ? 'bg-primary-50 border-primary-300' : 'bg-white border-gray-200 hover:bg-gray-50'
+                    isSel ? 'bg-primary-50 border-primary-300' : 'bg-white border-secondary-200 hover:bg-secondary-50'
                   }`}
                 >
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-secondary-900">
                     {c.display_name || `${c.last_name || ''} ${c.first_name || ''}`.trim() || 'Sans nom'}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-secondary-500">
                     {[
                       c.status_label,
                       c.city,
@@ -171,19 +171,19 @@ export function MergeLeadDialog({ open, onOpenChange, lead, orgId, onMerged }) {
         )}
 
         {selected && (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+          <div className="rounded-lg border border-secondary-200 bg-secondary-50 p-3 text-xs text-secondary-700">
             <p className="font-medium mb-1">Sera transféré depuis cette carte :</p>
             {counts ? (
               <ul className="list-disc list-inside space-y-0.5">
                 <li><span className="font-medium">{counts.quotes}</span> devis Pennylane rattaché{counts.quotes > 1 ? 's' : ''}</li>
                 <li><span className="font-medium">{counts.appointments}</span> RDV planning</li>
                 <li><span className="font-medium">{counts.activities}</span> activité{counts.activities > 1 ? 's' : ''} (timeline)</li>
-                <li className="text-gray-500">+ interactions, mailings, visites techniques, études, dossiers PV</li>
+                <li className="text-secondary-500">+ interactions, mailings, visites techniques, études, dossiers PV</li>
               </ul>
             ) : (
-              <p className="text-gray-500 italic">Calcul en cours…</p>
+              <p className="text-secondary-500 italic">Calcul en cours…</p>
             )}
-            <p className="mt-2 text-gray-500 italic">
+            <p className="mt-2 text-secondary-500 italic">
               Le statut le plus avancé est conservé (Gagné l&apos;emporte). Le placement Kanban reste piloté par Pennylane.
             </p>
           </div>

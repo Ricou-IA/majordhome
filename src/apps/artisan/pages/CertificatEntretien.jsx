@@ -269,12 +269,12 @@ export default function CertificatEntretien() {
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-secondary-100 rounded-lg transition-colors">
+            <ArrowLeft className="w-5 h-5 text-secondary-600" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Certificat d&apos;entretien</h1>
-            <p className="text-sm text-gray-500">{certificat.reference}</p>
+            <h1 className="text-xl font-bold text-secondary-900">Certificat d&apos;entretien</h1>
+            <p className="text-sm text-secondary-500">{certificat.reference}</p>
           </div>
         </div>
 
@@ -315,12 +315,12 @@ export default function CertificatEntretien() {
     <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        <button onClick={() => navigate(-1)} className="p-2 hover:bg-secondary-100 rounded-lg transition-colors">
+          <ArrowLeft className="w-5 h-5 text-secondary-600" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Certificat d&apos;entretien</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl font-bold text-secondary-900">Certificat d&apos;entretien</h1>
+          <p className="text-sm text-secondary-500">
             {client?.display_name || client?.last_name || 'Client'}
             {equipment ? ` — ${equipment.brand || ''} ${equipment.model || ''}`.trim() : ''}
           </p>

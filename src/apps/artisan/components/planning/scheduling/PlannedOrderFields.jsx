@@ -14,8 +14,8 @@ import { useEffect, useState } from 'react';
 import { Users, CalendarRange } from 'lucide-react';
 
 const inputClass =
-  'w-16 px-2 py-1 border border-gray-300 rounded-md text-sm text-center tabular-nums ' +
-  'focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400';
+  'w-16 px-2 py-1 border border-secondary-300 rounded-md text-sm text-center tabular-nums ' +
+  'focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-secondary-50 disabled:text-secondary-400';
 
 /** Normalise une saisie : entier ≥ 1 ou null. */
 function normaliser(value, max) {
@@ -49,9 +49,9 @@ export function PlannedOrderFields({ teamSize = null, days = null, onChange, dis
   };
 
   return (
-    <div className="flex items-center gap-4 text-sm text-gray-700">
+    <div className="flex items-center gap-4 text-sm text-secondary-700">
       <label className="flex items-center gap-1.5">
-        <Users className="w-4 h-4 text-gray-400" />
+        <Users className="w-4 h-4 text-secondary-400" />
         <input
           type="number"
           min={1}
@@ -67,9 +67,9 @@ export function PlannedOrderFields({ teamSize = null, days = null, onChange, dis
         />
         <span>pers.</span>
       </label>
-      <span className="text-gray-300">×</span>
+      <span className="text-secondary-300">×</span>
       <label className="flex items-center gap-1.5">
-        <CalendarRange className="w-4 h-4 text-gray-400" />
+        <CalendarRange className="w-4 h-4 text-secondary-400" />
         <input
           type="number"
           min={1}

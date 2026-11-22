@@ -80,10 +80,10 @@ const STATUS_LABEL_TO_COLUMN_KEY = {
  * Couleur du badge "jours dans statut" selon le délai
  */
 function getDaysColor(days) {
-  if (days == null) return 'text-gray-400';
+  if (days == null) return 'text-secondary-400';
   if (days > 7) return 'text-red-500';
   if (days > 3) return 'text-amber-500';
-  return 'text-gray-400';
+  return 'text-secondary-400';
 }
 
 /**
@@ -224,14 +224,14 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
             </span>
           </>
         ) : (
-          <CtxIcon className="h-4 w-4 text-gray-300" />
+          <CtxIcon className="h-4 w-4 text-secondary-300" />
         )}
       </div>
 
       {/* Contenu carte */}
       <div className="flex-1 min-w-0 p-2.5">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-medium text-sm text-gray-900 truncate">{name}</p>
+          <p className="font-medium text-sm text-secondary-900 truncate">{name}</p>
           <div className="flex items-center gap-1.5 shrink-0">
             {onMoveToLongTerm && LONG_TERM_ELIGIBLE_STATUSES.has(lead.statuses?.label) && (
               <button
@@ -243,7 +243,7 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
                 <Hourglass className="h-3.5 w-3.5" />
               </button>
             )}
-            <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
+            <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-secondary-400'}`}>
               {formatEuroCeil(amount)}
             </span>
           </div>
@@ -325,7 +325,7 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
           </p>
         )}
         {lead.next_action && (
-          <p className="text-xs text-gray-500 mt-1.5 truncate">
+          <p className="text-xs text-secondary-500 mt-1.5 truncate">
             → {lead.next_action}
           </p>
         )}

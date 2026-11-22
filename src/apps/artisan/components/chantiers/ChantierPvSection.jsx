@@ -68,7 +68,7 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
                 {avecReserves ? 'PV signé avec réserves' : 'PV signé'}
               </p>
               {signeEnLigne && (
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-secondary-600">
                   Signé en ligne le {formatDateTimeFR(chantier.pv_signed_at)}
                   {pv?.signataire_nom ? ` par ${pv.signataire_nom}` : ''}
                 </p>
@@ -106,7 +106,7 @@ export function ChantierPvSection({ chantier, canEdit, isUpdatingStatus, onSigne
           </p>
 
           {envoye && (
-            <p className="text-xs text-gray-700">
+            <p className="text-xs text-secondary-700">
               Lien envoyé le {formatDateTimeFR(chantier.pv_sent_at)}
               {pv?.sent_to ? ` à ${pv.sent_to}` : ''}
               {pv?.sent_count > 1 ? ` (${pv.sent_count} envois)` : ''}

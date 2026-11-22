@@ -13,12 +13,12 @@ export default function ChantierGaillacPartage() {
   const { data, isLoading, error, isFetching, dataUpdatedAt } = useChantierGaillacPartage(token);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-secondary-50">
       <div className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 sm:px-6">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Chantier Gaillac – Préconisations P2</h1>
-            <p className="mt-1 text-sm text-slate-600">Mayer Énergie pour Veolia · devis D-2026-09452 et D-2026-09411</p>
+            <h1 className="text-2xl font-bold text-secondary-900 sm:text-3xl">Chantier Gaillac – Préconisations P2</h1>
+            <p className="mt-1 text-sm text-secondary-600">Mayer Énergie pour Veolia · devis D-2026-09452 et D-2026-09411</p>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-[#1565C0] bg-[#E3EEFB] px-3 py-1 text-xs font-semibold text-[#0D47A1]">
             <Eye className="h-3.5 w-3.5" aria-hidden />Consultation seule
@@ -26,7 +26,7 @@ export default function ChantierGaillacPartage() {
         </header>
 
         {isLoading ? (
-          <div className="flex items-center gap-2 py-12 text-slate-500">
+          <div className="flex items-center gap-2 py-12 text-secondary-500">
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> Chargement du suivi…
           </div>
         ) : error || !data ? (

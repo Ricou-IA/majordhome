@@ -304,7 +304,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
       {/* Modale */}
       <div className={`fixed inset-4 md:inset-8 lg:inset-16 bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-secondary-200">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
               isCreateMode ? 'bg-green-100' : 'bg-blue-100'
@@ -314,7 +314,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
                 : <User className="w-5 h-5 text-blue-600" />}
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-secondary-900">
                 {isCreateMode ? 'Nouveau client' : (loading ? 'Chargement...' : displayName)}
               </h2>
               {!isCreateMode && client && (
@@ -331,7 +331,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
                 onClick={handleToggleLock}
                 className={`p-2 rounded-lg transition-colors ${
                   isLocked
-                    ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                    ? 'text-secondary-400 hover:text-secondary-600 hover:bg-secondary-100'
                     : 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
                 }`}
                 title={isLocked ? 'Déverrouiller pour modifier' : 'Verrouiller (annule les modifications)'}
@@ -341,7 +341,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
             )}
             <button
               onClick={handleClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-secondary-400 hover:text-secondary-600 hover:bg-secondary-100 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -350,7 +350,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
 
         {/* Onglets */}
         {!isCreateMode && (
-          <div className="flex border-b border-gray-200 px-6">
+          <div className="flex border-b border-secondary-200 px-6">
             {TABS.map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -361,13 +361,13 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                     isActive
                       ? 'text-blue-600 border-blue-600'
-                      : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+                      : 'text-secondary-500 border-transparent hover:text-secondary-700 hover:border-secondary-300'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
                   {tab.label}
                   {tab.id === 'equipments' && client?.equipments_count > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">
+                    <span className="ml-1 px-1.5 py-0.5 text-xs bg-secondary-100 text-secondary-600 rounded-full">
                       {client.equipments_count}
                     </span>
                   )}
@@ -396,7 +396,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
         </div>
 
         {/* Footer */}
-        <div className={`flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 ${MODAL_FOOTER_PHONE}`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-t border-secondary-200 bg-secondary-50 ${MODAL_FOOTER_PHONE}`}>
           <div>
             {errors.general && (
               <p className="text-sm text-red-600 flex items-center gap-1">
@@ -418,7 +418,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
           <div className="flex items-center gap-3">
             <button
               onClick={handleClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+              className="px-4 py-2 text-secondary-700 hover:bg-secondary-200 rounded-lg transition-colors"
             >
               Fermer
             </button>

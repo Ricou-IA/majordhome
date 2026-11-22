@@ -52,7 +52,7 @@ const PL_STATUS_LABELS = {
 const ORDER_ACTIVE_CLASS = {
   recu: 'bg-emerald-500 text-white',
   commande: 'bg-st-info text-white',
-  na: 'bg-gray-200 text-gray-600',
+  na: 'bg-secondary-200 text-secondary-600',
 };
 
 /**
@@ -61,8 +61,8 @@ const ORDER_ACTIVE_CLASS = {
 function ApproToggle({ label, value, onChange, disabled }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-sm text-gray-700">{label}</span>
-      <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+      <span className="text-sm text-secondary-700">{label}</span>
+      <div className="inline-flex rounded-lg border border-secondary-200 overflow-hidden shrink-0">
         {ORDER_STATUSES.map((s) => {
           const active = value === s.value;
           return (
@@ -74,8 +74,8 @@ function ApproToggle({ label, value, onChange, disabled }) {
               onClick={() => onChange(active ? null : s.value)}
               title={active ? 'Cliquer à nouveau pour effacer' : undefined}
               disabled={disabled}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors border-r border-gray-200 last:border-r-0 disabled:cursor-not-allowed disabled:opacity-60 ${
-                active ? ORDER_ACTIVE_CLASS[s.value] : 'bg-white text-gray-500 hover:bg-gray-50'
+              className={`px-3 py-1.5 text-xs font-medium transition-colors border-r border-secondary-200 last:border-r-0 disabled:cursor-not-allowed disabled:opacity-60 ${
+                active ? ORDER_ACTIVE_CLASS[s.value] : 'bg-white text-secondary-500 hover:bg-secondary-50'
               }`}
             >
               {s.label}
@@ -182,7 +182,7 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
       </h3>
 
       {/* Suivi appro : 2 axes */}
-      <div className="space-y-2.5 p-3 bg-white border border-gray-200 rounded-lg">
+      <div className="space-y-2.5 p-3 bg-white border border-secondary-200 rounded-lg">
         <ApproToggle
           label="Équipement"
           value={equip}
@@ -200,7 +200,7 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
       {/* Référence devis rattachés (lecture seule + éjection) */}
       {quotes.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-secondary-400">
             Devis de ce chantier
           </p>
           {quotes.map((q) => {
@@ -212,20 +212,20 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm ${
                   q.is_validated
                     ? 'bg-blue-50 border-blue-100'
-                    : 'bg-gray-50 border-gray-200'
+                    : 'bg-secondary-50 border-secondary-200'
                 }`}
               >
                 <div className="min-w-0 flex-1">
-                  <span className="font-medium text-gray-900">{label}</span>
+                  <span className="font-medium text-secondary-900">{label}</span>
                   {!q.is_validated && (
-                    <span className="text-gray-400">
+                    <span className="text-secondary-400">
                       {' '}
                       · {PL_STATUS_LABELS[q.quote_status] || q.quote_status || '—'}
                     </span>
                   )}
                 </div>
                 {q.quote_amount_ht != null && (
-                  <span className="font-semibold text-gray-900 tabular-nums shrink-0">
+                  <span className="font-semibold text-secondary-900 tabular-nums shrink-0">
                     {formatEuro(Number(q.quote_amount_ht))}
                   </span>
                 )}
@@ -247,7 +247,7 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
                     disabled={isEjecting}
                     title="Retirer ce devis du chantier"
                     aria-label={`Retirer le devis ${label}`}
-                    className="text-gray-400 hover:text-amber-600 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+                    className="text-secondary-400 hover:text-amber-600 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -275,9 +275,9 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
         loading={isEjecting}
         onConfirm={handleEject}
       >
-        <p className="mt-3 text-sm text-gray-600">
+        <p className="mt-3 text-sm text-secondary-600">
           Pour séparer ce devis sur sa propre carte (autre commande du même client), utilisez plutôt
-          <span className="font-medium text-gray-900"> « Détacher en chantier distinct »</span>.
+          <span className="font-medium text-secondary-900"> « Détacher en chantier distinct »</span>.
         </p>
       </ConfirmDialog>
 

@@ -51,28 +51,28 @@ export default function EtapeCorrespondance({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+      <div className="bg-white rounded-lg border border-secondary-200 p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Quelle colonne va où ?</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-lg font-semibold text-secondary-900">Quelle colonne va où ?</h2>
+            <p className="text-sm text-secondary-600">
               {fichier.nom} · {fichier.lignes.length} ligne{fichier.lignes.length > 1 ? 's' : ''}. Vérifiez le champ choisi
               pour chaque colonne de votre fichier.
             </p>
             {accents && (
-              <p className="mt-1 flex items-start gap-2 text-sm text-gray-700">
-                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" aria-hidden="true" />
+              <p className="mt-1 flex items-start gap-2 text-sm text-secondary-700">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-secondary-500" aria-hidden="true" />
                 {accents}
               </p>
             )}
           </div>
           <div>
-            <label htmlFor="import-entete" className="block text-sm font-medium text-gray-700 mb-1">Ligne d&apos;en-tête</label>
+            <label htmlFor="import-entete" className="block text-sm font-medium text-secondary-700 mb-1">Ligne d&apos;en-tête</label>
             <select
               id="import-entete"
               value={fichier.indexEntete}
               onChange={(e) => onEntete(Number(e.target.value))}
-              className="w-full sm:w-80 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full sm:w-80 px-3 py-2 border border-secondary-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {fichier.matrice.slice(0, 10).map((ligne, i) => (
                 <option key={i} value={i}>Ligne {i + 1} : {resumeLigne(ligne)}</option>
@@ -84,7 +84,7 @@ export default function EtapeCorrespondance({
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-500">
+              <tr className="border-b border-secondary-200 text-left text-secondary-500">
                 <th scope="col" className="py-2 pr-4 font-medium">Colonne du fichier</th>
                 <th scope="col" className="py-2 pr-4 font-medium">Premières valeurs</th>
                 <th scope="col" className="py-2 font-medium">Champ de la fiche</th>
@@ -96,15 +96,15 @@ export default function EtapeCorrespondance({
                 const idSelect = `import-cible-${col.index}`;
                 const conseil = conseils.get(col.index);
                 return (
-                  <tr key={col.index} className={`border-b border-gray-100 align-top ${aFaire ? 'bg-amber-50' : ''}`}>
-                    <th scope="row" className="py-2 pr-4 font-medium text-gray-900 text-left">
+                  <tr key={col.index} className={`border-b border-secondary-100 align-top ${aFaire ? 'bg-amber-50' : ''}`}>
+                    <th scope="row" className="py-2 pr-4 font-medium text-secondary-900 text-left">
                       {col.entete}
                       {aFaire && <span className="block text-xs font-normal text-amber-800">À choisir</span>}
                     </th>
-                    <td className="py-2 pr-4 text-gray-600">
+                    <td className="py-2 pr-4 text-secondary-600">
                       {exemples[col.index]?.length
                         ? exemples[col.index].map((v, i) => <div key={i} className="truncate max-w-xs">{v}</div>)
-                        : <span className="text-gray-400">(colonne vide)</span>}
+                        : <span className="text-secondary-400">(colonne vide)</span>}
                     </td>
                     <td className="py-2">
                       <label htmlFor={idSelect} className="sr-only">Champ pour la colonne {col.entete}</label>
@@ -113,7 +113,7 @@ export default function EtapeCorrespondance({
                         value={col.cible}
                         onChange={(e) => onCible(col.index, e.target.value)}
                         className={`w-full min-w-[14rem] px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          aFaire ? 'border-amber-400' : 'border-gray-300'
+                          aFaire ? 'border-amber-400' : 'border-secondary-300'
                         }`}
                       >
                         <option value={CIBLE_A_CHOISIR}>— À choisir —</option>
@@ -137,7 +137,7 @@ export default function EtapeCorrespondance({
                           <button
                             type="button"
                             onClick={() => onCible(col.index, conseil.cible)}
-                            className="shrink-0 px-2 py-0.5 bg-white text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                            className="shrink-0 px-2 py-0.5 bg-white text-secondary-700 border border-secondary-300 rounded-md hover:bg-secondary-50 transition-colors"
                           >
                             Séparer
                           </button>
@@ -175,7 +175,7 @@ export default function EtapeCorrespondance({
         <button
           type="button"
           onClick={onRetour}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-secondary-700 border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />
           Changer de fichier

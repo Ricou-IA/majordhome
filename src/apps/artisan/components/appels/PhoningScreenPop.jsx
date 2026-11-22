@@ -67,13 +67,13 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
         <PhoneForwarded className="h-5 w-5" />
         <span className="font-semibold">Appel transféré</span>
       </div>
-      <h3 className="text-lg font-bold text-gray-900">{contact.name}</h3>
-      <p className="text-sm text-gray-500 flex items-center gap-1">
+      <h3 className="text-lg font-bold text-secondary-900">{contact.name}</h3>
+      <p className="text-sm text-secondary-500 flex items-center gap-1">
         <Phone className="h-3.5 w-3.5" />
         {contact.phone}
       </p>
       {ctx?.contract_number && (
-        <p className="text-xs text-gray-400 mt-0.5">Contrat {ctx.contract_number}</p>
+        <p className="text-xs text-secondary-400 mt-0.5">Contrat {ctx.contract_number}</p>
       )}
 
       {/* Grille 3 actions — visible uniquement quand aucune action n'est choisie */}
@@ -107,7 +107,7 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
       {mode !== null && (
         <button
           onClick={goBack}
-          className="mt-3 text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+          className="mt-3 text-sm text-secondary-500 hover:text-secondary-700 flex items-center gap-1"
         >
           ← Retour
         </button>
@@ -128,7 +128,7 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
       {/* Panneau Refus — inchangé */}
       {mode === 'refus' && (
         <div className="mt-4 space-y-2 border-t pt-3">
-          <label className="block text-sm font-medium text-gray-700">Motif du refus</label>
+          <label className="block text-sm font-medium text-secondary-700">Motif du refus</label>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}

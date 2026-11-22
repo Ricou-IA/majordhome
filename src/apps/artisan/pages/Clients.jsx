@@ -62,18 +62,18 @@ const SORT_OPTIONS = [
 const SearchBar = ({ value, onChange, placeholder = "Rechercher un client..." }) => {
   return (
     <div className="relative">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary-400" />
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+        className="w-full pl-10 pr-4 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
       />
       {value && (
         <button
           onClick={() => onChange('')}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-secondary-400 hover:text-secondary-600"
         >
           <X className="w-4 h-4" />
         </button>
@@ -99,7 +99,7 @@ const FilterDropdown = ({ label, icon: Icon, value, options, onChange }) => {
           inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors
           ${hasValue 
             ? 'bg-blue-50 border-blue-200 text-blue-700' 
-            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            : 'bg-white border-secondary-300 text-secondary-700 hover:bg-secondary-50'
           }
         `}
       >
@@ -116,7 +116,7 @@ const FilterDropdown = ({ label, icon: Icon, value, options, onChange }) => {
             className="fixed inset-0 z-10" 
             onClick={() => setIsOpen(false)} 
           />
-          <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+          <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-secondary-200 rounded-lg shadow-lg z-20 py-1">
             {options.map(option => (
               <button
                 key={option.value}
@@ -125,7 +125,7 @@ const FilterDropdown = ({ label, icon: Icon, value, options, onChange }) => {
                   w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors
                   ${option.value === value 
                     ? 'bg-blue-50 text-blue-700' 
-                    : 'text-gray-700 hover:bg-gray-50'
+                    : 'text-secondary-700 hover:bg-secondary-50'
                   }
                 `}
               >
@@ -167,15 +167,15 @@ const StatCard = ({ icon: Icon, label, value, color = 'blue', onClick, active = 
       onClick={onClick}
       className={`bg-white rounded-lg border p-4 transition-all ${
         onClick ? 'cursor-pointer hover:shadow-md' : ''
-      } ${active ? borderColor[color] : 'border-gray-200'}`}
+      } ${active ? borderColor[color] : 'border-secondary-200'}`}
     >
       <div className="flex items-center gap-3">
         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorClasses[color]}`}>
           <Icon className="w-5 h-5" />
         </div>
         <div>
-          <p className="text-2xl font-semibold text-gray-900">{value}</p>
-          <p className="text-sm text-gray-500">{label}</p>
+          <p className="text-2xl font-semibold text-secondary-900">{value}</p>
+          <p className="text-sm text-secondary-500">{label}</p>
         </div>
       </div>
     </div>
@@ -199,15 +199,15 @@ const EmptyState = ({ hasFilters, onClearFilters, onAddClient, activeStatCard })
 
   return (
     <div className="text-center py-12">
-      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <Users className="w-8 h-8 text-gray-400" />
+      <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <Users className="w-8 h-8 text-secondary-400" />
       </div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">
+      <h3 className="text-lg font-medium text-secondary-900 mb-2">
         {statCardLabel || (hasFilters ? 'Aucun client trouvé' : 'Aucun client')}
       </h3>
       {!statCardLabel && (
         <>
-          <p className="text-gray-500 mb-6 max-w-sm mx-auto">
+          <p className="text-secondary-500 mb-6 max-w-sm mx-auto">
             {hasFilters
               ? 'Essayez de modifier vos critères de recherche ou de supprimer les filtres.'
               : 'Commencez par ajouter votre premier client.'
@@ -217,7 +217,7 @@ const EmptyState = ({ hasFilters, onClearFilters, onAddClient, activeStatCard })
             {hasFilters && (
               <button
                 onClick={onClearFilters}
-                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 border border-secondary-300 text-secondary-700 rounded-lg hover:bg-secondary-50 transition-colors"
               >
                 <X className="w-4 h-4" />
                 Effacer les filtres
@@ -245,10 +245,10 @@ const ErrorState = ({ error, onRetry }) => (
     <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
       <AlertCircle className="w-8 h-8 text-red-500" />
     </div>
-    <h3 className="text-lg font-medium text-gray-900 mb-2">
+    <h3 className="text-lg font-medium text-secondary-900 mb-2">
       Erreur de chargement
     </h3>
-    <p className="text-gray-500 mb-6">
+    <p className="text-secondary-500 mb-6">
       {error?.message || 'Une erreur est survenue lors du chargement des clients.'}
     </p>
     <button
@@ -482,14 +482,14 @@ export function Clients() {
   const currentSort = `${filters.orderBy}:${filters.ascending ? 'asc' : 'desc'}`;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-secondary-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white border-b border-secondary-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
-              <p className="text-gray-500 mt-1">
+              <h1 className="text-2xl font-bold text-secondary-900">Clients</h1>
+              <p className="text-secondary-500 mt-1">
                 {totalCount} client{totalCount !== 1 ? 's' : ''} au total
               </p>
             </div>
@@ -498,7 +498,7 @@ export function Clients() {
               <button
                 type="button"
                 onClick={() => navigate('/clients/import')}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-secondary-700 border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors shadow-sm"
               >
                 <Upload className="w-5 h-5" />
                 Importer
@@ -631,7 +631,7 @@ export function Clients() {
                 inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm font-medium
                 ${filters.showArchived || filters.onlyArchived
                   ? 'bg-amber-50 border-amber-200 text-amber-700'
-                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                  : 'bg-white border-secondary-300 text-secondary-500 hover:bg-secondary-50'
                 }
               `}
               title={filters.showArchived ? 'Masquer les archivés' : 'Afficher les archivés'}
@@ -643,7 +643,7 @@ export function Clients() {
             <button
               onClick={refresh}
               disabled={loading}
-              className="p-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2.5 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
               title="Rafraîchir"
             >
               <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -709,7 +709,7 @@ export function Clients() {
               <div className="text-center mt-8">
                 <button
                   onClick={loadMore}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-white border border-secondary-300 text-secondary-700 rounded-lg hover:bg-secondary-50 transition-colors"
                 >
                   Charger plus de clients
                   <ChevronDown className="w-4 h-4" />
@@ -719,7 +719,7 @@ export function Clients() {
 
             {/* Indicateur fin de liste */}
             {!hasMore && clients.length > 0 && (
-              <p className="text-center text-gray-500 mt-8">
+              <p className="text-center text-secondary-500 mt-8">
                 Fin de la liste • {clients.length} client{clients.length !== 1 ? 's' : ''} affiché{clients.length !== 1 ? 's' : ''}
               </p>
             )}

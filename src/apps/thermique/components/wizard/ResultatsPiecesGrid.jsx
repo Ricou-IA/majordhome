@@ -48,12 +48,12 @@ export default function ResultatsPiecesGrid({ bilan }) {
           return (
             <div
               key={p.id}
-              className="flex flex-col items-center justify-center text-center rounded-md border border-slate-500/40 px-1.5 py-1 overflow-hidden"
+              className="flex flex-col items-center justify-center text-center rounded-md border border-secondary-500/40 px-1.5 py-1 overflow-hidden"
               style={{ width: cote, height: cote, backgroundColor: couleurPiece(p), opacity: 0.85 }}
               title={`${p.nom} · ${Math.round(p.total)} W`}
             >
-              <span className="text-xs font-medium text-slate-900 leading-tight truncate w-full">{p.nom}</span>
-              <span className="text-[11px] text-slate-800">{Math.round(p.total)} W</span>
+              <span className="text-xs font-medium text-secondary-900 leading-tight truncate w-full">{p.nom}</span>
+              <span className="text-[11px] text-secondary-800">{Math.round(p.total)} W</span>
             </div>
           );
         })}

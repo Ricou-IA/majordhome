@@ -59,8 +59,8 @@ export const SectionType = ({
   retypeHint = null,
 }) => (
   <div>
-    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-      <Tag className="w-4 h-4 text-gray-500" />
+    <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+      <Tag className="w-4 h-4 text-secondary-500" />
       Type de RDV
       <span className="text-red-500 -ml-1">*</span>
     </h3>
@@ -79,7 +79,7 @@ export const SectionType = ({
       )}
     </div>
     {retypeHint && (
-      <p className="mt-1.5 text-xs text-gray-400">{retypeHint}</p>
+      <p className="mt-1.5 text-xs text-secondary-400">{retypeHint}</p>
     )}
     {/* Objet masqué dans le flux assistant (création VT/entretien/SAV/install) :
         généré automatiquement (type + client) pour aller droit au but. */}
@@ -113,17 +113,17 @@ export const SectionDateTime = ({ formData, updateField, errors, isCancelled, re
       || (formData.duration_minutes ? `${formData.duration_minutes} min` : '');
     return (
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <Clock className="w-4 h-4 text-gray-500" />
+        <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-secondary-500" />
           Date & Heure
         </h3>
-        <div className="flex items-center justify-between gap-3 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
-          <div className="text-sm text-gray-900 min-w-0">
+        <div className="flex items-center justify-between gap-3 px-3 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg">
+          <div className="text-sm text-secondary-900 min-w-0">
             <span className="font-medium">
               {formData.scheduled_date ? formatDateFR(formData.scheduled_date) : '—'}
             </span>
-            {timeRange && <span className="text-gray-600"> · {timeRange}</span>}
-            {durationLabel && <span className="text-gray-500"> ({durationLabel})</span>}
+            {timeRange && <span className="text-secondary-600"> · {timeRange}</span>}
+            {durationLabel && <span className="text-secondary-500"> ({durationLabel})</span>}
           </div>
           {!isCancelled && (onRequestReschedule || onRequestContinuation) && (
             <div className="flex items-center gap-2 shrink-0">
@@ -142,7 +142,7 @@ export const SectionDateTime = ({ formData, updateField, errors, isCancelled, re
                   type="button"
                   onClick={onRequestContinuation}
                   title="Ajouter un ou plusieurs RDV sur la même carte, sans toucher à celui-ci"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-secondary-700 bg-white border border-secondary-200 rounded-lg hover:bg-secondary-100 transition-colors"
                 >
                   <CalendarPlus className="w-4 h-4" />
                   Programmer une suite
@@ -157,8 +157,8 @@ export const SectionDateTime = ({ formData, updateField, errors, isCancelled, re
 
   return (
   <div>
-    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-      <Clock className="w-4 h-4 text-gray-500" />
+    <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+      <Clock className="w-4 h-4 text-secondary-500" />
       Date & Heure
     </h3>
     <div className="grid grid-cols-2 gap-4">
@@ -223,7 +223,7 @@ const LinkChip = ({ icon: Icon, label, title, tone, onOpen, onUnlink, unlinkTitl
         type="button"
         onClick={onUnlink}
         title={unlinkTitle}
-        className="px-1.5 py-1 border-l border-black/10 text-gray-400 hover:text-red-500 rounded-r-md transition-colors"
+        className="px-1.5 py-1 border-l border-black/10 text-secondary-400 hover:text-red-500 rounded-r-md transition-colors"
       >
         <X className="w-3.5 h-3.5" />
       </button>
@@ -299,8 +299,8 @@ export const SectionClient = ({
 
   return (
   <div>
-    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-      <User className="w-4 h-4 text-gray-500" />
+    <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+      <User className="w-4 h-4 text-secondary-500" />
       Client
     </h3>
 
@@ -311,12 +311,12 @@ export const SectionClient = ({
         Avant : trois blocs (coordonnées + bannière client + bannière lead) répétaient
         le même nom. Client masqué en leadOnly (R2 raisonne par carte, pas par client). */}
     {showContactCard && (
-      <div className="mb-3 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg space-y-1.5">
+      <div className="mb-3 px-3 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg space-y-1.5">
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-gray-900 truncate">{contactName}</div>
+            <div className="text-sm font-semibold text-secondary-900 truncate">{contactName}</div>
             {showClientChip && selectedClient.client_number && (
-              <div className="text-xs text-gray-500">N° client {selectedClient.client_number}</div>
+              <div className="text-xs text-secondary-500">N° client {selectedClient.client_number}</div>
             )}
           </div>
           {showClientChip && (
@@ -404,7 +404,7 @@ export const SectionClient = ({
                 <span
                   key={q.id}
                   title="PDF pas encore synchronisé depuis Pennylane"
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 bg-white text-xs text-gray-500"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-secondary-200 bg-white text-xs text-secondary-500"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   Devis {label}{amount}
@@ -421,7 +421,7 @@ export const SectionClient = ({
     {(leadOnly ? !selectedLead : (!selectedClient && !selectedLead)) && !isCancelled && (
       <div className="relative mb-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
           <input
             type="text"
             value={clientSearchQuery}
@@ -436,19 +436,19 @@ export const SectionClient = ({
               if (leadOnly || clientSearchQuery.length >= 2) setShowClientDropdown(true);
             }}
             onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
-            className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg text-sm outline-none transition-colors bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full pl-9 pr-9 py-2 border border-secondary-300 rounded-lg text-sm outline-none transition-colors bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={leadOnly ? 'Rechercher une carte du pipeline…' : 'Rechercher un client ou un lead...'}
           />
           {(clientSearching || leadSearching) && (
-            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
+            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-secondary-400" />
           )}
         </div>
         {/* Dropdown résultats unifiés (leadOnly : cartes récentes ou recherche) */}
         {showClientDropdown && (leadOnly ? displayLeads.length > 0 : (clientSearchResults.length > 0 || leadSearchResults.length > 0)) && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          <div className="absolute z-50 w-full mt-1 bg-white border border-secondary-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
             {clientSearchResults.length > 0 && !leadOnly && (
               <>
-                <div className="px-3 py-1.5 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+                <div className="px-3 py-1.5 bg-secondary-50 text-xs font-semibold text-secondary-500 uppercase tracking-wide border-b border-secondary-100">
                   Clients ({clientSearchResults.length})
                 </div>
                 {clientSearchResults.map((client) => (
@@ -457,12 +457,12 @@ export const SectionClient = ({
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleSelectClient(client)}
-                    className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
+                    className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors border-b border-secondary-100 last:border-b-0"
                   >
-                    <span className="text-sm font-medium text-gray-900 block truncate">
+                    <span className="text-sm font-medium text-secondary-900 block truncate">
                       {client.display_name}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-secondary-500">
                       {client.client_number}{client.city ? ` — ${client.city}` : ''}{client.phone ? ` — ${client.phone}` : ''}
                     </span>
                   </button>
@@ -471,7 +471,7 @@ export const SectionClient = ({
             )}
             {displayLeads.length > 0 && (
               <>
-                <div className="px-3 py-1.5 bg-violet-50 text-xs font-semibold text-violet-600 uppercase tracking-wide border-b border-gray-100">
+                <div className="px-3 py-1.5 bg-violet-50 text-xs font-semibold text-violet-600 uppercase tracking-wide border-b border-secondary-100">
                   {leadOnly && clientSearchQuery.length < 2
                     ? `Cartes récentes (${displayLeads.length})`
                     : `Leads (${displayLeads.length})`}
@@ -482,12 +482,12 @@ export const SectionClient = ({
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleSelectLead(lead)}
-                    className="w-full text-left px-3 py-2 hover:bg-violet-50 transition-colors border-b border-gray-100 last:border-b-0"
+                    className="w-full text-left px-3 py-2 hover:bg-violet-50 transition-colors border-b border-secondary-100 last:border-b-0"
                   >
-                    <span className="text-sm font-medium text-gray-900 block truncate">
+                    <span className="text-sm font-medium text-secondary-900 block truncate">
                       {lead.display_name}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-secondary-500">
                       {lead.status_label && (
                         <span
                           className="inline-block px-1.5 py-0.5 rounded text-xs mr-1"
@@ -510,7 +510,7 @@ export const SectionClient = ({
         )}
         {showClientDropdown && clientSearchQuery.length >= 2 && !clientSearching && !leadSearching
           && leadSearchResults.length === 0 && (leadOnly || clientSearchResults.length === 0) && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-3 text-sm text-gray-500 italic">
+          <div className="absolute z-50 w-full mt-1 bg-white border border-secondary-200 rounded-lg shadow-lg px-3 py-3 text-sm text-secondary-500 italic">
             {leadOnly ? 'Aucune carte du pipeline trouvée' : 'Aucun client ou lead trouvé'}
           </div>
         )}
@@ -519,7 +519,7 @@ export const SectionClient = ({
 
     {/* Séparateur saisie manuelle (jamais en leadOnly : R2 exige une carte existante) */}
     {!selectedClient && !selectedLead && !isCancelled && !leadOnly && (
-      <p className="text-xs text-gray-400 mb-2 text-center">— ou saisie manuelle —</p>
+      <p className="text-xs text-secondary-400 mb-2 text-center">— ou saisie manuelle —</p>
     )}
 
     {/* Saisie manuelle / compact : masquée dès qu'un client ou lead est lié
@@ -622,17 +622,17 @@ export const SectionAssignee = ({ formData, updateField, allTeamMembers, commerc
   if (isCommercialType) {
     selectMembers = (allTeamMembers || []).filter(m => ['commercial', 'admin'].includes(m.role));
     label = 'Commercial assigné';
-    icon = <User className="w-4 h-4 text-gray-500" />;
+    icon = <User className="w-4 h-4 text-secondary-500" />;
     placeholder = 'Sélectionner un commercial...';
   } else if (isTechnicianType) {
     selectMembers = (allTeamMembers || []).filter(m => m.role === 'technician');
     label = 'Technicien assigné';
-    icon = <Wrench className="w-4 h-4 text-gray-500" />;
+    icon = <Wrench className="w-4 h-4 text-secondary-500" />;
     placeholder = 'Sélectionner un technicien...';
   } else {
     selectMembers = allTeamMembers || [];
     label = 'Personne(s) assignée(s)';
-    icon = <User className="w-4 h-4 text-gray-500" />;
+    icon = <User className="w-4 h-4 text-secondary-500" />;
     placeholder = 'Sélectionner des personnes...';
   }
 
@@ -640,7 +640,7 @@ export const SectionAssignee = ({ formData, updateField, allTeamMembers, commerc
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+      <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
         {icon}
         {label}
       </h3>
@@ -683,8 +683,8 @@ export const SectionAssignee = ({ formData, updateField, allTeamMembers, commerc
  */
 export const SectionSouplesse = ({ formData, updateField, isCancelled, souplesseDefaut = 30 }) => (
   <div>
-    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-      <MoveHorizontal className="w-4 h-4 text-gray-500" />
+    <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+      <MoveHorizontal className="w-4 h-4 text-secondary-500" />
       Souplesse du rendez-vous
     </h3>
     <SouplesseSelect
@@ -699,8 +699,8 @@ export const SectionSouplesse = ({ formData, updateField, isCancelled, souplesse
 
 export const SectionNotes = ({ formData, updateField, isCancelled }) => (
   <div>
-    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-      <FileText className="w-4 h-4 text-gray-500" />
+    <h3 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
+      <FileText className="w-4 h-4 text-secondary-500" />
       Notes
     </h3>
     <div className="space-y-4">

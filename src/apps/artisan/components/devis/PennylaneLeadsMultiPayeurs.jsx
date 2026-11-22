@@ -72,7 +72,7 @@ export function PennylaneLeadsMultiPayeurs() {
       <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-1">
         <Split className="w-5 h-5 text-amber-500" />
         Leads rattachés à plusieurs clients Pennylane
-        <span className="text-sm font-normal text-gray-400">({leads.length})</span>
+        <span className="text-sm font-normal text-secondary-400">({leads.length})</span>
       </h2>
       <p className="text-xs text-secondary-500 mb-3">
         Pennylane ne peut pas faire foi sur l’identité de ces leads : leur synchronisation est suspendue.
@@ -80,7 +80,7 @@ export function PennylaneLeadsMultiPayeurs() {
         l’explorateur). Même contact en double → fusionner les fiches dans Pennylane.
       </p>
 
-      <ul className="divide-y divide-gray-100">
+      <ul className="divide-y divide-secondary-100">
         {leads.map((lead) => {
           const names = new Set(lead.customers.map((c) => normalizeName(c.name)).filter(Boolean));
           const sameContact = lead.customers.length > 1 && names.size === 1;
@@ -99,7 +99,7 @@ export function PennylaneLeadsMultiPayeurs() {
                 ) : (
                   <span className="text-sm font-medium text-secondary-900 truncate">{leadLabel}</span>
                 )}
-                {lead.leadCity && <span className="shrink-0 text-xs text-gray-400">{lead.leadCity}</span>}
+                {lead.leadCity && <span className="shrink-0 text-xs text-secondary-400">{lead.leadCity}</span>}
               </div>
 
               {sameContact && (
@@ -121,7 +121,7 @@ export function PennylaneLeadsMultiPayeurs() {
                       type="button"
                       disabled={isEjecting}
                       onClick={() => setPending({ lead, customer: c })}
-                      className="shrink-0 rounded border border-gray-200 px-2 py-1 text-xs text-secondary-700 hover:bg-gray-50 disabled:opacity-50"
+                      className="shrink-0 rounded border border-secondary-200 px-2 py-1 text-xs text-secondary-700 hover:bg-secondary-50 disabled:opacity-50"
                     >
                       Retirer {c.quoteCount > 1 ? `ces ${c.quoteCount} devis` : 'ce devis'}
                     </button>

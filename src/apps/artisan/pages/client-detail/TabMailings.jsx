@@ -50,7 +50,7 @@ const UNSUB_REASON_LABELS = {
 const STATUS_CONFIG = {
   sent: {
     label: 'Envoyé',
-    color: 'bg-slate-100 text-slate-700 border border-slate-200',
+    color: 'bg-secondary-100 text-secondary-700 border border-secondary-200',
     icon: Send,
   },
   delivered: {
@@ -129,7 +129,7 @@ function buildTimeline(log) {
 }
 
 const TONE_DOT = {
-  slate: 'bg-slate-400',
+  slate: 'bg-secondary-400',
   blue: 'bg-blue-500',
   purple: 'bg-purple-500',
   indigo: 'bg-indigo-500',
@@ -144,7 +144,7 @@ function Timeline({ steps }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {steps.map((step, idx) => (
           <div key={step.key + idx} className="flex items-center gap-1.5 text-xs">
-            <span className={`w-2 h-2 rounded-full ${TONE_DOT[step.tone] || 'bg-slate-400'}`} />
+            <span className={`w-2 h-2 rounded-full ${TONE_DOT[step.tone] || 'bg-secondary-400'}`} />
             <span className="font-medium text-secondary-700">{step.label}</span>
             <span className="text-secondary-400">· {formatDateTimeFR(step.at)}</span>
           </div>

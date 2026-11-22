@@ -77,11 +77,11 @@ export function DuplicateClientPanel({
             className="flex items-center justify-between gap-3 px-3 py-2 bg-white rounded-lg border border-amber-200"
           >
             <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-secondary-900 truncate">
                 {candidateName(c)}
-                {c.client_number && <span className="ml-1.5 text-xs font-normal text-gray-500">{c.client_number}</span>}
+                {c.client_number && <span className="ml-1.5 text-xs font-normal text-secondary-500">{c.client_number}</span>}
               </p>
-              <p className="text-xs text-gray-600 truncate">
+              <p className="text-xs text-secondary-600 truncate">
                 {[c.address, [c.postal_code, c.city].filter(Boolean).join(' '), c.phone]
                   .filter(Boolean).join(' · ')}
                 {c.has_active_contract && ' · Contrat actif'}
@@ -112,7 +112,7 @@ export function DuplicateClientPanel({
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-sm text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
             >
               Annuler
             </button>
@@ -131,7 +131,7 @@ export function DuplicateClientPanel({
             <button
               type="button"
               onClick={onCancel}
-              className="px-3 py-1.5 text-sm text-gray-700 hover:bg-amber-100 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-sm text-secondary-700 hover:bg-amber-100 rounded-lg transition-colors"
             >
               Retour
             </button>

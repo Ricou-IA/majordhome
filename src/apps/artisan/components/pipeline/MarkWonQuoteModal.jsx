@@ -161,10 +161,10 @@ export function MarkWonQuoteModal({
           <div className="flex items-center gap-3">
             <Trophy className="w-5 h-5 text-amber-500" />
             <div>
-              <h2 className="text-base font-semibold text-gray-900">
+              <h2 className="text-base font-semibold text-secondary-900">
                 Marquer comme « Gagné »
               </h2>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-secondary-500">
                 Quel devis Pennylane a été signé ?
               </p>
             </div>
@@ -173,7 +173,7 @@ export function MarkWonQuoteModal({
             type="button"
             onClick={handleClose}
             disabled={isMarking}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg transition-colors disabled:opacity-50"
+            className="p-2 text-secondary-400 hover:text-secondary-600 rounded-lg transition-colors disabled:opacity-50"
             aria-label="Fermer"
           >
             <X className="w-5 h-5" />
@@ -184,18 +184,18 @@ export function MarkWonQuoteModal({
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {isLoading ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-secondary-400" />
             </div>
           ) : isEmpty ? (
-            <div className="text-center py-6 text-sm text-gray-600 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="text-center py-6 text-sm text-secondary-600 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="font-medium">Aucun devis Pennylane attaché à ce lead.</p>
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-secondary-500 mt-2">
                 Rattache d&apos;abord un devis via le statut « Devis envoyé ».
               </p>
             </div>
           ) : (
             <>
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-secondary-100">
                 {sortedQuotes.map((q) => {
                   const cfg = getQuoteStatusConfig(q.quote_status);
                   const isChecked = selectedQuotePlId === q.pennylane_quote_id;
@@ -212,7 +212,7 @@ export function MarkWonQuoteModal({
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-gray-900 text-sm">
+                            <span className="font-medium text-secondary-900 text-sm">
                               {q.quote_label || `#${q.pennylane_quote_id}`}
                             </span>
                             <span
@@ -223,13 +223,13 @@ export function MarkWonQuoteModal({
                             </span>
                           </div>
                           {q.quote_date && (
-                            <div className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-secondary-500 mt-1">
                               {formatDateShortFR(q.quote_date)}
                             </div>
                           )}
                         </div>
                         <div className="text-right shrink-0">
-                          <div className="text-sm font-semibold text-gray-900">
+                          <div className="text-sm font-semibold text-secondary-900">
                             {q.quote_amount_ht != null
                               ? formatEuro(Number(q.quote_amount_ht))
                               : '—'}
@@ -247,7 +247,7 @@ export function MarkWonQuoteModal({
                             </a>
                           ) : (
                             <span
-                              className="text-xs text-gray-300 inline-flex items-center gap-1 mt-1 cursor-not-allowed"
+                              className="text-xs text-secondary-300 inline-flex items-center gap-1 mt-1 cursor-not-allowed"
                               title="PDF non encore synchronisé"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -276,12 +276,12 @@ export function MarkWonQuoteModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t bg-gray-50">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t bg-secondary-50">
           <button
             type="button"
             onClick={handleClose}
             disabled={isMarking}
-            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors disabled:opacity-50"
           >
             Annuler
           </button>

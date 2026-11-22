@@ -288,7 +288,7 @@ export function CertificatsSection({ item, onCloseModal }) {
 
       {/* Barre de progression */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+        <div className="flex-1 bg-secondary-200 rounded-full h-1.5 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-300 ${
               doneCount === totalCount ? 'bg-green-500' : 'bg-blue-500'
@@ -296,7 +296,7 @@ export function CertificatsSection({ item, onCloseModal }) {
             style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%` }}
           />
         </div>
-        <span className="text-xs text-gray-500">{doneCount}/{totalCount}</span>
+        <span className="text-xs text-secondary-500">{doneCount}/{totalCount}</span>
       </div>
 
       {/* Liste équipements */}

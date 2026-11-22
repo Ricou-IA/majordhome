@@ -82,11 +82,11 @@ export default function Login() {
     // 100dvh : hauteur réelle du viewport mobile (barre d'adresse comprise), le
     // formulaire tient sur un écran sans défilement. Sur téléphone (< md) la
     // carte devient la page elle-même : pas de panneau de marque, logo compact.
-    <div className="min-h-[100dvh] flex items-center justify-center bg-gray-100 px-0 py-0 md:px-4 md:py-12">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-secondary-100 px-0 py-0 md:px-4 md:py-12">
       <div className="w-full min-h-[100dvh] md:min-h-0 max-w-4xl bg-white md:rounded-2xl md:shadow-xl overflow-hidden flex flex-col md:flex-row">
 
         {/* Partie gauche — Branding (bureau et tablette) */}
-        <div className="relative hidden md:flex md:w-1/2 bg-gray-50 flex-col items-center justify-center p-12 overflow-hidden">
+        <div className="relative hidden md:flex md:w-1/2 bg-secondary-50 flex-col items-center justify-center p-12 overflow-hidden">
           <div
             className="absolute inset-0 opacity-[0.04]"
             style={{
@@ -98,10 +98,10 @@ export default function Login() {
             }}
           />
           <div className="relative z-10 flex flex-col items-center text-center">
-            <p className="text-4xl font-bold tracking-tight text-gray-900 mb-6">
+            <p className="text-4xl font-bold tracking-tight text-secondary-900 mb-6">
               Majord&apos;home
             </p>
-            <p className="text-lg font-semibold text-gray-700">
+            <p className="text-lg font-semibold text-secondary-700">
               Clients, planning, devis, chantiers :
             </p>
             <p className="text-lg font-semibold text-primary-600">
@@ -113,15 +113,15 @@ export default function Login() {
         {/* Partie droite — Formulaire */}
         <div className="md:w-1/2 flex-1 px-6 py-8 md:p-12 flex flex-col justify-center pb-[max(2rem,env(safe-area-inset-bottom))]">
           {/* Logo compact (téléphone uniquement) */}
-          <p className="md:hidden text-3xl font-bold tracking-tight text-gray-900 mb-8 self-center">
+          <p className="md:hidden text-3xl font-bold tracking-tight text-secondary-900 mb-8 self-center">
             Majord&apos;home
           </p>
 
           <div className="mb-6 md:mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-1 md:mb-2">
+            <h1 className="text-2xl font-bold text-secondary-900 mb-1 md:mb-2">
               Bienvenue
             </h1>
-            <p className="text-gray-500">
+            <p className="text-secondary-500">
               {isClientLogin
                 ? 'Identifiez-vous pour accéder à votre espace client.'
                 : 'Connectez-vous à votre espace.'}
@@ -131,7 +131,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5" noValidate>
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-sm font-medium text-secondary-700 mb-1">
                 Adresse email
               </label>
               <input
@@ -148,13 +148,13 @@ export default function Login() {
                 placeholder="votre@email.com"
                 // text-base (16 px) : sous 16 px, iOS zoome la page au focus et
                 // le formulaire sort de l'écran.
-                className="w-full h-12 px-4 border border-gray-300 rounded-lg text-base md:text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                className="w-full h-12 px-4 border border-secondary-300 rounded-lg text-base md:text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
               />
             </div>
 
             {/* Mot de passe */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-secondary-700 mb-1">
                 Mot de passe
               </label>
               <div className="relative">
@@ -167,14 +167,14 @@ export default function Login() {
                   required
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="w-full h-12 px-4 pr-12 border border-gray-300 rounded-lg text-base md:text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                  className="w-full h-12 px-4 pr-12 border border-secondary-300 rounded-lg text-base md:text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   aria-pressed={showPassword}
-                  className="absolute right-0 top-0 h-12 w-12 flex items-center justify-center rounded-r-lg text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-0 top-0 h-12 w-12 flex items-center justify-center rounded-r-lg text-secondary-400 hover:text-secondary-600 transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -219,7 +219,7 @@ export default function Login() {
 
           {/* Footer */}
           <div className="mt-6 md:mt-8 text-center">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-secondary-500">
               {isClientLogin ? (
                 <>Pas encore de compte ? Contactez votre installateur.</>
               ) : (

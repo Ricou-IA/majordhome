@@ -96,7 +96,7 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
   const selecteur = liste.length > 1 && (
     <select
       value={choisi || ''} onChange={(e) => { setChoisi(e.target.value); changerAtelier(false); }} aria-label="Appareil concerné"
-      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+      className="w-full border border-secondary-300 rounded-lg px-2 py-1.5 text-sm"
     >
       {liste.map((e) => <option key={e.id} value={e.id}>{nomEquipement(e, referentiel)}{e.id === item?.equipment_id ? ' (appareil du SAV)' : ''}</option>)}
     </select>
@@ -138,13 +138,13 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+      <h3 className="text-sm font-semibold text-secondary-700 uppercase tracking-wider flex items-center gap-2">
         <Wrench className="w-4 h-4" />
         Pièces détachées de l&apos;appareil
       </h3>
       {identifiees}
       {selecteur}
-      {liste.length === 1 && equipement && <p className="text-sm text-gray-600">{nomEquipement(equipement, referentiel)}</p>}
+      {liste.length === 1 && equipement && <p className="text-sm text-secondary-600">{nomEquipement(equipement, referentiel)}</p>}
       {equipement && (
         <EquipmentPartsSection
           key={equipement.id}
@@ -160,7 +160,7 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
       )}
       {equipement && <TrouverPieceButton key={`assistant-${equipement.id}`} equipment={equipement} interventionId={item.id} />}
       {equipement && !equipement.equipment_model_id && !canEdit && (
-        <p className="text-xs text-gray-500">Le modèle fabricant de cet appareil n&apos;a pas encore été choisi.</p>
+        <p className="text-xs text-secondary-500">Le modèle fabricant de cet appareil n&apos;a pas encore été choisi.</p>
       )}
 
       {lignesDevis && createPortal(

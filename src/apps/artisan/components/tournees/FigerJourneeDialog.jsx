@@ -72,9 +72,9 @@ export function FigerJourneeDialog({ journee, consolidation }) {
             {apercu.estime && (
               <p className="text-xs text-amber-700">Trajets estimés à vol d’oiseau (matrice indisponible) — les heures peuvent varier de quelques minutes.</p>
             )}
-            <ul className="divide-y divide-gray-100 rounded-md border border-gray-200">
+            <ul className="divide-y divide-secondary-100 rounded-md border border-secondary-200">
               {apercu.lignes.map((l) => (
-                <li key={l.id} className={`flex items-center gap-2 px-3 py-1.5 ${l.fige ? 'text-gray-400' : 'text-gray-800'}`}>
+                <li key={l.id} className={`flex items-center gap-2 px-3 py-1.5 ${l.fige ? 'text-secondary-400' : 'text-secondary-800'}`}>
                   {l.fige ? <Lock className="h-3.5 w-3.5 shrink-0" /> : <MoveHorizontal className="h-3.5 w-3.5 shrink-0 text-primary-600" />}
                   <span className="truncate flex-1">{l.label}{l.ville ? ` (${l.ville})` : ''}</span>
                   <span className="tabular-nums">{l.avant}</span>
@@ -83,7 +83,7 @@ export function FigerJourneeDialog({ journee, consolidation }) {
                 </li>
               ))}
             </ul>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-secondary-500">
               {changes.length} heure(s) modifiée(s)
               {smsActifs ? ` · ${aChanger.length} client(s) recevront un SMS d’heure de passage (mobile FR uniquement).` : ' · aucun SMS (désactivés).'}
             </p>
@@ -97,7 +97,7 @@ export function FigerJourneeDialog({ journee, consolidation }) {
               <li>{resultat.figes} rendez-vous figé(s){resultat.echecs.length > 0 ? ' — arrêt au premier refus, aucun SMS envoyé' : ''}.</li>
             )}
             {resultat.echecs.length === 0 && (resultat.smsDesactives
-              ? <li className="text-gray-500">SMS désactivés : aucun client prévenu.</li>
+              ? <li className="text-secondary-500">SMS désactivés : aucun client prévenu.</li>
               : <li>{resultat.sms} SMS d’heure de passage envoyé(s).</li>)}
             {resultat.smsGabaritAbsent && (
               <li className="text-amber-700">Heures figées, mais SMS non envoyés : gabarit « heure_de_passage » absent (Settings → SMS).</li>

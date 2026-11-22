@@ -357,19 +357,19 @@ export default function ContractSign() {
     <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link to={`/clients/${clientId}`} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        <Link to={`/clients/${clientId}`} className="p-2 hover:bg-secondary-100 rounded-lg transition-colors">
+          <ArrowLeft className="w-5 h-5 text-secondary-600" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Signature du contrat</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl font-bold text-secondary-900">Signature du contrat</h1>
+          <p className="text-sm text-secondary-500">
             {client?.display_name || client?.last_name || 'Client'}
           </p>
         </div>
       </div>
 
       {/* Résumé du contrat */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-secondary-200 rounded-xl shadow-sm overflow-hidden">
         {/* Titre contrat — orange Mayer */}
         <div className="bg-[#F97316] text-white px-6 py-4">
           <h2 className="text-lg font-bold">Contrat d’entretien annuel</h2>
@@ -379,26 +379,26 @@ export default function ContractSign() {
         <div className="p-6 space-y-6">
           {/* Informations client */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Informations client</h3>
+            <h3 className="text-sm font-semibold text-secondary-900 mb-2">Informations client</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
               <div>
-                <span className="text-gray-500">Nom : </span>
+                <span className="text-secondary-500">Nom : </span>
                 <span className="font-medium">{client?.display_name || [client?.first_name, client?.last_name].filter(Boolean).join(' ') || '-'}</span>
               </div>
               <div>
-                <span className="text-gray-500">Téléphone : </span>
+                <span className="text-secondary-500">Téléphone : </span>
                 <span className="font-medium">{client?.phone || '-'}</span>
               </div>
               <div>
-                <span className="text-gray-500">Adresse : </span>
+                <span className="text-secondary-500">Adresse : </span>
                 <span className="font-medium">{client?.address || '-'}</span>
               </div>
               <div>
-                <span className="text-gray-500">Email : </span>
+                <span className="text-secondary-500">Email : </span>
                 <span className="font-medium">{client?.email || '-'}</span>
               </div>
               <div>
-                <span className="text-gray-500">Ville : </span>
+                <span className="text-secondary-500">Ville : </span>
                 <span className="font-medium">{client?.postal_code} {client?.city}</span>
               </div>
             </div>
@@ -406,18 +406,18 @@ export default function ContractSign() {
 
           {/* Conditions */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Conditions du contrat</h3>
+            <h3 className="text-sm font-semibold text-secondary-900 mb-2">Conditions du contrat</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
               <div>
-                <span className="text-gray-500">Date de début : </span>
+                <span className="text-secondary-500">Date de début : </span>
                 <span className="font-medium">{formatDateFR(new Date().toISOString())}</span>
               </div>
               <div>
-                <span className="text-gray-500">Mois d’entretien : </span>
+                <span className="text-secondary-500">Mois d’entretien : </span>
                 <span className="font-medium">{contract.maintenance_month ? MONTHS_FR[contract.maintenance_month] : '-'}</span>
               </div>
               <div>
-                <span className="text-gray-500">Zone tarifaire : </span>
+                <span className="text-secondary-500">Zone tarifaire : </span>
                 <span className="font-medium">{activeZone?.label || '-'}</span>
               </div>
             </div>
@@ -426,18 +426,18 @@ export default function ContractSign() {
           {/* Équipements — lignes individuelles avec références (alignées sur le montant signé) */}
           {presentation.equipmentLines.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Équipements sous contrat</h3>
+              <h3 className="text-sm font-semibold text-secondary-900 mb-2">Équipements sous contrat</h3>
               <div className="border rounded-lg overflow-hidden">
                 <div className="bg-[#F97316] text-white grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium">
                   <div className="col-span-9">Équipement</div>
                   <div className="col-span-3 text-right">Prix</div>
                 </div>
                 {presentation.equipmentLines.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 px-4 py-2.5 text-sm border-t border-gray-100">
+                  <div key={idx} className="grid grid-cols-12 gap-2 px-4 py-2.5 text-sm border-t border-secondary-100">
                     <div className="col-span-9">
-                      <div className="text-gray-800">{item.label}</div>
+                      <div className="text-secondary-800">{item.label}</div>
                       {item.reference && (
-                        <div className="text-xs text-gray-400 mt-0.5">{item.reference}</div>
+                        <div className="text-xs text-secondary-400 mt-0.5">{item.reference}</div>
                       )}
                     </div>
                     <div className="col-span-3 text-right font-medium">
@@ -452,7 +452,7 @@ export default function ContractSign() {
               <div className="mt-3 space-y-1">
                 {(presentation.discountPercent > 0 || presentation.exceptionalDiscountAmount > 0) && (
                   <div className="flex justify-between text-sm px-4">
-                    <span className="text-gray-500">Sous-total</span>
+                    <span className="text-secondary-500">Sous-total</span>
                     <span className="tabular-nums">{formatEuro(presentation.subtotal)}</span>
                   </div>
                 )}
@@ -479,25 +479,25 @@ export default function ContractSign() {
           {/* Notes */}
           {contract.notes && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Observations</h3>
-              <p className="text-sm text-gray-600">{contract.notes}</p>
+              <h3 className="text-sm font-semibold text-secondary-900 mb-1">Observations</h3>
+              <p className="text-sm text-secondary-600">{contract.notes}</p>
             </div>
           )}
 
           {/* Conditions générales */}
           <div className="border-t pt-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Conditions générales</h3>
-            <div className="text-xs text-gray-500 space-y-2">
+            <h3 className="text-sm font-semibold text-secondary-900 mb-2">Conditions générales</h3>
+            <div className="text-xs text-secondary-500 space-y-2">
               <p>
-                <strong className="text-gray-700">Objet :</strong> Entretien annuel des équipements listés ci-dessus,
+                <strong className="text-secondary-700">Objet :</strong> Entretien annuel des équipements listés ci-dessus,
                 conformément aux réglementations en vigueur.
               </p>
               <p>
-                <strong className="text-gray-700">Durée :</strong> Contrat d’un an, renouvelable par tacite reconduction,
+                <strong className="text-secondary-700">Durée :</strong> Contrat d’un an, renouvelable par tacite reconduction,
                 résiliable avec 30 jours de préavis.
               </p>
               <p>
-                <strong className="text-gray-700">Obligations :</strong> {company.name} s’engage à effectuer l’entretien dans les
+                <strong className="text-secondary-700">Obligations :</strong> {company.name} s’engage à effectuer l’entretien dans les
                 règles de l’art et à délivrer une attestation. Le client s’engage à permettre l’accès aux installations.
               </p>
             </div>
@@ -506,8 +506,8 @@ export default function ContractSign() {
       </div>
 
       {/* Zone de signature */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-        <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <div className="bg-white border border-secondary-200 rounded-xl shadow-sm p-6">
+        <h3 className="text-base font-semibold text-secondary-900 mb-4 flex items-center gap-2">
           <FileText className="w-5 h-5 text-[#F97316]" />
           Signature du client
         </h3>

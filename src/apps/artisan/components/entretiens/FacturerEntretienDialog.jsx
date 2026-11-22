@@ -340,7 +340,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
       confirmDisabled={isLoading || blocked}
     >
       <div className="mt-4 space-y-3 text-sm">
-        {isLoading && <p className="text-gray-500">Préparation de la facture…</p>}
+        {isLoading && <p className="text-secondary-500">Préparation de la facture…</p>}
 
         {!isLoading && !contract && (
           <p className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />Cette carte n’a pas de contrat rattaché : rien à facturer.</p>
@@ -376,7 +376,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
             {edits === null ? (
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-gray-500 border-b border-gray-200">
+                  <tr className="text-secondary-500 border-b border-secondary-200">
                     <th className="text-left font-medium py-1">Ligne</th>
                     <th className="text-right font-medium py-1 w-10">Qté</th>
                     <th className="text-right font-medium py-1 w-14">TVA</th>
@@ -385,16 +385,16 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
                 </thead>
                 <tbody>
                   {effectiveModel.lines.map((l, i) => (
-                    <tr key={i} className="border-b border-gray-100 align-top">
+                    <tr key={i} className="border-b border-secondary-100 align-top">
                       <td className="py-1.5 pr-2">
-                        <div className="text-gray-900">{l.label}</div>
-                        {l.description && <div className="text-gray-500">{l.description}</div>}
+                        <div className="text-secondary-900">{l.label}</div>
+                        {l.description && <div className="text-secondary-500">{l.description}</div>}
                       </td>
-                      <td className="py-1.5 text-right text-gray-700">{l.quantity}</td>
-                      <td className="py-1.5 text-right text-gray-700">{l.vatPercent} %</td>
-                      <td className="py-1.5 text-right text-gray-900 font-medium">
+                      <td className="py-1.5 text-right text-secondary-700">{l.quantity}</td>
+                      <td className="py-1.5 text-right text-secondary-700">{l.vatPercent} %</td>
+                      <td className="py-1.5 text-right text-secondary-900 font-medium">
                         {l.kind === 'libre' && l.netTtc === 0 ? (
-                          <span className="text-gray-700">offert</span>
+                          <span className="text-secondary-700">offert</span>
                         ) : (
                           formatEuro(l.netTtc)
                         )}
@@ -404,17 +404,17 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
                 </tbody>
                 <tfoot>
                   {effectiveModel.discount && (
-                    <tr className="text-gray-700">
+                    <tr className="text-secondary-700">
                       <td colSpan={3} className="pt-2 text-right">
                         Remise {effectiveModel.discount.percent} % sur les équipements
-                        <span className="text-gray-500"> ({discountDetail})</span>
+                        <span className="text-secondary-500"> ({discountDetail})</span>
                       </td>
                       <td className="pt-2 text-right">−{formatEuro(effectiveModel.discount.amount)}</td>
                     </tr>
                   )}
                   <tr>
-                    <td colSpan={3} className="pt-2 text-right font-semibold text-gray-900">Total TTC</td>
-                    <td className="pt-2 text-right font-semibold text-gray-900">{formatEuro(effectiveModel.totalTtc)}</td>
+                    <td colSpan={3} className="pt-2 text-right font-semibold text-secondary-900">Total TTC</td>
+                    <td className="pt-2 text-right font-semibold text-secondary-900">{formatEuro(effectiveModel.totalTtc)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -423,29 +423,29 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
                 <InvoiceLinesEditor lines={edits} onChange={setEdits} model={model} />
                 <div className="space-y-1 text-xs">
                   {effectiveModel.discount && (
-                    <div className="flex justify-between text-gray-700">
+                    <div className="flex justify-between text-secondary-700">
                       <span>
                         Remise {effectiveModel.discount.percent} % sur les équipements
-                        <span className="text-gray-500"> ({discountDetail})</span>
+                        <span className="text-secondary-500"> ({discountDetail})</span>
                       </span>
                       <span>−{formatEuro(effectiveModel.discount.amount)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between font-semibold text-gray-900">
+                  <div className="flex justify-between font-semibold text-secondary-900">
                     <span>Total TTC</span>
                     <span>{formatEuro(effectiveModel.totalTtc)}</span>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-secondary-500">
                   Les lignes modifiées partent telles quelles (brouillon Pennylane ou facture émise). La remise du contrat reste appliquée sur les lignes d’équipement via leur colonne Rem.
                 </p>
               </>
             )}
 
-            <div className="text-xs text-gray-600 space-y-0.5">
-              <div><span className="text-gray-500">Objet :</span> {effectiveModel.subject}</div>
-              <div><span className="text-gray-500">Échéance :</span> {formatDateShortFR(effectiveModel.deadline)} ({invoiceSettings.deadlineDays} j)</div>
-              {activeZone && <div><span className="text-gray-500">Zone tarifaire :</span> {activeZone.label || activeZone.code || activeZone.name}</div>}
+            <div className="text-xs text-secondary-600 space-y-0.5">
+              <div><span className="text-secondary-500">Objet :</span> {effectiveModel.subject}</div>
+              <div><span className="text-secondary-500">Échéance :</span> {formatDateShortFR(effectiveModel.deadline)} ({invoiceSettings.deadlineDays} j)</div>
+              {activeZone && <div><span className="text-secondary-500">Zone tarifaire :</span> {activeZone.label || activeZone.code || activeZone.name}</div>}
             </div>
 
             <FormField label="Information client (imprimée sur la facture)">
@@ -481,7 +481,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         ))}
 
         {!isLoading && (
-          <p className="text-xs text-gray-500 flex items-center gap-1">
+          <p className="text-xs text-secondary-500 flex items-center gap-1">
             <ExternalLink className="w-3 h-3" />
             Mode, échéance et mentions : Paramètres → Facturation.
           </p>

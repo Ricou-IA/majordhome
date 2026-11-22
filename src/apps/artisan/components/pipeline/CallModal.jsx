@@ -46,11 +46,11 @@ export const CallModal = ({ isOpen, onClose, onConfirm, loading = false, title =
             <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${isFollowup ? 'bg-purple-100' : 'bg-amber-100'}`}>
               <Phone className={`h-4 w-4 ${isFollowup ? 'text-purple-600' : 'text-amber-600'}`} />
             </div>
-            <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+            <h3 className="text-base font-semibold text-secondary-900">{title}</h3>
           </div>
           <button
             onClick={handleClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-1.5 text-secondary-400 hover:text-secondary-600 rounded-lg hover:bg-secondary-100 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -60,20 +60,20 @@ export const CallModal = ({ isOpen, onClose, onConfirm, loading = false, title =
         <div className="px-5 py-4 space-y-4">
           {/* Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Date de l&apos;appel
             </label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-colors"
+              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-colors"
             />
           </div>
 
           {/* Résultat */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Résultat de l&apos;appel
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -88,7 +88,7 @@ export const CallModal = ({ isOpen, onClose, onConfirm, loading = false, title =
                     className={`flex items-center gap-2 px-3 py-3 rounded-lg border text-sm font-medium transition-all
                       ${isSelected
                         ? `${opt.color} ring-2 ring-offset-1 ${opt.value === 'no_answer' ? 'ring-red-400' : 'ring-amber-400'}`
-                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                        : 'border-secondary-200 bg-white text-secondary-600 hover:bg-secondary-50'
                       }`}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
@@ -101,7 +101,7 @@ export const CallModal = ({ isOpen, onClose, onConfirm, loading = false, title =
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t bg-gray-50 rounded-b-xl">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t bg-secondary-50 rounded-b-xl">
           <Button variant="ghost" size="sm" onClick={handleClose} className="min-h-[36px]">
             Annuler
           </Button>

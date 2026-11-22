@@ -152,7 +152,7 @@ export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir
         >
           <div className="flex items-center gap-2 text-sm">
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: k.couleur || '#94A3B8' }} />
-            <span className="font-medium text-gray-900">{formatDateShortFR(k.date)} · {k.debut}</span>
+            <span className="font-medium text-secondary-900">{formatDateShortFR(k.date)} · {k.debut}</span>
             <span className="text-secondary-500 truncate">{k.technicianNom}</span>
             {/* Les trois chiffres de l'opérateur : trajet pour y aller, travail,
                 reste utile (décision Eric 2026-09-12). Le coût total en info-bulle. */}

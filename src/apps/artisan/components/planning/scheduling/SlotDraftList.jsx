@@ -62,18 +62,18 @@ export function SlotDraftList({
   const joursPoses = new Set(slots.map((s) => s.date).filter(Boolean)).size;
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+      <h4 className="text-sm font-semibold text-secondary-700 flex items-center gap-1.5">
         <CalendarDays className="w-4 h-4 text-blue-600" />
         Créneaux à planifier ({slots.length})
         {expectedDays ? (
-          <span className={`text-xs font-medium ${joursPoses < expectedDays ? 'text-amber-700' : 'text-gray-500'}`}>
+          <span className={`text-xs font-medium ${joursPoses < expectedDays ? 'text-amber-700' : 'text-secondary-500'}`}>
             · {joursPoses}/{expectedDays} jour{expectedDays > 1 ? 's' : ''}
           </span>
         ) : null}
       </h4>
 
       {slots.length === 0 ? (
-        <p className="text-xs text-gray-400 italic px-1 py-2">{emptyHint}</p>
+        <p className="text-xs text-secondary-400 italic px-1 py-2">{emptyHint}</p>
       ) : (
         <ul className="space-y-2">
           {slots.map((slot) => {
@@ -83,7 +83,7 @@ export function SlotDraftList({
               <li
                 key={slot.id}
                 className={`rounded-lg border p-2.5 ${
-                  conflictCount > 0 ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white'
+                  conflictCount > 0 ? 'border-amber-300 bg-amber-50' : 'border-secondary-200 bg-white'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -94,10 +94,10 @@ export function SlotDraftList({
                         title={`${conflictCount} conflit(s) de disponibilité`}
                       />
                     )}
-                    <span className="text-sm font-medium text-gray-900 capitalize">
+                    <span className="text-sm font-medium text-secondary-900 capitalize">
                       {formatSlotDate(slot.date)}
                     </span>
-                    <span className="text-sm text-gray-600 tabular-nums">
+                    <span className="text-sm text-secondary-600 tabular-nums">
                       {slot.startTime}
                       {slot.endTime ? `–${slot.endTime}` : ''}
                     </span>
@@ -113,7 +113,7 @@ export function SlotDraftList({
                         className={`px-1.5 py-0.5 rounded text-[11px] border shrink-0 ${
                           selectedIds.length < expectedTeamSize
                             ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-gray-50 text-gray-600 border-gray-200'
+                            : 'bg-secondary-50 text-secondary-600 border-secondary-200'
                         }`}
                         title={`${selectedIds.length} personne(s) sur ${expectedTeamSize} attendue(s)`}
                       >
@@ -124,7 +124,7 @@ export function SlotDraftList({
                   <button
                     type="button"
                     onClick={() => onRemoveSlot?.(slot.id)}
-                    className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+                    className="p-1 rounded text-secondary-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
                     title="Retirer ce créneau"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -134,7 +134,7 @@ export function SlotDraftList({
                 {/* Sélecteur de technicien(s) par ligne */}
                 {showTechSelect && (
                   <div className="mt-2">
-                    <label className="block text-[11px] font-medium text-gray-500 mb-1">{assigneeLabel}</label>
+                    <label className="block text-[11px] font-medium text-secondary-500 mb-1">{assigneeLabel}</label>
                     <TechnicianSelect
                       selectedIds={selectedIds}
                       onChange={(newIds) => {

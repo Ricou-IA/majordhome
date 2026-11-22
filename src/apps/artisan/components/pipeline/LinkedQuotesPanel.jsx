@@ -49,11 +49,11 @@ export function LinkedQuotesPanel({ quotes, isLoading }) {
             >
               <div className="flex items-center gap-2 min-w-0">
                 <div className="flex flex-col min-w-0">
-                  <span className="font-medium text-gray-900 text-sm truncate">
+                  <span className="font-medium text-secondary-900 text-sm truncate">
                     {displayNumber}
                   </span>
                   {q.quote_date && (
-                    <span className="text-[11px] text-gray-500 leading-none mt-0.5">
+                    <span className="text-[11px] text-secondary-500 leading-none mt-0.5">
                       {formatDateShortFR(q.quote_date)}
                     </span>
                   )}
@@ -74,7 +74,7 @@ export function LinkedQuotesPanel({ quotes, isLoading }) {
                     {statusChip.label}
                   </span>
                 )}
-                <span className="text-sm font-semibold text-gray-900 tabular-nums">
+                <span className="text-sm font-semibold text-secondary-900 tabular-nums">
                   {q.quote_amount_ht != null
                     ? formatEuro(Number(q.quote_amount_ht))
                     : '—'}
@@ -91,7 +91,7 @@ export function LinkedQuotesPanel({ quotes, isLoading }) {
                   </a>
                 ) : (
                   <span
-                    className="text-gray-300 inline-flex items-center gap-1 text-xs cursor-not-allowed"
+                    className="text-secondary-300 inline-flex items-center gap-1 text-xs cursor-not-allowed"
                     title="PDF non encore synchronisé (prochain cycle sous 15 min)"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />

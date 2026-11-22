@@ -7,7 +7,7 @@ import { MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 /** En-tête : pastille de la couleur du type, titre, client du RDV en édition. */
 export function EventModalHeader({ typeConfig, title, subtitle, onClose }) {
   return (
-    <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 shrink-0">
+    <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-secondary-200 shrink-0">
       <div className="flex items-center gap-3 min-w-0">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
@@ -16,15 +16,15 @@ export function EventModalHeader({ typeConfig, title, subtitle, onClose }) {
           <CalendarDays className="w-5 h-5" style={{ color: typeConfig.color }} />
         </div>
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-gray-900 truncate">{title}</h2>
+          <h2 className="text-lg font-semibold text-secondary-900 truncate">{title}</h2>
           {subtitle && (
-            <p className="text-sm text-gray-500 truncate">{subtitle}</p>
+            <p className="text-sm text-secondary-500 truncate">{subtitle}</p>
           )}
         </div>
       </div>
       <button
         onClick={onClose}
-        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+        className="p-2 text-secondary-400 hover:text-secondary-600 hover:bg-secondary-100 rounded-lg transition-colors flex-shrink-0"
       >
         <X className="w-5 h-5" />
       </button>
@@ -47,7 +47,7 @@ export function EventModalFooter({
   return (
     /* Sous `sm`, quatre boutons ne tiennent pas sur 390 px : retour de ligne (sinon le panneau
        en overflow-hidden rogne le bouton principal), groupe principal gardé à droite. */
-    <div className={`flex items-center justify-between max-sm:flex-wrap max-sm:gap-y-2 px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50 shrink-0 ${MODAL_FOOTER_PHONE}`}>
+    <div className={`flex items-center justify-between max-sm:flex-wrap max-sm:gap-y-2 px-4 sm:px-6 py-4 border-t border-secondary-200 bg-secondary-50 shrink-0 ${MODAL_FOOTER_PHONE}`}>
       {/* Actions danger (mode edit seulement, hors re-planification) */}
       <div className="flex items-center gap-2">
         {showDangerActions && (
@@ -77,14 +77,14 @@ export function EventModalFooter({
         {inAssistantMode ? (
           <button
             onClick={onBack}
-            className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-200 rounded-lg transition-colors"
           >
             Retour
           </button>
         ) : (
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-200 rounded-lg transition-colors"
           >
             Fermer
           </button>

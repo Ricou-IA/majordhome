@@ -70,10 +70,10 @@ export function AddInteractionModal({
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
         <div className="flex items-start justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Nouvelle interaction</h3>
+          <h3 className="text-lg font-semibold text-secondary-900">Nouvelle interaction</h3>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+            className="p-1 text-secondary-400 hover:text-secondary-600 rounded transition-colors"
             disabled={loading}
           >
             <X className="h-5 w-5" />
@@ -82,7 +82,7 @@ export function AddInteractionModal({
 
         {/* Canal — pastilles */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Canal</label>
+          <label className="block text-sm font-medium text-secondary-700 mb-2">Canal</label>
           <div className="flex flex-wrap gap-2">
             {CHANNEL_OPTIONS.map((value) => {
               const cfg = CHANNEL_CONFIG[value];
@@ -95,8 +95,8 @@ export function AddInteractionModal({
                   onClick={() => setChannel(value)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-colors ${
                     active
-                      ? `${cfg.color} border-transparent ring-2 ring-offset-1 ring-gray-300`
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      ? `${cfg.color} border-transparent ring-2 ring-offset-1 ring-secondary-300`
+                      : 'bg-white text-secondary-600 border-secondary-200 hover:bg-secondary-50'
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -109,7 +109,7 @@ export function AddInteractionModal({
 
         {/* Résumé */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-secondary-700 mb-1">
             Résumé <span className="text-red-500">*</span>
           </label>
           <textarea
@@ -117,19 +117,19 @@ export function AddInteractionModal({
             onChange={(e) => setSummary(e.target.value)}
             placeholder="Ex: appelé, pas de réponse / mail relance projet rénovation envoyé..."
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+            className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
             autoFocus
           />
         </div>
 
         {/* Date */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+          <label className="block text-sm font-medium text-secondary-700 mb-1">Date</label>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           />
         </div>
 
@@ -144,13 +144,13 @@ export function AddInteractionModal({
               value={nextAction}
               onChange={(e) => setNextAction(e.target.value)}
               placeholder="Ex: rappeler M. Dupont après le 15/05"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
             <input
               type="date"
               value={nextActionDate}
               onChange={(e) => setNextActionDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
           </div>
         </details>
@@ -159,7 +159,7 @@ export function AddInteractionModal({
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm text-secondary-700 bg-secondary-100 rounded-lg hover:bg-secondary-200 transition-colors disabled:opacity-50"
           >
             Annuler
           </button>

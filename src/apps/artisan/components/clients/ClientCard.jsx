@@ -37,10 +37,10 @@ import { LienWaze } from '../shared/LienWaze';
  */
 const ContractIcon = ({ hasContract }) => (
   <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-    hasContract ? 'bg-green-100' : 'bg-gray-100'
+    hasContract ? 'bg-green-100' : 'bg-secondary-100'
   }`}>
     <FileText className={`w-3.5 h-3.5 ${
-      hasContract ? 'text-green-600' : 'text-gray-400'
+      hasContract ? 'text-green-600' : 'text-secondary-400'
     }`} />
   </div>
 );
@@ -58,15 +58,15 @@ const InfoLine = ({ icon: Icon, children, onClick, isLink = false }) => {
         onClick={onClick}
         className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline truncate w-full text-left"
       >
-        <Icon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <Icon className="w-4 h-4 text-secondary-400 flex-shrink-0" />
         <span className="truncate">{content}</span>
       </button>
     );
   }
   
   return (
-    <div className={`flex items-center gap-2 text-sm truncate ${isEmpty ? 'text-gray-400' : 'text-gray-600'}`}>
-      <Icon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+    <div className={`flex items-center gap-2 text-sm truncate ${isEmpty ? 'text-secondary-400' : 'text-secondary-600'}`}>
+      <Icon className="w-4 h-4 text-secondary-400 flex-shrink-0" />
       <span className="truncate">{content}</span>
     </div>
   );
@@ -157,8 +157,8 @@ export function ClientCard({
       className={`
         group relative rounded-lg border p-4 transition-all duration-200
         ${onClick ? 'cursor-pointer hover:shadow-md hover:border-blue-300' : ''}
-        ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200'}
-        ${isArchived ? 'bg-gray-50/80 opacity-60' : 'bg-white'}
+        ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-secondary-200'}
+        ${isArchived ? 'bg-secondary-50/80 opacity-60' : 'bg-white'}
       `}
     >
       {/* Ligne 1 : Nom + Badges */}
@@ -167,7 +167,7 @@ export function ClientCard({
           <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${iconBg}`}>
             <CategoryIcon className={`w-4 h-4 ${iconColor}`} />
           </div>
-          <h3 className="font-medium text-gray-900 truncate">
+          <h3 className="font-medium text-secondary-900 truncate">
             {displayName}
           </h3>
           <EquipmentKindIcons clientId={id} />
@@ -194,17 +194,17 @@ export function ClientCard({
           className="group/adresse flex items-start gap-2 text-sm -mx-1 px-1 -my-1 py-1 rounded hover:bg-blue-50"
           sinon={(
             <div className="flex items-start gap-2 text-sm">
-              <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-              <p className="text-gray-400">-</p>
+              <MapPin className="w-4 h-4 text-secondary-400 flex-shrink-0 mt-0.5" />
+              <p className="text-secondary-400">-</p>
             </div>
           )}
         >
-          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+          <MapPin className="w-4 h-4 text-secondary-400 flex-shrink-0 mt-0.5" />
           <div className="min-w-0">
             {streetAddress ? (
               <p className="text-blue-600 truncate group-hover/adresse:underline">{streetAddress}</p>
             ) : (
-              <p className="text-gray-400">-</p>
+              <p className="text-secondary-400">-</p>
             )}
             {cityLine && (
               <p className="text-blue-600/80 truncate group-hover/adresse:underline">{cityLine}</p>
@@ -238,7 +238,7 @@ export function ClientCard({
       {/* Indicateur de clic */}
       {onClick && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronRight className="w-5 h-5 text-gray-400" />
+          <ChevronRight className="w-5 h-5 text-secondary-400" />
         </div>
       )}
     </div>
@@ -254,32 +254,32 @@ export function ClientCard({
  */
 export function ClientCardSkeleton() {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 animate-pulse">
+    <div className="bg-white rounded-lg border border-secondary-200 p-4 animate-pulse">
       {/* Ligne 1 : Nom + Badge */}
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gray-200 rounded-full" />
-          <div className="h-5 w-36 bg-gray-200 rounded" />
+          <div className="w-8 h-8 bg-secondary-200 rounded-full" />
+          <div className="h-5 w-36 bg-secondary-200 rounded" />
         </div>
-        <div className="h-5 w-20 bg-gray-200 rounded-full" />
+        <div className="h-5 w-20 bg-secondary-200 rounded-full" />
       </div>
 
       {/* Ligne 2 : Adresse */}
       <div className="flex items-center gap-2 mb-2">
-        <div className="w-4 h-4 bg-gray-200 rounded" />
-        <div className="h-4 w-48 bg-gray-200 rounded" />
+        <div className="w-4 h-4 bg-secondary-200 rounded" />
+        <div className="h-4 w-48 bg-secondary-200 rounded" />
       </div>
 
       {/* Ligne 3 : Téléphone */}
       <div className="flex items-center gap-2 mb-2">
-        <div className="w-4 h-4 bg-gray-200 rounded" />
-        <div className="h-4 w-32 bg-gray-200 rounded" />
+        <div className="w-4 h-4 bg-secondary-200 rounded" />
+        <div className="h-4 w-32 bg-secondary-200 rounded" />
       </div>
 
       {/* Ligne 4 : Email */}
       <div className="flex items-center gap-2">
-        <div className="w-4 h-4 bg-gray-200 rounded" />
-        <div className="h-4 w-40 bg-gray-200 rounded" />
+        <div className="w-4 h-4 bg-secondary-200 rounded" />
+        <div className="h-4 w-40 bg-secondary-200 rounded" />
       </div>
     </div>
   );

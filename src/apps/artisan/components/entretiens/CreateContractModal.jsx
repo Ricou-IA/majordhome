@@ -69,11 +69,11 @@ const StepIndicator = ({ current, total }) => (
       <div
         key={i}
         className={`h-1.5 rounded-full transition-all ${
-          i < current ? 'w-8 bg-blue-600' : i === current ? 'w-8 bg-blue-400' : 'w-6 bg-gray-200'
+          i < current ? 'w-8 bg-blue-600' : i === current ? 'w-8 bg-blue-400' : 'w-6 bg-secondary-200'
         }`}
       />
     ))}
-    <span className="text-xs text-gray-500 ml-1">
+    <span className="text-xs text-secondary-500 ml-1">
       Étape {current + 1}/{total}
     </span>
   </div>
@@ -393,9 +393,9 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
           onClick={(e) => e.stopPropagation()}
         >
           {/* ===== HEADER ===== */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-secondary-200">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-secondary-900">
                 {isProposal ? 'Proposition de contrat' : 'Nouveau contrat'}
               </h2>
               <StepIndicator current={step} total={preSelectedClient ? 2 : 3} />
@@ -404,7 +404,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
               type="button"
               onClick={fermer}
               disabled={Boolean(envoi)}
-              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-40"
+              className="p-2 rounded-lg text-secondary-400 hover:text-secondary-600 hover:bg-secondary-100 transition-colors disabled:opacity-40"
             >
               <X className="w-5 h-5" />
             </button>

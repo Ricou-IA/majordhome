@@ -27,7 +27,7 @@ import { logger } from '@lib/logger';
 const STAT_COLORS = {
   green:  'bg-green-50 text-green-600',
   amber:  'bg-amber-50 text-amber-600',
-  gray:   'bg-gray-50 text-gray-500',
+  gray:   'bg-secondary-50 text-secondary-500',
   blue:   'bg-blue-50 text-blue-600',
 };
 
@@ -41,23 +41,23 @@ function StatCard({ icon: Icon, label, value, color = 'blue', onClick, title }) 
         <Icon className="w-5 h-5" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-        <p className="text-sm text-gray-500">{label}</p>
+        <p className="text-2xl font-bold text-secondary-900">{value}</p>
+        <p className="text-sm text-secondary-500">{label}</p>
       </div>
     </>
   );
   if (!onClick) {
-    return <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4">{contenu}</div>;
+    return <div className="bg-white rounded-lg border border-secondary-200 p-4 flex items-center gap-4">{contenu}</div>;
   }
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4 text-left w-full hover:shadow-md hover:border-gray-300 transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+      className="bg-white rounded-lg border border-secondary-200 p-4 flex items-center gap-4 text-left w-full hover:shadow-md hover:border-secondary-300 transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
     >
       {contenu}
-      <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" aria-hidden="true" />
+      <ChevronRight className="w-5 h-5 text-secondary-400 shrink-0" aria-hidden="true" />
     </button>
   );
 }
@@ -75,7 +75,7 @@ const SOURCE_CONFIG = {
   chantier: { label: 'Chantier', emoji: '🔧', color: '#10B981', bg: 'bg-emerald-50',  text: 'text-emerald-700',  ring: 'ring-emerald-200' },
   pipeline: { label: 'Pipeline', emoji: '🎯', color: '#6366F1', bg: 'bg-indigo-50',   text: 'text-indigo-700',   ring: 'ring-indigo-200' },
   web:      { label: 'Site web', emoji: '🌐', color: '#3B82F6', bg: 'bg-blue-50',     text: 'text-blue-700',     ring: 'ring-blue-200' },
-  manual:   { label: 'Manuel',   emoji: '✋', color: '#6B7280', bg: 'bg-gray-50',     text: 'text-gray-700',     ring: 'ring-gray-200' },
+  manual:   { label: 'Manuel',   emoji: '✋', color: '#6B7280', bg: 'bg-secondary-50',     text: 'text-secondary-700',     ring: 'ring-secondary-200' },
 };
 
 const SOURCE_ORDER = ['chantier', 'pipeline', 'web', 'manual'];
@@ -185,12 +185,12 @@ function ContractPipelineCard({ contract }) {
   const sourceConfig = SOURCE_CONFIG[contract.source] || SOURCE_CONFIG.manual;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow cursor-pointer">
+    <div className="bg-white border border-secondary-200 rounded-lg p-3 hover:shadow-sm transition-shadow cursor-pointer">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">{clientName || 'Client'}</p>
+          <p className="text-sm font-semibold text-secondary-900 truncate">{clientName || 'Client'}</p>
           {location && (
-            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+            <p className="text-xs text-secondary-500 flex items-center gap-1 mt-0.5">
               <MapPin className="w-3 h-3 flex-shrink-0" />
               {location}
             </p>
@@ -204,7 +204,7 @@ function ContractPipelineCard({ contract }) {
       </div>
 
       <div className="flex items-center justify-between gap-2 text-xs mt-2">
-        <span className="text-gray-400 font-mono truncate">{contract.contract_number}</span>
+        <span className="text-secondary-400 font-mono truncate">{contract.contract_number}</span>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <span
             title={`Source : ${sourceConfig.label}`}
@@ -213,14 +213,14 @@ function ContractPipelineCard({ contract }) {
             <span aria-hidden>{sourceConfig.emoji}</span>
             <span className="font-medium">{sourceConfig.label}</span>
           </span>
-          <span className={`px-1.5 py-0.5 rounded-full ${createdDays > 7 ? 'bg-red-50 text-red-600' : createdDays > 3 ? 'bg-amber-50 text-amber-600' : 'bg-gray-50 text-gray-500'}`}>
+          <span className={`px-1.5 py-0.5 rounded-full ${createdDays > 7 ? 'bg-red-50 text-red-600' : createdDays > 3 ? 'bg-amber-50 text-amber-600' : 'bg-secondary-50 text-secondary-500'}`}>
             {createdDays === 0 ? "Aujourd'hui" : `${createdDays}j`}
           </span>
         </div>
       </div>
 
       {contract.client_phone && (
-        <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
+        <p className="text-xs text-secondary-400 mt-1.5 flex items-center gap-1">
           <Phone className="w-3 h-3" />
           {contract.client_phone}
         </p>
@@ -251,12 +251,12 @@ function SourceFilter({ contracts, activeSource, onChange }) {
         onClick={() => onChange(null)}
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ring-1 transition-colors
           ${activeSource === null
-            ? 'bg-gray-900 text-white ring-gray-900'
-            : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50'
+            ? 'bg-secondary-900 text-white ring-secondary-900'
+            : 'bg-white text-secondary-700 ring-secondary-200 hover:bg-secondary-50'
           }`}
       >
         Toutes
-        <span className={`${activeSource === null ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'} px-1.5 py-0.5 rounded-full tabular-nums`}>
+        <span className={`${activeSource === null ? 'bg-white/20 text-white' : 'bg-secondary-100 text-secondary-600'} px-1.5 py-0.5 rounded-full tabular-nums`}>
           {counts.total}
         </span>
       </button>
@@ -272,12 +272,12 @@ function SourceFilter({ contracts, activeSource, onChange }) {
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ring-1 transition-colors
               ${active
                 ? `${cfg.bg} ${cfg.text} ${cfg.ring} ring-2`
-                : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50'
+                : 'bg-white text-secondary-700 ring-secondary-200 hover:bg-secondary-50'
               }`}
           >
             <span aria-hidden>{cfg.emoji}</span>
             {cfg.label}
-            <span className={`${active ? 'bg-white/60' : 'bg-gray-100 text-gray-600'} px-1.5 py-0.5 rounded-full tabular-nums`}>
+            <span className={`${active ? 'bg-white/60' : 'bg-secondary-100 text-secondary-600'} px-1.5 py-0.5 rounded-full tabular-nums`}>
               {count}
             </span>
           </button>
@@ -360,8 +360,8 @@ export default function PipelineContrats() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pipeline Contrats</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-secondary-900">Pipeline Contrats</h1>
+          <p className="text-secondary-500 mt-1">
             {loading ? '...' : `${contracts.length} contrat${contracts.length !== 1 ? 's' : ''} en cours de traitement`}
           </p>
         </div>

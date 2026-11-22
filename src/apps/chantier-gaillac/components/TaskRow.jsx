@@ -45,7 +45,7 @@ function CommentField({ tache, onSave }) {
       }}
       placeholder="Commentaire terrain…"
       aria-label={`Commentaire terrain, tâche ${tache.numero}`}
-      className="w-full resize-y rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-base leading-snug focus:border-[#1565C0] focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 xl:text-sm"
+      className="w-full resize-y rounded-lg border border-secondary-300 bg-white px-2 py-1.5 text-base leading-snug focus:border-[#1565C0] focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 xl:text-sm"
     />
   );
 }
@@ -65,12 +65,12 @@ function FaitToggle({ tache: t, onToggle }) {
       <span
         aria-hidden
         className={`flex h-9 w-9 items-center justify-center rounded-lg border-2 transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#F5C542] ${
-          fait ? 'border-[#1565C0] bg-[#1565C0] text-white' : 'border-slate-400 bg-white text-transparent'
+          fait ? 'border-[#1565C0] bg-[#1565C0] text-white' : 'border-secondary-400 bg-white text-transparent'
         }`}
       >
         <Check className="h-6 w-6" strokeWidth={3} />
       </span>
-      <span className={`text-xs font-semibold ${fait ? 'text-[#0D47A1]' : 'text-slate-500'}`}>
+      <span className={`text-xs font-semibold ${fait ? 'text-[#0D47A1]' : 'text-secondary-500'}`}>
         {fait ? 'Fait' : 'À faire'}
       </span>
     </label>
@@ -84,7 +84,7 @@ function FaitBadge({ fait }) {
       <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> Fait
     </span>
   ) : (
-    <span className={`${chip} border-slate-300 bg-white text-slate-600`}>À faire</span>
+    <span className={`${chip} border-secondary-300 bg-white text-secondary-600`}>À faire</span>
   );
 }
 
@@ -102,7 +102,7 @@ export default function TaskRow({
   const validation = formatValidation(t, nameOf);
 
   const planChip = hp ? (
-    <span className={`${chip} border-slate-300 text-slate-500`}>— Hors périmètre</span>
+    <span className={`${chip} border-secondary-300 text-secondary-500`}>— Hors périmètre</span>
   ) : planning?.date_prevue ? (
     <span className={`${chip} border-[#1565C0] bg-[#1565C0] text-white`}>
       <CalendarDays className="h-3 w-3" aria-hidden /> {formatDateCourte(planning.date_prevue)} · {t.planning_code}
@@ -116,7 +116,7 @@ export default function TaskRow({
       <ShoppingCart className="h-3 w-3" aria-hidden /> Achat
     </span>
   ) : (
-    <span className={`${chip} border-slate-300 text-slate-500`}>
+    <span className={`${chip} border-secondary-300 text-secondary-500`}>
       <Package className="h-3 w-3" aria-hidden /> Stock
     </span>
   );
@@ -131,7 +131,7 @@ export default function TaskRow({
     <li
       className={`grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1.5 rounded-xl border p-3 xl:rounded-none xl:border-0 xl:border-b xl:px-3 xl:py-2.5 ${
         readOnly ? ROW_GRID_READONLY : ROW_GRID
-      } ${fait ? 'border-[#90CAF9] bg-[#EAF2FD]' : 'border-slate-200 bg-white'} ${hp ? 'italic text-slate-500' : 'text-slate-900'}`}
+      } ${fait ? 'border-[#90CAF9] bg-[#EAF2FD]' : 'border-secondary-200 bg-white'} ${hp ? 'italic text-secondary-500' : 'text-secondary-900'}`}
     >
       {/* Statut */}
       <div className="row-span-3 xl:row-span-1">
@@ -140,7 +140,7 @@ export default function TaskRow({
 
       {/* N° (+ durée à droite sur carte) */}
       <div className="col-start-2 row-start-1 flex flex-wrap items-center gap-1.5 xl:col-auto xl:row-auto">
-        <span className="font-mono text-sm text-slate-500 xl:text-slate-900">{t.numero}</span>
+        <span className="font-mono text-sm text-secondary-500 xl:text-secondary-900">{t.numero}</span>
         <span className="flex flex-wrap gap-1 xl:hidden">
           {securiteChip}
           {achatChip}
@@ -172,7 +172,7 @@ export default function TaskRow({
           text={t.action}
           byNumero={byNumero}
           planningIndex={planningIndex}
-          className={fait ? 'line-through decoration-slate-400' : ''}
+          className={fait ? 'line-through decoration-secondary-400' : ''}
         />
         {validation && <p className="mt-0.5 text-xs font-normal not-italic text-[#0D47A1]">✓ {validation}</p>}
       </div>
@@ -191,7 +191,7 @@ export default function TaskRow({
       </div>
 
       {/* Thème / technicien / durée / achat / planning (desktop) */}
-      <div className="hidden text-xs text-slate-600 xl:block">{t.theme}</div>
+      <div className="hidden text-xs text-secondary-600 xl:block">{t.theme}</div>
       <div className="hidden text-sm xl:block">{techName || '–'}</div>
       {!readOnly && (
         <>
@@ -202,7 +202,7 @@ export default function TaskRow({
       <div className="hidden xl:block">{planChip}</div>
 
       {/* Méta (carte) */}
-      <div className="col-span-2 col-start-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-600 xl:hidden">
+      <div className="col-span-2 col-start-2 flex flex-wrap items-center gap-1.5 text-xs text-secondary-600 xl:hidden">
         {planChip}
         {t.theme && <span>{t.theme}</span>}
         {techName && <span>· {techName}</span>}
@@ -211,7 +211,7 @@ export default function TaskRow({
       {!readOnly && (
         <>
           {/* Observations */}
-          <div className={`col-span-2 col-start-2 text-sm text-slate-600 xl:col-span-1 xl:col-auto ${t.observations ? '' : 'hidden xl:block'}`}>
+          <div className={`col-span-2 col-start-2 text-sm text-secondary-600 xl:col-span-1 xl:col-auto ${t.observations ? '' : 'hidden xl:block'}`}>
             <TextWithRefs text={t.observations} byNumero={byNumero} planningIndex={planningIndex} />
           </div>
 

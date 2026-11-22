@@ -40,10 +40,10 @@ export default function ClientDashboard() {
       {/* En-tête bienvenue */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-secondary-900">
             Bonjour, {displayName}
           </h1>
-          <p className="mt-1 text-gray-500">
+          <p className="mt-1 text-secondary-500">
             Bienvenue sur votre espace client Mayer Energie.
           </p>
         </div>
@@ -59,7 +59,7 @@ export default function ClientDashboard() {
         {/* Contrat */}
         <Link
           to="/client/contrat"
-          className="bg-white rounded-xl border border-gray-200 p-6 hover:border-primary-300 hover:shadow-sm transition-all"
+          className="bg-white rounded-xl border border-secondary-200 p-6 hover:border-primary-300 hover:shadow-sm transition-all"
         >
           <div className="flex items-start justify-between">
             <div className="p-2 bg-primary-50 rounded-lg">
@@ -71,14 +71,14 @@ export default function ClientDashboard() {
                 Actif
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-secondary-500 bg-secondary-100 px-2 py-1 rounded-full">
                 <AlertCircle className="w-3 h-3" />
                 {contract ? 'Inactif' : 'Aucun'}
               </span>
             )}
           </div>
-          <h3 className="mt-4 font-semibold text-gray-900">Mon contrat</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <h3 className="mt-4 font-semibold text-secondary-900">Mon contrat</h3>
+          <p className="mt-1 text-sm text-secondary-500">
             {contract?.status === 'active'
               ? `Prochaine visite : ${contract.next_maintenance_date ? formatDateFR(contract.next_maintenance_date) : 'non planifiée'}`
               : 'Consulter les détails de votre contrat'}
@@ -88,16 +88,16 @@ export default function ClientDashboard() {
         {/* Equipements */}
         <Link
           to="/client/equipements"
-          className="bg-white rounded-xl border border-gray-200 p-6 hover:border-primary-300 hover:shadow-sm transition-all"
+          className="bg-white rounded-xl border border-secondary-200 p-6 hover:border-primary-300 hover:shadow-sm transition-all"
         >
           <div className="flex items-start justify-between">
             <div className="p-2 bg-blue-50 rounded-lg">
               <Wrench className="w-5 h-5 text-blue-600" />
             </div>
-            <span className="text-2xl font-bold text-gray-900">{equipmentCount}</span>
+            <span className="text-2xl font-bold text-secondary-900">{equipmentCount}</span>
           </div>
-          <h3 className="mt-4 font-semibold text-gray-900">Mes équipements</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <h3 className="mt-4 font-semibold text-secondary-900">Mes équipements</h3>
+          <p className="mt-1 text-sm text-secondary-500">
             {equipmentCount > 0
               ? `${equipmentCount} équipement${equipmentCount > 1 ? 's' : ''} enregistré${equipmentCount > 1 ? 's' : ''}`
               : 'Aucun équipement enregistré'}
@@ -107,16 +107,16 @@ export default function ClientDashboard() {
         {/* Interventions */}
         <Link
           to="/client/interventions"
-          className="bg-white rounded-xl border border-gray-200 p-6 hover:border-primary-300 hover:shadow-sm transition-all"
+          className="bg-white rounded-xl border border-secondary-200 p-6 hover:border-primary-300 hover:shadow-sm transition-all"
         >
           <div className="flex items-start justify-between">
             <div className="p-2 bg-amber-50 rounded-lg">
               <ClipboardList className="w-5 h-5 text-amber-600" />
             </div>
-            <span className="text-2xl font-bold text-gray-900">{interventionCount}</span>
+            <span className="text-2xl font-bold text-secondary-900">{interventionCount}</span>
           </div>
-          <h3 className="mt-4 font-semibold text-gray-900">Mes interventions</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <h3 className="mt-4 font-semibold text-secondary-900">Mes interventions</h3>
+          <p className="mt-1 text-sm text-secondary-500">
             {interventionCount > 0
               ? `${interventionCount} intervention${interventionCount > 1 ? 's' : ''}`
               : 'Aucune intervention'}
@@ -125,27 +125,27 @@ export default function ClientDashboard() {
       </div>
 
       {/* Informations personnelles */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Mes informations</h2>
+      <div className="bg-white rounded-xl border border-secondary-200 p-6">
+        <h2 className="text-lg font-semibold text-secondary-900 mb-4">Mes informations</h2>
 
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-500">Nom</span>
-            <p className="font-medium text-gray-900">
+            <span className="text-secondary-500">Nom</span>
+            <p className="font-medium text-secondary-900">
               {client?.first_name} {client?.last_name}
             </p>
           </div>
           <div>
-            <span className="text-gray-500">Email</span>
-            <p className="font-medium text-gray-900">{client?.email || '-'}</p>
+            <span className="text-secondary-500">Email</span>
+            <p className="font-medium text-secondary-900">{client?.email || '-'}</p>
           </div>
           <div>
-            <span className="text-gray-500">Téléphone</span>
-            <p className="font-medium text-gray-900">{client?.phone || '-'}</p>
+            <span className="text-secondary-500">Téléphone</span>
+            <p className="font-medium text-secondary-900">{client?.phone || '-'}</p>
           </div>
           <div>
-            <span className="text-gray-500">Adresse</span>
-            <p className="font-medium text-gray-900">
+            <span className="text-secondary-500">Adresse</span>
+            <p className="font-medium text-secondary-900">
               {client?.address ? `${client.address}, ${client.postal_code} ${client.city}` : '-'}
             </p>
           </div>

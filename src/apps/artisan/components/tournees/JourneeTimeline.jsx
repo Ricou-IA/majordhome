@@ -63,7 +63,7 @@ const COULEUR_BLOC = {
   maintenance: 'bg-blue-500',
   service: 'bg-violet-400',
 };
-const COULEUR_BLOC_DEFAUT = 'bg-slate-400';
+const COULEUR_BLOC_DEFAUT = 'bg-secondary-400';
 
 const arrondiAuPas = (m) => Math.round(m / PAS_AJUSTEMENT_MINUTES) * PAS_AJUSTEMENT_MINUTES;
 
@@ -189,7 +189,7 @@ export function JourneeTimeline({
   // Amplitude inexploitable : pas de barre inventée. On dit ce qu'on a.
   if (base.span <= 0) {
     return (
-      <p className="text-xs text-gray-400 italic">
+      <p className="text-xs text-secondary-400 italic">
         Horaires de la journée non exploitables — {(rdvs?.length ?? 0)} RDV non placés.
       </p>
     );
@@ -212,7 +212,7 @@ export function JourneeTimeline({
     <div className="relative">
       <div
         ref={barreRef}
-        className={`relative rounded bg-gray-100 overflow-hidden ${interactif ? 'h-10' : 'h-7'}`}
+        className={`relative rounded bg-secondary-100 overflow-hidden ${interactif ? 'h-10' : 'h-7'}`}
       >
         {/* Le plus grand trou est souligné : c'est la réponse à « où ça rentre ? ».
             Rendu SOUS les blocs, jamais par-dessus. */}
@@ -341,7 +341,7 @@ export function JourneeTimeline({
             .map((r) => (
               <span
                 key={r.minutes}
-                className="absolute text-[10px] text-gray-400 -translate-x-1/2"
+                className="absolute text-[10px] text-secondary-400 -translate-x-1/2"
                 style={{ left: `${r.leftPct}%` }}
               >
                 {r.heure}h

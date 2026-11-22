@@ -22,19 +22,19 @@ export function AutoRdvMois({ coreOrgId }) {
   const { compteurs, isLoading, error } = useInvitationsDuMois(coreOrgId);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5">
+    <div className="bg-white rounded-lg border border-secondary-200 p-5">
       <div className="flex items-center gap-2 mb-3">
         <MailCheck className="w-4 h-4 text-secondary-500" />
-        <h3 className="text-sm font-medium text-gray-900">Prise de rendez-vous en ligne, {mois}</h3>
+        <h3 className="text-sm font-medium text-secondary-900">Prise de rendez-vous en ligne, {mois}</h3>
       </div>
       {error && <p className="text-sm text-red-600">Invitations illisibles : {error.message}</p>}
-      {!error && isLoading && <p className="text-sm text-gray-500">Chargement…</p>}
+      {!error && isLoading && <p className="text-sm text-secondary-500">Chargement…</p>}
       {!error && !isLoading && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {CASES.map(([k, label]) => (
-            <div key={k} className="rounded-md bg-gray-50 px-3 py-2">
-              <p className="text-xs text-gray-500">{label}</p>
-              <p className="text-xl font-semibold text-gray-900">{compteurs[k]}</p>
+            <div key={k} className="rounded-md bg-secondary-50 px-3 py-2">
+              <p className="text-xs text-secondary-500">{label}</p>
+              <p className="text-xl font-semibold text-secondary-900">{compteurs[k]}</p>
             </div>
           ))}
         </div>

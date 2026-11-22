@@ -160,7 +160,7 @@ function SegmentCard({ segment, orgId, onEdit, onDuplicate, onArchive, disabled 
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-secondary-700 font-mono">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-secondary-100 text-secondary-700 font-mono">
           {segment.audience}
         </span>
         {isLoading ? (

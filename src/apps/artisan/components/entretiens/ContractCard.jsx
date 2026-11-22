@@ -29,8 +29,8 @@ const StatusIcon = ({ status }) => {
   const config = {
     active: { icon: FileCheck, bg: 'bg-green-100', color: 'text-green-600' },
     pending: { icon: Clock, bg: 'bg-amber-100', color: 'text-amber-600' },
-    cancelled: { icon: Clock, bg: 'bg-gray-100', color: 'text-gray-500' },
-    archived: { icon: Archive, bg: 'bg-slate-100', color: 'text-slate-400' },
+    cancelled: { icon: Clock, bg: 'bg-secondary-100', color: 'text-secondary-500' },
+    archived: { icon: Archive, bg: 'bg-secondary-100', color: 'text-secondary-400' },
   };
 
   const { icon: Icon, bg, color } = config[status] || config.cancelled;
@@ -48,8 +48,8 @@ const StatusIcon = ({ status }) => {
 const InfoLine = ({ icon: Icon, children }) => {
   const isEmpty = !children;
   return (
-    <div className={`flex items-center gap-2 text-sm truncate ${isEmpty ? 'text-gray-400' : 'text-gray-600'}`}>
-      <Icon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+    <div className={`flex items-center gap-2 text-sm truncate ${isEmpty ? 'text-secondary-400' : 'text-secondary-600'}`}>
+      <Icon className="w-4 h-4 text-secondary-400 flex-shrink-0" />
       <span className="truncate">{children || '-'}</span>
     </div>
   );
@@ -101,7 +101,7 @@ export function ContractCard({ contract, onClick, selected = false }) {
       className={`
         group relative rounded-lg border p-4 transition-all duration-200
         ${onClick ? 'cursor-pointer hover:shadow-md hover:border-blue-300' : ''}
-        ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200'}
+        ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-secondary-200'}
         bg-white
         ${isArchived ? 'opacity-60' : ''}
       `}
@@ -110,7 +110,7 @@ export function ContractCard({ contract, onClick, selected = false }) {
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <StatusIcon status={status} />
-          <h3 className="font-medium text-gray-900 truncate">{client_name || 'Sans nom'}</h3>
+          <h3 className="font-medium text-secondary-900 truncate">{client_name || 'Sans nom'}</h3>
           <EquipmentKindIcons clientId={client_id} />
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -135,14 +135,14 @@ export function ContractCard({ contract, onClick, selected = false }) {
       {/* Ligne 2 : Adresse (rue + CP/ville sur 2 lignes) */}
       <div className="mb-2">
         <div className="flex items-start gap-2 text-sm">
-          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+          <MapPin className="w-4 h-4 text-secondary-400 flex-shrink-0 mt-0.5" />
           <div className="min-w-0">
             {streetAddress ? (
-              <p className="text-gray-600 truncate">{streetAddress}</p>
+              <p className="text-secondary-600 truncate">{streetAddress}</p>
             ) : (
-              <p className="text-gray-400">-</p>
+              <p className="text-secondary-400">-</p>
             )}
-            {cityLine && <p className="text-gray-500 truncate">{cityLine}</p>}
+            {cityLine && <p className="text-secondary-500 truncate">{cityLine}</p>}
           </div>
         </div>
       </div>
@@ -162,7 +162,7 @@ export function ContractCard({ contract, onClick, selected = false }) {
       {/* Hover chevron */}
       {onClick && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronRight className="w-5 h-5 text-gray-400" />
+          <ChevronRight className="w-5 h-5 text-secondary-400" />
         </div>
       )}
     </div>
@@ -175,32 +175,32 @@ export function ContractCard({ contract, onClick, selected = false }) {
 
 export function ContractCardSkeleton() {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 animate-pulse">
+    <div className="bg-white rounded-lg border border-secondary-200 p-4 animate-pulse">
       {/* Ligne 1 : Icon + Nom + Badge */}
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gray-200 rounded-full" />
-          <div className="h-5 w-36 bg-gray-200 rounded" />
+          <div className="w-8 h-8 bg-secondary-200 rounded-full" />
+          <div className="h-5 w-36 bg-secondary-200 rounded" />
         </div>
-        <div className="h-5 w-16 bg-gray-200 rounded-full" />
+        <div className="h-5 w-16 bg-secondary-200 rounded-full" />
       </div>
       {/* Ligne 2 : Adresse */}
       <div className="flex items-center gap-2 mb-2">
-        <div className="w-4 h-4 bg-gray-200 rounded" />
-        <div className="h-4 w-48 bg-gray-200 rounded" />
+        <div className="w-4 h-4 bg-secondary-200 rounded" />
+        <div className="h-4 w-48 bg-secondary-200 rounded" />
       </div>
       {/* Ligne 3 : Téléphone */}
       <div className="flex items-center gap-2 mb-2">
-        <div className="w-4 h-4 bg-gray-200 rounded" />
-        <div className="h-4 w-32 bg-gray-200 rounded" />
+        <div className="w-4 h-4 bg-secondary-200 rounded" />
+        <div className="h-4 w-32 bg-secondary-200 rounded" />
       </div>
       {/* Ligne 4 : Fréquence + Tarif */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-gray-200 rounded" />
-          <div className="h-4 w-24 bg-gray-200 rounded" />
+          <div className="w-4 h-4 bg-secondary-200 rounded" />
+          <div className="h-4 w-24 bg-secondary-200 rounded" />
         </div>
-        <div className="h-4 w-16 bg-gray-200 rounded" />
+        <div className="h-4 w-16 bg-secondary-200 rounded" />
       </div>
     </div>
   );

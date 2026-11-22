@@ -195,7 +195,7 @@ export const TabTimeline = ({ clientId, projectId }) => {
           <div className="space-y-4">
             {timeline.map((entry) => (entry.kind === 'audit' ? (
               <div key={entry.id} className="relative flex gap-3">
-                <Pastille icon={AUDIT_ICONS[entry.table] || History} className="bg-slate-100 text-slate-600" />
+                <Pastille icon={AUDIT_ICONS[entry.table] || History} className="bg-secondary-100 text-secondary-600" />
                 <div className="flex-1 min-w-0 pt-0.5">
                   <AuditEntry entry={entry} showSubject />
                 </div>

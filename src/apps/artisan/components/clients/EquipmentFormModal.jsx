@@ -258,7 +258,7 @@ export function EquipmentFormModal({
       {/* Panneau slide-over droit */}
       <div className={`fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-xl flex flex-col animate-in slide-in-from-right duration-300 ${MODAL_PANEL_PHONE}`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-secondary-200">
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${isEditMode ? 'bg-amber-100' : 'bg-blue-100'}`}>
               {isEditMode ? (
@@ -268,17 +268,17 @@ export function EquipmentFormModal({
               )}
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-secondary-900">
                 {isEditMode ? 'Modifier l\'équipement' : 'Ajouter un équipement'}
               </h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-secondary-500">
                 {isEditMode ? 'Mettre à jour les caractéristiques' : 'Saisir les caractéristiques du matériel'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 text-secondary-400 hover:text-secondary-600 hover:bg-secondary-100 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -288,14 +288,14 @@ export function EquipmentFormModal({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {/* Type d'équipement — depuis pricing_equipment_types */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Type <span className="text-red-500">*</span>
             </label>
             <select
               value={form.equipmentTypeId}
               onChange={(e) => handleChange('equipmentTypeId', e.target.value)}
               disabled={typesLoading}
-              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm disabled:bg-gray-50 disabled:text-gray-400"
+              className="w-full px-3 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm disabled:bg-secondary-50 disabled:text-secondary-400"
               required
             >
               <option value="">Sélectionner un type...</option>
@@ -312,22 +312,22 @@ export function EquipmentFormModal({
           {/* Quantité — visible pour les types à tarification unitaire */}
           {showQuantity && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-secondary-700 mb-1.5">
                 Quantité ({unitLabel})
               </label>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => handleChange('quantity', Math.max(1, form.quantity - 1))}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors text-lg font-medium"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-secondary-300 text-secondary-600 hover:bg-secondary-100 transition-colors text-lg font-medium"
                 >
                   −
                 </button>
-                <span className="text-lg font-semibold text-gray-900 w-8 text-center">{form.quantity}</span>
+                <span className="text-lg font-semibold text-secondary-900 w-8 text-center">{form.quantity}</span>
                 <button
                   type="button"
                   onClick={() => handleChange('quantity', Math.min(20, form.quantity + 1))}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors text-lg font-medium"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-secondary-300 text-secondary-600 hover:bg-secondary-100 transition-colors text-lg font-medium"
                 >
                   +
                 </button>
@@ -347,7 +347,7 @@ export function EquipmentFormModal({
 
           {/* N° Série */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               N° Série
             </label>
             <input
@@ -355,14 +355,14 @@ export function EquipmentFormModal({
               value={form.serialNumber}
               onChange={(e) => handleChange('serialNumber', e.target.value)}
               placeholder="Ex: SN-2024-0001"
-              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="w-full px-3 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
             />
           </div>
 
           {/* Plaque signalétique : photo prise ici, ou recopiée du dernier certificat qui l'a photographiée */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
-              <Camera className="w-4 h-4 text-gray-400" />
+            <label className="block text-sm font-medium text-secondary-700 mb-1.5 flex items-center gap-1.5">
+              <Camera className="w-4 h-4 text-secondary-400" />
               Plaque signalétique
             </label>
             {isEditMode && onNameplateUpload ? (
@@ -375,7 +375,7 @@ export function EquipmentFormModal({
                 isUploading={isUploadingNameplate}
               />
             ) : (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-secondary-400">
                 {isEditMode ? 'Photo non modifiable ici.' : 'Disponible une fois l’équipement ajouté (ou prise automatiquement lors d’un entretien avec anomalie).'}
               </p>
             )}
@@ -383,13 +383,13 @@ export function EquipmentFormModal({
 
           {/* Année */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Année
             </label>
             <select
               value={form.installationYear}
               onChange={(e) => handleChange('installationYear', e.target.value)}
-              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="w-full px-3 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
             >
               <option value="">Sélectionner une année...</option>
               {YEARS.map(year => (
@@ -400,13 +400,13 @@ export function EquipmentFormModal({
 
           {/* Type de pose */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Type de pose
             </label>
             <select
               value={form.installationType}
               onChange={(e) => handleChange('installationType', e.target.value)}
-              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="w-full px-3 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
             >
               <option value="">Non renseigné</option>
               <option value="ventouse">Pose ventouse</option>
@@ -416,7 +416,7 @@ export function EquipmentFormModal({
 
           {/* Note */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Note
             </label>
             <textarea
@@ -424,18 +424,18 @@ export function EquipmentFormModal({
               onChange={(e) => handleChange('notes', e.target.value)}
               placeholder="Remarques, observations..."
               rows={3}
-              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm resize-none"
+              className="w-full px-3 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm resize-none"
             />
           </div>
         </form>
 
         {/* Footer actions */}
-        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 ${MODAL_FOOTER_PHONE}`}>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t border-secondary-200 bg-secondary-50 ${MODAL_FOOTER_PHONE}`}>
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="px-4 py-2.5 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors disabled:opacity-50"
           >
             Annuler
           </button>

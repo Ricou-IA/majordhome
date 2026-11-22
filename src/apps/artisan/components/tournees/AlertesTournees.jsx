@@ -67,14 +67,14 @@ function AlerteCard({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-secondary-200 bg-white p-4">
       <div className="flex items-center gap-3">
         <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
           <Icon className="w-4 h-4" />
         </div>
         <div className="min-w-0">
-          <p className="text-xl font-semibold text-gray-900">{count}</p>
-          <p className="text-xs text-gray-500 truncate">{title}</p>
+          <p className="text-xl font-semibold text-secondary-900">{count}</p>
+          <p className="text-xs text-secondary-500 truncate">{title}</p>
         </div>
       </div>
       <button
@@ -86,7 +86,7 @@ function AlerteCard({
         {open ? 'Masquer le détail' : 'Voir le détail'}
       </button>
       {open && (
-        <div className="mt-2 space-y-1 max-h-52 overflow-y-auto border-t border-gray-100 pt-2">
+        <div className="mt-2 space-y-1 max-h-52 overflow-y-auto border-t border-secondary-100 pt-2">
           {children}
         </div>
       )}
@@ -180,7 +180,7 @@ export function AlertesTournees({
       );
     }
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-400 bg-white rounded-lg border border-gray-200 p-4">
+      <div className="flex items-center gap-2 text-sm text-secondary-400 bg-white rounded-lg border border-secondary-200 p-4">
         <Loader2 className="h-4 w-4 animate-spin" />
         Calcul des alertes…
       </div>
@@ -222,10 +222,10 @@ export function AlertesTournees({
                   key={`${j.date}-${j.technicienId}`}
                   type="button"
                   onClick={() => onOpenJournee?.(j)}
-                  className="w-full flex items-center justify-between gap-2 text-left text-sm px-2 py-1.5 rounded hover:bg-gray-50"
+                  className="w-full flex items-center justify-between gap-2 text-left text-sm px-2 py-1.5 rounded hover:bg-secondary-50"
                 >
                   <span className="truncate">{formatDateFR(j.date)} — {j.technicienNom}</span>
-                  <span className="text-xs text-gray-400 flex-shrink-0">{j.chargeMinutes}/{j.budgetMinutes} min</span>
+                  <span className="text-xs text-secondary-400 flex-shrink-0">{j.chargeMinutes}/{j.budgetMinutes} min</span>
                 </button>
               ))}
             </AlerteCard>
@@ -243,7 +243,7 @@ export function AlertesTournees({
                   key={c.contractId}
                   type="button"
                   onClick={() => onOpenContract?.(c.contractId)}
-                  className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-gray-50 truncate"
+                  className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-secondary-50 truncate"
                 >
                   {c.clientName} — {c.ville || '—'}
                   {/* I1.4 — mention DISTINCTE, jamais confondue avec un vrai retard */}
@@ -262,7 +262,7 @@ export function AlertesTournees({
               title="client(s) sans adresse localisée"
               count={sansPosition.length}
             >
-              <p className="px-2 pb-1 text-xs text-gray-500">
+              <p className="px-2 pb-1 text-xs text-secondary-500">
                 Sans coordonnées, aucun trajet n&apos;est calculable : ces contrats ne sont
                 jamais proposés. Corrigez l&apos;adresse sur la fiche client.
               </p>
@@ -271,7 +271,7 @@ export function AlertesTournees({
                   key={c.contractId}
                   type="button"
                   onClick={() => onOpenContract?.(c.contractId)}
-                  className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-gray-50 truncate"
+                  className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-secondary-50 truncate"
                 >
                   {c.clientName} — {c.ville || 'ville inconnue'}
                 </button>
@@ -282,14 +282,14 @@ export function AlertesTournees({
           {aTyper > 0 && (
             <AlerteCard
               icon={Tag}
-              color="bg-slate-100 text-slate-600"
+              color="bg-secondary-100 text-secondary-600"
               title="équipement(s) sans type"
               count={aTyper}
             >
               {contratsATyper.map((c) => (
                 <div key={c.contractId} className="flex items-center justify-between gap-2 text-sm px-2 py-1.5">
                   <span className="truncate">{c.clientName}</span>
-                  <span className="text-xs text-gray-400 flex-shrink-0">{c.typesNonRenseignes} à typer</span>
+                  <span className="text-xs text-secondary-400 flex-shrink-0">{c.typesNonRenseignes} à typer</span>
                 </div>
               ))}
               <Link

@@ -17,7 +17,7 @@ import { lienGoogleMaps, lienWaze } from '@/lib/itineraire';
  * @param {boolean} [props.sansIcone] - l'appelant dessine déjà l'épingle
  * @param {string} [props.className] - classes du conteneur (taille de texte, couleur)
  */
-export function AdresseItineraire({ adresse, lat, lng, sansIcone = false, className = 'text-sm text-gray-600' }) {
+export function AdresseItineraire({ adresse, lat, lng, sansIcone = false, className = 'text-sm text-secondary-600' }) {
   const maps = lienGoogleMaps({ adresse, lat, lng });
   const waze = lienWaze({ adresse, lat, lng });
   if (!maps || !adresse) return null;
@@ -42,7 +42,7 @@ export function AdresseItineraire({ adresse, lat, lng, sansIcone = false, classN
             rel="noopener noreferrer"
             title="Itinéraire dans Waze"
             aria-label="Itinéraire dans Waze"
-            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-xs font-medium text-gray-600 hover:border-blue-300 hover:text-blue-700 transition-colors"
+            className="inline-flex items-center gap-1 rounded-md border border-secondary-200 bg-white px-1.5 py-0.5 text-xs font-medium text-secondary-600 hover:border-blue-300 hover:text-blue-700 transition-colors"
           >
             <Navigation className="w-3 h-3" aria-hidden="true" />
             Waze

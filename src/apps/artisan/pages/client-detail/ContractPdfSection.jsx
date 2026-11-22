@@ -267,28 +267,28 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-secondary-900 flex items-center gap-2">
                   <Mail className="w-5 h-5 text-blue-600" />
                   Envoyer la proposition
                 </h3>
-                <button onClick={() => setShowSendConfirm(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded">
+                <button onClick={() => setShowSendConfirm(false)} className="p-1 text-secondary-400 hover:text-secondary-600 rounded">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="space-y-3 mb-6">
-                <div className="p-3 bg-gray-50 rounded-lg text-sm space-y-1">
-                  <p className="text-gray-600">
-                    <span className="font-medium text-gray-900">Destinataire :</span> {client?.email}
+                <div className="p-3 bg-secondary-50 rounded-lg text-sm space-y-1">
+                  <p className="text-secondary-600">
+                    <span className="font-medium text-secondary-900">Destinataire :</span> {client?.email}
                   </p>
-                  <p className="text-gray-600">
-                    <span className="font-medium text-gray-900">Client :</span> {client?.display_name || [client?.first_name, client?.last_name].filter(Boolean).join(' ')}
+                  <p className="text-secondary-600">
+                    <span className="font-medium text-secondary-900">Client :</span> {client?.display_name || [client?.first_name, client?.last_name].filter(Boolean).join(' ')}
                   </p>
-                  <p className="text-gray-600">
-                    <span className="font-medium text-gray-900">Montant :</span> {formatEuro(billableTotal)} / an
+                  <p className="text-secondary-600">
+                    <span className="font-medium text-secondary-900">Montant :</span> {formatEuro(billableTotal)} / an
                   </p>
                 </div>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-secondary-500">
                   Un email professionnel sera envoyé avec le contrat en PDF. Le client pourra le consulter directement depuis l&apos;email.
                 </p>
               </div>
@@ -296,7 +296,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
               <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => setShowSendConfirm(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50"
                 >
                   Annuler
                 </button>

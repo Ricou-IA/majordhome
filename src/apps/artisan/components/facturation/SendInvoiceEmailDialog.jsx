@@ -74,7 +74,7 @@ export default function SendInvoiceEmailDialog({ item, orgId, open, onOpenChange
       confirmDisabled={!availability.enabled}
     >
       <div className="mt-4 space-y-2 text-sm">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-secondary-500">
           Un brouillon Pennylane ne peut pas être envoyé : l’envoi sera refusé tant que la facture n’est pas finalisée.
         </p>
         <InvoiceEmailOptions

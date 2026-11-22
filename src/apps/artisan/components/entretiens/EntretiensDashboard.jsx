@@ -40,7 +40,7 @@ function InfoCard({
   suffix = '',
 }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5">
+    <div className="bg-white rounded-lg border border-secondary-200 p-5">
       <div className="flex items-center gap-3">
         <div
           className={`w-10 h-10 rounded-lg flex items-center justify-center ${bgColor}`}
@@ -48,11 +48,11 @@ function InfoCard({
           <Icon className={`w-5 h-5 ${color}`} />
         </div>
         <div className="min-w-0">
-          <p className="text-sm text-gray-500 truncate">{label}</p>
-          <p className="text-2xl font-semibold text-gray-900">
+          <p className="text-sm text-secondary-500 truncate">{label}</p>
+          <p className="text-2xl font-semibold text-secondary-900">
             {value}
             {suffix && (
-              <span className="text-base font-normal text-gray-500 ml-1">
+              <span className="text-base font-normal text-secondary-500 ml-1">
                 {suffix}
               </span>
             )}
@@ -108,24 +108,24 @@ export function EntretiensDashboard({ stats, savStats, isLoading, coreOrgId, onO
       <div className="space-y-6">
         {/* Skeleton contrats */}
         <div>
-          <div className="h-4 bg-gray-200 rounded w-20 mb-3 animate-pulse" />
+          <div className="h-4 bg-secondary-200 rounded w-20 mb-3 animate-pulse" />
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             {[...Array(3)].map((_, i) => (
               <div
                 key={i}
-                className="h-20 bg-white rounded-lg border border-gray-200 animate-pulse"
+                className="h-20 bg-white rounded-lg border border-secondary-200 animate-pulse"
               />
             ))}
           </div>
         </div>
         {/* Skeleton SAV */}
         <div>
-          <div className="h-4 bg-gray-200 rounded w-24 mb-3 animate-pulse" />
+          <div className="h-4 bg-secondary-200 rounded w-24 mb-3 animate-pulse" />
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             {[...Array(3)].map((_, i) => (
               <div
                 key={i}
-                className="h-20 bg-white rounded-lg border border-gray-200 animate-pulse"
+                className="h-20 bg-white rounded-lg border border-secondary-200 animate-pulse"
               />
             ))}
           </div>
@@ -139,7 +139,7 @@ export function EntretiensDashboard({ stats, savStats, isLoading, coreOrgId, onO
       {/* Section Contrats */}
       {stats && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+          <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider mb-3">
             Contrats d&apos;entretien
           </h3>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
@@ -175,7 +175,7 @@ export function EntretiensDashboard({ stats, savStats, isLoading, coreOrgId, onO
       {/* Section Pipeline SAV */}
       {savStats && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+          <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider mb-3">
             Pipeline SAV
           </h3>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
@@ -210,7 +210,7 @@ export function EntretiensDashboard({ stats, savStats, isLoading, coreOrgId, onO
       {/* Journal du cron de figeage — ce que la machine a fait, passage par passage */}
       {coreOrgId && (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Planification automatique</h2>
+          <h2 className="text-lg font-semibold text-secondary-900 mb-4">Planification automatique</h2>
           <div className="space-y-4">
             <AutoRdvMois coreOrgId={coreOrgId} />
             <PlanificationJournal coreOrgId={coreOrgId} job="tournees-figer" />

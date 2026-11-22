@@ -51,41 +51,41 @@ export function StepSignature({
 
   const bilanClass = formData.bilan_conformite === 'conforme' ? 'text-green-600' :
     formData.bilan_conformite === 'anomalie' ? 'text-orange-600' :
-    formData.bilan_conformite === 'arret_urgence' ? 'text-red-600' : 'text-gray-500';
+    formData.bilan_conformite === 'arret_urgence' ? 'text-red-600' : 'text-secondary-500';
 
   return (
     <div className="space-y-6">
       {/* Résumé compact */}
       <SectionTitle>Résumé de l&apos;intervention</SectionTitle>
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2 text-sm">
+      <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-4 space-y-2 text-sm">
         <div className="flex justify-between">
-          <span className="text-gray-500">Client</span>
-          <span className="font-medium text-gray-800">{client?.display_name || '—'}</span>
+          <span className="text-secondary-500">Client</span>
+          <span className="font-medium text-secondary-800">{client?.display_name || '—'}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Équipement</span>
-          <span className="font-medium text-gray-800">
+          <span className="text-secondary-500">Équipement</span>
+          <span className="font-medium text-secondary-800">
             {referentiel?.categoriesByCode.get(formData.equipement_type)?.label || formData.equipement_type || '—'}
             {formData.equipement_marque && ` — ${formData.equipement_marque}`}
             {formData.equipement_modele && ` ${formData.equipement_modele}`}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Date</span>
-          <span className="font-medium text-gray-800">{formData.date_intervention || '—'}</span>
+          <span className="text-secondary-500">Date</span>
+          <span className="font-medium text-secondary-800">{formData.date_intervention || '—'}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Technicien</span>
-          <span className="font-medium text-gray-800">{formData.technicien_nom || '—'}</span>
+          <span className="text-secondary-500">Technicien</span>
+          <span className="font-medium text-secondary-800">{formData.technicien_nom || '—'}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Bilan</span>
+          <span className="text-secondary-500">Bilan</span>
           <span className={`font-semibold ${bilanClass}`}>{bilanLabel}</span>
         </div>
         {(formData.pieces_remplacees || []).length > 0 && (
           <div className="flex justify-between">
-            <span className="text-gray-500">Pièces remplacées</span>
-            <span className="font-medium text-gray-800">{formData.pieces_remplacees.length}</span>
+            <span className="text-secondary-500">Pièces remplacées</span>
+            <span className="font-medium text-secondary-800">{formData.pieces_remplacees.length}</span>
           </div>
         )}
       </div>
@@ -107,9 +107,9 @@ export function StepSignature({
       {!hasPdf && hasSignature && !showPad && (
         <div className="space-y-3">
           <SectionTitle>Signature technicien</SectionTitle>
-          <div className="border border-gray-200 rounded-lg p-4 bg-white">
+          <div className="border border-secondary-200 rounded-lg p-4 bg-white">
             <img src={signatureBase64} alt="Signature" className="max-h-[150px] mx-auto" />
-            <p className="text-center text-sm text-gray-500 mt-2">Signé par {signataireNom}</p>
+            <p className="text-center text-sm text-secondary-500 mt-2">Signé par {signataireNom}</p>
           </div>
           <Button
             type="button"

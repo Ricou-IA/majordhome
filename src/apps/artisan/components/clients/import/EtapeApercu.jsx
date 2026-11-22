@@ -14,9 +14,9 @@ const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
 
 function Compteur({ libelle, valeur }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 px-4 py-3">
-      <p className="text-2xl font-semibold text-gray-900">{valeur}</p>
-      <p className="text-sm text-gray-600">{libelle}</p>
+    <div className="bg-white rounded-lg border border-secondary-200 px-4 py-3">
+      <p className="text-2xl font-semibold text-secondary-900">{valeur}</p>
+      <p className="text-sm text-secondary-600">{libelle}</p>
     </div>
   );
 }
@@ -54,7 +54,7 @@ export default function EtapeApercu({
         </p>
       )}
       {!classees && !enErreur && (
-        <p className="flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
+        <p className="flex items-center gap-2 text-sm text-secondary-700 bg-white border border-secondary-200 rounded-lg px-4 py-3">
           <Loader2 className="w-4 h-4 animate-spin text-primary-700" aria-hidden="true" />
           Lecture de vos clients existants…
         </p>
@@ -68,7 +68,7 @@ export default function EtapeApercu({
           <button
             type="button"
             onClick={onRelire}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 shrink-0"
+            className="inline-flex items-center gap-2 px-3 py-2 bg-white text-secondary-700 border border-secondary-300 rounded-lg hover:bg-secondary-50 shrink-0"
           >
             <RefreshCw className="w-4 h-4" aria-hidden="true" />
             Réessayer
@@ -85,22 +85,22 @@ export default function EtapeApercu({
               <Compteur libelle="doublons écartés" valeur={bilan.doublons_ecartes} />
               <Compteur libelle="écartées" valeur={bilan.ecartees} />
             </div>
-            <p className="text-sm text-gray-700">{phraseBilan(bilan)}</p>
+            <p className="text-sm text-secondary-700">{phraseBilan(bilan)}</p>
             {accents && (
-              <p className="flex items-start gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
-                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" aria-hidden="true" />
+              <p className="flex items-start gap-2 text-sm text-secondary-700 bg-white border border-secondary-200 rounded-lg px-4 py-3">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-secondary-500" aria-hidden="true" />
                 {accents}
               </p>
             )}
             {corrections && (
-              <p className="flex items-start gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
-                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" aria-hidden="true" />
+              <p className="flex items-start gap-2 text-sm text-secondary-700 bg-white border border-secondary-200 rounded-lg px-4 py-3">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-secondary-500" aria-hidden="true" />
                 {corrections}
               </p>
             )}
             {sansCodePostal && (
-              <p className="flex items-start gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
-                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" aria-hidden="true" />
+              <p className="flex items-start gap-2 text-sm text-secondary-700 bg-white border border-secondary-200 rounded-lg px-4 py-3">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-secondary-500" aria-hidden="true" />
                 {sansCodePostal}
               </p>
             )}
@@ -129,7 +129,7 @@ export default function EtapeApercu({
         <button
           type="button"
           onClick={onRetour}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-secondary-700 border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />
           {libelleRetour}

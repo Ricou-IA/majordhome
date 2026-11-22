@@ -34,7 +34,7 @@ export default function PiecesIdentifieesListe({ selections = [], nomAppareil = 
   return (
     <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+        <h4 className="text-sm font-semibold text-secondary-800 flex items-center gap-1.5">
           <ClipboardList className="w-4 h-4 text-indigo-600" />
           Pièces identifiées ({selections.length})
         </h4>
@@ -47,23 +47,23 @@ export default function PiecesIdentifieesListe({ selections = [], nomAppareil = 
           return (
             <li key={s.id || `${s.equipment_id}-${s.piece_reference}-${s.repere}`} className="py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <div className="min-w-0 flex-1">
-                {appareil && <p className="text-[11px] text-gray-500 truncate">{appareil}</p>}
-                <p className="text-gray-900">
-                  <span className="font-mono text-xs text-gray-600">{s.piece_reference}</span>
-                  {s.repere ? <span className="text-xs text-gray-500"> · repère {s.repere}</span> : null}
+                {appareil && <p className="text-[11px] text-secondary-500 truncate">{appareil}</p>}
+                <p className="text-secondary-900">
+                  <span className="font-mono text-xs text-secondary-600">{s.piece_reference}</span>
+                  {s.repere ? <span className="text-xs text-secondary-500"> · repère {s.repere}</span> : null}
                   <span> — {s.piece_name || 'Pièce détachée'}</span>
                 </p>
-                <p className="text-[11px] text-gray-500">{mentionIdentification(s, membres)}</p>
+                <p className="text-[11px] text-secondary-500">{mentionIdentification(s, membres)}</p>
               </div>
-              <span className="text-xs text-gray-600 whitespace-nowrap">
+              <span className="text-xs text-secondary-600 whitespace-nowrap">
                 {s.public_price_ht != null ? `${formatEuro(s.public_price_ht)} HT (prix public)` : 'Prix à chiffrer'}
               </span>
               {peutModifier ? (
                 <div className="flex items-center gap-1.5">
-                  <button type="button" onClick={() => onQuantite?.(s, q - 1)} aria-label={`Diminuer ${s.piece_reference}`} className="group w-9 h-9 -my-1.5 flex items-center justify-center"><span className="w-6 h-6 rounded-full border border-gray-300 bg-white flex items-center justify-center group-hover:bg-gray-100"><Minus className="w-3 h-3" /></span></button>
+                  <button type="button" onClick={() => onQuantite?.(s, q - 1)} aria-label={`Diminuer ${s.piece_reference}`} className="group w-9 h-9 -my-1.5 flex items-center justify-center"><span className="w-6 h-6 rounded-full border border-secondary-300 bg-white flex items-center justify-center group-hover:bg-secondary-100"><Minus className="w-3 h-3" /></span></button>
                   <span className="w-6 text-center font-semibold tabular-nums" aria-label="Quantité">{q}</span>
-                  <button type="button" onClick={() => onQuantite?.(s, q + 1)} aria-label={`Augmenter ${s.piece_reference}`} className="group w-9 h-9 -my-1.5 flex items-center justify-center"><span className="w-6 h-6 rounded-full border border-gray-300 bg-white flex items-center justify-center group-hover:bg-gray-100"><Plus className="w-3 h-3" /></span></button>
-                  <button type="button" onClick={() => onQuantite?.(s, 0)} aria-label={`Retirer ${s.piece_reference}`} title="Retirer" className="group ml-1 w-9 h-9 -my-1.5 flex items-center justify-center text-gray-400 hover:text-red-600"><span className="w-6 h-6 rounded-full flex items-center justify-center group-hover:bg-red-50"><X className="w-3.5 h-3.5" /></span></button>
+                  <button type="button" onClick={() => onQuantite?.(s, q + 1)} aria-label={`Augmenter ${s.piece_reference}`} className="group w-9 h-9 -my-1.5 flex items-center justify-center"><span className="w-6 h-6 rounded-full border border-secondary-300 bg-white flex items-center justify-center group-hover:bg-secondary-100"><Plus className="w-3 h-3" /></span></button>
+                  <button type="button" onClick={() => onQuantite?.(s, 0)} aria-label={`Retirer ${s.piece_reference}`} title="Retirer" className="group ml-1 w-9 h-9 -my-1.5 flex items-center justify-center text-secondary-400 hover:text-red-600"><span className="w-6 h-6 rounded-full flex items-center justify-center group-hover:bg-red-50"><X className="w-3.5 h-3.5" /></span></button>
                 </div>
               ) : (
                 <span className="text-sm font-semibold tabular-nums whitespace-nowrap">× {q}</span>

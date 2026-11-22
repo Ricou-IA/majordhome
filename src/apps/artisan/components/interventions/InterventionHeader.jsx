@@ -113,7 +113,7 @@ export function InterventionHeader({
       {client && (
         <div className="bg-white rounded-lg border p-4 space-y-2">
           <h3 className="font-semibold text-base flex items-center gap-2">
-            <User className="h-4 w-4 text-gray-500" />
+            <User className="h-4 w-4 text-secondary-500" />
             {client.display_name}
           </h3>
           {client.address && (
@@ -121,7 +121,7 @@ export function InterventionHeader({
               adresse={formaterAdresse({ address: client.address, postalCode: client.postal_code, city: client.city })}
               lat={client.latitude}
               lng={client.longitude}
-              className="text-sm text-gray-600 [&>svg]:text-gray-400 [&>svg]:h-4 [&>svg]:w-4"
+              className="text-sm text-secondary-600 [&>svg]:text-secondary-400 [&>svg]:h-4 [&>svg]:w-4"
             />
           )}
           {client.phone && (
@@ -129,7 +129,7 @@ export function InterventionHeader({
               href={`tel:${client.phone}`}
               className="text-sm text-blue-600 flex items-center gap-2 hover:underline"
             >
-              <Phone className="h-4 w-4 text-gray-400" />
+              <Phone className="h-4 w-4 text-secondary-400" />
               {client.phone}
             </a>
           )}
@@ -145,13 +145,13 @@ export function InterventionHeader({
       {equipment && (
         <div className="bg-white rounded-lg border p-4">
           <h3 className="font-semibold text-base flex items-center gap-2 mb-1">
-            <Wrench className="h-4 w-4 text-gray-500" />
+            <Wrench className="h-4 w-4 text-secondary-500" />
             Équipement
           </h3>
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-secondary-700">
             {equipment.brand} {equipment.model}
             {equipment.serial_number && (
-              <span className="text-gray-500"> — N° {equipment.serial_number}</span>
+              <span className="text-secondary-500"> — N° {equipment.serial_number}</span>
             )}
           </p>
           {/* Notice / vue éclatée du modèle : partagées par marque + modèle, déposées depuis la fiche client */}
@@ -160,20 +160,20 @@ export function InterventionHeader({
       )}
 
       {/* Date & heure planifiées */}
-      <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
+      <div className="flex items-center gap-4 text-sm text-secondary-600 flex-wrap">
         <span className="flex items-center gap-1">
-          <Calendar className="h-4 w-4 text-gray-400" />
+          <Calendar className="h-4 w-4 text-secondary-400" />
           {dateStr}
         </span>
         {timeStr && (
           <span className="flex items-center gap-1">
-            <Clock className="h-4 w-4 text-gray-400" />
+            <Clock className="h-4 w-4 text-secondary-400" />
             {timeStr}
           </span>
         )}
         {intervention.technician_name && (
           <span className="flex items-center gap-1">
-            <User className="h-4 w-4 text-gray-400" />
+            <User className="h-4 w-4 text-secondary-400" />
             {intervention.technician_name}
           </span>
         )}

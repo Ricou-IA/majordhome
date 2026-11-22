@@ -61,7 +61,7 @@ export function EquipmentModelDocuments({ equipment, className = '' }) {
           type="button"
           onClick={() => setProceduresOuvertes((v) => !v)}
           aria-expanded={proceduresOuvertes}
-          className={`${PUCE} border-gray-300 bg-white text-gray-700 hover:bg-gray-50`}
+          className={`${PUCE} border-secondary-300 bg-white text-secondary-700 hover:bg-secondary-50`}
         >
           <ListChecks className="h-4 w-4" />
           Procédures ({procedures.length})

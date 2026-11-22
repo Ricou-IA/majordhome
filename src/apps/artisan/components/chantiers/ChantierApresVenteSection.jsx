@@ -25,10 +25,10 @@ import { BoutonEnvoiProposition } from '../entretiens/EnvoiProposition';
 function Ligne({ Icone, titre, etat, fait, children }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2.5">
-      <Icone className="w-4 h-4 text-gray-400 shrink-0" />
+      <Icone className="w-4 h-4 text-secondary-400 shrink-0" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray-900">{titre}</p>
-        <p className="text-xs text-gray-500 flex items-center gap-1">
+        <p className="text-sm font-medium text-secondary-900">{titre}</p>
+        <p className="text-xs text-secondary-500 flex items-center gap-1">
           {fait && <Check className="w-3 h-3 text-emerald-600 shrink-0" />}
           {etat}
         </p>
@@ -104,7 +104,7 @@ export function ChantierApresVenteSection({ chantier, onUpdated, peutAgir = true
         Après-vente
       </h3>
 
-      <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+      <div className="bg-white border border-secondary-200 rounded-lg divide-y divide-secondary-100">
         <Ligne Icone={MessageSquare} titre="Avis client" etat={reperes.avis.titre} fait={reperes.avis.etat === 'fait'}>
           {peutAgir && reperes.avis.etat !== 'fait' && (
             <button

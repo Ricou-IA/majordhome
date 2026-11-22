@@ -82,7 +82,7 @@ export function CertificatSignaturePad({
             alt="Signature client"
             className="max-h-40 mx-auto"
           />
-          <p className="text-sm text-gray-600 mt-3">
+          <p className="text-sm text-secondary-600 mt-3">
             Signé par <strong>{signataireNom}</strong>
           </p>
         </div>
@@ -110,7 +110,7 @@ export function CertificatSignaturePad({
 
       {/* Nom du signataire */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-secondary-700 mb-1">
           {nomLabel} <span className="text-red-500">*</span>
         </label>
         <input
@@ -119,18 +119,18 @@ export function CertificatSignaturePad({
           onChange={(e) => onSignataireNomChange?.(e.target.value)}
           placeholder={nomLabel}
           disabled={disabled || isSaving}
-          className="w-full px-3 py-3 border border-gray-300 rounded-lg text-base bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+          className="w-full px-3 py-3 border border-secondary-300 rounded-lg text-base bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
         />
       </div>
 
       {/* Zone de signature */}
       <div ref={containerRef} className="relative">
-        <p className="text-sm font-medium text-gray-700 mb-1">
+        <p className="text-sm font-medium text-secondary-700 mb-1">
           {signatureLabel} <span className="text-red-500">*</span>
         </p>
         <div
           className={`border-2 rounded-lg bg-white ${
-            disabled ? 'border-gray-200 opacity-50' : 'border-dashed border-gray-400'
+            disabled ? 'border-secondary-200 opacity-50' : 'border-dashed border-secondary-400'
           }`}
         >
           <SignatureCanvas
@@ -146,7 +146,7 @@ export function CertificatSignaturePad({
 
         {/* Placeholder */}
         {isEmpty && !disabled && (
-          <p className="absolute inset-0 flex items-center justify-center text-gray-400 text-base pointer-events-none mt-6">
+          <p className="absolute inset-0 flex items-center justify-center text-secondary-400 text-base pointer-events-none mt-6">
             {placeholder}
           </p>
         )}

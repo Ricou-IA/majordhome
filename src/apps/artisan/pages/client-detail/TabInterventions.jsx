@@ -86,7 +86,7 @@ function useLibelleEquipement(intervention) {
 const ChildCard = ({ intervention }) => {
   const isNeant = intervention.status === 'cancelled' && intervention.workflow_status === 'realise';
   const statusInfo = isNeant
-    ? { label: 'Néant', className: 'bg-gray-100 text-gray-500' }
+    ? { label: 'Néant', className: 'bg-secondary-100 text-secondary-500' }
     : (STATUTS_TECHNIQUES[intervention.status] || STATUTS_TECHNIQUES.scheduled);
   const hasEntretien = intervention.intervention_type === 'entretien'
     || (intervention.intervention_type === 'sav' && intervention.includes_entretien);
@@ -95,13 +95,13 @@ const ChildCard = ({ intervention }) => {
   const { label, detail } = useLibelleEquipement(intervention);
 
   return (
-    <div className={`ml-6 p-3 bg-white rounded-lg border border-l-2 border-l-blue-300 border-gray-200 ${isNeant ? 'opacity-60' : ''}`}>
+    <div className={`ml-6 p-3 bg-white rounded-lg border border-l-2 border-l-blue-300 border-secondary-200 ${isNeant ? 'opacity-60' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <span className="text-sm font-medium text-gray-900">{label || 'Équipement'}</span>
-          {detail && <span className="text-xs text-gray-500">{detail}</span>}
+          <span className="text-sm font-medium text-secondary-900">{label || 'Équipement'}</span>
+          {detail && <span className="text-xs text-secondary-500">{detail}</span>}
           <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.className}`}>{statusInfo.label}</span>
-          {isNeant && <Ban className="w-3 h-3 text-gray-400" />}
+          {isNeant && <Ban className="w-3 h-3 text-secondary-400" />}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {showCertificat && (

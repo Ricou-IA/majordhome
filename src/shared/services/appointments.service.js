@@ -48,9 +48,9 @@ export const APPOINTMENT_TYPES = [
   // Congés : absence d'une personne, sans client ni carte (2026-09-30). Journée entière
   // au clic dans l'assistant ; bloque la journée du technicien pour le moteur de
   // tournées comme n'importe quel RDV posé sur lui (arrêt fixe, journée non « vide »).
-  { value: 'leave', label: 'Congés', color: '#64748B', bgClass: 'bg-slate-500' },
+  { value: 'leave', label: 'Congés', color: '#64748B', bgClass: 'bg-secondary-500' },
   // « Autre » reste EN DERNIER : getAppointmentTypeConfig y replie tout type inconnu.
-  { value: 'other', label: 'Autre', color: '#6B7280', bgClass: 'bg-gray-500' },
+  { value: 'other', label: 'Autre', color: '#6B7280', bgClass: 'bg-secondary-500' },
 ];
 
 /** Types sans client ni carte kanban (RDV interne / absence) : nom facultatif, personne(s) = toute l'équipe. */
@@ -65,14 +65,14 @@ export const APPOINTMENT_STATUSES = [
   { value: 'in_progress', label: 'En cours', color: 'bg-amber-100 text-amber-700' },
   { value: 'completed', label: 'Terminé', color: 'bg-emerald-100 text-emerald-700' },
   { value: 'cancelled', label: 'Annulé', color: 'bg-red-100 text-red-700' },
-  { value: 'no_show', label: 'Absent', color: 'bg-gray-100 text-gray-700' },
+  { value: 'no_show', label: 'Absent', color: 'bg-secondary-100 text-secondary-700' },
 ];
 
 /**
  * Niveaux de priorité
  */
 export const PRIORITIES = [
-  { value: 'low', label: 'Basse', color: 'text-gray-500' },
+  { value: 'low', label: 'Basse', color: 'text-secondary-500' },
   { value: 'normal', label: 'Normale', color: 'text-blue-500' },
   { value: 'high', label: 'Haute', color: 'text-orange-500' },
   { value: 'urgent', label: 'Urgente', color: 'text-red-500' },

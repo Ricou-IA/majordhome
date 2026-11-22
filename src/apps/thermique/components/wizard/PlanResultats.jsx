@@ -100,8 +100,8 @@ export default function PlanResultats({ dessin, bilan }) {
               height="20"
               patternTransform="rotate(45)"
             >
-              <rect width="20" height="20" className="fill-slate-100" />
-              <line x1="0" y1="0" x2="0" y2="20" className="stroke-slate-400" strokeWidth="4" />
+              <rect width="20" height="20" className="fill-secondary-100" />
+              <line x1="0" y1="0" x2="0" y2="20" className="stroke-secondary-400" strokeWidth="4" />
             </pattern>
           </defs>
           {piecesNiveau.map((piece) => {
@@ -121,14 +121,14 @@ export default function PlanResultats({ dessin, bilan }) {
                   points={points}
                   fill={fill ?? undefined}
                   fillOpacity={piece.chauffee ? 0.55 : 1}
-                  className="stroke-slate-500"
+                  className="stroke-secondary-500"
                   strokeWidth={2 * echelle}
                 />
                 <text
                   x={centroide.x}
                   y={centroide.y}
                   textAnchor="middle"
-                  className="fill-slate-800 select-none"
+                  className="fill-secondary-800 select-none"
                   style={{ fontSize: 20 * echelle }}
                 >
                   {resultat ? `${piece.nom} · ${Math.round(resultat.total)} W` : piece.nom}

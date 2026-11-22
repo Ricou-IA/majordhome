@@ -39,7 +39,7 @@ export function CancelConfirmation({ onConfirm, onBack, isSaving }) {
       <div className="flex items-center gap-3 justify-end">
         <button
           onClick={onBack}
-          className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          className="px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
         >
           Retour
         </button>
@@ -79,7 +79,7 @@ export function DeleteConfirmation({ appointmentSubject, onConfirm, onBack, isSa
       <div className="flex items-center gap-3 justify-end">
         <button
           onClick={onBack}
-          className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          className="px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
         >
           Retour
         </button>

@@ -318,7 +318,7 @@ export default function InterventionDetail() {
         <div className="flex items-center gap-4">
           <Link
             to="/planning"
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2 rounded-lg hover:bg-secondary-100 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
@@ -327,10 +327,10 @@ export default function InterventionDetail() {
 
         <div className="bg-white rounded-lg border p-8 text-center">
           <AlertCircle className="h-12 w-12 text-red-400 mx-auto" />
-          <p className="mt-4 text-lg font-medium text-gray-700">
+          <p className="mt-4 text-lg font-medium text-secondary-700">
             Intervention introuvable
           </p>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-secondary-500">
             {error?.message || "Cette intervention n'existe pas ou vous n'y avez pas accès."}
           </p>
         </div>
@@ -348,15 +348,15 @@ export default function InterventionDetail() {
       <div className="flex items-center gap-3">
         <Link
           to="/planning"
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+          className="p-2 rounded-lg hover:bg-secondary-100 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-bold text-gray-900 truncate">
+          <h1 className="text-xl font-bold text-secondary-900 truncate">
             {client?.display_name || 'Intervention'}
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-secondary-500">
             Intervention #{id?.slice(0, 8)}
           </p>
         </div>
@@ -522,7 +522,7 @@ export default function InterventionDetail() {
 
           {/* Indicateur auto-save */}
           {draft.lastSaved && canEdit && (
-            <p className="text-xs text-gray-400 text-center">
+            <p className="text-xs text-secondary-400 text-center">
               Brouillon auto-sauvegardé à{' '}
               {draft.lastSaved.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
             </p>
@@ -530,7 +530,7 @@ export default function InterventionDetail() {
 
           {/* CTA Créer un SAV — visible seulement pour admin/team_leader */}
           <PermissionGate resource="sav" action="create">
-            <div className="border-t border-gray-200 pt-4 mt-2">
+            <div className="border-t border-secondary-200 pt-4 mt-2">
               <div className="bg-orange-50 rounded-lg border border-orange-200 p-4 space-y-2">
                 <h4 className="text-sm font-semibold text-orange-900 flex items-center gap-2">
                   <Wrench className="h-4 w-4 text-orange-600" />
@@ -620,7 +620,7 @@ export default function InterventionDetail() {
           {/* Étape 1 : Générer le PV */}
           <div className="bg-white rounded-lg border p-4 space-y-3">
             <h3 className="font-semibold text-base">1. Générer le PV d&apos;intervention</h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-secondary-600">
               Le rapport sera compilé en PDF pour relecture avant signature.
             </p>
             <Button
@@ -666,7 +666,7 @@ export default function InterventionDetail() {
           {/* Étape 3 : Envoyer au client */}
           <div className="bg-white rounded-lg border p-4 space-y-3">
             <h3 className="font-semibold text-base">3. Envoyer au client</h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-secondary-600">
               Le PV signé sera envoyé par email à{' '}
               <strong>{client?.email || '(email non renseigné)'}</strong>.
             </p>

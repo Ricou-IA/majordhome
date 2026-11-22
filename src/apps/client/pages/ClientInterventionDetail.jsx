@@ -41,7 +41,7 @@ export default function ClientInterventionDetail() {
   if (!intervention) {
     return (
       <div className="text-center py-20">
-        <p className="text-gray-500">Intervention introuvable.</p>
+        <p className="text-secondary-500">Intervention introuvable.</p>
         <Link to="/client/interventions" className="text-primary-600 hover:underline mt-2 inline-block">
           Retour aux interventions
         </Link>
@@ -69,15 +69,15 @@ export default function ClientInterventionDetail() {
       <div className="flex items-center gap-3">
         <Link
           to="/client/interventions"
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          className="p-2 rounded-lg hover:bg-secondary-100 transition-colors"
         >
-          <ArrowLeft className="w-5 h-5 text-gray-500" />
+          <ArrowLeft className="w-5 h-5 text-secondary-500" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-secondary-900">
             {TYPE_LABELS[intervention.intervention_type] || 'Intervention'}
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-secondary-500">
             {STATUS_LABELS[intervention.status] || intervention.status}
             {intervention.scheduled_date && ` - ${formatDateFR(intervention.scheduled_date)}`}
           </p>
@@ -85,35 +85,35 @@ export default function ClientInterventionDetail() {
       </div>
 
       {/* Détails */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Détails</h2>
+      <div className="bg-white rounded-xl border border-secondary-200 p-6">
+        <h2 className="text-lg font-semibold text-secondary-900 mb-4">Détails</h2>
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
           {intervention.scheduled_date && (
             <div className="flex items-start gap-2">
-              <Calendar className="w-4 h-4 text-gray-400 mt-0.5" />
+              <Calendar className="w-4 h-4 text-secondary-400 mt-0.5" />
               <div>
-                <span className="text-gray-500">Date</span>
-                <p className="font-medium text-gray-900">{formatDateFR(intervention.scheduled_date)}</p>
+                <span className="text-secondary-500">Date</span>
+                <p className="font-medium text-secondary-900">{formatDateFR(intervention.scheduled_date)}</p>
               </div>
             </div>
           )}
 
           {intervention.technician_name && (
             <div className="flex items-start gap-2">
-              <User className="w-4 h-4 text-gray-400 mt-0.5" />
+              <User className="w-4 h-4 text-secondary-400 mt-0.5" />
               <div>
-                <span className="text-gray-500">Technicien</span>
-                <p className="font-medium text-gray-900">{intervention.technician_name}</p>
+                <span className="text-secondary-500">Technicien</span>
+                <p className="font-medium text-secondary-900">{intervention.technician_name}</p>
               </div>
             </div>
           )}
 
           {equipment && (
             <div className="flex items-start gap-2">
-              <Wrench className="w-4 h-4 text-gray-400 mt-0.5" />
+              <Wrench className="w-4 h-4 text-secondary-400 mt-0.5" />
               <div>
-                <span className="text-gray-500">Équipement</span>
-                <p className="font-medium text-gray-900">
+                <span className="text-secondary-500">Équipement</span>
+                <p className="font-medium text-secondary-900">
                   {[equipment.brand, equipment.model].filter(Boolean).join(' ') || 'Non renseigné'}
                 </p>
               </div>
@@ -122,10 +122,10 @@ export default function ClientInterventionDetail() {
 
           {intervention.duration && (
             <div className="flex items-start gap-2">
-              <Clock className="w-4 h-4 text-gray-400 mt-0.5" />
+              <Clock className="w-4 h-4 text-secondary-400 mt-0.5" />
               <div>
-                <span className="text-gray-500">Durée</span>
-                <p className="font-medium text-gray-900">{intervention.duration} min</p>
+                <span className="text-secondary-500">Durée</span>
+                <p className="font-medium text-secondary-900">{intervention.duration} min</p>
               </div>
             </div>
           )}
@@ -133,46 +133,46 @@ export default function ClientInterventionDetail() {
 
         {/* Travaux effectués */}
         {intervention.work_performed && (
-          <div className="mt-6 pt-4 border-t border-gray-100">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Travaux effectués</h3>
-            <p className="text-sm text-gray-600 whitespace-pre-line">{intervention.work_performed}</p>
+          <div className="mt-6 pt-4 border-t border-secondary-100">
+            <h3 className="text-sm font-medium text-secondary-700 mb-2">Travaux effectués</h3>
+            <p className="text-sm text-secondary-600 whitespace-pre-line">{intervention.work_performed}</p>
           </div>
         )}
 
         {/* Pièces remplacées */}
         {intervention.parts_replaced && (
           <div className="mt-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Pièces remplacées</h3>
-            <p className="text-sm text-gray-600 whitespace-pre-line">{intervention.parts_replaced}</p>
+            <h3 className="text-sm font-medium text-secondary-700 mb-2">Pièces remplacées</h3>
+            <p className="text-sm text-secondary-600 whitespace-pre-line">{intervention.parts_replaced}</p>
           </div>
         )}
 
         {/* Commentaire client */}
         {intervention.client_comment && (
           <div className="mt-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Message du technicien</h3>
-            <p className="text-sm text-gray-600 whitespace-pre-line">{intervention.client_comment}</p>
+            <h3 className="text-sm font-medium text-secondary-700 mb-2">Message du technicien</h3>
+            <p className="text-sm text-secondary-600 whitespace-pre-line">{intervention.client_comment}</p>
           </div>
         )}
       </div>
 
       {/* Photos */}
       {(photoBeforeUrl || photoAfterUrl) && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <ImageIcon className="w-5 h-5 text-gray-400" />
+        <div className="bg-white rounded-xl border border-secondary-200 p-6">
+          <h2 className="text-lg font-semibold text-secondary-900 mb-4 flex items-center gap-2">
+            <ImageIcon className="w-5 h-5 text-secondary-400" />
             Photos
           </h2>
           <div className="grid sm:grid-cols-2 gap-4">
             {photoBeforeUrl && (
               <div>
-                <p className="text-sm text-gray-500 mb-2">Avant</p>
+                <p className="text-sm text-secondary-500 mb-2">Avant</p>
                 <img src={photoBeforeUrl} alt="Avant intervention" className="rounded-lg w-full object-cover max-h-64" />
               </div>
             )}
             {photoAfterUrl && (
               <div>
-                <p className="text-sm text-gray-500 mb-2">Après</p>
+                <p className="text-sm text-secondary-500 mb-2">Après</p>
                 <img src={photoAfterUrl} alt="Après intervention" className="rounded-lg w-full object-cover max-h-64" />
               </div>
             )}
@@ -182,15 +182,15 @@ export default function ClientInterventionDetail() {
 
       {/* Certificat */}
       {!certLoading && certificat && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-secondary-200 p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-50 rounded-lg">
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <h2 className="font-semibold text-gray-900">Certificat d&apos;entretien</h2>
-                <p className="text-sm text-gray-500">
+                <h2 className="font-semibold text-secondary-900">Certificat d&apos;entretien</h2>
+                <p className="text-sm text-secondary-500">
                   {certificat.signed_at ? `Signé le ${formatDateFR(certificat.signed_at)}` : 'En cours'}
                 </p>
               </div>

@@ -75,10 +75,10 @@ export function LeadHardDeleteDialog({ open, onOpenChange, leadId, hardDeleteLea
       loading={isHardDeleting}
       onConfirm={handleConfirm}
     >
-      <div className="mt-4 rounded-lg border border-red-100 bg-red-50/60 p-3 text-sm text-gray-700">
+      <div className="mt-4 rounded-lg border border-red-100 bg-red-50/60 p-3 text-sm text-secondary-700">
         <p className="font-medium text-red-700 mb-2">Données qui seront supprimées :</p>
         {counts === null ? (
-          <p className="text-gray-500 italic">Calcul en cours…</p>
+          <p className="text-secondary-500 italic">Calcul en cours…</p>
         ) : (
           <ul className="space-y-1 list-disc list-inside text-xs">
             <li>
@@ -93,12 +93,12 @@ export function LeadHardDeleteDialog({ open, onOpenChange, leadId, hardDeleteLea
               <span className="font-medium">{counts.mailings ?? '?'}</span>{' '}
               log{(counts.mailings || 0) > 1 ? 's' : ''} mailing
             </li>
-            <li className="text-gray-500">
+            <li className="text-secondary-500">
               + activités, devis Pennylane liés, visites techniques (cascade DB)
             </li>
           </ul>
         )}
-        <p className="mt-3 text-xs text-gray-500 italic">
+        <p className="mt-3 text-xs text-secondary-500 italic">
           Les interventions ou devis fournisseur liés seront déliés (préservés mais sans lead).
         </p>
       </div>

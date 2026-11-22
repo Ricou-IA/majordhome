@@ -200,12 +200,12 @@ export function CreateSAVModal({
             <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
               <Wrench className="w-4 h-4 text-orange-600" />
             </div>
-            <h2 className="text-base font-semibold text-gray-900">Nouvelle demande SAV</h2>
+            <h2 className="text-base font-semibold text-secondary-900">Nouvelle demande SAV</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg transition-colors"
+            className="p-2 text-secondary-400 hover:text-secondary-600 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -216,13 +216,13 @@ export function CreateSAVModal({
           {/* Sélection client */}
           {selectedClient ? (
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Client</label>
+              <label className="block text-sm font-medium text-secondary-700">Client</label>
               <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-blue-500" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{selectedClient.display_name}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-medium text-secondary-900">{selectedClient.display_name}</p>
+                    <p className="text-xs text-secondary-500">
                       {[selectedClient.postal_code, selectedClient.city].filter(Boolean).join(' ')}
                     </p>
                   </div>
@@ -243,25 +243,25 @@ export function CreateSAVModal({
             </div>
           ) : (
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Rechercher un client</label>
+              <label className="block text-sm font-medium text-secondary-700">Rechercher un client</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400" />
                 <input
                   ref={searchRef}
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Nom, code postal, ville..."
-                  className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full pl-9 pr-4 py-2.5 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
                 {isSearching && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 animate-spin" />
                 )}
               </div>
 
               {/* Résultats */}
               {results.length > 0 && (
-                <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+                <div className="border border-secondary-200 rounded-lg max-h-48 overflow-y-auto divide-y divide-secondary-100">
                   {results.map((client) => (
                     <button
                       key={client.id}
@@ -270,10 +270,10 @@ export function CreateSAVModal({
                         setSelectedClient(client);
                         setSearchTerm('');
                       }}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors"
+                      className="w-full text-left px-3 py-2 hover:bg-secondary-50 transition-colors"
                     >
-                      <p className="text-sm font-medium text-gray-900">{client.display_name}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-sm font-medium text-secondary-900">{client.display_name}</p>
+                      <p className="text-xs text-secondary-500">
                         {[client.postal_code, client.city].filter(Boolean).join(' ')}
                         {client.has_active_contract && (
                           <span className="ml-2 text-green-600 font-medium">Contrat actif</span>
@@ -285,14 +285,14 @@ export function CreateSAVModal({
               )}
 
               {searchTerm.length >= 2 && results.length === 0 && !isSearching && (
-                <p className="text-xs text-gray-400 italic py-2">Aucun client trouvé</p>
+                <p className="text-xs text-secondary-400 italic py-2">Aucun client trouvé</p>
               )}
             </div>
           )}
 
           {/* Description */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-secondary-700">
               Description du problème <span className="text-red-400">*</span>
             </label>
             <textarea
@@ -300,25 +300,25 @@ export function CreateSAVModal({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Décrivez le problème signalé par le client..."
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
             />
           </div>
 
           {/* Degré d'urgence */}
           <div className="space-y-2">
-            <span className="block text-sm font-medium text-gray-700">Degré d&apos;urgence</span>
+            <span className="block text-sm font-medium text-secondary-700">Degré d&apos;urgence</span>
             <SAVUrgencySelect value={urgence} onChange={setUrgence} />
           </div>
 
-          {suite && <p className="text-xs text-gray-500">{suite}</p>}
+          {suite && <p className="text-xs text-secondary-500">{suite}</p>}
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t bg-gray-50 rounded-b-xl flex items-center justify-end gap-2">
+        <div className="px-5 py-3 border-t bg-secondary-50 rounded-b-xl flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-secondary-600 hover:text-secondary-800 transition-colors"
           >
             Annuler
           </button>

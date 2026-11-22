@@ -16,13 +16,13 @@ export function LeadModalHeader({ isEditing, currentStatus, pennylaneActive, onA
         {scheduling && (
           <button
             onClick={onBack}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1.5 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
         )}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-secondary-900">
             {scheduling
               ? 'Planifier le RDV'
               : isEditing ? 'Modifier le lead' : 'Nouveau lead'
@@ -53,13 +53,13 @@ export function LeadModalHeader({ isEditing, currentStatus, pennylaneActive, onA
             </div>
           )}
           {scheduling && (
-            <p className="text-sm text-gray-500 mt-0.5">{contactName}</p>
+            <p className="text-sm text-secondary-500 mt-0.5">{contactName}</p>
           )}
         </div>
       </div>
       <button
         onClick={scheduling ? onBack : onClose}
-        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        className="p-2 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
       >
         <X className="h-5 w-5" />
       </button>
@@ -81,7 +81,7 @@ export function LeadModalFooter({ isEditing, isAdmin, isSaving, isHardDeleting, 
               type="button"
               variant="ghost"
               onClick={onMerge}
-              className="min-h-[44px] text-gray-600 hover:bg-gray-100 hover:text-gray-800 gap-1.5"
+              className="min-h-[44px] text-secondary-600 hover:bg-secondary-100 hover:text-secondary-800 gap-1.5"
               title="God mode — absorber un doublon dans cette carte (org_admin)"
             >
               <GitMerge className="h-4 w-4" />

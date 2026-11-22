@@ -108,7 +108,7 @@ export const NEXT_STEPS = [
 
 // Statut de la fiche
 export const FICHE_STATUS_CONFIG = {
-  not_started: { label: 'Non renseignée', color: 'bg-gray-100 text-gray-600', dotColor: '#9ca3af' },
+  not_started: { label: 'Non renseignée', color: 'bg-secondary-100 text-secondary-600', dotColor: '#9ca3af' },
   in_progress: { label: 'En cours', color: 'bg-amber-100 text-amber-700', dotColor: '#d97706' },
   completed: { label: 'Complétée', color: 'bg-emerald-100 text-emerald-700', dotColor: '#059669' },
 };

@@ -105,9 +105,9 @@ export function EntretienPartsSection({ item, orgId }) {
   };
 
   return (
-    <div className="text-sm text-gray-500">
+    <div className="text-sm text-secondary-500">
       <div className="flex items-center gap-2">
-        <Wrench className="w-4 h-4 text-gray-400" />
+        <Wrench className="w-4 h-4 text-secondary-400" />
         <span>Pièces de rechange</span>
         <span className="ml-auto text-sm font-semibold text-emerald-700">{formatEuro(total)}</span>
       </div>
@@ -117,7 +117,7 @@ export function EntretienPartsSection({ item, orgId }) {
           const confirming = confirmDeleteKey === key;
           return (
             <li key={key} className="flex items-center gap-2 text-xs">
-              <span className={`truncate ${p.offert ? 'line-through text-gray-400' : 'text-gray-600'}`}>
+              <span className={`truncate ${p.offert ? 'line-through text-secondary-400' : 'text-secondary-600'}`}>
                 {p.designation || 'Pièce'}
                 {Number(p.quantite) > 1 ? ` ×${p.quantite}` : ''}
               </span>
@@ -126,7 +126,7 @@ export function EntretienPartsSection({ item, orgId }) {
                   Offert
                 </span>
               )}
-              <span className={`ml-auto flex-shrink-0 ${p.offert ? 'line-through text-gray-400' : 'text-gray-600'}`}>
+              <span className={`ml-auto flex-shrink-0 ${p.offert ? 'line-through text-secondary-400' : 'text-secondary-600'}`}>
                 {formatEuro(lineTotal(p))}
               </span>
 
@@ -138,7 +138,7 @@ export function EntretienPartsSection({ item, orgId }) {
                     disabled={busy}
                     className={`flex-shrink-0 text-[11px] px-1.5 py-0.5 rounded border transition-colors disabled:opacity-40 ${
                       p.offert
-                        ? 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                        ? 'border-secondary-200 text-secondary-500 hover:bg-secondary-50'
                         : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
                     }`}
                     title={p.offert ? 'Annuler l’offert' : 'Offrir cette pièce'}
@@ -159,7 +159,7 @@ export function EntretienPartsSection({ item, orgId }) {
 
               {isTeamLeaderOrAbove && confirming && (
                 <span className="flex items-center gap-1 flex-shrink-0">
-                  <span className="text-[11px] text-gray-500">Supprimer ?</span>
+                  <span className="text-[11px] text-secondary-500">Supprimer ?</span>
                   <button
                     type="button"
                     onClick={() => confirmDelete(p)}
@@ -172,7 +172,7 @@ export function EntretienPartsSection({ item, orgId }) {
                     type="button"
                     onClick={() => setConfirmDeleteKey(null)}
                     disabled={busy}
-                    className="text-[11px] px-1.5 py-0.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50"
+                    className="text-[11px] px-1.5 py-0.5 rounded border border-secondary-200 text-secondary-500 hover:bg-secondary-50"
                   >
                     Non
                   </button>

@@ -35,7 +35,7 @@ export const INTERVENTION_TYPES = [
   { value: 'urgent', label: 'Urgence', color: '#F59E0B', bgClass: 'bg-amber-100 text-amber-700', icon: 'Zap' },
   { value: 'entretien', label: 'Entretien', color: '#3B82F6', bgClass: 'bg-blue-100 text-blue-700', icon: 'Calendar' },
   { value: 'sav', label: 'SAV', color: '#F97316', bgClass: 'bg-orange-100 text-orange-700', icon: 'Wrench' },
-  { value: 'other', label: 'Autre', color: '#6B7280', bgClass: 'bg-gray-100 text-gray-700', icon: 'MoreHorizontal' },
+  { value: 'other', label: 'Autre', color: '#6B7280', bgClass: 'bg-secondary-100 text-secondary-700', icon: 'MoreHorizontal' },
 ];
 
 /**
@@ -46,7 +46,7 @@ const INTERVENTION_STATUSES = [
   { value: 'in_progress', label: 'En cours', color: 'bg-amber-100 text-amber-700' },
   { value: 'completed', label: 'Terminée', color: 'bg-emerald-100 text-emerald-700' },
   { value: 'cancelled', label: 'Annulée', color: 'bg-red-100 text-red-700' },
-  { value: 'on_hold', label: 'En attente', color: 'bg-gray-100 text-gray-700' },
+  { value: 'on_hold', label: 'En attente', color: 'bg-secondary-100 text-secondary-700' },
 ];
 
 /**

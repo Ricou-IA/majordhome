@@ -91,15 +91,15 @@ export default function ValidationDialog({ cible, operateurs, libelleModule, onF
   const commentaireManquant = s.statut === 'not_done' && s.commentaire.trim().length === 0;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-50 bg-secondary-950/80 flex items-center justify-center p-6">
       <div className="w-full max-w-3xl rounded-3xl bg-white p-8 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            {cible.unite && <p className="text-base font-medium uppercase tracking-wide text-slate-500">{cible.unite.name}</p>}
-            <h2 className="text-3xl font-bold text-slate-900">{cible.tache.label}</h2>
+            {cible.unite && <p className="text-base font-medium uppercase tracking-wide text-secondary-500">{cible.unite.name}</p>}
+            <h2 className="text-3xl font-bold text-secondary-900">{cible.tache.label}</h2>
           </div>
-          <button type="button" onClick={onFermer} className="p-3 rounded-xl hover:bg-slate-100" aria-label="Fermer">
-            <X className="w-8 h-8 text-slate-500" />
+          <button type="button" onClick={onFermer} className="p-3 rounded-xl hover:bg-secondary-100" aria-label="Fermer">
+            <X className="w-8 h-8 text-secondary-500" />
           </button>
         </div>
 
@@ -108,23 +108,23 @@ export default function ValidationDialog({ cible, operateurs, libelleModule, onF
             <div className="grid grid-cols-2 gap-4">
               <button type="button" onClick={() => dispatch({ type: 'statut', statut: 'done' })}
                 className={`h-28 rounded-2xl text-2xl font-bold flex items-center justify-center gap-3 border-4
-                  ${s.statut === 'done' ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-800'}`}>
+                  ${s.statut === 'done' ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-secondary-200 text-secondary-800'}`}>
                 <Check className="w-9 h-9" /> Fait
               </button>
               <button type="button" onClick={() => dispatch({ type: 'statut', statut: 'not_done' })}
                 className={`h-28 rounded-2xl text-2xl font-bold flex items-center justify-center gap-3 border-4
-                  ${s.statut === 'not_done' ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-slate-200 text-slate-800'}`}>
+                  ${s.statut === 'not_done' ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-secondary-200 text-secondary-800'}`}>
                 <AlertTriangle className="w-9 h-9" /> Pas pu faire
               </button>
             </div>
             <div>
-              <label htmlFor="maint-commentaire" className="block text-lg font-medium text-slate-700">
+              <label htmlFor="maint-commentaire" className="block text-lg font-medium text-secondary-700">
                 Commentaire {s.statut === 'not_done' ? '(obligatoire)' : '(facultatif)'}
               </label>
               <textarea id="maint-commentaire" rows={2} value={s.commentaire}
                 onChange={(e) => dispatch({ type: 'commentaire', valeur: e.target.value })}
                 placeholder={s.statut === 'not_done' ? 'Pourquoi ? (ex. pièce manquante)' : 'Ex. courroie usée, à surveiller'}
-                className="mt-2 w-full rounded-xl border-2 border-slate-300 p-3 text-xl focus:border-blue-600 focus:outline-none" />
+                className="mt-2 w-full rounded-xl border-2 border-secondary-300 p-3 text-xl focus:border-blue-600 focus:outline-none" />
             </div>
             <button type="button" disabled={!s.statut || commentaireManquant}
               onClick={() => dispatch({ type: 'vers_operateur' })}
@@ -136,21 +136,21 @@ export default function ValidationDialog({ cible, operateurs, libelleModule, onF
 
         {s.etape === 'operateur' && (
           <div className="mt-8 space-y-4">
-            <p className="text-2xl font-semibold text-slate-800">Qui es-tu ?</p>
+            <p className="text-2xl font-semibold text-secondary-800">Qui es-tu ?</p>
             {s.message && <p className="rounded-xl bg-amber-50 p-3 text-lg text-amber-800">{s.message}</p>}
             {operateurs.length === 0 && (
-              <p className="text-lg text-slate-600">Aucun opérateur : le responsable doit en créer dans Paramètres → {libelleModule}.</p>
+              <p className="text-lg text-secondary-600">Aucun opérateur : le responsable doit en créer dans Paramètres → {libelleModule}.</p>
             )}
             <div className="grid grid-cols-3 gap-3">
               {operateurs.map((o) => (
                 <button key={o.id} type="button" onClick={() => dispatch({ type: 'operateur', operateur: o })}
-                  className="h-20 rounded-2xl bg-slate-100 hover:bg-slate-200 text-2xl font-semibold text-slate-900">
+                  className="h-20 rounded-2xl bg-secondary-100 hover:bg-secondary-200 text-2xl font-semibold text-secondary-900">
                   {o.first_name}
                 </button>
               ))}
             </div>
             <button type="button" onClick={() => dispatch({ type: 'retour' })}
-              className="inline-flex items-center gap-2 text-lg text-slate-600 hover:text-slate-900">
+              className="inline-flex items-center gap-2 text-lg text-secondary-600 hover:text-secondary-900">
               <ArrowLeft className="w-5 h-5" /> Retour
             </button>
           </div>
@@ -158,7 +158,7 @@ export default function ValidationDialog({ cible, operateurs, libelleModule, onF
 
         {s.etape === 'pin' && (
           <div className="mt-6 space-y-5">
-            <p className="text-2xl font-semibold text-slate-800 text-center">{s.operateur.first_name}, ton code PIN</p>
+            <p className="text-2xl font-semibold text-secondary-800 text-center">{s.operateur.first_name}, ton code PIN</p>
             {s.message && <p className="rounded-xl bg-amber-50 p-3 text-lg text-amber-800 text-center">{s.message}</p>}
             {s.envoi ? (
               <div className="flex justify-center py-16"><Loader2 className="w-12 h-12 animate-spin text-blue-700" /></div>
@@ -166,7 +166,7 @@ export default function ValidationDialog({ cible, operateurs, libelleModule, onF
               <PavePin valeur={s.pin} onChange={(v) => dispatch({ type: 'pin', valeur: v })} onComplet={envoyer} />
             )}
             <button type="button" onClick={() => dispatch({ type: 'retour' })}
-              className="inline-flex items-center gap-2 text-lg text-slate-600 hover:text-slate-900">
+              className="inline-flex items-center gap-2 text-lg text-secondary-600 hover:text-secondary-900">
               <ArrowLeft className="w-5 h-5" /> Changer de prénom
             </button>
           </div>
@@ -177,10 +177,10 @@ export default function ValidationDialog({ cible, operateurs, libelleModule, onF
             <div className={`mx-auto w-24 h-24 rounded-full flex items-center justify-center ${s.statut === 'done' ? 'bg-blue-100' : 'bg-amber-100'}`}>
               {s.statut === 'done' ? <Check className="w-14 h-14 text-blue-700" /> : <AlertTriangle className="w-12 h-12 text-amber-700" />}
             </div>
-            <p className="mt-6 text-3xl font-bold text-slate-900">
+            <p className="mt-6 text-3xl font-bold text-secondary-900">
               {s.statut === 'done' ? '✓ ' : ''}{cible.tache.label}
             </p>
-            <p className="mt-2 text-2xl text-slate-700">
+            <p className="mt-2 text-2xl text-secondary-700">
               {s.statut === 'done' ? 'Fait' : 'Pas pu faire'} — {s.operateur.first_name},{' '}
               {HEURE.format(new Date(s.resultat?.done_at || Date.now()))}
             </p>
