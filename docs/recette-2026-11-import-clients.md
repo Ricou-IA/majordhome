@@ -13,6 +13,7 @@
 - **Migrations appliquées en production** : `20261121_13_clients_import`, `20261121_14_geocode_file_equitable`, `20261122_1_clients_import_suite`, inscrites au registre.
 - **Vérifié en base après application** : les trois vues ont `security_invoker` ; `external_ref` est la dernière colonne des deux vues clients ; un visiteur sans compte n'a ni lecture ni exécution sur aucun objet de l'import ; les fonctions internes sont fermées à tout compte.
 - **Essai de bout en bout en production, annulé à la fin** (aucune fiche ne reste) : 200 fiches créées en 674 ms, lot rejoué = 0 créée et 200 déjà présentes, administrateur d'une autre entreprise refusé, retrait de 100 fiches en 150 à 200 ms. Après l'essai : 3 788 clients, 0 import, comme avant.
+- **Numéros de client** : migration `20261122_2_client_number_sans_troncature` appliquée et inscrite au registre le 2026-11-22 (le numéro ne se tronque plus au-delà de 99 999). Vérifié : le défaut de la colonne passe par `majordhome.client_number_suivant()`, exécutable par l'application et le serveur, pas par un visiteur ; les 3 788 numéros existants sont inchangés ; une fiche créée comme le fait l'application, dans un essai annulé, a reçu `CLI-04066`.
 - **Aucune variable d'environnement, aucune fonction serveur** dans ce lot.
 - **Dépôt** : 1 677 tests, lint, contrôle du code mort et compilation au vert après le rebase.
 - **Fichier d'essai passé par les règles réelles** (hors navigateur) : 6 lignes lues = 4 à importer + 1 doublon écarté + 1 écartée.
