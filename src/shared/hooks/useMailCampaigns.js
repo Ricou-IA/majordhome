@@ -9,6 +9,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { mailCampaignsService } from '@services/mailCampaigns.service';
 import { mailCampaignKeys } from './cacheKeys';
 import { unwrapResult } from '@lib/serviceHelpers';
+import { logger } from '@lib/logger';
+
+/** Échec d'écriture : une phrase pour l'utilisateur, le détail dans le journal. */
+const echec = (message) => (err) => {
+  logger.error('[useMailCampaigns]', message, err);
+  toast.error(message);
+};
 import { toast } from 'sonner';
 
 export { mailCampaignKeys };
@@ -39,12 +46,12 @@ export function useMailCampaigns(orgId, { includeArchived = false } = {}) {
       invalidate();
       toast.success('Campagne créée');
     },
-    onError: (err) => toast.error(`Création échouée : ${err.message}`),
+    onError: echec('L’enregistrement n’a pas abouti. Réessayez.'),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, patch }) => {
-      const { data, error } = await mailCampaignsService.update(id, patch);
+      const { data, error } = await mailCampaignsService.update(id, patch, orgId);
       if (error) throw error;
       return data;
     },
@@ -52,12 +59,12 @@ export function useMailCampaigns(orgId, { includeArchived = false } = {}) {
       invalidate();
       toast.success('Campagne mise à jour');
     },
-    onError: (err) => toast.error(`Mise à jour échouée : ${err.message}`),
+    onError: echec('L’enregistrement n’a pas abouti. Réessayez.'),
   });
 
   const archiveMutation = useMutation({
     mutationFn: async (id) => {
-      const { data, error } = await mailCampaignsService.archive(id);
+      const { data, error } = await mailCampaignsService.archive(id, orgId);
       if (error) throw error;
       return data;
     },
@@ -65,25 +72,26 @@ export function useMailCampaigns(orgId, { includeArchived = false } = {}) {
       invalidate();
       toast.success('Campagne archivée');
     },
-    onError: (err) => toast.error(`Archivage échoué : ${err.message}`),
+    onError: echec('L’archivage n’a pas abouti. Réessayez.'),
   });
 
   const duplicateMutation = useMutation({
     mutationFn: async ({ campaign, newKey, newLabel }) => {
-      const { data, error } = await mailCampaignsService.duplicate(campaign, newKey, newLabel);
+      const { data, error } = await mailCampaignsService.duplicate(campaign, newKey, newLabel, orgId);
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
       invalidate();
-      toast.success('Campagne dupliquée');
+      toast.success('Copie créée. Elle n’envoie rien toute seule : c’est une campagne à lancer à la main.');
     },
-    onError: (err) => toast.error(`Duplication échouée : ${err.message}`),
+    onError: echec('La copie n’a pas abouti. Réessayez.'),
   });
 
   return {
     campaigns: query.data || [],
     isLoading: query.isLoading,
+    isFetched: query.isFetched,
     error: query.error,
     refetch: query.refetch,
     createCampaign: createMutation.mutateAsync,
@@ -104,7 +112,7 @@ export function useMailCampaigns(orgId, { includeArchived = false } = {}) {
  * @param {string | undefined} orgId
  * @param {string | null | undefined} libelle
  * @param {{ enabled?: boolean }} [options]
- * @returns {{ nombre: number | undefined }}
+ * @returns {{ nombre: number | undefined, echec: boolean }}
  */
 export function useNombreEnvois(orgId, libelle, { enabled = true } = {}) {
   const query = useQuery({
@@ -117,7 +125,10 @@ export function useNombreEnvois(orgId, libelle, { enabled = true } = {}) {
     enabled: !!orgId && !!libelle && enabled,
     staleTime: 60_000,
   });
-  return { nombre: query.isError || typeof query.data !== 'number' ? undefined : query.data };
+  return {
+    nombre: query.isError || typeof query.data !== 'number' ? undefined : query.data,
+    echec: query.isError,
+  };
 }
 
 /**

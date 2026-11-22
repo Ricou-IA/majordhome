@@ -26,7 +26,7 @@ export async function allumerSequence({ orgId, sequence, campagnes, segments, st
 
   let campagne = campagnes.find((c) => c.key === sequence.gabarit.key) ?? null;
   if (!campagne) campagne = ok(await mailCampaignsService.create({ org_id: orgId, ...sequence.gabarit }));
-  else if (campagne.is_archived) campagne = ok(await mailCampaignsService.unarchive(campagne.id));
+  else if (campagne.is_archived) campagne = ok(await mailCampaignsService.unarchive(campagne.id, orgId));
 
   // Le segment déjà relié à la campagne (celui qu'une entreprise a réglé à la main) est gardé tel quel.
   let segment = segments.find((s) => s.id === campagne.auto_segment_id && !s.is_archived)
@@ -48,12 +48,12 @@ export async function allumerSequence({ orgId, sequence, campagnes, segments, st
     auto_segment_id: segment.id,
     next_run_at: null,
     ...(sansCadence ? sequence.cadence : {}),
-  }));
+  }, orgId));
 }
 
-/** @param {{ id: string }} campagne */
+/** @param {{ id: string, org_id: string }} campagne */
 export async function eteindreSequence(campagne) {
-  ok(await mailCampaignsService.update(campagne.id, { is_automated: false }));
+  ok(await mailCampaignsService.update(campagne.id, { is_automated: false }, campagne.org_id));
 }
 
 /**

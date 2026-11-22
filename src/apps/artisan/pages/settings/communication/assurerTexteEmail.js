@@ -17,7 +17,7 @@ export async function assurerTexteEmail(orgId, gabarit) {
   if (lErr) throw lErr;
   const archive = (tous || []).find((c) => c.key === gabarit.key);
   if (archive) {
-    const { error: uErr } = await mailCampaignsService.unarchive(archive.id);
+    const { error: uErr } = await mailCampaignsService.unarchive(archive.id, orgId);
     if (uErr) throw uErr;
     return;
   }

@@ -6,6 +6,9 @@
  */
 
 import supabase from '@lib/supabaseClient';
+import { champsDeCopie } from '@/lib/mailPage';
+
+const sansOrganisation = () => ({ data: null, error: new Error('[mailCampaigns] orgId requis') });
 
 export const mailCampaignsService = {
   async list(orgId, { includeArchived = false } = {}) {
@@ -50,29 +53,34 @@ export const mailCampaignsService = {
     return { data, error };
   },
 
-  async update(id, patch) {
+  /** Toute écriture filtre aussi par organisation (défense en profondeur) : sans `orgId`, rien n'est écrit. */
+  async update(id, patch, orgId) {
+    if (!orgId) return sansOrganisation();
     const { data, error } = await supabase
       .from('majordhome_mail_campaigns')
       .update(patch)
       .eq('id', id)
+      .eq('org_id', orgId)
       .select()
       .single();
     return { data, error };
   },
 
-  async archive(id) {
-    return this.update(id, { is_archived: true });
+  async archive(id, orgId) {
+    return this.update(id, { is_archived: true }, orgId);
   },
 
-  async unarchive(id) {
-    return this.update(id, { is_archived: false });
+  async unarchive(id, orgId) {
+    return this.update(id, { is_archived: false }, orgId);
   },
 
-  async remove(id) {
+  async remove(id, orgId) {
+    if (!orgId) return sansOrganisation();
     const { error } = await supabase
       .from('majordhome_mail_campaigns')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('org_id', orgId);
     return { error };
   },
 
@@ -124,15 +132,12 @@ export const mailCampaignsService = {
     return { data: typeof count === 'number' ? count : null, error: count === null ? new Error('compte_inconnu') : null };
   },
 
-  /** Copie d'une campagne : clé et nom fournis par l'appelant (`cleDeCopie`, `libelleDeCopie` de `mailPage.js`). */
-  async duplicate(campaign, newKey, newLabel) {
-    const {
-      id: _id,
-      created_at: _ca,
-      updated_at: _ua,
-      created_by: _cb,
-      ...rest
-    } = campaign;
-    return this.create({ ...rest, key: newKey, label: newLabel || `${rest.label} (copie)` });
+  /**
+   * Copie d'une campagne : clé et nom fournis par l'appelant (`cleDeCopie`, `libelleDeCopie`), colonnes par
+   * `champsDeCopie` — une copie naît campagne manuelle et n'envoie rien d'elle-même.
+   */
+  async duplicate(campaign, newKey, newLabel, orgId) {
+    if (!orgId) return sansOrganisation();
+    return this.create({ ...champsDeCopie(campaign, newKey, newLabel), org_id: orgId });
   },
 };

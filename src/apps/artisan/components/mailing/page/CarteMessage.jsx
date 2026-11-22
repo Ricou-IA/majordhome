@@ -69,11 +69,12 @@ function Avertissement({ children }) {
  * @param {boolean} props.annulable
  * @param {boolean} props.aUnTexteParDefaut
  * @param {boolean} props.ancienGarde un ancien texte est mis de côté
+ * @param {boolean} props.simplifiee la mise en forme du texte enregistré sera simplifiée à l'enregistrement
  * @param {object} props.actions { intention, objet, corps, demander, choisirObjet, annuler, garder, refaire, revenir }
  */
 export default function CarteMessage({
   numero, form, version, lecture, assistant, editable, variables, elements, avertissements, rappelObjet,
-  redaction, raisonsRedaction, aUnTexte, objetsProposes, annulable, aUnTexteParDefaut, ancienGarde, actions,
+  redaction, raisonsRedaction, aUnTexte, objetsProposes, annulable, aUnTexteParDefaut, ancienGarde, simplifiee, actions,
 }) {
   const occupe = !!redaction;
   const fermeObjets = occupe || raisonsRedaction.objets.length > 0;
@@ -137,6 +138,13 @@ export default function CarteMessage({
         <p className="mb-1.5 text-sm font-medium text-secondary-800">Texte</p>
         {editable ? (
           <div className="space-y-2">
+            {simplifiee && !lecture && (
+              <p className="flex items-start gap-2 text-sm text-secondary-500">
+                <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-secondary-400" aria-hidden="true" />
+                La mise en forme de ce texte sera simplifiée à l’enregistrement : les couleurs et les alignements viennent
+                désormais de l’habillage de votre entreprise.
+              </p>
+            )}
             <EditeurTexte
               valeur={form.html_body}
               version={version}

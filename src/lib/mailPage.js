@@ -14,6 +14,9 @@ import {
 } from './mailVariables.js';
 import { CONSIGNES } from './mailRedaction.js';
 import { resoudreExpediteur, EXPEDITEUR_REFUS } from './expediteur.js';
+import { EMAILS_AUTOMATIQUES } from './emailsAutomatiques.js';
+import { SEQUENCES_EMAILS } from './sequencesEmails.js';
+import { WEBSHOP_EMAIL_KEYS } from './webshop/emailTemplates.js';
 
 /**
  * @typedef {'manuelle' | 'automatique' | 'sequence' | 'auto_registre' | 'boutique'} NatureMail
@@ -120,16 +123,19 @@ export function nomVerrouille(nbEnvois) {
  * Le nom est-il modifiable, et sinon pourquoi. Les e-mails de l'application (séquences, e-mails automatiques,
  * boutique) gardent le nom que l'application leur donne.
  * `lectureSeule` (le message n'est pas modifiable par cette personne) : nom fixé, sans raison à afficher.
- * @param {{ nature: string, nouveau: boolean, nbEnvois: number | null | undefined, lectureSeule?: boolean }} entree
+ * Journal en cours de lecture : nom fixé, sans phrase ; la phrase « impossible de vérifier » seulement après un échec.
+ * @param {{ nature: string, nouveau: boolean, nbEnvois: number | null | undefined, lectureSeule?: boolean,
+ *   journalEnEchec?: boolean }} entree
  * @returns {{ modifiable: boolean, raison: string | null }}
  */
-export function etatDuNom({ nature, nouveau, nbEnvois, lectureSeule = false }) {
+export function etatDuNom({ nature, nouveau, nbEnvois, lectureSeule = false, journalEnEchec = false }) {
   if (lectureSeule) return { modifiable: false, raison: null };
   if (nouveau) return { modifiable: true, raison: null };
   if (nature !== 'manuelle' && nature !== 'automatique') {
     return { modifiable: false, raison: 'Le nom de cet e-mail est fixé par l’application.' };
   }
   if (typeof nbEnvois !== 'number') {
+    if (!journalEnEchec) return { modifiable: false, raison: null };
     return { modifiable: false, raison: 'Impossible de vérifier pour l’instant si ce mail a déjà été envoyé : son nom reste fixé.' };
   }
   if (nbEnvois > 0) {
@@ -241,21 +247,39 @@ export function corpsVide(html) {
   return texteBrut(String(html ?? '')).replace(/\{\{[A-Za-z0-9_]+\}\}/g, ' ').replace(/\s+/g, '') === '';
 }
 
+/** Clés des e-mails de l'application : un mail de ce nom deviendrait leur texte. */
+const CLES_RESERVEES = new Set([
+  ...EMAILS_AUTOMATIQUES.map((e) => e.gabarit.key), ...SEQUENCES_EMAILS.map((e) => e.gabarit.key), ...WEBSHOP_EMAIL_KEYS,
+]);
+
+/**
+ * La clé est-elle celle d'un e-mail de l'application (registre, séquence, boutique) ?
+ * @param {string} cle
+ * @returns {boolean}
+ */
+export function cleReservee(cle) {
+  return CLES_RESERVEES.has(cle);
+}
+
 /**
  * Pourquoi « Enregistrer » est fermé (phrases affichées telles quelles), liste vide sinon.
  * Une campagne manuelle s'enregistre incomplète (brouillon : elle ne part qu'à la main) ; un mail qui part tout
  * seul doit avoir un objet et un texte. Le nom est requis et unique (le journal des envois en dépend) ; la clé
- * d'un mail neuf aussi.
- * @param {{ form: FormulaireMail, nature: string, nouveau: boolean,
+ * d'un mail neuf aussi, et elle ne peut pas être celle d'un e-mail de l'application. L'unicité du nom n'est
+ * vérifiée que pour un mail neuf ou un nom changé : des homonymes anciens n'empêchent jamais d'enregistrer.
+ * @param {{ form: FormulaireMail, initial?: FormulaireMail | null, nature: string, nouveau: boolean,
  *   campagnes: Array<{ id?: string, key?: string, label?: string }>, id?: string | null }} entree
  * @returns {string[]}
  */
-export function raisonsEnregistrement({ form, nature, nouveau, campagnes, id = null }) {
+export function raisonsEnregistrement({ form, initial = null, nature, nouveau, campagnes, id = null }) {
   const raisons = [];
   const nom = String(form.label ?? '').trim();
   const autres = (campagnes ?? []).filter((c) => !id || c.id !== id);
+  const nomChange = nouveau || !initial || nomComparable(initial.label) !== nomComparable(nom);
   if (!nom) raisons.push('Donnez un nom à ce mail.');
-  else if (autres.some((c) => nomComparable(c.label) === nomComparable(nom))) {
+  else if (nouveau && cleReservee(cleDepuisLibelle(nom))) {
+    raisons.push('Ce nom est réservé à un e-mail automatique de l’application : choisissez-en un autre.');
+  } else if (nomChange && autres.some((c) => nomComparable(c.label) === nomComparable(nom))) {
     raisons.push('Un autre mail porte déjà ce nom : choisissez-en un autre.');
   } else if (nouveau && autres.some((c) => c.key === cleDepuisLibelle(nom))) {
     raisons.push('Un autre mail porte un nom trop proche : choisissez-en un autre.');
@@ -265,6 +289,43 @@ export function raisonsEnregistrement({ form, nature, nouveau, campagnes, id = n
     if (corpsVide(form.html_body)) raisons.push('Ce mail part tout seul : écrivez son texte.');
   }
   return raisons;
+}
+
+// ── Copie ────────────────────────────────────────────────────────────────────
+
+/** Colonnes de `mail_campaigns` reprises telles quelles par une copie (ni id, ni dates, ni auteur, ni org). */
+const COLONNES_COPIEES = Object.freeze([
+  'subject', 'preheader', 'html_body', 'default_segment', 'allowed_segments', 'purpose', 'audience', 'tone',
+  'trigger_description', 'notes', 'blocks', 'auto_segment_id', 'auto_time_of_day',
+]);
+
+/**
+ * Ce que « Dupliquer » insère : le contenu et le segment, sous une clé et un nom neufs. Une copie naît TOUJOURS
+ * campagne manuelle qui n'envoie rien d'elle-même : ni automatique (le planificateur la prendrait et, sous un nom
+ * neuf, écrirait de nouveau à tous ceux que l'original a déjà touchés), ni transactionnelle, ni archivée.
+ * L'organisation est posée par l'appelant.
+ * @param {Record<string, any>} campagne
+ * @param {string} cle
+ * @param {string} libelle
+ * @returns {Record<string, any>}
+ */
+export function champsDeCopie(campagne, cle, libelle) {
+  /** @type {Record<string, any>} */
+  const out = {};
+  for (const col of COLONNES_COPIEES) if (campagne && col in campagne) out[col] = campagne[col];
+  return {
+    ...out,
+    key: cle,
+    label: libelle,
+    tracking_type_value: cle,
+    is_automated: false,
+    is_transactional: false,
+    is_archived: false,
+    auto_cadence_days: null,
+    auto_cadence_minutes: null,
+    next_run_at: null,
+    last_run_at: null,
+  };
 }
 
 // ── Gestes d'envoi ───────────────────────────────────────────────────────────
@@ -357,6 +418,25 @@ export function appliquerRedaction(resultat, { sansElements = false } = {}) {
   return { objet, objets, corps };
 }
 
+/**
+ * Objets proposés par l'assistant : texte non vide, rognés, trois au plus.
+ * @param {{ objets?: unknown } | null | undefined} reponse
+ * @returns {string[]}
+ */
+export function objetsSuggeres(reponse) {
+  const liste = Array.isArray(reponse?.objets) ? reponse.objets : [];
+  return liste.filter((o) => typeof o === 'string' && o.trim()).map((o) => o.trim()).slice(0, 3);
+}
+
+/**
+ * Un mail sans titre, bouton ni encadré (habillé par le site) : sa normalisation les retire.
+ * @param {{ titre: boolean, bouton: boolean, encadre: boolean }} elements
+ * @returns {boolean}
+ */
+export function sansElementsDe(elements) {
+  return !elements?.titre && !elements?.bouton && !elements?.encadre;
+}
+
 // ── Ancien format ────────────────────────────────────────────────────────────
 
 /**
@@ -385,6 +465,49 @@ export function revenirALAncien(campagne) {
 }
 
 // ── Petits messages ──────────────────────────────────────────────────────────
+
+/** Entités courantes décodées (comparaison seulement). @param {string} s */
+const decoder = (s) => s.replace(/&nbsp;/g, '\u00a0').replace(/&#39;|&apos;/g, '\'').replace(/&quot;/g, '"')
+  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+/** Déclarations d'un style, propriétés en minuscules, triées. @param {string} style */
+const styleCanonique = (style) => style.split(';').map((d) => d.trim()).filter(Boolean)
+  .map((d) => { const i = d.indexOf(':'); return i < 0 ? d.toLowerCase() : `${d.slice(0, i).trim().toLowerCase()}:${d.slice(i + 1).trim()}`; })
+  .sort().join(';');
+
+/** Balise canonique : nom + attributs triés (style canonique). @param {string} balise */
+function baliseCanonique(balise) {
+  const m = balise.match(/^<\s*(\/?)\s*([a-zA-Z0-9]+)([\s\S]*?)\/?\s*>$/);
+  if (!m) return balise;
+  const attrs = [];
+  const re = /([^\s=/]+)(?:\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+  for (const a of m[3].matchAll(re)) {
+    const nom = a[1].toLowerCase();
+    const val = decoder(a[3] ?? a[4] ?? a[5] ?? '');
+    attrs.push(`${nom}=${nom === 'style' ? styleCanonique(val) : val}`);
+  }
+  return `<${m[1]}${m[2].toLowerCase()} ${attrs.sort().join(' ')}>`;
+}
+
+/** Forme comparable d'un texte : blancs réduits, entités décodées, balises canoniques. @param {string} html */
+function formeComparable(html) {
+  return String(html ?? '').replace(/<[^>]*>/g, baliseCanonique)
+    .replace(/>\s+</g, '><').split(/(<[^>]*>)/).map((x) => (x.startsWith('<') ? x : decoder(x))).join('')
+    .replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Un texte enregistré perdra-t-il de sa mise en forme au premier enregistrement (couleur, alignement, police que
+ * la lecture tolérante accepte mais que le format ne garde pas) ? Les blancs, l'ordre des attributs et des
+ * déclarations de style ne comptent pas. Un ancien format (non éditable) n'est pas concerné : il part tel quel.
+ * @param {string | null | undefined} htmlStocke
+ * @returns {boolean}
+ */
+export function miseEnFormeSimplifiee(htmlStocke) {
+  const html = String(htmlStocke ?? '');
+  if (!html.trim() || !estEditable(html)) return false;
+  return formeComparable(normaliser(html)) !== formeComparable(html);
+}
 
 /**
  * Rappel (pas une erreur) pour un objet long : il risque d'être coupé.
@@ -439,7 +562,7 @@ export function ligneEnvoi(nature, cartes) {
   const reglages = { vers: '/settings/communication', libelle: 'Ouvrir les réglages des e-mails' };
   if (cartes.envoi === 'complet') {
     return nature === 'automatique'
-      ? { texte: 'Cette campagne part toute seule selon sa cadence. Pour l’envoyer maintenant à la main, passez par l’onglet Envoi.', lien: ongletEnvoi }
+      ? { texte: 'Cette campagne part toute seule selon sa cadence : son envoi automatique continue tel qu’il est réglé, et l’archiver depuis la liste des campagnes l’arrête. Pour l’envoyer maintenant à la main, passez par l’onglet Envoi.', lien: ongletEnvoi }
       : { texte: 'Pour envoyer cette campagne, passez par l’onglet Envoi.', lien: ongletEnvoi };
   }
   if (cartes.envoi === 'essai') {

@@ -32,7 +32,7 @@ import { messageErreurRedaction } from '@/lib/mailRedaction';
 import {
   cartesDuMail, etatDuNom, champsAEnregistrer, estModifie, raisonsEnregistrement, raisonsRedaction, demandeRedaction,
   appliquerRedaction, refaireAvecNouvelEditeur, revenirALAncien, rappelObjet, avertissementsTexte, ligneEnvoi,
-  etatEnregistrement, corpsVide,
+  etatEnregistrement, corpsVide, objetsSuggeres, sansElementsDe, miseEnFormeSimplifiee,
 } from '@/lib/mailPage';
 import { etatInitial, reducteurPageMail } from './etatPageMail';
 import EnTetePage from './EnTetePage';
@@ -69,7 +69,7 @@ export default function PageMail({ mailId, onRetour, onCree }) {
   const orgId = organization?.id;
   const { settings } = useOrgSettings();
   // Archivés compris : un nom ou une clé pris par un mail archivé reste pris (contrainte et journal).
-  const { campaigns, isLoading, error: erreurListe, createCampaign, updateCampaign, isMutating } = useMailCampaigns(orgId, { includeArchived: true });
+  const { campaigns, isFetched, error: erreurListe, createCampaign, updateCampaign, isMutating } = useMailCampaigns(orgId, { includeArchived: true });
   const { rediger } = useRedactionMail(orgId);
   const [etat, dispatch] = useReducer(reducteurPageMail, undefined, etatInitial);
   const navigate = useNavigate();
@@ -98,15 +98,17 @@ export default function PageMail({ mailId, onRetour, onCree }) {
   // Identités stables : l'éditeur lit ses étiquettes quand `version` change.
   const variables = useMemo(() => variablesProposees(base), [base]);
   const elements = useMemo(() => elementsPermis(base), [base]);
-  const sansElements = !elements.titre && !elements.bouton && !elements.encadre;
+  const sansElements = sansElementsDe(elements);
   const defaut = useMemo(() => texteParDefaut(base), [base]);
 
-  const { nombre } = useNombreEnvois(orgId, initial?.label, { enabled: !nouveau && (nature === 'manuelle' || nature === 'automatique') });
-  const nom = etatDuNom({ nature, nouveau, nbEnvois: nombre, lectureSeule: lecture });
+  const { nombre, echec: journalEnEchec } = useNombreEnvois(orgId, initial?.label, { enabled: !nouveau && (nature === 'manuelle' || nature === 'automatique') });
+  const nom = etatDuNom({ nature, nouveau, nbEnvois: nombre, lectureSeule: lecture, journalEnEchec });
 
   const modifie = useMemo(() => estModifie(form, initial), [form, initial]);
-  const raisons = raisonsEnregistrement({ form, nature, nouveau, campagnes: campaigns, id: base?.id ?? null });
+  const raisons = raisonsEnregistrement({ form, initial, nature, nouveau, campagnes: campaigns, id: base?.id ?? null });
   const editable = useMemo(() => estEditable(form.html_body), [form.html_body]);
+  // Mise en forme du texte ENREGISTRÉ que le premier enregistrement simplifiera (couleurs, alignements).
+  const simplifiee = useMemo(() => miseEnFormeSimplifiee(initial?.html_body), [initial]);
   const avertissements = useMemo(() => avertissementsTexte(base, form.html_body), [base, form.html_body]);
   const raisonsParConsigne = useMemo(() => Object.fromEntries(CONSIGNES_ECRAN.map((consigne) => [
     consigne, raisonsRedaction({ consigne, intention: form.blocks?.brief ?? '', objet: form.subject, corps: form.html_body }),
@@ -138,7 +140,7 @@ export default function PageMail({ mailId, onRetour, onCree }) {
     try {
       const reponse = await rediger(demandeRedaction({ consigne, form, campagne: base }));
       if (consigne === 'objets') {
-        const objets = Array.isArray(reponse?.objets) ? reponse.objets.filter((o) => typeof o === 'string' && o.trim()) : [];
+        const objets = objetsSuggeres(reponse);
         if (!objets.length) throw erreurRedaction('reponse_illisible');
         dispatch({ type: 'objetsProposes', objets });
         return;
@@ -173,7 +175,8 @@ export default function PageMail({ mailId, onRetour, onCree }) {
   if (!ouvert) {
     return (
       <div className="card flex flex-col items-center justify-center gap-3 p-10 text-secondary-500">
-        {isLoading
+        {/* Tant que l'organisation n'est pas connue ou la liste jamais lue, on charge : jamais « introuvable » à tort. */}
+        {!orgId || (!isFetched && !erreurListe)
           ? <><Loader2 className="h-5 w-5 animate-spin" /> Chargement du mail…</>
           : (
             <>
@@ -224,6 +227,7 @@ export default function PageMail({ mailId, onRetour, onCree }) {
             annulable={!!etat.annulation}
             aUnTexteParDefaut={!!defaut}
             ancienGarde={!!form.blocks?.ancien_html}
+            simplifiee={simplifiee}
             actions={actions}
           />
           {/* Carte « Envoi » (tâche 10) remplacera cette ligne. */}

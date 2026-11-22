@@ -5,8 +5,11 @@ import {
   formulaireDepuisCampagne, champsAEnregistrer, estModifie, raisonsEnregistrement, raisonsDeBlocage,
   raisonsRedaction, demandeRedaction, appliquerRedaction, refaireAvecNouvelEditeur, revenirALAncien,
   rappelObjet, avertissementsTexte, ligneExpediteur, ligneEnvoi, etatEnregistrement, corpsVide,
-  LIMITES_REDACTION,
+  LIMITES_REDACTION, champsDeCopie, objetsSuggeres, sansElementsDe, miseEnFormeSimplifiee, cleReservee,
 } from '../src/lib/mailPage.js';
+import { EMAILS_AUTOMATIQUES } from '../src/lib/emailsAutomatiques.js';
+import { SEQUENCES_EMAILS } from '../src/lib/sequencesEmails.js';
+import { WEBSHOP_EMAIL_KEYS } from '../src/lib/webshop/emailTemplates.js';
 
 const MANUELLE = {
   id: 'c1', key: 'promo_automne', label: 'Promo automne', subject: 'Votre poêle avant l’hiver',
@@ -77,7 +80,7 @@ test('etatDuNom : nouveau libre ; envoyé ou inconnu fixé avec la raison ; e-ma
   const envoye = etatDuNom({ nature: 'automatique', nouveau: false, nbEnvois: 12 });
   assert.equal(envoye.modifiable, false);
   assert.match(envoye.raison, /déjà été envoyé/);
-  const inconnu = etatDuNom({ nature: 'manuelle', nouveau: false, nbEnvois: undefined });
+  const inconnu = etatDuNom({ nature: 'manuelle', nouveau: false, nbEnvois: undefined, journalEnEchec: true });
   assert.equal(inconnu.modifiable, false);
   assert.ok(inconnu.raison);
   assert.deepEqual(etatDuNom({ nature: 'manuelle', nouveau: false, nbEnvois: 0, lectureSeule: true }), { modifiable: false, raison: null });
@@ -330,7 +333,10 @@ test('ligneExpediteur : envoi en nombre sans domaine vérifié ⇒ refus, indivi
 test('ligneEnvoi : renvoi provisoire vers l’onglet Envoi pour les campagnes, Réglages pour les autres', () => {
   const admin = { isOrgAdmin: true };
   assert.match(ligneEnvoi('manuelle', cartesDuMail('manuelle', admin)).texte, /onglet Envoi/);
-  assert.ok(ligneEnvoi('automatique', cartesDuMail('automatique', admin)));
+  const auto = ligneEnvoi('automatique', cartesDuMail('automatique', admin)).texte;
+  // L'envoi automatique continue tel que réglé ; archiver l'arrête (mail_campaigns_due écarte les archivées).
+  assert.match(auto, /continue/);
+  assert.match(auto, /archiv/i);
   assert.equal(ligneEnvoi('sequence', cartesDuMail('sequence', admin)).lien.vers, '/settings/communication');
   assert.equal(ligneEnvoi('auto_registre', cartesDuMail('auto_registre', admin)).lien.vers, '/settings/communication');
   assert.equal(ligneEnvoi('boutique', cartesDuMail('boutique', admin)), null);
@@ -347,4 +353,96 @@ test('corpsVide : variables et blancs seuls = vide', () => {
   assert.equal(corpsVide(''), true);
   assert.equal(corpsVide('<p>{{SALUTATION}}</p><p> </p>'), true);
   assert.equal(corpsVide('<p>{{SALUTATION}} Merci</p>'), false);
+});
+
+// ── Fix round 1 ──────────────────────────────────────────────────────────────
+
+const AUTOMATIQUE = {
+  ...MANUELLE, id: 'a1', key: 'relance_hiver', label: 'Relance hiver', is_automated: true, auto_segment_id: 's1',
+  auto_cadence_days: 7, auto_cadence_minutes: null, next_run_at: '2026-11-01T09:00:00Z', last_run_at: '2026-10-25T09:00:00Z',
+  is_archived: false, created_at: 'x', updated_at: 'y', created_by: 'u', org_id: 'o', preheader: 'P',
+};
+
+test('champsDeCopie : une copie n’envoie jamais toute seule (automatique, séquence, e-mail du registre)', () => {
+  const sources = [
+    AUTOMATIQUE,
+    { ...AUTOMATIQUE, key: SEQUENCES_EMAILS[0].gabarit.key },
+    { ...AUTOMATIQUE, key: EMAILS_AUTOMATIQUES[0].gabarit.key, is_automated: false, is_transactional: true },
+  ];
+  for (const c of sources) {
+    const copie = champsDeCopie(c, 'nouvelle_cle', 'Nouveau nom');
+    assert.equal(copie.is_automated, false, c.key);
+    assert.equal(copie.is_transactional, false, c.key);
+    assert.equal(copie.next_run_at, null, c.key);
+    assert.equal(copie.last_run_at, null, c.key);
+    assert.equal(copie.is_archived, false, c.key);
+    assert.equal(copie.auto_cadence_days, null, c.key);
+    assert.equal(copie.auto_cadence_minutes, null, c.key);
+    assert.equal(copie.key, 'nouvelle_cle');
+    assert.equal(copie.label, 'Nouveau nom');
+    assert.equal(copie.tracking_type_value, 'nouvelle_cle');
+    for (const k of ['id', 'created_at', 'updated_at', 'created_by', 'org_id']) assert.ok(!(k in copie), k);
+  }
+});
+
+test('champsDeCopie : contenu et segment suivent, seules les colonnes de la table sont écrites', () => {
+  const copie = champsDeCopie({ ...AUTOMATIQUE, colonne_de_vue: 'calculée' }, 'k', 'L');
+  assert.equal(copie.subject, AUTOMATIQUE.subject);
+  assert.equal(copie.html_body, AUTOMATIQUE.html_body);
+  assert.equal(copie.preheader, 'P');
+  assert.equal(copie.auto_segment_id, 's1');
+  assert.deepEqual(copie.blocks, { brief: 'Promo poêle' });
+  assert.ok(!('colonne_de_vue' in copie));
+});
+
+test('raisonsEnregistrement : un mail existant dont seul l’objet change s’enregistre malgré un homonyme', () => {
+  const initial = formulaireDepuisCampagne({ ...MANUELLE, label: 'Promo (copie)' });
+  const form = { ...initial, subject: 'Autre objet' };
+  const autres = [{ id: 'zz', key: 'promo_copie_2', label: 'Promo (copie)' }];
+  assert.deepEqual(raisonsEnregistrement({ form, initial, nature: 'manuelle', nouveau: false, campagnes: autres, id: 'c1' }), []);
+  // Renommer vers un nom pris reste refusé.
+  const renomme = { ...formulaireDepuisCampagne(MANUELLE), label: 'Promo (copie)' };
+  assert.ok(raisonsEnregistrement({ form: renomme, initial: formulaireDepuisCampagne(MANUELLE), nature: 'manuelle', nouveau: false, campagnes: autres, id: 'c1' }).length > 0);
+});
+
+test('cleReservee / raisonsEnregistrement : un nom qui donnerait la clé d’un e-mail de l’application est refusé', () => {
+  for (const cle of [EMAILS_AUTOMATIQUES[0].gabarit.key, SEQUENCES_EMAILS[0].gabarit.key, WEBSHOP_EMAIL_KEYS[0]]) {
+    assert.equal(cleReservee(cle), true, cle);
+    const label = cle.replace(/_/g, ' ');
+    const r = raisonsEnregistrement({ form: { ...formulaireDepuisCampagne(null), label }, initial: null, nature: 'manuelle', nouveau: true, campagnes: [] });
+    assert.ok(r.some((m) => /réservé/.test(m)), cle);
+  }
+  assert.equal(cleReservee('promo_automne'), false);
+});
+
+test('etatDuNom : pendant le comptage, nom fixé sans phrase ; la phrase seulement après un échec', () => {
+  assert.deepEqual(etatDuNom({ nature: 'manuelle', nouveau: false, nbEnvois: undefined }), { modifiable: false, raison: null });
+  const echec = etatDuNom({ nature: 'manuelle', nouveau: false, nbEnvois: undefined, journalEnEchec: true });
+  assert.equal(echec.modifiable, false);
+  assert.match(echec.raison, /Impossible de vérifier/);
+});
+
+test('objetsSuggeres : texte non vide seulement, rognés, trois au plus', () => {
+  assert.deepEqual(objetsSuggeres({ objets: [' A ', '', 3, 'B', 'C', 'D'] }), ['A', 'B', 'C']);
+  assert.deepEqual(objetsSuggeres(null), []);
+  assert.deepEqual(objetsSuggeres({ objets: 'x' }), []);
+});
+
+test('sansElementsDe : vrai quand aucun titre, bouton ni encadré n’est permis', () => {
+  assert.equal(sansElementsDe({ titre: false, bouton: false, encadre: false }), true);
+  assert.equal(sansElementsDe({ titre: true, bouton: true, encadre: true }), false);
+  assert.equal(sansElementsDe({ titre: false, bouton: true, encadre: false }), false);
+});
+
+test('miseEnFormeSimplifiee : texte simple ou déjà au format ⇒ faux ; couleur ou alignement ⇒ vrai', () => {
+  assert.equal(miseEnFormeSimplifiee('<p>{{SALUTATION}}</p>\n<p>Bonjour <strong>toi</strong>,<br>merci.</p>'), false);
+  assert.equal(miseEnFormeSimplifiee('<p>A &amp; B l&#39;été&nbsp;x</p>'), false);
+  assert.equal(miseEnFormeSimplifiee(''), false);
+  // Texte tel que l'éditeur l'enregistre, attributs et déclarations dans un autre ordre : rien à simplifier.
+  assert.equal(miseEnFormeSimplifiee('<h2 style="color:#0f172a; margin:24px 0 8px;font-size:18px;line-height:1.3">T</h2>'
+    + '<p style="margin:28px 0;text-align:center"><a style="background:{{ACCENT_COLOR}};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600" href="https://a.fr" data-bouton>B</a></p>'), false);
+  assert.equal(miseEnFormeSimplifiee('<p style="color:red">Rouge</p>'), true);
+  assert.equal(miseEnFormeSimplifiee('<p style="text-align:center">Centré</p>'), true);
+  // Un ancien format (non éditable) part tel quel : pas concerné.
+  assert.equal(miseEnFormeSimplifiee('<!DOCTYPE html><html><body><table><tr><td>x</td></tr></table></body></html>'), false);
 });
