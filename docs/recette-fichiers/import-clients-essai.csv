@@ -1,0 +1,9 @@
+Export clients - essai de recette (personnes fictives)
+
+Réf. client;Nom complet;Société;GSM;Mail;Adresse complète;Type de logement;Surface habitable;Marque chaudière;Accord SMS;ID interne
+A-1001;DURAND Paul;;639980001;paul.durand@example.org;12 rue de la République 69003 Lyon;Maison;85,5;Atlantic;oui;77
+A-1002;Mme MARTIN Claire;;06 39 98 00 02;claire.martin(at)example.org;3 place Bellecour 69002 Lyon;Appart;85,333333;Viessmann;non;78
+A-1003;;Garage du Centre;01 99 00 00 03;contact@example.org;8 avenue Jean Jaurès 69007 Lyon;;;;;79
+A-1004;LEROY JEAN;;néant;;Lieu-dit Les Granges 69700 Givors;Maison;120 m²;De Dietrich;peut-être;80
+;;;;sans.nom@example.org;;;;;;81
+A-1001;DURAND Paul;;0639980001;;12 rue de la République 69003 Lyon;;;;;82
