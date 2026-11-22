@@ -249,12 +249,14 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
           </div>
         </div>
 
-        {/* Les repères passent à la ligne plutôt que d'écraser la source : « Bouche-à-oreille »
-            se lit en entier, c'est le délai ou le bouton des devis qui descend d'une ligne. */}
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1.5">
+        {/* Une seule ligne, pour que toutes les cartes aient la même hauteur (Eric 2026-11-22 :
+            « le plus important »). Les repères gardent leur taille ; la source prend la place qui
+            reste et ne se coupe que si la ligne est pleine (avant : coupée à 100 px même avec de la
+            place). */}
+        <div className="flex items-center gap-1.5 mt-1.5 min-w-0">
           {estHorsZone(lead) && (
             <span
-              className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 font-medium whitespace-nowrap"
+              className="shrink-0 inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 font-medium whitespace-nowrap"
               title="Adresse hors de la zone où l’entreprise intervient"
             >
               <MapPinOff className="h-3 w-3" />Hors zone
@@ -262,7 +264,7 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
           )}
           {sourceLabel && (
             <span
-              className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium truncate max-w-full"
+              className="min-w-0 text-xs px-1.5 py-0.5 rounded-full text-white font-medium truncate"
               style={{ backgroundColor: sourceColor }}
               title={sourceLabel}
             >
@@ -271,24 +273,24 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
           )}
           {commercial && (
             <span
-              className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ring-1 ${getCommercialColor(commercial.colorIndex)}`}
+              className={`shrink-0 text-[11px] px-1.5 py-0.5 rounded-full font-bold ring-1 ${getCommercialColor(commercial.colorIndex)}`}
               title={commercial.name}
             >
               {commercial.initials}
             </span>
           )}
           {lead.statuses?.label === 'Contacté' && lead.call_count > 0 && (
-            <span className="text-xs flex items-center gap-0.5 text-amber-600" title={`${lead.call_count} appel${lead.call_count > 1 ? 's' : ''}`}>
+            <span className="shrink-0 text-xs flex items-center gap-0.5 text-amber-600" title={`${lead.call_count} appel${lead.call_count > 1 ? 's' : ''}`}>
               <Phone className="h-3 w-3" />{lead.call_count}
             </span>
           )}
           {lead.statuses?.label === 'Devis envoyé' && lead.followup_count > 0 && (
-            <span className="text-xs flex items-center gap-0.5 text-purple-600" title={`${lead.followup_count} relance${lead.followup_count > 1 ? 's' : ''}`}>
+            <span className="shrink-0 text-xs flex items-center gap-0.5 text-purple-600" title={`${lead.followup_count} relance${lead.followup_count > 1 ? 's' : ''}`}>
               <Phone className="h-3 w-3" />{lead.followup_count}
             </span>
           )}
           {daysInStatus !== null && (
-            <span className={`text-xs flex items-center gap-0.5 ${getDaysColor(daysInStatus)}`}>
+            <span className={`shrink-0 text-xs flex items-center gap-0.5 ${getDaysColor(daysInStatus)}`}>
               <Clock className="h-3 w-3" />
               {daysInStatus}j
             </span>
@@ -297,7 +299,7 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-              className="ml-auto inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors"
+              className="ml-auto shrink-0 inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors"
               style={{
                 backgroundColor: card?.column_key === 'gagne' ? '#d97706'
                   : card?.column_key === 'perdu' ? '#94a3b8'
