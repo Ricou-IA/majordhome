@@ -51,7 +51,7 @@ const PL_STATUS_LABELS = {
 
 const ORDER_ACTIVE_CLASS = {
   recu: 'bg-emerald-500 text-white',
-  commande: 'bg-primary-600 text-white',
+  commande: 'bg-st-info text-white',
   na: 'bg-gray-200 text-gray-600',
 };
 
