@@ -19,7 +19,7 @@ const ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp';
 const MAX_SIZE = 20 * 1024 * 1024; // limite du bucket product-documents
 
 const segmentClass = (actif) => `px-3 py-1.5 text-sm rounded-lg border transition-colors ${actif
-  ? 'bg-indigo-600 border-indigo-600 text-white'
+  ? 'bg-primary-600 border-indigo-600 text-white'
   : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`;
 
 const PLACEHOLDERS_LIBELLE = { notice: 'ex. Notice d\'installation 2019', vue_eclatee: 'ex. Vue éclatée corps de chauffe' };
@@ -137,7 +137,7 @@ export function EquipmentDocumentUploadModal({ equipment, onClose, onSubmit, isS
           <button
             type="submit"
             disabled={!file || isSubmitting}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary-700 text-white rounded-lg hover:bg-primary-800 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             Déposer

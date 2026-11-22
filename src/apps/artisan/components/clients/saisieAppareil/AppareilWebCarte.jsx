@@ -53,7 +53,7 @@ export default function AppareilWebCarte({ appareil, champs = [], isCreating = f
         <button
           type="button" disabled={isCreating || !modelName.trim()}
           onClick={() => onValider({ ...appareil, model_name: modelName.trim(), reference: reference.trim() || null })}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
         >
           {isCreating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
           C&apos;est cet appareil

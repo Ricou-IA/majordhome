@@ -427,7 +427,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
                 onClick={() => handleSave()}
                 disabled={saving}
                 className={`inline-flex items-center gap-2 px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
-                  isCreateMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                  isCreateMode ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-600 hover:bg-primary-700'
                 }`}
               >
                 {saving ? (

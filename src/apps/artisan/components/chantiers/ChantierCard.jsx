@@ -202,7 +202,7 @@ function Repere({ repere }) {
 
 const ORDER_STYLES = {
   recu: { css: 'bg-emerald-500 text-white', etat: 'reçu' },
-  commande: { css: 'bg-blue-500 text-white', etat: 'commandé' },
+  commande: { css: 'bg-primary-600 text-white', etat: 'commandé' },
   na: { css: 'bg-gray-200 text-gray-400', etat: 'rien à recevoir' },
 };
 

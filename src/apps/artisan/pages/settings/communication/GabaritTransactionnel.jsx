@@ -82,7 +82,7 @@ export default function GabaritTransactionnel({ orgId, gabarit, placeholders = [
           type="button"
           onClick={creer}
           disabled={creation}
-          className="px-3 py-1.5 text-sm bg-primary-700 text-white rounded-md hover:bg-primary-800 disabled:opacity-50 whitespace-nowrap"
+          className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap"
         >
           {creation ? 'Création…' : 'Créer le gabarit par défaut'}
         </button>

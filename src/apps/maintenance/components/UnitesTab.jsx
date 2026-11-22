@@ -74,7 +74,7 @@ export default function UnitesTab({ orgId, v }) {
           <NomEditable placeholder={`${v.unite} : nom`} onValider={creerUnite} onAnnuler={() => setNouvelleUnite(false)} />
         ) : (
           <button type="button" onClick={() => setNouvelleUnite(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary-700 px-4 py-2 text-sm font-medium text-white hover:bg-primary-800">
+            className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700">
             <Plus className="w-4 h-4" /> {v.unite}
           </button>
         )}

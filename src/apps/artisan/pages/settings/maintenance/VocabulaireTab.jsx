@@ -67,7 +67,7 @@ export default function VocabulaireTab() {
         Aperçu : menu « {apercu.module} », onglet « {apercu.unites} &amp; tâches », bouton « + {apercu.unite} ».
       </p>
       <button type="button" onClick={enregistrer} disabled={!modifie || isSaving}
-        className="inline-flex items-center gap-2 rounded-lg bg-primary-700 px-4 py-2 text-sm font-medium text-white hover:bg-primary-800 disabled:opacity-50">
+        className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50">
         {isSaving && <Loader2 className="w-4 h-4 animate-spin" />} Enregistrer
       </button>
     </div>

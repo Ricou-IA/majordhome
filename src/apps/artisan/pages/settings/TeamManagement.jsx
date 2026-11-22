@@ -205,7 +205,7 @@ function InviteModal({ open, onClose, onInvite, isInviting, roleOptions }) {
             <button
               type="submit"
               disabled={isInviting}
-              className="px-4 py-2 text-sm font-medium text-white bg-primary-700 rounded-lg hover:bg-primary-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
             >
               {isInviting && <Loader2 className="w-4 h-4 animate-spin" />}
               Inviter
@@ -670,7 +670,7 @@ export default function TeamManagement() {
         {tab === 'membres' && (
           <button
             onClick={() => setShowInviteModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-700 rounded-lg hover:bg-primary-800 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
           >
             <UserPlus className="w-4 h-4" />
             Inviter un membre

@@ -117,7 +117,7 @@ export default function TacheForm({ open, onOpenChange, tache, unitId, dernierLo
               <button key={j.iso} type="button" onClick={() => basculerJour(j.iso)}
                 aria-pressed={f.weekdays.includes(j.iso)}
                 className={`w-10 h-10 rounded-full text-sm font-semibold border ${f.weekdays.includes(j.iso)
-                  ? 'bg-primary-700 border-primary-700 text-white' : 'border-secondary-300 text-secondary-600'}`}>
+                  ? 'bg-primary-600 border-primary-700 text-white' : 'border-secondary-300 text-secondary-600'}`}>
                 {j.court}
               </button>
             ))}

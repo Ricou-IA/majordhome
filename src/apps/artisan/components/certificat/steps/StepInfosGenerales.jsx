@@ -68,7 +68,7 @@ export function StepInfosGenerales({ formData, onChange, client, technicians = [
             {(formData.technicien_certifications || []).map(cert => (
               <span
                 key={cert}
-                className="px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white border border-blue-600"
+                className="px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white border border-blue-600"
               >
                 {cert}
               </span>

@@ -292,7 +292,7 @@ export default function AppLayout() {
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm font-medium transition-colors ${
                           isActive
-                            ? 'bg-primary-700 text-white'
+                            ? 'bg-primary-600 text-white'
                             : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
                         }`
                       }
@@ -319,7 +319,7 @@ export default function AppLayout() {
             className={({ isActive }) =>
               `flex-1 min-w-0 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-primary-700 text-white'
+                  ? 'bg-primary-600 text-white'
                   : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
               }`
             }

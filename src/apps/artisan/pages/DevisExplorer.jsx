@@ -191,7 +191,7 @@ export default function DevisExplorer() {
                 <button
                   type="button"
                   onClick={() => setAttachRows(selectedRows)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-700 hover:bg-primary-800 text-sm font-medium text-white"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-sm font-medium text-white"
                 >
                   <Link2 className="w-4 h-4" />
                   Rattacher {selectedIds.size} devis

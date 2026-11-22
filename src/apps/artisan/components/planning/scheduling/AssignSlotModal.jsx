@@ -124,7 +124,7 @@ export function AssignSlotModal({
             type="button"
             onClick={() => selected.length && onAssign?.(selected)}
             disabled={selected.length === 0}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <UserCheck className="w-4 h-4" />
             Assigner{selected.length > 1 ? ` (${selected.length})` : ''}

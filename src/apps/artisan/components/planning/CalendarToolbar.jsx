@@ -156,7 +156,7 @@ export function CalendarToolbar({
         {onAddEvent && (
           <button
             onClick={onAddEvent}
-            className="inline-flex items-center gap-2 h-10 px-3 sm:px-4 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 h-10 px-3 sm:px-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Nouveau RDV</span>

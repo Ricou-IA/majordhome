@@ -73,7 +73,7 @@ export function DuplicateLeadDialog({
                 <button
                   type="button"
                   onClick={() => onPrimaryAction(c)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors flex-shrink-0"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex-shrink-0"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   {primaryActionLabel}

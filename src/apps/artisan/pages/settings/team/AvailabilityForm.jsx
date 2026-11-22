@@ -126,7 +126,7 @@ export function AvailabilityForm({ teamMember, canEdit }) {
               type="button"
               onClick={enregistrer}
               disabled={!valide || !modifie || isSaving}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-700 text-white hover:bg-primary-800 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
             >
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
               Enregistrer les horaires

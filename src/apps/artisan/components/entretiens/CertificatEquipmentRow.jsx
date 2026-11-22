@@ -135,7 +135,7 @@ export function CertificatEquipmentRow({
           <button
             onClick={() => onVoirConforme?.(childIntervention)}
             disabled={isLoading}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md bg-sky-700 text-white hover:bg-sky-800 transition-colors disabled:opacity-70"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-70"
           >
             {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
             Voir certificat

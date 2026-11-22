@@ -72,7 +72,7 @@ export default function KeywordListsPanel({ orgId }) {
         {!editingList && (
           <button
             onClick={handleNew}
-            className="flex items-center gap-2 px-3 py-1.5 bg-primary-700 text-white text-sm font-medium rounded-md hover:bg-primary-800"
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700"
           >
             <Plus className="w-4 h-4" />
             Nouvelle liste
@@ -138,7 +138,7 @@ export default function KeywordListsPanel({ orgId }) {
             <button
               onClick={handleSave}
               disabled={!editingList.name.trim() || !editingList.keywords.length || createList.isPending || updateList.isPending}
-              className="flex items-center gap-2 px-3 py-1.5 bg-primary-700 text-white text-sm font-medium rounded-md hover:bg-primary-800 disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               {editingList.id ? 'Enregistrer' : 'Créer'}

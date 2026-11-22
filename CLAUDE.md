@@ -87,7 +87,7 @@ Règles pour maintenir le niveau atteint après le hardening Sem 0 + audit quali
 - **Pas de composant > 10 `useState`** sans envisager `useReducer` ou state machine. >15 useState = obligatoire à refacto
 - **Pas de logique business dans le JSX** : extraire dans des hooks ou des helpers `src/lib/`
 - **Tailwind only** : pas de CSS modules, pas de styled-components
-- **Texte blanc sur la couleur principale = `bg-primary-700`, survol `hover:bg-primary-800`** (2026-11-22) : le blanc ne fait que 4,10:1 sur `primary-600` et 2,77:1 sur `primary-500`, sous le seuil de 4,5. Un bouton d'action n'est jamais en `blue-*` ni en `indigo-*`. Le `Button` de `components/ui` suit la même teinte (`--primary` dans `index.css`) — ses variantes `default` et `secondary` n'avaient aucun fond tant que `primary.DEFAULT` / `secondary.DEFAULT` manquaient dans `tailwind.config.js` : toute nouvelle couleur lue par une variable CSS s'y déclare.
+- **Texte blanc sur la couleur principale = `bg-primary-600` (cuivre `#C2532B`, 4,60:1), survol `hover:bg-primary-700`** (palette cuivre, 2026-11-22) : `#C2532B` est fixe, jamais interpolé ; `primary-500` et plus clair restent sous le seuil de 4,5 avec du blanc. Un bouton d'action n'est jamais en `blue-*` ni en `indigo-*`. Le `Button` de `components/ui` suit la même teinte (`--primary` dans `index.css`) — ses variantes `default` et `secondary` n'avaient aucun fond tant que `primary.DEFAULT` / `secondary.DEFAULT` manquaient dans `tailwind.config.js` : toute nouvelle couleur lue par une variable CSS s'y déclare.
 - **Pas de texte sous 11 px** hors écrans à géométrie fixe (planning, tournées, aperçu du modèle de devis, graphiques) ; texte courant et boutons d'une carte à 12 px (`text-xs`) au moins.
 
 ### Services (`src/shared/services/`)

@@ -343,7 +343,7 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
                       <button
                         onClick={() => handleRecordVisit(year)}
                         disabled={isRecordingVisit}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-700 text-white rounded-lg hover:bg-primary-800 disabled:opacity-50 transition-colors"
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                       >
                         {isRecordingVisit ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarCheck className="w-4 h-4" />}
                         Valider
@@ -458,7 +458,7 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
         <p className="mt-1 text-sm text-secondary-500">Ce client n&apos;a pas encore de contrat.</p>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors"
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
           Créer un contrat
@@ -541,7 +541,7 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
               <button
                 onClick={handleSaveContract}
                 disabled={isUpdating}
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-700 text-white rounded-lg hover:bg-primary-800 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
               >
                 {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Enregistrer

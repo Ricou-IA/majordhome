@@ -204,7 +204,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 flex items-center justify-center gap-2 bg-primary-700 hover:bg-primary-800 disabled:bg-primary-400 text-white font-semibold px-6 rounded-lg transition-colors"
+              className="w-full h-12 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 text-white font-semibold px-6 rounded-lg transition-colors"
             >
               {loading ? (
                 <>

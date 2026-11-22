@@ -256,7 +256,7 @@ export function RapportSavDialog({ item, equipements = [], referentiel, membres 
             )}
             <button
               type="button" onClick={handleEditer} disabled={!contenu || erreurs.length > 0 || edition || envoiEnCours || aJour}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {edition ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
               {trace ? 'Mettre à jour le rapport' : 'Éditer le rapport'}

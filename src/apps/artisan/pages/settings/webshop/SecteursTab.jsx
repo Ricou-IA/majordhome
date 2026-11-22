@@ -57,7 +57,7 @@ export default function SecteursTab() {
           <button type="button" onClick={() => setConfirmer(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-secondary-300 text-sm text-secondary-700 hover:bg-secondary-50">
             <RefreshCw className="w-4 h-4" /> Régénérer les créneaux à venir
           </button>
-          <button type="button" onClick={() => setEdition({ secteur: null })} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary-700 text-white text-sm font-medium hover:bg-primary-800">
+          <button type="button" onClick={() => setEdition({ secteur: null })} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700">
             <Plus className="w-4 h-4" /> Nouveau secteur
           </button>
         </div>

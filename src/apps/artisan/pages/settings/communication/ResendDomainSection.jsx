@@ -234,7 +234,7 @@ export default function ResendDomainSection() {
               type="button"
               onClick={() => run('setup', { persist: true })}
               disabled={busy != null}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary-700 text-white rounded-md hover:bg-primary-800 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
             >
               {busy === 'setup' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
               Configurer {domain}
@@ -254,7 +254,7 @@ export default function ResendDomainSection() {
                   type="button"
                   onClick={() => run('verify', { persist: true })}
                   disabled={busy != null}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary-700 text-white rounded-md hover:bg-primary-800 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
                 >
                   {busy === 'verify' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                   Vérifier

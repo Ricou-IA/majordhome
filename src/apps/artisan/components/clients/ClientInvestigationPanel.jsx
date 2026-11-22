@@ -50,7 +50,7 @@ function RecordCard({ record, matchMode, clientAddress, onChoose, choosing, chos
       type="button"
       onClick={() => onChoose(record, matchMode === 'proximity')}
       disabled={choosing || dejaChoisi}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg text-white bg-primary-700 hover:bg-primary-800 disabled:opacity-50 transition-colors"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 transition-colors"
     >
       {choosing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
       {dejaChoisi ? 'Rattaché à la fiche' : 'C’est ce logement'}

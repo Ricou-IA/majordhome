@@ -379,7 +379,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person, ajout = null, c
                 )}
               <div className={`flex gap-2 rounded-lg border ${compact ? 'px-1.5 py-1 items-center' : 'p-2'} ${it.nouveau ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200' : 'border-gray-200 bg-gray-50'}`}>
                 <span
-                  className={`flex ${compact ? 'h-5 w-5 text-[11px]' : 'h-6 w-6 text-xs'} flex-shrink-0 items-center justify-center rounded-full font-semibold text-white ${it.localise ? 'bg-blue-600' : 'bg-gray-400'}`}
+                  className={`flex ${compact ? 'h-5 w-5 text-[11px]' : 'h-6 w-6 text-xs'} flex-shrink-0 items-center justify-center rounded-full font-semibold text-white ${it.localise ? 'bg-primary-600' : 'bg-gray-400'}`}
                 >
                   {it.rang}
                 </span>

@@ -152,7 +152,7 @@ export default function TrouverPieceModal({ equipment, interventionId = null, on
               <div className="flex justify-end">
                 <button
                   type="submit" disabled={isLaunching || !demande.trim()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-white bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLaunching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}Rien de probant ? Chercher sur le web (environ deux minutes)
                 </button>

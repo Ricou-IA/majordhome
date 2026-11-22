@@ -50,7 +50,7 @@ function FormPoint({ edition, onClose }) {
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm text-secondary-600">Annuler</button>
-        <button type="button" onClick={enregistrer} disabled={isSavingPoint || Object.keys(erreurs).length > 0} className="px-3 py-1.5 rounded-md bg-primary-700 text-white text-sm font-medium disabled:opacity-50">
+        <button type="button" onClick={enregistrer} disabled={isSavingPoint || Object.keys(erreurs).length > 0} className="px-3 py-1.5 rounded-md bg-primary-600 text-white text-sm font-medium disabled:opacity-50">
           Enregistrer le point
         </button>
       </div>

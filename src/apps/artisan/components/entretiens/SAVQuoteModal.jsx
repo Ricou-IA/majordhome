@@ -102,7 +102,7 @@ export function SAVQuoteModal({ isOpen, onClose, onConfirm, loading = false, cli
             size="sm"
             onClick={handleConfirm}
             disabled={loading}
-            className="min-h-[36px] bg-primary-700 hover:bg-primary-800 text-white"
+            className="min-h-[36px] bg-primary-600 hover:bg-primary-700 text-white"
           >
             {loading ? 'Enregistrement...' : 'Valider le devis'}
           </Button>

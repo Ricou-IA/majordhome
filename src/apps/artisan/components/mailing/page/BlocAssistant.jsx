@@ -59,7 +59,7 @@ export default function BlocAssistant({ intention, onIntention, enCours, aUnText
           type="button"
           onClick={() => onDemander('rediger')}
           disabled={!!enCours || raisons.rediger.length > 0}
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Attente actif={enCours === 'rediger'}>{aUnTexte ? 'Rédiger à nouveau' : 'Rédiger'}</Attente>
         </button>

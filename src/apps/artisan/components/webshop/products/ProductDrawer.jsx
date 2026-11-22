@@ -144,7 +144,7 @@ export default function ProductDrawer({ product, products, categories, orgId, si
               type="button"
               onClick={handleSave}
               disabled={(!isDirty && !isNew) || isSaving}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium hover:bg-primary-800 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
             >
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
               {isNew ? 'Créer le produit' : 'Enregistrer'}

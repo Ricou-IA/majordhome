@@ -392,7 +392,7 @@ export default function Entretiens() {
         {canCreateContract && (
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
           >
             <Plus className="w-5 h-5" />
             Nouveau contrat

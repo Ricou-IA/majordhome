@@ -6,7 +6,7 @@
 import { AlertCircle, CheckCircle2, Download, Loader2, RefreshCw, Users, ArrowLeft, FilePlus2, Square } from 'lucide-react';
 
 const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
-const BOUTON_PRINCIPAL = 'inline-flex items-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors shadow-sm';
+const BOUTON_PRINCIPAL = 'inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm';
 const BOUTON_SECONDAIRE = 'inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors';
 
 function Barre({ faits, total }) {

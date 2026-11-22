@@ -88,7 +88,7 @@ function SectionDevisContent({ leadId, onCreateDevis, onOpenDevis, onSendDevis }
               type="button"
               onClick={onSendDevis}
               className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white
-                         bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                         bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
             >
               <Send className="w-4 h-4" /> Envoyer le devis
             </button>

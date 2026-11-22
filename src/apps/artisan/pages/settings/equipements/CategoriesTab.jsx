@@ -207,7 +207,7 @@ function CategoryModal({ category, nextSortOrder, onClose, onSave, isSaving }) {
                   key={t}
                   type="button"
                   onClick={() => set('default_vat_rate', String(t))}
-                  className={`px-2 py-0.5 rounded text-xs border ${Number(form.default_vat_rate) === t ? 'bg-primary-700 text-white border-primary-700' : 'border-secondary-300 text-secondary-600 hover:border-primary-400'}`}
+                  className={`px-2 py-0.5 rounded text-xs border ${Number(form.default_vat_rate) === t ? 'bg-primary-600 text-white border-primary-700' : 'border-secondary-300 text-secondary-600 hover:border-primary-400'}`}
                 >
                   {String(t).replace('.', ',')} %
                 </button>

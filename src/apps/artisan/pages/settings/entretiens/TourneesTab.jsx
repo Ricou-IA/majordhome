@@ -169,7 +169,7 @@ export default function TourneesTab() {
                       ? form.souplesses_proposees.filter((x) => x !== v)
                       : [...form.souplesses_proposees, v].sort((a, b) => a - b))}
                     className={`rounded-full border px-3 py-1 text-sm transition-colors ${on
-                      ? 'bg-primary-700 text-white border-primary-700'
+                      ? 'bg-primary-600 text-white border-primary-700'
                       : 'bg-white text-secondary-700 border-secondary-300 hover:border-primary-400'} ${v === 0 ? 'opacity-80 cursor-default' : ''}`}
                     title={v === 0 ? 'Toujours proposé : le client exige son heure' : optionSouplesse(v).aide}
                   >
@@ -315,7 +315,7 @@ export default function TourneesTab() {
         <button type="button" onClick={() => setForm(initial)} disabled={!isDirty || isSaving} className="px-4 py-2 text-sm text-secondary-600 hover:bg-secondary-50 rounded-md disabled:opacity-50">
           Annuler
         </button>
-        <button type="button" onClick={handleSave} disabled={!isDirty || !isValid || isSaving} className="px-4 py-2 text-sm bg-primary-700 text-white rounded-md hover:bg-primary-800 disabled:opacity-50">
+        <button type="button" onClick={handleSave} disabled={!isDirty || !isValid || isSaving} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50">
           {isSaving ? 'Enregistrement…' : 'Enregistrer'}
         </button>
       </div>

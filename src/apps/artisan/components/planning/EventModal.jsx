@@ -512,7 +512,7 @@ export function EventModal({
           >
             <div className="flex flex-wrap items-center gap-1.5 border-t border-secondary-100 pt-2">
               <button type="button" onClick={() => slotActionsRef.current?.choisir(index, memberId)}
-                className={`${boutonPied} bg-primary-700 text-white hover:bg-primary-800`}>
+                className={`${boutonPied} bg-primary-600 text-white hover:bg-primary-700`}>
                 Choisir {pers.displayName.split(' ')[0]}
               </button>
               {!isCommercialType && (

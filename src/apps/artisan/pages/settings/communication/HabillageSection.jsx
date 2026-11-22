@@ -230,7 +230,7 @@ export default function HabillageSection() {
             type="button"
             onClick={demanderEnregistrement}
             disabled={!ouvert || isSaving}
-            className="px-4 py-2 text-sm bg-primary-700 text-white rounded-md hover:bg-primary-800 disabled:opacity-50"
+            className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
           >
             {isSaving ? 'Enregistrement…' : libelleEnregistrer(settings)}
           </button>

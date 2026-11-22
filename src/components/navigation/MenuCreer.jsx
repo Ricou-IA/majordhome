@@ -17,7 +17,7 @@ const LISTE = 'absolute z-50 w-48 rounded-lg border border-secondary-200 bg-whit
 const HABILLAGES = {
   menu: {
     cadre: 'relative shrink-0',
-    bouton: 'inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-700 px-3 py-2.5 lg:py-2 text-sm font-medium text-white hover:bg-primary-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
+    bouton: 'inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2.5 lg:py-2 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
     liste: `${LISTE} right-0 top-full mt-2`,
     ligne: 'block px-4 py-2.5 lg:py-2 text-sm text-secondary-700 hover:bg-secondary-50 focus:bg-secondary-50 focus:outline-none',
   },
@@ -34,7 +34,7 @@ function Contenu({ variante }) {
   if (variante === 'barre') {
     return (
       <>
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-700 text-white">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-600 text-white">
           <Plus className="h-5 w-5" aria-hidden="true" />
         </span>
         Créer

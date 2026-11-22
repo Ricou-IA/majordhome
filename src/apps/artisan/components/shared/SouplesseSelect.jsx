@@ -46,7 +46,7 @@ export function SouplesseSelect({ value, onChange, defaut = 30, disabled = false
             title={s.aide}
             onClick={() => onChange(s.value)}
             className={`inline-flex items-center gap-1 rounded-full border transition-colors disabled:opacity-50 ${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} ${on
-              ? 'bg-primary-700 text-white border-primary-700'
+              ? 'bg-primary-600 text-white border-primary-700'
               : 'bg-white text-secondary-700 border-secondary-300 hover:border-primary-400'}`}
           >
             {s.value === 0 ? <Lock className="h-3 w-3" /> : <MoveHorizontal className="h-3 w-3" />}

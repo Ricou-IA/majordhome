@@ -60,7 +60,7 @@ export default function ProductImagesField({ images, onChange, onUploaded, orgId
                 </div>
               )}
               {i === 0 && (
-                <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-primary-700 text-white text-[11px] font-medium">Principale</span>
+                <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-primary-600 text-white text-[11px] font-medium">Principale</span>
               )}
               {!disabled && (
                 <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">

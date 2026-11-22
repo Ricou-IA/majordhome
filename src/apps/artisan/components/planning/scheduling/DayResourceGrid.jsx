@@ -396,7 +396,7 @@ export function DayResourceGrid({
               onClick={() => onDateChange(d.date)}
               className={`flex flex-col items-center px-1.5 py-1 rounded-lg transition-colors min-w-[36px] ${
                 d.date === date
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-primary-600 text-white'
                   : d.isToday
                   ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
                   : 'text-gray-600 hover:bg-gray-200'

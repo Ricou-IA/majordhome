@@ -125,7 +125,7 @@ export default function TelephonieTab() {
           type="button"
           onClick={handleSave}
           disabled={!isDirty || !!erreur || !!erreurMessage || isSaving}
-          className="px-4 py-2 text-sm bg-primary-700 text-white rounded-md hover:bg-primary-800 disabled:opacity-50"
+          className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
         >
           {isSaving ? 'Enregistrement…' : 'Enregistrer'}
         </button>

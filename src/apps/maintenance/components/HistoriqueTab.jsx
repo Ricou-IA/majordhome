@@ -94,7 +94,7 @@ export default function HistoriqueTab({ orgId, v }) {
           {(logs.data?.length || 0) >= 5000 && ' — liste tronquée à 5 000 lignes, réduisez la période.'}
         </p>
         <button type="button" onClick={exporter} disabled={export_ || periodeInvalide || lignes.length === 0}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary-700 px-4 py-2 text-sm font-medium text-white hover:bg-primary-800 disabled:opacity-50">
+          className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50">
           {export_ ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
           Exporter le registre PDF
         </button>

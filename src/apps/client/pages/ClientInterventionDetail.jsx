@@ -199,7 +199,7 @@ export default function ClientInterventionDetail() {
               <button
                 onClick={handleDownloadPdf}
                 disabled={downloadingPdf}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
               >
                 {downloadingPdf ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

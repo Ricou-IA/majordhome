@@ -128,7 +128,7 @@ export default function ValidationDialog({ cible, operateurs, libelleModule, onF
             </div>
             <button type="button" disabled={!s.statut || commentaireManquant}
               onClick={() => dispatch({ type: 'vers_operateur' })}
-              className="w-full h-16 rounded-2xl bg-blue-700 text-white text-2xl font-bold disabled:opacity-40">
+              className="w-full h-16 rounded-2xl bg-primary-600 text-white text-2xl font-bold disabled:opacity-40">
               Continuer
             </button>
           </div>

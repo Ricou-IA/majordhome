@@ -321,7 +321,7 @@ function SimulateurInner({ config, settings }) {
                 }`}
               >
                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs flex-shrink-0 ${
-                  isActive ? 'bg-primary-700 text-white' : isDone ? 'bg-secondary-200 text-secondary-700' : 'bg-secondary-100 text-secondary-400'
+                  isActive ? 'bg-primary-600 text-white' : isDone ? 'bg-secondary-200 text-secondary-700' : 'bg-secondary-100 text-secondary-400'
                 }`}
                 >
                   {isDone ? <Check className="w-3.5 h-3.5" /> : s.n}

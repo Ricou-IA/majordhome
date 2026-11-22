@@ -149,7 +149,7 @@ export default function SecteurEditor({ secteur, cfg, onClose }) {
 
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="px-3 py-2 text-sm text-secondary-600">Annuler</button>
-        <button type="button" onClick={enregistrer} disabled={bloque || isSavingSector} className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary-700 text-white text-sm font-medium disabled:opacity-50">
+        <button type="button" onClick={enregistrer} disabled={bloque || isSavingSector} className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium disabled:opacity-50">
           {isSavingSector && <Loader2 className="w-4 h-4 animate-spin" />}
           Enregistrer le secteur
         </button>

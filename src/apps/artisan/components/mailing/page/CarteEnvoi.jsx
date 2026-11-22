@@ -19,7 +19,7 @@ import { EXPEDITEUR_REFUS } from '@/lib/expediteur';
 import { lienChapitre } from '@/lib/chapitresCommunication';
 import Carte from './Carte';
 
-const PRINCIPAL = 'inline-flex h-10 items-center gap-2 rounded-lg bg-primary-700 px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+const PRINCIPAL = 'inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 const SECONDAIRE = 'inline-flex h-10 items-center gap-2 rounded-lg border border-secondary-300 bg-white px-4 text-sm font-medium text-secondary-800 transition-colors hover:bg-secondary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50';
 const LIEN = 'inline-flex items-center gap-1 text-sm font-medium text-primary-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 

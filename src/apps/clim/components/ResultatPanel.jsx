@@ -64,8 +64,8 @@ export default function ResultatPanel({ resultat, mode, onMode, onCreerDevis, pe
           <h2 className="text-sm font-semibold uppercase tracking-wide text-secondary-500">Proposition · {resultat.gamme}</h2>
           {resultat.pieces.length >= 2 && (
             <div className="flex rounded-lg border border-secondary-200 overflow-hidden text-sm">
-              <button type="button" onClick={() => onMode('mono')} className={`px-3 py-1.5 ${mode !== 'multi' ? 'bg-primary-700 text-white' : 'text-secondary-600 hover:bg-secondary-50'}`}>Mono-split</button>
-              <button type="button" onClick={() => onMode('multi')} disabled={!multiPossible} className={`px-3 py-1.5 ${mode === 'multi' ? 'bg-primary-700 text-white' : 'text-secondary-600 hover:bg-secondary-50 disabled:opacity-40'}`} title={multiPossible ? '' : 'Aucun groupe compatible'}>Multi-split</button>
+              <button type="button" onClick={() => onMode('mono')} className={`px-3 py-1.5 ${mode !== 'multi' ? 'bg-primary-600 text-white' : 'text-secondary-600 hover:bg-secondary-50'}`}>Mono-split</button>
+              <button type="button" onClick={() => onMode('multi')} disabled={!multiPossible} className={`px-3 py-1.5 ${mode === 'multi' ? 'bg-primary-600 text-white' : 'text-secondary-600 hover:bg-secondary-50 disabled:opacity-40'}`} title={multiPossible ? '' : 'Aucun groupe compatible'}>Multi-split</button>
             </div>
           )}
         </div>

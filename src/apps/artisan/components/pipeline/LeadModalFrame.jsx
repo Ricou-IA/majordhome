@@ -104,7 +104,7 @@ export function LeadModalFooter({ isEditing, isAdmin, isSaving, isHardDeleting, 
       <Button
         onClick={onSave}
         disabled={isSaving}
-        className="gap-2 min-h-[44px] bg-blue-600 hover:bg-blue-700"
+        className="gap-2 min-h-[44px] bg-primary-600 hover:bg-primary-700"
       >
         {isSaving ? (
           <Loader2 className="h-4 w-4 animate-spin" />

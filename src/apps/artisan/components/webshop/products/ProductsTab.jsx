@@ -70,7 +70,7 @@ export default function ProductsTab() {
           {isOrgAdmin && <Link to="/settings/webshop" className="text-xs text-secondary-500 hover:text-primary-600 underline">Paramètres</Link>}
         </div>
         {isOrgAdmin ? (
-          <button type="button" onClick={() => setDrawer({ product: null })} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium hover:bg-primary-800">
+          <button type="button" onClick={() => setDrawer({ product: null })} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700">
             <Plus className="w-4 h-4" /> Nouveau produit
           </button>
         ) : (

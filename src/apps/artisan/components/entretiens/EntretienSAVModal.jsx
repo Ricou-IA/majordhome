@@ -638,7 +638,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                   <button
                     type="button"
                     onClick={handleOpenClient}
-                    className="mt-1 w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-primary-700 text-white hover:bg-primary-800 transition-colors"
+                    className="mt-1 w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors"
                   >
                     <UserPlus className="w-4 h-4" />
                     Compléter la fiche client
@@ -802,7 +802,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                 <button
                   type="button"
                   onClick={() => toast.info('Envoi par mail — fonctionnalité à connecter avec N8N')}
-                  className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg bg-primary-700 text-white hover:bg-primary-800 shadow-sm transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg bg-primary-600 text-white hover:bg-primary-700 shadow-sm transition-colors"
                 >
                   <Mail className="w-4 h-4" />
                   Envoyer par mail
@@ -881,7 +881,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                   disabled={!isDirty || isSavingFields}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg border transition-all ${
                     isDirty
-                      ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                      ? 'bg-primary-600 border-blue-600 text-white hover:bg-primary-700 shadow-sm'
                       : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
                 >

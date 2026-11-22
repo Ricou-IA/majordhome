@@ -518,7 +518,7 @@ export function QuoteCandidatesModal({
               type="button"
               onClick={handleSubmit}
               disabled={newSelectionsCount === 0 || isAttaching}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isAttaching ? (
                 <>
