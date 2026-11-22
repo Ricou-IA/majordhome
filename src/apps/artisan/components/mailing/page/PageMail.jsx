@@ -18,7 +18,8 @@
  * Quoi ? (Message), Quand ? (Envoi) — selon la nature du mail (`cartesDuMail`).
  * Ce qui part est ce qui est enregistré ; l'envoi passe par `useEnvoiCampagne`
  * (via `useEnvoiDeLaPage`), seule voie. Quitter pendant un envoi demande
- * confirmation : la vague en cours va à son terme, la suivante n'est pas demandée.
+ * confirmation : la vague en cours va à son terme, la suivante n'est pas demandée ;
+ * rouverte avant la fin, la page garde l'envoi fermé (registre `envoiEnCours.js`).
  * Un autre rôle que l'administrateur n'ouvre qu'une campagne manuelle (`peutOuvrirMail`).
  * ============================================================================
  */
@@ -68,7 +69,7 @@ export default function PageMail({ mailId, onRetour, onCree }) {
   const [etat, dispatch] = useReducer(reducteurPageMail, undefined, etatInitial);
   const navigate = useNavigate();
   const [quitter, setQuitter] = useState(null); // { vers } : départ en attente de confirmation (vers null = la liste)
-  const [activation, setActivation] = useState(false); // mise en route automatique à confirmer avant d'enregistrer
+  const [activation, setActivation] = useState(false); // réglage automatique à confirmer avant d'enregistrer
   const sauverRef = useRef(null); // enregistrement avant un envoi (posé plus bas, lu par useEnvoiDeLaPage)
 
   const neuf = mailId === 'nouveau';
@@ -141,7 +142,8 @@ export default function PageMail({ mailId, onRetour, onCree }) {
   sauverRef.current = enregistrer;
 
   // « Enregistrer » qui mettrait l'envoi automatique en route : confirmé d'abord (c'est lui qui fera partir le mail).
-  const enregistrerDepuisEnTete = () => (envoi.miseEnRoute ? setActivation(true) : enregistrer());
+  // « Enregistrer » qui met en route, change ou arrête l'envoi automatique : confirmé d'abord (il décide qui reçoit, et quand).
+  const enregistrerDepuisEnTete = () => (envoi.avantEnregistrement ? setActivation(true) : enregistrer());
 
   const demander = useCallback(async (consigne) => {
     if (etat.redaction || raisonsParConsigne[consigne]?.length) return;
@@ -266,8 +268,8 @@ export default function PageMail({ mailId, onRetour, onCree }) {
       <DialoguesEnvoi
         confirmation={envoi.confirmation}
         activation={{
-          ouverte: activation,
-          texte: envoi.texteActivation,
+          ouverte: activation && !!envoi.avantEnregistrement,
+          ...envoi.avantEnregistrement,
           fermer: () => setActivation(false),
           confirmer: () => { setActivation(false); enregistrer(); },
         }}
@@ -277,7 +279,7 @@ export default function PageMail({ mailId, onRetour, onCree }) {
         onOpenChange={(o) => { if (!o) setQuitter(null); }}
         title={quitter?.envoi ? 'Quitter pendant l’envoi ?' : 'Quitter sans enregistrer ?'}
         description={quitter?.envoi
-          ? 'La vague en cours ira à son terme, mais la suivante ne partira pas. Rouvrez le mail et cliquez sur « Lancer » pour continuer : personne ne le recevra deux fois.'
+          ? 'La vague déjà demandée au serveur ira à son terme, la suivante ne partira pas. Ne relancez pas avant que la page du mail dise que l’envoi est terminé : relancer pendant cette vague écrirait une seconde fois à une partie des destinataires.'
           : 'Les modifications de ce mail seront perdues.'}
         confirmLabel={quitter?.envoi ? 'Quitter quand même' : 'Quitter sans enregistrer'}
         cancelLabel="Rester sur le mail"

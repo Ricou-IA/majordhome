@@ -23,7 +23,7 @@ function Nombre({ d }) {
     return <p className="flex items-center gap-2 text-sm text-secondary-500"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Calcul du nombre de destinataires…</p>;
   }
   if (typeof d.nombre !== 'number') {
-    return <p className="text-sm text-secondary-500">Le nombre de destinataires n’a pas pu être calculé pour l’instant.</p>;
+    return <p className="text-sm text-secondary-500">{d.phraseInconnu}</p>;
   }
   return (
     <div className="space-y-1">
@@ -83,7 +83,7 @@ export default function CarteDestinataires({ numero, d }) {
         </div>
       ) : (
         <div className="space-y-3">
-          <label htmlFor="mail-segment" className="block text-sm font-medium text-secondary-700">Segment</label>
+          <label htmlFor="mail-segment" className="block text-sm font-medium text-secondary-700">Groupe de destinataires</label>
           {d.enErreur ? (
             <p className="text-sm text-secondary-500">Les groupes de destinataires n’ont pas pu être lus. Réessayez dans un instant.</p>
           ) : (
@@ -120,7 +120,7 @@ export default function CarteDestinataires({ numero, d }) {
             {d.peutCreer && (
               <button type="button" onClick={d.actions.ouvrirDessin} disabled={d.occupe} className={LIEN}>
                 <Plus className="h-4 w-4" aria-hidden="true" />
-                Nouveau segment
+                Nouveau groupe de destinataires (segment)
               </button>
             )}
           </div>

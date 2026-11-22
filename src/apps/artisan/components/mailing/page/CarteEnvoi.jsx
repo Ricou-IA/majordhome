@@ -61,6 +61,26 @@ function Progression({ p }) {
   );
 }
 
+/** Envoi de cette campagne lancé par une page quittée : en cours (tout fermé), puis terminé (reprise sûre). */
+function EtatCampagne({ etat }) {
+  if (etat === 'en_cours') {
+    return (
+      <p className="flex items-start gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-800" aria-live="polite">
+        <Loader2 className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin" aria-hidden="true" />
+        Un envoi de cette campagne est en cours : la vague demandée au serveur se termine. Rien ne peut repartir avant ; la page vous dira quand c’est fini.
+      </p>
+    );
+  }
+  if (etat === 'reprendre') {
+    return (
+      <p className="rounded-lg border border-secondary-200 bg-secondary-50 px-3 py-2.5 text-sm text-secondary-800" aria-live="polite">
+        L’envoi précédent est terminé. S’il restait des destinataires, « Reprendre l’envoi » continue : ceux qui ont déjà reçu ce mail ne le recevront pas une seconde fois.
+      </p>
+    );
+  }
+  return null;
+}
+
 function UneFois({ e, bandeau }) {
   const sansBandeau = (liste) => liste.filter((r) => r !== bandeau);
   const raisonsTest = sansBandeau(e.raisons.tester);
@@ -91,9 +111,9 @@ function UneFois({ e, bandeau }) {
       <div className="space-y-2 border-t border-secondary-100 pt-5">
         <button type="button" onClick={e.actions.lancer} disabled={e.occupe || e.raisons.lancer.length > 0} className={PRINCIPAL}>
           <Send className="h-4 w-4" aria-hidden="true" />
-          Lancer
+          {e.etatCampagne === 'reprendre' ? 'Reprendre l’envoi' : 'Lancer'}
         </button>
-        <p className="text-sm text-secondary-500">Envoie le mail enregistré au segment choisi, après confirmation.</p>
+        <p className="text-sm text-secondary-500">Envoie le mail enregistré aux destinataires choisis, après confirmation.</p>
         <Raisons liste={raisonsLancer} />
         <Progression p={e.progression} />
       </div>
@@ -118,7 +138,7 @@ function Automatiquement({ e, bandeau }) {
         <span>
           <span className="block text-sm font-medium text-secondary-900">Envoyer ce mail automatiquement</span>
           <span className="block text-sm text-secondary-500">
-            Il part aux nouvelles personnes du segment, selon la cadence. Personne ne le reçoit deux fois. Pris en compte à l’enregistrement.
+            Il part aux nouvelles personnes du groupe de destinataires, selon la cadence. Personne ne le reçoit deux fois. Pris en compte à l’enregistrement.
           </span>
         </span>
       </label>
@@ -142,7 +162,7 @@ function Automatiquement({ e, bandeau }) {
             />
           </div>
           <div>
-            <label htmlFor="mail-heure" className="block text-sm font-medium text-secondary-700">À</label>
+            <label htmlFor="mail-heure" className="block text-sm font-medium text-secondary-700">À (heure de Paris)</label>
             <input
               id="mail-heure"
               type="time"
@@ -208,11 +228,13 @@ export default function CarteEnvoi({ numero, e, nature }) {
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" aria-hidden="true" />
           <div className="space-y-1">
             <p>{bandeau}</p>
-            <p>Tant que ce n’est pas fait, ce mail ne peut pas partir à un segment{e.refusNombre === 'domaine_requis' ? ' ; un essai à votre adresse reste possible' : ''}.</p>
+            <p>Tant que ce n’est pas fait, ce mail ne peut pas partir à un groupe de destinataires{e.refusNombre === 'domaine_requis' ? ' ; un essai à votre adresse reste possible' : ''}.</p>
             <LienReglages>Ouvrir les réglages des e-mails</LienReglages>
           </div>
         </div>
       )}
+
+      <EtatCampagne etat={e.etatCampagne} />
 
       {e.modes.length > 1 && (
         <div role="radiogroup" aria-label="Façon d’envoyer" className="inline-flex rounded-lg border border-secondary-200 bg-secondary-50 p-1">

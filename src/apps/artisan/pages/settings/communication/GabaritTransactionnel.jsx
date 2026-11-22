@@ -3,7 +3,7 @@
  * ============================================================================
  * Même mécanique que le gabarit de facture d'entretien (EmailsTab) : le gabarit
  * vit dans `majordhome_mail_campaigns` (is_transactional = true). Absent → bouton
- * « Créer le gabarit par défaut » ; présent → lien vers Mailing → Éditeur ;
+ * « Créer le gabarit par défaut » ; présent → lien vers Mailing → Campagnes ;
  * archivé → invite à le restaurer (la contrainte unique `(org_id, key)` refuserait
  * une création). Utilisé par Réglages → Webshop ; Réglages → Emails est passé à EmailAutoLigne (2026-10-24).
  * ============================================================================
@@ -71,11 +71,11 @@ export default function GabaritTransactionnel({ orgId, gabarit, placeholders = [
         <span className="text-xs text-secondary-500">Chargement…</span>
       ) : existant ? (
         <Link to="/mailing" className="text-sm text-primary-600 hover:underline whitespace-nowrap">
-          Modifier dans Mailing → Éditeur
+          Modifier dans Mailing → Campagnes
         </Link>
       ) : archive ? (
         <Link to="/mailing" className="text-sm text-amber-700 hover:underline whitespace-nowrap">
-          Gabarit archivé : restaurez-le dans Mailing → Éditeur
+          Gabarit archivé : restaurez-le dans Mailing → Campagnes
         </Link>
       ) : (
         <button

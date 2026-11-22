@@ -9,6 +9,8 @@ import {
   segmentsRanges, etatSegment, segmentSurLaCampagne, modesEnvoi, raisonsAutomatisation, cadenceEnMots,
   prochainEnvoiEnMots, basculerAutomatisation, texteConfirmationLancement, peutOuvrirMail, raisonsEnvoiPage,
   dejaServis, metEnRoute, texteConfirmationActivation, raisonsReglageAutomatique, raisonsSauvegardePage,
+  cleEnvoi, etatEnvoiCampagne, reglageAutomatiqueModifie, texteConfirmationReglage, phraseNombreInconnu,
+  messageErreurEnvoi,
 } from '../src/lib/mailPage.js';
 import { texteParDefaut } from '../src/lib/mailVariables.js';
 import { EMAILS_AUTOMATIQUES } from '../src/lib/emailsAutomatiques.js';
@@ -639,4 +641,76 @@ test('raisonsSauvegardePage : un envoi en cours ferme « Enregistrer », sans do
   assert.deepEqual(raisonsSauvegardePage({ envoiEnCours: false, raisonsEnregistrement: [], raisonsReglage: [] }), []);
   assert.ok(raisonsSauvegardePage({ envoiEnCours: true, raisonsEnregistrement: [], raisonsReglage: [] })[0].includes('envoi est en cours'));
   assert.deepEqual(raisonsSauvegardePage({ envoiEnCours: false, raisonsEnregistrement: ['A'], raisonsReglage: ['A', 'B'] }), ['A', 'B']);
+});
+
+// ── Fix round 1 de la tâche 10 ───────────────────────────────────────────────
+
+test('cleEnvoi : organisation + nom au caractère près ; incomplet ⇒ vide', () => {
+  assert.equal(cleEnvoi('o1', 'Promo '), 'o1:Promo ');
+  assert.equal(cleEnvoi('', 'Promo'), '');
+  assert.equal(cleEnvoi('o1', ''), '');
+  assert.notEqual(cleEnvoi('o1', 'A'), cleEnvoi('o2', 'A'));
+});
+
+test('etatEnvoiCampagne : en cours ailleurs, à reprendre une fois fini, libre', () => {
+  assert.equal(etatEnvoiCampagne({ occupe: true, vuOccupe: true, ici: false }), 'en_cours');
+  assert.equal(etatEnvoiCampagne({ occupe: true, vuOccupe: true, ici: true }), 'ici');
+  assert.equal(etatEnvoiCampagne({ occupe: false, vuOccupe: true, ici: false }), 'reprendre');
+  assert.equal(etatEnvoiCampagne({ occupe: false, vuOccupe: false, ici: false }), 'libre');
+});
+
+test('raisonsEnvoiPage : un envoi de cette campagne en cours ailleurs ferme tester, lancer et automatiser', () => {
+  const base = { etat: PRET, archive: false, segment: { etat: 'ok', raison: null }, raisonsEnregistrement: [], modifie: false };
+  for (const geste of ['tester', 'lancer']) {
+    assert.ok(raisonsEnvoiPage({ ...base, geste, envoiAilleurs: true }).some((m) => /en cours/.test(m)), geste);
+  }
+  assert.ok(raisonsEnvoiPage({ ...base, geste: 'automatiser', etat: PRET_AUTO, envoiAilleurs: true }).some((m) => /en cours/.test(m)));
+});
+
+test('raisonsEnvoiPage : une campagne automatique en base ne se lance pas à la main', () => {
+  const base = { etat: PRET, archive: false, segment: { etat: 'ok', raison: null }, raisonsEnregistrement: [], modifie: false };
+  const r = raisonsEnvoiPage({ ...base, geste: 'lancer', automatiqueEnBase: true });
+  assert.ok(r.some((m) => /part déjà tout seul/.test(m) && /arrêtez/.test(m)));
+  assert.deepEqual(raisonsEnvoiPage({ ...base, geste: 'tester', automatiqueEnBase: true }), []);
+});
+
+test('raisonsEnvoiPage : un réglage automatique modifié non enregistré ferme tester et lancer', () => {
+  const base = { etat: PRET, archive: false, segment: { etat: 'ok', raison: null }, raisonsEnregistrement: [], modifie: true };
+  for (const geste of ['tester', 'lancer']) {
+    assert.ok(raisonsEnvoiPage({ ...base, geste, reglageAutoModifie: true }).some((m) => /Enregistrez d’abord les changements de l’envoi automatique/.test(m)), geste);
+  }
+});
+
+test('reglageAutomatiqueModifie : segment, cadence, heure ou interrupteur d’une campagne automatique en base', () => {
+  const auto = formulaireDepuisCampagne({ ...MANUELLE, is_automated: true, auto_cadence_days: 7, auto_segment_id: 's1' });
+  assert.equal(reglageAutomatiqueModifie(auto, auto), false);
+  assert.equal(reglageAutomatiqueModifie({ ...auto, subject: 'Autre' }, auto), false);
+  assert.equal(reglageAutomatiqueModifie({ ...auto, auto_segment_id: 's2' }, auto), true);
+  assert.equal(reglageAutomatiqueModifie({ ...auto, auto_cadence_days: 3 }, auto), true);
+  assert.equal(reglageAutomatiqueModifie({ ...auto, auto_time_of_day: '10:00' }, auto), true);
+  assert.equal(reglageAutomatiqueModifie({ ...auto, is_automated: false }, auto), true);
+  // Campagne manuelle en base : ce n'est pas un réglage automatique (l'allumage a sa propre confirmation).
+  const manuelle = formulaireDepuisCampagne(MANUELLE);
+  assert.equal(reglageAutomatiqueModifie({ ...manuelle, auto_segment_id: 's2' }, manuelle), false);
+  assert.equal(reglageAutomatiqueModifie(manuelle, null), false);
+});
+
+test('texteConfirmationReglage : arrêt ou changement de l’envoi automatique dit en clair', () => {
+  assert.match(texteConfirmationReglage({ actif: false, segmentNom: 'X', cadence: null }), /ne partira plus/);
+  const t = texteConfirmationReglage({ actif: true, segmentNom: 'Clients poêle', cadence: 'tous les 3 jours à 10 h' });
+  assert.match(t, /Clients poêle/);
+  assert.match(t, /tous les 3 jours/);
+});
+
+test('phraseNombreInconnu : sans nom, le nombre attend le nom ; sinon échec de calcul', () => {
+  assert.match(phraseNombreInconnu({ nomCampagne: '' }), /nom/);
+  assert.match(phraseNombreInconnu({ nomCampagne: 'Promo' }), /pas pu être calculé/);
+});
+
+test('messageErreurEnvoi : refus d’expéditeur traduit, sinon le message reçu', () => {
+  assert.match(messageErreurEnvoi({ code: 'domaine_requis', message: 'x' }), /domaine/);
+  assert.match(messageErreurEnvoi({ code: 'no_from_email', message: 'x' }), /adresse e-mail/);
+  assert.equal(messageErreurEnvoi({ code: null, message: 'Panne' }), 'Panne');
+  assert.equal(messageErreurEnvoi({ code: 'autre_chose', message: '' }), 'autre_chose');
+  assert.ok(messageErreurEnvoi({}));
 });

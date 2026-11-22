@@ -603,12 +603,24 @@ export function peutOuvrirMail({ campagne, nouveau, isOrgAdmin }) {
  * être enregistré (ce qui part est ce qui est enregistré).
  * @param {{ geste: 'tester' | 'lancer' | 'automatiser', etat: Record<string, any>, archive: boolean,
  *   segment: { etat: string, raison: string | null }, raisonsEnregistrement: string[], modifie: boolean,
- *   miseEnRoute?: boolean }} entree
+ *   miseEnRoute?: boolean, envoiAilleurs?: boolean, automatiqueEnBase?: boolean, reglageAutoModifie?: boolean }} entree
  * @returns {string[]}
  */
-export function raisonsEnvoiPage({ geste, etat, archive, segment, raisonsEnregistrement: aEnregistrer, modifie, miseEnRoute = false }) {
+export function raisonsEnvoiPage({
+  geste, etat, archive, segment, raisonsEnregistrement: aEnregistrer, modifie, miseEnRoute = false,
+  envoiAilleurs = false, automatiqueEnBase = false, reglageAutoModifie = false,
+}) {
   const raisons = [];
+  // Une vague de cette campagne est encore chez le serveur : relancer écrirait de nouveau à ceux qu'elle n'a pas
+  // encore journalisés (`mailing-send` n'a pas de verrou).
+  if (envoiAilleurs) raisons.push('Un envoi de cette campagne est en cours : attendez que la page dise qu’il est terminé.');
   if (archive) raisons.push('Ce mail est archivé : il ne part plus.');
+  // Un envoi ponctuel d'une campagne automatique doublerait le planificateur.
+  if (automatiqueEnBase && geste === 'lancer') {
+    raisons.push('Ce mail part déjà tout seul : pour l’envoyer une fois à la main, arrêtez d’abord l’envoi automatique et enregistrez.');
+  }
+  // Un essai ou un envoi n'enregistre jamais en silence un changement de qui reçoit le mail automatique, ou quand.
+  if (reglageAutoModifie && geste !== 'automatiser') raisons.push('Enregistrez d’abord les changements de l’envoi automatique (bouton « Enregistrer »).');
   // Enregistrer pour un essai mettrait aussi l'envoi automatique en route : cela se confirme à part.
   if (miseEnRoute && geste !== 'automatiser') raisons.push('Enregistrez d’abord la mise en route automatique (bouton « Enregistrer »).');
   if (segment?.raison) raisons.push(segment.raison);
@@ -618,6 +630,78 @@ export function raisonsEnvoiPage({ geste, etat, archive, segment, raisonsEnregis
   }
   raisons.push(...(geste === 'automatiser' ? raisonsAutomatisation(etat) : raisonsDeBlocage(etat, geste)));
   return [...new Set(raisons)];
+}
+
+// ── Envoi en cours, réglage automatique, messages ────────────────────────────
+
+/**
+ * Clé d'un envoi dans le registre `envoiEnCours.js` : organisation + nom de campagne au caractère près (c'est
+ * le nom qui tient le journal des envois). Incomplet ⇒ '' (aucune clé, rien ne peut partir).
+ * @param {string | null | undefined} orgId
+ * @param {string | null | undefined} nomCampagne
+ * @returns {string}
+ */
+export function cleEnvoi(orgId, nomCampagne) {
+  if (!orgId || !nomCampagne) return '';
+  return `${orgId}:${nomCampagne}`;
+}
+
+/**
+ * Ce que la page peut faire selon le registre : `ici` (envoi lancé par cette page), `en_cours` (lancé avant, par
+ * une page quittée : tout est fermé), `reprendre` (cet envoi-là vient de finir : chacun de sa vague est journalisé,
+ * relancer est sûr), `libre`.
+ * @param {{ occupe: boolean, vuOccupe: boolean, ici: boolean }} entree
+ * @returns {'ici' | 'en_cours' | 'reprendre' | 'libre'}
+ */
+export function etatEnvoiCampagne({ occupe, vuOccupe, ici }) {
+  if (occupe) return ici ? 'ici' : 'en_cours';
+  return vuOccupe ? 'reprendre' : 'libre';
+}
+
+/** Champs qui décident qui reçoit le mail automatique, et quand. */
+const CHAMPS_AUTOMATIQUES = Object.freeze(['is_automated', 'auto_segment_id', 'auto_cadence_days', 'auto_time_of_day']);
+
+/**
+ * Le formulaire change-t-il qui reçoit, ou quand, une campagne AUTOMATIQUE EN BASE ? Un tel changement ne
+ * s'enregistre qu'avec « Enregistrer », après confirmation, jamais par un essai ou un envoi.
+ * @param {FormulaireMail} form
+ * @param {FormulaireMail | null} initial
+ * @returns {boolean}
+ */
+export function reglageAutomatiqueModifie(form, initial) {
+  if (!initial?.is_automated) return false;
+  return CHAMPS_AUTOMATIQUES.some((c) => !egaux(c, form?.[c], initial[c]));
+}
+
+/**
+ * Phrase de la confirmation d'un changement de l'envoi automatique d'une campagne qui part déjà toute seule.
+ * @param {{ actif: boolean, segmentNom: string, cadence: string | null }} entree
+ * @returns {string}
+ */
+export function texteConfirmationReglage({ actif, segmentNom, cadence }) {
+  if (!actif) return 'Une fois enregistré, ce mail ne partira plus tout seul. Rien n’est supprimé : vous pourrez le remettre en route.';
+  return `Une fois enregistré, l’envoi automatique de ce mail change : il partira vers le groupe « ${segmentNom || '?'} », `
+    + `${cadence ?? 'selon sa cadence'}, aux personnes qui ne l’ont pas encore reçu.`;
+}
+
+/**
+ * Phrase de la carte « À qui ? » quand le nombre de destinataires n'est pas connu (hors chargement).
+ * @param {{ nomCampagne: string | null | undefined }} entree
+ * @returns {string}
+ */
+export function phraseNombreInconnu({ nomCampagne }) {
+  if (!String(nomCampagne ?? '').trim()) return 'Donnez d’abord un nom à ce mail : le nombre de destinataires en dépend (ceux qui l’ont déjà reçu sont retirés).';
+  return 'Le nombre de destinataires n’a pas pu être calculé pour l’instant.';
+}
+
+/**
+ * Message d'un refus de `mailing-send` : un refus d'adresse d'envoi en clair, sinon le message reçu.
+ * @param {{ code?: string | null, message?: string | null }} entree
+ * @returns {string}
+ */
+export function messageErreurEnvoi({ code = null, message = null } = {}) {
+  if (code && EXPEDITEUR_REFUS[code]) return EXPEDITEUR_REFUS[code];
+  return String(message || code || 'L’envoi n’a pas abouti.');
 }
 
 // ── Rédaction assistée ───────────────────────────────────────────────────────

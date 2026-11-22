@@ -12,10 +12,10 @@
  * envoie la ligne telle qu'elle est en base, au segment qu'il a choisi.
  * ============================================================================
  */
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { useMailSegments, useSegmentCount, useSegmentPreview } from '@hooks/useMailSegments';
-import { useEnvoiCampagne } from '@hooks/useEnvoiCampagne';
+import { useEnvoiCampagne, useEnvoiEnCours } from '@hooks/useEnvoiCampagne';
 import { useDebounce } from '@hooks/useDebounce';
 import { mailCampaignsService } from '@services/mailCampaigns.service';
 import { resoudreExpediteur } from '@/lib/expediteur';
@@ -24,6 +24,7 @@ import { messageErreurEssai } from '@/lib/emailsAutomatiques';
 import {
   segmentsRanges, etatSegment, segmentSurLaCampagne, modesEnvoi, raisonsEnvoiPage, raisonsReglageAutomatique,
   cadenceEnMots, prochainEnvoiEnMots, raisonsSauvegardePage, texteConfirmationLancement, texteConfirmationActivation, metEnRoute, dejaServis,
+  cleEnvoi, etatEnvoiCampagne, reglageAutomatiqueModifie, texteConfirmationReglage, phraseNombreInconnu,
 } from '@/lib/mailPage';
 
 /** Nombre lisible d'une requête : inconnu (chargement, erreur) ⇒ `undefined`, jamais 0. */
@@ -72,7 +73,18 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
   const inconnues = useMemo(() => [...new Set(variablesInconnues(base, corps))], [base, corps]);
   const refusNombre = resoudreExpediteur(settings ?? {}, { usage: 'nombre' }).refus;
   const refusIndividuel = resoudreExpediteur(settings ?? {}, { usage: 'individuel' }).refus;
-  const occupe = envoyeur.enCours || isMutating;
+  // Un envoi de CETTE campagne lancé par une page quittée (registre du module) : tout reste fermé jusqu'à sa fin,
+  // puis la page propose de reprendre (chacun de cette vague est alors journalisé).
+  const cle = cleEnvoi(orgId, base?.label);
+  const occupeRegistre = useEnvoiEnCours(cle);
+  const etatCampagne = etatEnvoiCampagne({ occupe: occupeRegistre, vuOccupe: !!envoi.vuOccupe, ici: envoyeur.enCours });
+  useEffect(() => {
+    if (etatCampagne === 'en_cours' && !envoi.vuOccupe) dispatch({ type: 'envoi', patch: { vuOccupe: true } });
+  }, [etatCampagne, envoi.vuOccupe, dispatch]);
+  const envoiAilleurs = etatCampagne === 'en_cours';
+  const occupe = envoyeur.enCours || isMutating || envoiAilleurs;
+  const automatiqueEnBase = !!base?.is_automated;
+  const reglageAutoModifie = enregistre && reglageAutomatiqueModifie(form, initial);
 
   const commun = { objet, corps, variablesInconnues: inconnues, segmentId, nombre, envoiEnCours: occupe };
   const etatAuto = {
@@ -84,7 +96,7 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
   const miseEnRoute = enregistre && metEnRoute(form, initial);
   const cadre = {
     archive: !!base?.is_archived, segment: etatSeg, raisonsEnregistrement: raisonsSauvegarde,
-    modifie: enregistre && modifie, miseEnRoute,
+    modifie: enregistre && modifie, miseEnRoute, envoiAilleurs, automatiqueEnBase, reglageAutoModifie,
   };
   const raisons = {
     tester: raisonsEnvoiPage({ ...cadre, geste: 'tester', etat: { ...commun, refusExpediteur: refusIndividuel, adresseTest: envoi.adresseTest } }),
@@ -119,6 +131,7 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
     if (raisons.lancer.length || occupe) return;
     const ligne = await ligneAEnvoyer();
     if (!ligne) return;
+    if (ligne.is_automated) return; // jamais : la ligne enregistrée part déjà toute seule
     dispatch({
       type: 'envoi',
       patch: {
@@ -136,7 +149,7 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
 
   const confirmerLancement = unSeul(async () => {
     if (!photoAJour || !texteLancement) return;
-    dispatch({ type: 'envoi', patch: { confirmation: null } });
+    dispatch({ type: 'envoi', patch: { confirmation: null, vuOccupe: false } });
     await envoyeur.lancer({ ...photo, nombre });
   });
 
@@ -165,11 +178,26 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
   };
 
   const nomSegment = etatSeg.segment?.name ?? '';
+  // Enregistrer qui met l'envoi automatique en route, ou qui change qui le reçoit (ou quand) : confirmé d'abord.
+  let avantEnregistrement = null;
+  if (miseEnRoute) {
+    avantEnregistrement = {
+      titre: 'Mettre ce mail en route automatiquement ?',
+      texte: texteConfirmationActivation({ segmentNom: nomSegment, nombre, cadence: cadenceEnMots(form) }),
+      bouton: 'Enregistrer et mettre en route',
+    };
+  } else if (reglageAutoModifie) {
+    avantEnregistrement = {
+      titre: form.is_automated ? 'Changer l’envoi automatique ?' : 'Arrêter l’envoi automatique ?',
+      texte: texteConfirmationReglage({ actif: !!form.is_automated, segmentNom: nomSegment, cadence: cadenceEnMots(form) }),
+      bouton: form.is_automated ? 'Enregistrer le changement' : 'Enregistrer et arrêter',
+    };
+  }
+
   return {
-    enCours: envoyeur.enCours,
+    enCours: envoyeur.enCours || envoiAilleurs,
     raisonsSauvegarde,
-    miseEnRoute,
-    texteActivation: miseEnRoute ? texteConfirmationActivation({ segmentNom: nomSegment, nombre, cadence: cadenceEnMots(form) }) : null,
+    avantEnregistrement,
     destinataires: {
       mode: cartes.destinataires,
       ranges: segmentsRanges(segments),
@@ -179,6 +207,7 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
       enErreur: !!segmentsEnErreur,
       nombre,
       nombreEnLecture: compte.isFetching && nombre === undefined && !!filtres,
+      phraseInconnu: phraseNombreInconnu({ nomCampagne: nomCompte }),
       dejaServis: dejaServis(nombreDe(taille), nombre),
       peutCreer: isOrgAdmin,
       exemples: { ouverts: envoi.exemples, lignes: exemples.data ?? [], enLecture: exemples.isLoading, enErreur: exemples.isError },
@@ -202,6 +231,8 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
       refusNombre,
       progression: envoyeur.progression,
       enCours: envoyeur.enCours,
+      // 'en_cours' : lancé par une page quittée ; 'reprendre' : cet envoi-là vient de finir.
+      etatCampagne,
       occupe,
       essaiEnCours: !!envoi.essaiEnCours,
       // L'essai d'un e-mail du registre part avec le texte enregistré : un mail modifié qui ne peut pas l'être le ferme.
@@ -231,9 +262,9 @@ export function useEnvoiDeLaPage({ orgId, isOrgAdmin, cartes, etat, dispatch, se
       texte: texteLancement,
       // Pourquoi « Oui, envoyer » est fermé, quand il l'est.
       attente: texteLancement ? null : (!photoAJour
-        ? 'Le mail ou son segment a changé depuis : annulez, puis cliquez de nouveau sur « Lancer ».'
+        ? 'Le mail ou ses destinataires ont changé depuis : annulez, puis cliquez de nouveau sur « Lancer ».'
         : (typeof nombre === 'number'
-          ? 'Plus personne à qui envoyer ce mail dans ce segment.'
+          ? 'Plus personne à qui envoyer ce mail parmi ces destinataires.'
           : 'Calcul du nombre de destinataires… Le bouton s’ouvre dès qu’il est connu.')),
       fermer: () => dispatch({ type: 'envoi', patch: { confirmation: null } }),
       confirmer: confirmerLancement,

@@ -88,7 +88,7 @@ export function useWebshopProcessForm() {
 export function useGabaritsExistants() {
   const { organization } = useAuth();
   const orgId = organization?.id;
-  // Même liste que Mailing → Éditeur (non archivés, filtrée par org, `enabled: !!orgId`).
+  // Même liste que Mailing → Campagnes (non archivés, filtrée par org, `enabled: !!orgId`).
   const q = useMailCampaigns(orgId);
   // `campaigns` vaut [] pendant le chargement, en erreur ou sans org : on ne s'y fie pas.
   const inconnu = !orgId || q.isLoading || !!q.error;

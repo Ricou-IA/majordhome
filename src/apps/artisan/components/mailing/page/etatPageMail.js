@@ -26,6 +26,7 @@ const envoiInitial = (campagne) => ({
   dessinSegment: false,     // fenêtre « Nouveau segment »
   exemples: false,          // « Voir des exemples »
   essaiEnCours: false,      // « M'envoyer un essai » d'un e-mail automatique
+  vuOccupe: false,          // un envoi de cette campagne lancé par une page quittée a été vu en cours
 });
 
 /**

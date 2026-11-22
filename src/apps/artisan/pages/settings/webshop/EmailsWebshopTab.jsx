@@ -1,6 +1,6 @@
 // src/apps/artisan/pages/settings/webshop/EmailsWebshopTab.jsx
 // Settings → Webshop → E-mails : les 7 gabarits du webshop (`WEBSHOP_EMAIL_DEFAULTS`), rangés dans
-// `majordhome_mail_campaigns` (transactionnels). Création et lien vers Mailing → Éditeur par la même
+// `majordhome_mail_campaigns` (transactionnels). Création et lien vers Mailing → Campagnes par la même
 // ligne que Paramètres → E-mails & SMS (`GabaritTransactionnel`).
 import { WEBSHOP_EMAIL_DEFAULTS, WEBSHOP_EMAIL_KEYS, WEBSHOP_EMAIL_PLACEHOLDERS } from '@/lib/webshop/emailTemplates';
 import { buildWebshopConfig } from '@/lib/webshop/reglages';
@@ -28,7 +28,7 @@ export default function EmailsWebshopTab() {
       <section className={CARD}>
         <h2 className={SECTION_TITLE}>Gabarits d’e-mail de la boutique</h2>
         <p className="text-xs text-secondary-500 mb-2">
-          Créés avec un texte par défaut, puis modifiables dans Mailing → Éditeur. Envoyés quel que soit le module Communication (e-mails de vente).
+          Créés avec un texte par défaut, puis modifiables dans Mailing → Campagnes. Envoyés quel que soit le module Communication (e-mails de vente).
         </p>
         {/* État inconnu (pas d'org, chargement, erreur) : jamais de bouton « Créer » à tort. */}
         {gabarits.error ? (

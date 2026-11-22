@@ -3,7 +3,7 @@
  * ============================================================================
  * « Lancer » : segment, nombre (le même que la carte « À qui ? », compté avec le
  * nom qui partira), nom du mail ; impossible tant que ce nombre est inconnu ou nul.
- * Mise en route automatique : confirmée avant d'enregistrer, c'est l'enregistrement
+ * Réglage automatique (mise en route, changement, arrêt) : confirmé avant d'enregistrer, c'est l'enregistrement
  * qui fera partir le mail. Le bouton « Annuler » a le focus à l'ouverture.
  * Présentation seulement : les phrases viennent de `src/lib/mailPage.js`.
  * ============================================================================
@@ -27,9 +27,9 @@ export default function DialoguesEnvoi({ confirmation, activation }) {
       <ConfirmDialog
         open={activation.ouverte}
         onOpenChange={(o) => { if (!o) activation.fermer(); }}
-        title="Mettre ce mail en route automatiquement ?"
+        title={activation.titre ?? 'Enregistrer ?'}
         description={activation.texte ?? ''}
-        confirmLabel="Enregistrer et mettre en route"
+        confirmLabel={activation.bouton ?? 'Enregistrer'}
         cancelLabel="Annuler"
         variant="default"
         onConfirm={activation.confirmer}
