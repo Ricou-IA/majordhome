@@ -98,7 +98,7 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/tournee/secteurs.js',
   'src/lib/tournee/populations.js',
   'src/lib/mailHabillage.js', // habillage des e-mails : consommé par les edges via sa copie _shared (sync-tournee-engine) et par l'aperçu à venir (tâches suivantes du chantier « créateur de mail »)
-  'src/lib/mailCorps.js', // format du texte d'un mail : copié pour les edges (sync-tournee-engine), à retirer quand mailRedaction l'importera (tâche 5)
+  'src/lib/mailRedaction.js', // rédaction assistée des mails : consommée par l'edge mailing-rediger via sa copie _shared (sync-tournee-engine), à retirer quand le service mailCampaigns l'importera (tâche 6)
   'src/lib/maintenance/digestModel.js', // consommé par l'edge maintenance-digest via sa copie _shared/maintenance (sync-tournee-engine), jamais importé depuis src/
   'src/lib/agentTelephonique.js', // consommé par l'edge agent-verifier-client via sa copie _shared/ (sync-tournee-engine), jamais importé depuis src/
   'src/lib/catalogue/enrichissementAppareil.js', // consommé par l'edge equipment-model-enrich via sa copie _shared/catalogue (sync-tournee-engine), jamais importé depuis src/

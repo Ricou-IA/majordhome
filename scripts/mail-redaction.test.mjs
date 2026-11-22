@@ -1,0 +1,173 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  CONSIGNES, REDACTION_CODES, messageErreurRedaction, adressesAutorisees, adressesDuTexte, validerDemande,
+  construireConsigne, SCHEMA_REDACTION, lireReponse,
+} from '../src/lib/mailRedaction.js';
+import { variablesDe } from '../src/lib/mailCorps.js';
+import { SEQUENCES_EMAILS } from '../src/lib/sequencesEmails.js';
+
+const ctx = { consigne: 'rediger', variables: ['{{SALUTATION}}'], adresses: ['https://ex.fr/contact'] };
+const MARQUEUR = 'mailto:{{ORG_EMAIL}}?subject=Désabonnement';
+
+test('réponse inutilisable : null', () => {
+  for (const brut of [null, undefined, 42, [], '', 'pas du json', { objet: 'x' },
+    { objet: 'x', objets: [], corps: '<!DOCTYPE html><html></html>' }, { objet: '', objets: [], corps: '' },
+    { objet: 'x', objets: [], corps: '<p>a</p><table><tr><td>b</td></tr></table>' },
+    { objet: 'x', objets: [], corps: '<p>a</p><img src="x.png">' },
+    { objet: 'x', objets: [], corps: '<script>alert(1)</script><p>a</p>' },
+    { objet: 'x', objets: [], corps: 12 }, { objet: 3, objets: [], corps: '<p>a</p>' },
+    { objet: 'x', objets: 'a', corps: '<p>a</p>' }])
+    assert.equal(lireReponse(brut, ctx), null, JSON.stringify(brut));
+});
+
+test('lien inventé ramené à du texte, lien du catalogue gardé', () => {
+  const r = lireReponse({ objet: 'O', objets: ['a', 'b', 'c'], corps: '<p><a href="https://invente.fr">ici</a> <a href="https://ex.fr/contact">là</a></p>' }, ctx);
+  assert.ok(!r.corps.includes('invente.fr') && r.corps.includes('ici') && r.corps.includes('https://ex.fr/contact'));
+});
+
+test('téléphone et courriel inventés : ramenés à du texte', () => {
+  const r = lireReponse({ objet: 'O', objets: [], corps: '<p><a href="tel:0600000000">appelez</a> <a href="mailto:x@y.fr">écrivez</a></p>' }, ctx);
+  assert.ok(!r.corps.includes('tel:') && !r.corps.includes('mailto:') && r.corps.includes('appelez') && r.corps.includes('écrivez'));
+});
+
+test('bouton inventé : devient un paragraphe, sans style de bouton', () => {
+  const r = lireReponse({ objet: 'O', objets: [], corps: '<p style="text-align:center"><a data-bouton href="https://invente.fr">Cliquez</a></p>' }, ctx);
+  assert.equal(r.corps, '<p>Cliquez</p>');
+});
+
+test('lien sur une variable offerte gardé, sur une variable non offerte ramené à du texte', () => {
+  const c = { ...ctx, variables: ['{{SALUTATION}}', '{{LIEN}}'] };
+  const r = lireReponse({ objet: 'O', objets: [], corps: '<p><a href="{{LIEN}}">a</a> <a href="{{AUTRE}}">b</a></p>' }, c);
+  assert.ok(r.corps.includes('href="{{LIEN}}"') && !r.corps.includes('AUTRE') && r.corps.includes('b'));
+});
+
+test('variable non proposée retirée', () => {
+  const r = lireReponse({ objet: 'O {{PRENOM}}', objets: ['x {{PRENOM}} y'], corps: '<p>{{SALUTATION}} {{PRENOM}}</p>' }, ctx);
+  assert.deepEqual(variablesDe(r.corps), ['{{SALUTATION}}']);
+  assert.equal(r.objet, 'O');
+  assert.deepEqual(r.objets, ['x y']);
+});
+
+test('variable retirée : pas d\'espace doublé, pas de paragraphe vide, ponctuation recollée', () => {
+  const r = lireReponse({ objet: 'O', objets: [], corps: '<p>Bonjour {{PRENOM}}, merci.</p><p>{{NOM}}</p><p>Fin {{X}} ici</p>' }, ctx);
+  assert.equal(r.corps, '<p>Bonjour, merci.</p><p>Fin ici</p>');
+});
+
+test('corps fait seulement d\'une variable non offerte : null', () => {
+  assert.equal(lireReponse({ objet: 'O', objets: [], corps: '<p>{{PRENOM}}</p>' }, ctx), null);
+});
+
+test('consigne objets : le texte en place n\'est pas rendu', () => {
+  const o = { ...ctx, consigne: 'objets' };
+  assert.equal(lireReponse({ objet: 'O', objets: ['a', 'b', 'c'], corps: '<p>x</p>' }, o).corps, '');
+  assert.equal(lireReponse({ objet: '', objets: [], corps: '' }, o), null);
+  assert.equal(lireReponse({ objet: '', objets: [' ', 7], corps: '' }, o), null);
+});
+
+test('objets : texte seul, une ligne, vides écartés, trois au plus', () => {
+  const r = lireReponse({ objet: ' <b>Un\nobjet</b> ', objets: ['<i>a</i>', '', 5, 'b\n\nc', 'd', 'e'], corps: '<p>x</p>' }, ctx);
+  assert.equal(r.objet, 'Un objet');
+  assert.deepEqual(r.objets, ['a', 'b c', 'd']);
+});
+
+test('objet de 300 caractères gardé, sur une ligne', () => {
+  const r = lireReponse({ objet: `${'mot '.repeat(75)}\nfin`, objets: [], corps: '<p>x</p>' }, ctx);
+  assert.ok(r.objet.length > 250 && !r.objet.includes('\n'));
+});
+
+test('objet requis pour rediger, facultatif pour court / chaleureux / reformuler', () => {
+  const brut = { objet: '', objets: [], corps: '<p>x</p>' };
+  assert.equal(lireReponse(brut, ctx), null);
+  for (const consigne of ['court', 'chaleureux', 'reformuler']) assert.equal(lireReponse(brut, { ...ctx, consigne }).objet, '');
+});
+
+test('JSON en chaîne, clôture Markdown, clés en trop', () => {
+  const j = JSON.stringify({ objet: 'O', objets: [], corps: '<p>x</p>', autre: 1 });
+  assert.equal(lireReponse(j, ctx).corps, '<p>x</p>');
+  assert.equal(lireReponse(`\`\`\`json\n${j}\n\`\`\``, ctx).corps, '<p>x</p>');
+  assert.equal(lireReponse(`\`\`\`\n${j}\n\`\`\`\n`, ctx).objet, 'O');
+});
+
+test('lireReponse ne lève jamais', () => {
+  const piege = { get objet() { throw new Error('x'); }, objets: [], corps: '<p>a</p>' };
+  assert.equal(lireReponse(piege, ctx), null);
+  assert.equal(lireReponse({ objet: 'O', objets: [], corps: '<p>x</p>' }, undefined), null);
+  assert.equal(lireReponse({ objet: 'O', objets: [], corps: '<p>x</p>' }, { consigne: 'zzz', variables: [], adresses: [] }), null);
+});
+
+test('adressesDuTexte : marqueur de désabonnement d\'une séquence', () => {
+  const html = SEQUENCES_EMAILS[0].gabarit.html_body;
+  assert.deepEqual(adressesDuTexte(html), [MARQUEUR]);
+  assert.deepEqual(adressesDuTexte(''), []);
+  assert.deepEqual(adressesDuTexte(null), []);
+  assert.deepEqual(adressesDuTexte('<p><a href="https://a.fr/?x=1&amp;y=2">a</a> <a href="https://a.fr/?x=1&amp;y=2">b</a></p>'), ['https://a.fr/?x=1&y=2']);
+});
+
+test('reformuler : le pied de séquence survit si son adresse est listée, sinon devient du texte', () => {
+  const pied = SEQUENCES_EMAILS[0].gabarit.html_body;
+  const brut = { objet: '', objets: [], corps: `<p>Texte repris.</p>${pied}` };
+  const base = { consigne: 'reformuler', variables: ['{{ORG_EMAIL}}'] };
+  const garde = lireReponse(brut, { ...base, adresses: adressesDuTexte(pied) });
+  assert.ok(garde.corps.includes(`href="${MARQUEUR}"`), garde.corps);
+  const perdu = lireReponse(brut, { ...base, adresses: [] });
+  assert.ok(!perdu.corps.includes('mailto:') && perdu.corps.includes('Ne plus recevoir nos e-mails'));
+});
+
+test('adresses autorisées : toutes les url du catalogue, récursivement, et le site', () => {
+  const a = adressesAutorisees({
+    website_url: 'https://cimaj.fr',
+    mailing_resources: { avis: { url: 'https://g.page/r/x', category: 'avis' }, groupe: { sous: { url: 'https://ex.fr/contact' } }, vide: { url: null }, sans: { nom: 'x' } },
+  });
+  assert.deepEqual(a.sort(), ['https://cimaj.fr', 'https://ex.fr/contact', 'https://g.page/r/x']);
+  assert.deepEqual(adressesAutorisees(null), []);
+  assert.deepEqual(adressesAutorisees({}), []);
+});
+
+test('la consigne ne contient que ce qu\'on lui donne', () => {
+  const { system, user } = construireConsigne({ consigne: 'rediger', intention: 'Promo ramonage', objet: '', corps: '', nature: 'manuelle', variables: ['{{SALUTATION}}'], entreprise: { nom: 'Cimaj', site: '' }, adresses: [] });
+  assert.ok(user.includes('Promo ramonage') && system.includes('Cimaj') && system.includes('{{SALUTATION}}'));
+  assert.ok(/vouvoi/i.test(system) && system.includes('50'));
+});
+
+test('construireConsigne : déterministe, cinq consignes distinctes, rien d\'autre que l\'entrée', () => {
+  const base = { intention: 'x', objet: 'Sujet actuel', corps: '<p>Texte actuel</p>', nature: 'sequence', variables: ['{{SALUTATION}}'], entreprise: { nom: 'Cimaj', site: 'https://cimaj.fr' }, adresses: ['https://ex.fr/contact'], client: 'DUPONT Jean', telephone: '0601020304' };
+  const users = CONSIGNES.map((consigne) => construireConsigne({ ...base, consigne }).user);
+  assert.equal(new Set(users).size, 5);
+  assert.deepEqual(construireConsigne({ ...base, consigne: 'court' }), construireConsigne({ ...base, consigne: 'court' }));
+  for (const consigne of CONSIGNES) {
+    const { system, user } = construireConsigne({ ...base, consigne });
+    assert.ok(!system.includes('DUPONT') && !user.includes('DUPONT') && !user.includes('0601020304') && !system.includes('0601020304'));
+    assert.ok(system.includes('https://cimaj.fr') && system.includes('https://ex.fr/contact'));
+  }
+  for (const consigne of ['court', 'chaleureux', 'reformuler']) {
+    const { user } = construireConsigne({ ...base, consigne });
+    assert.ok(user.includes('Texte actuel') && user.includes('Sujet actuel'));
+    assert.ok(/liens et les variables/i.test(user));
+  }
+  assert.throws(() => construireConsigne({ ...base, consigne: 'zzz' }));
+});
+
+test('schéma sans type union ni null, trois champs requis', () => {
+  assert.ok(!JSON.stringify(SCHEMA_REDACTION).includes('null'));
+  assert.ok(!JSON.stringify(SCHEMA_REDACTION).includes('anyOf') && !JSON.stringify(SCHEMA_REDACTION).includes('oneOf'));
+  assert.deepEqual([...SCHEMA_REDACTION.required].sort(), ['corps', 'objet', 'objets']);
+  assert.equal(SCHEMA_REDACTION.additionalProperties, false);
+  assert.equal(SCHEMA_REDACTION.properties.objets.items.type, 'string');
+});
+
+test('validerDemande', () => {
+  assert.equal(validerDemande({ consigne: 'rediger', intention: ' ', corps: '' }), 'intention_requise');
+  assert.equal(validerDemande({ consigne: 'court', intention: '', corps: '' }), 'texte_requis');
+  assert.equal(validerDemande({ consigne: 'court', intention: '', corps: '<p> </p>' }), 'texte_requis');
+  assert.equal(validerDemande({ consigne: 'x', intention: 'a', corps: '' }), 'consigne_inconnue');
+  assert.equal(validerDemande({ consigne: 'rediger', intention: 'a', corps: '' }), null);
+  assert.equal(validerDemande({ consigne: 'objets', intention: '', corps: '<p>a</p>' }), null);
+});
+
+test('messages d\'erreur lisibles', () => {
+  for (const code of ['module_communication_inactif', 'consigne_inconnue', 'intention_requise', 'texte_requis', 'plafond_atteint', 'service_indisponible', 'reponse_illisible'])
+    assert.ok(REDACTION_CODES[code] && !/html|json|modèle/i.test(REDACTION_CODES[code]), code);
+  assert.ok(messageErreurRedaction('plafond_atteint').includes('demain'));
+  assert.ok(messageErreurRedaction('inconnu').length > 10);
+});
