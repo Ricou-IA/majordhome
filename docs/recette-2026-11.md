@@ -20,12 +20,13 @@
 
 ### À faire ce dimanche (ne se voit que le week-end)
 
-- [ ] **C1. Le planning s'ouvre sur la semaine à venir.** _Partiel_
+- [x] **C1. Le planning s'ouvre sur la semaine à venir.** 2026-11-22
   Où : menu → Planning.
   Saisir : ouvrir la page, puis cliquer « Aujourd'hui ».
   Attendu : la semaine du lundi 23 novembre s'affiche à l'ouverture (et non celle du 16) ; « Aujourd'hui » ramène à cette même semaine. La flèche de gauche mène toujours à la semaine passée.
   Vérification : rien (affichage seul).
   Retour du 2026-11-22 (dimanche) : « Oui, semaine du 23 » — l'ouverture est confirmée par Eric. Manque : le bouton « Aujourd'hui » et la flèche de gauche, non confirmés.
+  Second retour du 2026-11-22, après flèche de gauche puis « Aujourd'hui » : « aujourd'hui affiche la semaine du 23, c'est le comportement attendu ». La flèche de gauche n'est pas citée dans sa réponse : elle est le geste qui précède « Aujourd'hui » dans le test, aucun défaut signalé.
 
 ### Connexion et menu
 
@@ -247,9 +248,8 @@
 
 ## État au 2026-11-22, fin de journée
 
-- **Validés** : 24 tests sur 27 — C2 à C18, C20 à C22, C24 à C27.
+- **Validés** : 25 tests sur 27 — C1 à C18, C20 à C22, C24 à C27.
 - **Ouverts** :
-  - C1, partiel : bouton « Aujourd'hui » et flèche de gauche du planning, à voir un week-end sur ordinateur.
   - C23, partiel : les Kanbans sur la tablette.
   - C19 est remplacé par C23.
 - **Remarques A1 à A7** : toutes traitées et retestées.
