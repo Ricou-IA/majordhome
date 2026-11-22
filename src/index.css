@@ -20,7 +20,7 @@
     /* Fond des boutons d'action : primary-600 (cuivre #C2532B). Blanc dessus = 4,60:1, au-dessus
        du seuil de 4,5 ; survol primary-700. #C2532B est fixe, jamais interpolé : primary-500
        (#D4693C) tombe sous 4,5 avec du texte blanc. */
-    --primary: 16 64% 46%;               /* primary-600  #C2532B */
+    --primary: 15.9 63.7% 46.5%;              /* primary-600  #C2532B */
     --primary-foreground: 0 0% 100%;     /* white */
 
     --secondary: 40 23% 92%;             /* secondary-100 #F0EDE7 */
@@ -37,7 +37,7 @@
 
     --border: 40 21% 89%;               /* secondary-200 #E8E4DC */
     --input: 40 21% 89%;                /* secondary-200 */
-    --ring: 16 64% 46%;                 /* primary-600 */
+    --ring: 15.9 63.7% 46.5%;                /* primary-600 */
 
     --radius: 0.5rem;
   }
@@ -49,7 +49,8 @@
   body {
     @apply bg-secondary-50 text-secondary-900 font-sans;
     font-size: 15px;
-    line-height: 22px;
+    /* Sans unité : une longueur fixe (22px) serait héritée telle quelle par les textes de 10-11 px */
+    line-height: 1.4667; /* 22 / 15 */
   }
 
   h1, h2, h3 {

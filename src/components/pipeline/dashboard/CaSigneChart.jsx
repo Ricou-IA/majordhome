@@ -7,8 +7,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Panneau } from './Tableau';
 import { entier, euros, libelleMois, libelleMoisCourt } from './format';
 
-const COULEUR_PERIODE = '#0284c7'; // primary-600
-const COULEUR_AUTRES = '#cbd5e1'; // secondary-300
+const COULEUR_PERIODE = '#2D5BC7'; // st-info : couleur de donnée (le cuivre est réservé à l'action)
+const COULEUR_AUTRES = '#DDD7CD'; // secondary-300
 
 const enMilliers = (v) => (v >= 1000 ? `${Math.round(v / 1000)} k€` : `${v} €`);
 

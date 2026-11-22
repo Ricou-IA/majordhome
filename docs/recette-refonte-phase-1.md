@@ -40,7 +40,7 @@
 
 - [ ] **R3. Le cuivre ne sert jamais à un statut.**
   Où : menu latéral (en haut, sous le nom) ; une fiche client → onglets « Devis Pennylane » et « Factures » ; Réglages → Organisation → Identité.
-  Saisir : regarder l'étiquette du rôle sous votre nom ; le nombre à côté de « Devis Pennylane » et de « Vos Factures » ; le code comptable Pennylane sous le nom du client.
+  Saisir : regarder l'étiquette du rôle sous votre nom ; le nombre à côté de « Devis Pennylane » et, dans l'onglet « Factures », le titre « Vos Factures » ; le code comptable Pennylane sous le nom du client.
   Attendu : l'étiquette du rôle (Admin, Responsable, Commercial, Technicien) en gris, plus en violet, bleu, ambre ou vert ; les compteurs de devis et de factures en bleu ; le code comptable en gris. Nulle part une pastille, un compteur ou une étiquette cuivre.
   Vérification : rien (affichage seul). À dire : tout statut ou toute pastille encore cuivre.
 
@@ -114,10 +114,16 @@
 
 ### Réglages
 
+- [ ] **R13b. Interlignes des entretiens.**
+  Où : menu → Entretiens, Kanban.
+  Saisir : regarder les pastilles de statut des cartes et les petites mentions qui passent à la ligne.
+  Attendu : interligne normal (pas doublé) ; les pastilles gardent leur hauteur d'avant (environ 20 px, pas 26).
+  Vérification : rien (affichage seul).
+
 - [ ] **R14. Les réglages.**
   Où : menu → Réglages, puis Organisation, Équipe, Droits d'accès, Fournisseurs & catalogue → Articles.
   Saisir : parcourir les pages ; dans Organisation → Identité, lancer « Retrouver votre entreprise » et choisir l'entreprise sans enregistrer.
-  Attendu : les icônes des en-têtes de page en gris (plus en cuivre) ; le chapitre ouvert du menu de gauche en cuivre ; l'encadré de l'annuaire (« informations trouvées ») en bleu pâle ; dans Articles, la catégorie d'un article en gris. Dans Fumisterie ou Climatisation, une valeur refusée s'écrit en rouge.
+  Attendu : les icônes des en-têtes de page en gris (plus en cuivre) ; le chapitre ouvert du menu de gauche en cuivre ; l'encadré de l'annuaire (« informations trouvées ») en bleu pâle ; dans Articles, la catégorie d'un article en gris. Dans Climatisation, une valeur refusée s'écrit en rouge (vérifié dans le code : tapez 80 dans « Marge de sécurité (%) », borne 0 à 50, le message « ⚠ … » apparaît sous le champ ; remettre la valeur d'origine ensuite).
   Vérification : rien (affichage seul). Quitter Identité sans enregistrer.
 
 ### Ce qui part chez le client
