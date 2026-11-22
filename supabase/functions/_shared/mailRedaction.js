@@ -153,8 +153,9 @@ const FORMAT = [
  * @param {{ consigne: string, intention?: string, objet?: string, corps?: string, nature?: string, variables?: string[],
  *   entreprise?: { nom?: string, site?: string }, adresses?: string[] }} entree
  * @returns {{ system: string, user: string }}
+ * @throws {Error} `consigne_inconnue` si la consigne n'est pas l'une de `CONSIGNES` (l'appelant valide d'abord avec `validerDemande`)
  */
-export function construireConsigne({ consigne, intention, objet, corps, nature, variables, entreprise, adresses }) {
+export function construireConsigne({ consigne, intention, objet, corps, nature, variables, entreprise, adresses } = {}) {
   if (typeof consigne !== 'string' || !CONSIGNES.includes(consigne)) throw new Error('consigne_inconnue');
   const nom = uneLigne(entreprise?.nom) || 'l’entreprise';
   const site = uneLigne(entreprise?.site);
@@ -187,7 +188,9 @@ export function construireConsigne({ consigne, intention, objet, corps, nature, 
   ].join('\n');
 
   const sujet = uneLigne(objet);
-  const texteActuel = normaliser(texte(corps));
+  // Forme montrée au modèle : sans style en ligne (il ne connaît ni les styles, ni `{{ACCENT_COLOR}}`) ; `data-bouton`
+  // et `data-encadre` restent, `normaliser` repose les styles quand la réponse revient.
+  const texteActuel = normaliser(texte(corps)).replace(/ style="[^"]*"/g, '');
   const but = uneLigne(intention);
   const existant = [
     `Objet actuel : ${sujet || '(aucun)'}`,
@@ -264,13 +267,20 @@ function lireObjet(brut) {
 }
 
 /**
- * Retire d'un texte les variables non proposées, en recollant l'espace et la ponctuation voisines.
+ * Variables d'un texte : une variable proposée, même écrite avec des espaces (`{{ SALUTATION }}`), est ramenée à sa forme
+ * exacte (seule substituée à l'envoi) ; toute autre est retirée, espace et ponctuation voisines recollées.
  * @param {string} s
  * @param {Set<string>} permises
  * @returns {string}
  */
 function retirerVariables(s, permises) {
-  return s.replace(/(\s?)\{\{([A-Za-z0-9_]+)\}\}([,.]?)/g, (m, avant, nom, ponct) => (permises.has(`{{${nom}}}`) ? m : (ponct || avant)));
+  let retire = false;
+  const sortie = s.replace(/(\s?)\{\{\s*([A-Za-z0-9_]+)\s*\}\}([,.]?)/g, (m, avant, nom, ponct) => {
+    if (permises.has(`{{${nom}}}`)) return `${avant}{{${nom}}}${ponct}`;
+    retire = true;
+    return ponct || avant;
+  });
+  return retire ? sortie.replace(/[ \t]+([,.])/g, '$1') : sortie;
 }
 
 /** Objet de mail : texte seul, une ligne. @param {unknown} v @param {Set<string>} permises @returns {string} */

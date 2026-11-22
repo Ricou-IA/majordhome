@@ -4,7 +4,7 @@ import {
   CONSIGNES, REDACTION_CODES, messageErreurRedaction, adressesAutorisees, adressesDuTexte, validerDemande,
   construireConsigne, SCHEMA_REDACTION, lireReponse,
 } from '../src/lib/mailRedaction.js';
-import { variablesDe } from '../src/lib/mailCorps.js';
+import { variablesDe, normaliser } from '../src/lib/mailCorps.js';
 import { SEQUENCES_EMAILS } from '../src/lib/sequencesEmails.js';
 
 const ctx = { consigne: 'rediger', variables: ['{{SALUTATION}}'], adresses: ['https://ex.fr/contact'] };
@@ -170,4 +170,29 @@ test('messages d\'erreur lisibles', () => {
     assert.ok(REDACTION_CODES[code] && !/html|json|modèle/i.test(REDACTION_CODES[code]), code);
   assert.ok(messageErreurRedaction('plafond_atteint').includes('demain'));
   assert.ok(messageErreurRedaction('inconnu').length > 10);
+});
+
+test('variables à espaces : la forme exacte d’une variable offerte est rétablie, tout le reste est retiré', () => {
+  const r = lireReponse({ objet: 'A {{ SALUTATION }} {{ PRENOM }}', objets: ['b {{PRENOM }} c {{ prenom}}'], corps: '<p>{{ SALUTATION }} {{ PRENOM }} et {{PRENOM }} {{ nom }}.</p>' }, ctx);
+  assert.equal(r.corps, '<p>{{SALUTATION}} et.</p>');
+  assert.equal(r.objet, 'A {{SALUTATION}}');
+  assert.deepEqual(r.objets, ['b c']);
+  assert.equal(lireReponse({ objet: 'O', objets: [], corps: '<p>{{ PRENOM }}</p>' }, ctx), null);
+});
+
+test('texte actuel montré au modèle : sans style, et il revient à l’identique de normaliser', () => {
+  const pied = SEQUENCES_EMAILS[0].gabarit.html_body;
+  const original = `<h2>Titre</h2><p>Bonjour {{SALUTATION}}</p><p style="text-align:center"><a data-bouton href="https://ex.fr/contact">Nous écrire</a></p><div data-encadre>Un <strong>encadré</strong></div>${pied}`;
+  const base = { consigne: 'reformuler', intention: '', objet: 'S', corps: original, nature: 'sequence', variables: ['{{SALUTATION}}', '{{ORG_EMAIL}}', '{{BRAND_NAME}}'], entreprise: { nom: 'C', site: '' }, adresses: ['https://ex.fr/contact'] };
+  const { user } = construireConsigne(base);
+  const marque = 'Texte actuel :\n';
+  const vu = user.slice(user.indexOf(marque) + marque.length);
+  assert.ok(!vu.includes('style=') && !vu.includes('ACCENT_COLOR') && vu.includes('data-bouton') && vu.includes('data-encadre'));
+  const r = lireReponse({ objet: '', objets: [], corps: vu }, { consigne: 'reformuler', variables: base.variables, adresses: [...base.adresses, ...adressesDuTexte(original)] });
+  assert.equal(r.corps, normaliser(original));
+  assert.ok(r.corps.includes('data-bouton') && r.corps.includes('data-encadre') && r.corps.includes('<h2'));
+});
+
+test('construireConsigne sans argument : lève consigne_inconnue', () => {
+  assert.throws(() => construireConsigne(), /consigne_inconnue/);
 });
