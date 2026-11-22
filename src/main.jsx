@@ -8,6 +8,9 @@ import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { Toaster } from '@components/ui/sonner';
 import { initDeviceViewport } from '@lib/deviceViewport';
+import '@fontsource-variable/bricolage-grotesque';
+import '@fontsource-variable/figtree';
+import '@fontsource/geist-mono/400.css';
 import './index.css';
 
 // Adapte le viewport selon l'appareil (dézoom sur tablette, PC inchangé).

@@ -48,6 +48,12 @@
 
   body {
     @apply bg-secondary-50 text-secondary-900 font-sans;
+    font-size: 15px;
+    line-height: 22px;
+  }
+
+  h1, h2, h3 {
+    @apply font-display;
   }
 
   /* Scrollbar personnalisée */
