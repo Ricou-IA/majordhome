@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  libellesRapprochement, phraseBilan, texteRetrait, texteRetraitFait, messageEchecRetrait, resumeFichesImport, texteCorrections,
+  libellesRapprochement, phraseBilan, texteRetrait, texteRetraitFait, messageEchecRetrait, resumeFichesImport, texteCorrections, texteArret,
 } from '../../src/lib/importClients/libelles.js';
 
 test('chaque raison de rapprochement a son libellé, dans l\'ordre reçu', () => {
@@ -93,4 +93,10 @@ test("valeurs illisibles : une phrase, la plus fréquente d'abord", () => {
     texteCorrections([{ libelle: 'Accepte les SMS', nombre: 2 }]),
     "Valeurs illisibles : 2 × Accepte les SMS. Le champ est laissé vide (« oui » pour un accord) et la valeur d'origine est gardée dans les notes internes de la fiche.",
   );
+});
+
+test("import arrêté : combien de fiches sont déjà créées, et où les retirer", () => {
+  assert.equal(texteArret(0), "Import arrêté : aucune fiche n'a été créée.");
+  assert.equal(texteArret(1), "Import arrêté : 1 fiche est déjà créée. Vous pouvez la retirer dans « Imports précédents », plus bas.");
+  assert.equal(texteArret(400), "Import arrêté : 400 fiches sont déjà créées. Vous pouvez les retirer dans « Imports précédents », plus bas.");
 });

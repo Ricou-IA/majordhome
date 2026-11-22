@@ -18,6 +18,7 @@ import { useClientImportRun } from '@hooks/useClientImports';
 import { refusFichier } from '@/lib/importClients/lireFichier';
 import { feuillesFichierType, feuilleLignesEcartees } from '@/lib/importClients/fichierType';
 import { aImporter } from '@/lib/importClients/controles';
+import { texteArret } from '@/lib/importClients/libelles';
 import { useParcoursImport } from '@/apps/artisan/components/clients/import/useParcoursImport';
 import { lireFichierDepose, telechargerClasseur } from '@/apps/artisan/components/clients/import/classeur';
 import EtapeFichier from '@/apps/artisan/components/clients/import/EtapeFichier';
@@ -119,6 +120,13 @@ export default function ClientsImport() {
     });
   };
 
+  // Import interrompu que l'on ne reprend pas : retour à l'aperçu, les fiches déjà créées restent (retirables plus bas).
+  const arreter = () => {
+    const faits = run.progression.faits;
+    run.abandonner();
+    actions.arreter(texteArret(faits));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200">
@@ -174,6 +182,7 @@ export default function ClientsImport() {
             choix={choix}
             enCours={run.etat === 'en_cours'}
             libelleRetour="Revoir la correspondance"
+            avis={etat.avis}
             onRelire={relireExistants}
             onImporter={actions.basculerImporter}
             onEcarter={actions.basculerEcarter}
@@ -190,7 +199,9 @@ export default function ClientsImport() {
             erreur={run.erreur}
             aDesEcartees={envoi.classees.some((l) => !aImporter(l, envoi.choix))}
             onReprendre={run.reprendre}
+            onArreter={arreter}
             onVoirClients={() => navigate('/clients')}
+            onNouvelImport={actions.versFichier}
             onTelechargerEcartees={() => telechargerEcartees(envoi.classees, envoi.choix)}
             onRetourApercu={actions.retourApercu}
           />

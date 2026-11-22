@@ -154,7 +154,7 @@ export default function EtapeCorrespondance({
           type="button"
           onClick={onSuite}
           disabled={erreurs.length > 0}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Voir l&apos;aperçu
           <ArrowRight className="w-4 h-4" aria-hidden="true" />

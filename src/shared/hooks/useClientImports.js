@@ -89,6 +89,9 @@ export function useRemoveClientImport(orgId) {
 /**
  * Exécute un import : ouvre l'import, envoie les lots l'un après l'autre, le clôt avec son bilan.
  * Lignes et comptes sont calculés UNE fois au lancement et gardés pour `reprendre()`.
+ * Au départ, l'import reçoit le bilan PRÉVU (lues, prevues, doublons_ecartes, ecartees), jamais `importees` :
+ * seule la clôture écrit le nombre de fiches réellement créées (sinon un import coupé annoncerait le prévu).
+ * `abandonner()` quitte un import interrompu sans le reprendre (les fiches déjà créées restent, retirables).
  * `etat` ∈ 'repos' | 'en_cours' | 'interrompu' | 'termine'.
  * @param {string} orgId
  */
@@ -161,7 +164,8 @@ export function useClientImportRun(orgId) {
     let plan = null;
     try {
       const rows = lignesPourEcriture(classees, choix);
-      const counts = bilanImport(classees, choix);
+      const { lues, doublons_ecartes, ecartees } = bilanImport(classees, choix);
+      const counts = { lues, prevues: rows.length, doublons_ecartes, ecartees };
       if (rows.length === 0) {
         setErreur('Aucune fiche à importer.');
         changerEtat('repos');
@@ -200,5 +204,16 @@ export function useClientImportRun(orgId) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { etat, progression, bilan, erreur, lancer, reprendre };
+  // Arrêter sans reprendre : le plan est oublié, les listes se relisent (des fiches ont pu être créées).
+  const abandonner = useCallback(() => {
+    const plan = planRef.current;
+    if (etatRef.current !== 'interrompu') return;
+    planRef.current = null;
+    setErreur(null);
+    changerEtat('repos');
+    if (plan) invalider(plan.orgId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return { etat, progression, bilan, erreur, lancer, reprendre, abandonner };
 }

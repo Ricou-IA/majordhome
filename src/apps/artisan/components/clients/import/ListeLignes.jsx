@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { CheckCircle2, Copy, XCircle } from 'lucide-react';
-import { LIBELLE_RAISON } from '@/lib/importClients/controles';
+import { raisonAffichee } from '@/lib/importClients/controles';
 import { libellesRapprochement } from '@/lib/importClients/libelles';
 
 const PAS = 100;
@@ -51,13 +51,35 @@ function LigneFichier({ ligne }) {
   );
 }
 
+// Échantillon tel qu'il sera écrit : téléphone mis en forme et e-mail en minuscules, pour vérifier avant d'importer.
 export function ListePretes({ lignes }) {
   return (
     <Repliable titre="À importer" icone={CheckCircle2} compte={lignes.length} limiteFixe={20} ouvert>
       {(n) => (
-        <ul className="text-sm space-y-1">
-          {lignes.slice(0, n).map((l) => <li key={l.numero}><LigneFichier ligne={l} /></li>)}
-        </ul>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-gray-500">
+                <th scope="col" className="py-1 pr-3 font-medium">Ligne</th>
+                <th scope="col" className="py-1 pr-3 font-medium">Nom</th>
+                <th scope="col" className="py-1 pr-3 font-medium">Téléphone</th>
+                <th scope="col" className="py-1 pr-3 font-medium">E-mail</th>
+                <th scope="col" className="py-1 font-medium">Commune</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {lignes.slice(0, n).map((l) => (
+                <tr key={l.numero}>
+                  <td className="py-1 pr-3 text-gray-500">{l.numero}</td>
+                  <td className="py-1 pr-3 font-medium text-gray-900">{nomDe(l.fiche)}</td>
+                  <td className="py-1 pr-3 text-gray-700 whitespace-nowrap">{l.fiche.phone || '—'}</td>
+                  <td className="py-1 pr-3 text-gray-700">{l.fiche.email || '—'}</td>
+                  <td className="py-1 text-gray-700">{lieuDe(l.fiche) || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </Repliable>
   );
@@ -136,7 +158,7 @@ export function ListeEcartees({ lignes }) {
           {lignes.slice(0, n).map((l) => (
             <li key={l.numero}>
               <span className="text-gray-500">Ligne {l.numero}</span>
-              <span className="text-gray-700"> — {LIBELLE_RAISON[l.raison] || l.raison}</span>
+              <span className="text-gray-700"> — {raisonAffichee(l)}</span>
             </li>
           ))}
         </ul>

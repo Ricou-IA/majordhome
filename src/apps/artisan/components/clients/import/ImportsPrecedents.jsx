@@ -1,7 +1,8 @@
 /**
  * ImportsPrecedents.jsx - Import des clients
- * Liste des imports déjà faits, avec le retrait complet d'un import (les fiches qui ont déjà un contrat,
- * une intervention ou un e-mail envoyé sont conservées). Rien n'est affiché tant qu'aucun import n'existe.
+ * Liste des imports déjà faits, avec le retrait d'un import (les fiches déjà utilisées ailleurs — contrat,
+ * intervention, devis, e-mail envoyé… — sont conservées, et l'import reste dans la liste tant qu'il en a).
+ * Rien n'est affiché tant qu'aucun import n'existe.
  */
 
 import { useRef, useState } from 'react';
@@ -9,7 +10,7 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { formatDateTimeFR } from '@/lib/utils';
 import { messageErreurImport } from '@/lib/importClients/lots';
-import { texteRetrait, texteRetraitFait, messageEchecRetrait } from '@/lib/importClients/libelles';
+import { texteRetrait, texteRetraitFait, messageEchecRetrait, resumeFichesImport } from '@/lib/importClients/libelles';
 import { useClientImports, useRemovalPreview, useRemoveClientImport } from '@hooks/useClientImports';
 
 const RETIRABLE = ['termine', 'en_cours'];
@@ -20,15 +21,9 @@ function libelleEtat(imp) {
 }
 
 function libelleLigne(imp) {
-  // Import retiré : le nombre de fiches conservées n'est pas connu de la liste, on ne parle plus de fiches créées.
+  // Import retiré : il n'a plus aucune fiche, seule la date du retrait compte.
   if (imp.status === 'retire') return libelleEtat(imp);
-  return `${libelleCreees(imp.counts)} · ${libelleEtat(imp)}`;
-}
-
-function libelleCreees(counts) {
-  const n = counts?.importees;
-  if (typeof n !== 'number') return 'import interrompu';
-  return `${n.toLocaleString('fr-FR')} ${n > 1 ? 'fiches créées' : 'fiche créée'}`;
+  return `${resumeFichesImport(imp.counts)} · ${libelleEtat(imp)}`;
 }
 
 /** Fenêtre de confirmation : l'aperçu n'est demandé que pour l'import dont la fenêtre est ouverte. */
@@ -49,7 +44,7 @@ function RetraitDialog({ orgId, imp, onClose }) {
       const totaux = await retrait.mutateAsync(imp.id);
       toast.success(texteRetraitFait(totaux));
     } catch (e) {
-      toast.error(messageEchecRetrait(e?.message || messageErreurImport(e)));
+      toast.error(messageEchecRetrait(messageErreurImport(e)));
     }
     onClose();
   };
@@ -64,7 +59,8 @@ function RetraitDialog({ orgId, imp, onClose }) {
       variant="destructive"
       onConfirm={confirmer}
       loading={retrait.isPending}
-      confirmDisabled={apercu.isFetching || !apercu.data || apercu.data.retirables <= 0}
+      /* Fermé seulement quand des fiches restent et qu'aucune ne peut partir ; un import sans fiche se retire de la liste. */
+      confirmDisabled={apercu.isFetching || !apercu.data || (apercu.data.retirables <= 0 && apercu.data.conservees > 0)}
     />
   );
 }

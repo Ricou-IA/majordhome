@@ -118,3 +118,15 @@ export function texteCorrections(resume) {
   const accord = resume.some((r) => ACCORDS.has(r.libelle)) ? ' (« oui » pour un accord)' : '';
   return `Valeurs illisibles : ${liste}. Le champ est laissé vide${accord} et la valeur d'origine est gardée dans les notes internes de la fiche.`;
 }
+
+/**
+ * Avis affiché à l'aperçu après « Arrêter l'import » : les fiches déjà créées restent, et se retirent plus bas.
+ * @param {number} faits fiches déjà écrites
+ * @returns {string}
+ */
+export function texteArret(faits) {
+  if (!(faits > 0)) return "Import arrêté : aucune fiche n'a été créée.";
+  return faits > 1
+    ? `Import arrêté : ${nombreFR(faits)} fiches sont déjà créées. Vous pouvez les retirer dans « Imports précédents », plus bas.`
+    : 'Import arrêté : 1 fiche est déjà créée. Vous pouvez la retirer dans « Imports précédents », plus bas.';
+}

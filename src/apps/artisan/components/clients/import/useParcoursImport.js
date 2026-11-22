@@ -32,6 +32,7 @@ const ETAT_INITIAL = {
   correspondance: [],
   choix: choixVides(),
   envoi: null, // { classees, choix } au lancement de l'écriture
+  avis: null, // message affiché à l'aperçu après un import arrêté
 };
 
 /** Fichier découpé à partir de la ligne d'en-tête choisie. */
@@ -73,6 +74,7 @@ function reducteur(etat, action) {
         correspondance,
         choix: choixVides(),
         envoi: null,
+        avis: null,
         etape: direct ? 'apercu' : 'correspondance',
       };
     }
@@ -91,7 +93,7 @@ function reducteur(etat, action) {
     case 'vers_apercu':
       return { ...etat, etape: 'apercu' };
     case 'vers_correspondance':
-      return { ...etat, etape: 'correspondance', choix: choixVides() };
+      return { ...etat, etape: 'correspondance', choix: choixVides(), avis: null };
     case 'vers_fichier':
       return { ...ETAT_INITIAL, sourceLabel: etat.sourceLabel };
     case 'importer':
@@ -99,9 +101,12 @@ function reducteur(etat, action) {
     case 'ecarter':
       return { ...etat, choix: { ...etat.choix, ecarter: basculer(etat.choix.ecarter, action.numero) } };
     case 'envoi':
-      return { ...etat, etape: 'resultat', envoi: { classees: action.classees, choix: etat.choix } };
+      return { ...etat, etape: 'resultat', envoi: { classees: action.classees, choix: etat.choix }, avis: null };
     case 'retour_apercu':
       return { ...etat, etape: 'apercu', envoi: null };
+    // Import interrompu puis arrêté : retour à l'aperçu (les fiches déjà créées y deviennent des doublons) avec un avis.
+    case 'arret':
+      return { ...etat, etape: 'apercu', envoi: null, choix: choixVides(), avis: action.message };
     default:
       return etat;
   }
@@ -149,6 +154,7 @@ export function useParcoursImport(orgId) {
     basculerEcarter: (numero) => dispatch({ type: 'ecarter', numero }),
     envoyer: (lignesClassees) => dispatch({ type: 'envoi', classees: lignesClassees }),
     retourApercu: () => dispatch({ type: 'retour_apercu' }),
+    arreter: (message) => dispatch({ type: 'arret', message }),
   }), []);
 
   return { etat, actions, existants, validation, classees, bilan, relireExistants: existants.refetch };

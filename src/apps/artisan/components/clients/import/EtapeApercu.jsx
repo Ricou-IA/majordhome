@@ -4,9 +4,10 @@
  */
 
 import { useMemo } from 'react';
-import { ArrowLeft, Download, Loader2, AlertCircle, RefreshCw, Upload } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, AlertCircle, RefreshCw, Upload, Info } from 'lucide-react';
 import { ListePretes, ListeDoublons, ListeEcartees } from './ListeLignes';
-import { phraseBilan } from '@/lib/importClients/libelles';
+import { phraseBilan, texteCorrections } from '@/lib/importClients/libelles';
+import { resumeCorrections } from '@/lib/importClients/controles';
 
 const DOUBLONS = new Set(['doublon_fort', 'doublon_faible', 'doublon_fichier']);
 const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
@@ -21,7 +22,7 @@ function Compteur({ libelle, valeur }) {
 }
 
 export default function EtapeApercu({
-  classees, bilan, existants, choix, enCours, libelleRetour,
+  classees, bilan, existants, choix, enCours, libelleRetour, avis,
   onRelire, onImporter, onEcarter, onTelechargerEcartees, onRetour, onLancer,
 }) {
   const groupes = useMemo(() => {
@@ -33,6 +34,9 @@ export default function EtapeApercu({
     };
   }, [classees]);
 
+  // Valeurs illisibles des lignes qui seront importées : dites avant l'écriture, pas seulement dans les notes.
+  const corrections = useMemo(() => (classees ? texteCorrections(resumeCorrections(classees, choix)) : null), [classees, choix]);
+
   const n = bilan?.importees ?? 0;
   // Une relecture en cours prime sur l'erreur précédente (react-query la garde pendant la relecture).
   const enErreur = !classees && !existants.isLoading && !!existants.error;
@@ -40,9 +44,15 @@ export default function EtapeApercu({
 
   return (
     <div className="space-y-6">
+      {avis && (
+        <p role="status" className="flex items-start gap-2 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <Info className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+          {avis}
+        </p>
+      )}
       {!classees && !enErreur && (
         <p className="flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
-          <Loader2 className="w-4 h-4 animate-spin text-blue-600" aria-hidden="true" />
+          <Loader2 className="w-4 h-4 animate-spin text-primary-700" aria-hidden="true" />
           Lecture de vos clients existants…
         </p>
       )}
@@ -73,6 +83,12 @@ export default function EtapeApercu({
               <Compteur libelle="écartées" valeur={bilan.ecartees} />
             </div>
             <p className="text-sm text-gray-700">{phraseBilan(bilan)}</p>
+            {corrections && (
+              <p className="flex items-start gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" aria-hidden="true" />
+                {corrections}
+              </p>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -107,7 +123,7 @@ export default function EtapeApercu({
           type="button"
           onClick={onLancer}
           disabled={!classees || n === 0 || enCours}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Upload className="w-4 h-4" aria-hidden="true" />
           {bilan ? `Importer ${pluriel(n, 'client', 'clients')}` : 'Importer'}
