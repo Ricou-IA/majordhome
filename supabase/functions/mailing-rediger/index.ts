@@ -42,14 +42,15 @@ const LIMITE_JOUR = (() => {
   return Number.isFinite(n) && n >= 0 ? n : LIMITE_PAR_DEFAUT;
 })();
 
-const DUREE_IA_MS = 45_000;
-const MAX_TOKENS = 4_000;
+const DUREE_IA_MS = 60_000;
+const MAX_TOKENS = 8_000;
 // Bornes d'entrée, vérifiées avant tout appel payant.
 const INTENTION_MAX = 2_000;
 const OBJET_MAX = 300;
-const CORPS_MAX = 60_000;
+const CORPS_MAX = 12_000; // un texte retravaillé doit revenir EN ENTIER dans MAX_TOKENS
 const VARIABLES_MAX = 40;
 const NATURES = ["manuelle", "automatique", "sequence", "auto_registre", "boutique"];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VARIABLE = /^\{\{[A-Z0-9_]+\}\}$/;
 
 /** Texte d'une entrée de la requête ('' si ce n'est pas du texte). */
@@ -66,7 +67,9 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "Invalid JSON body" }, 400, req);
   }
 
-  // 1. Membre, org_admin de l'organisation du corps (401 / 403 de l'aide partagée).
+  // 1. Organisation exigée (sans elle l'aide partagée choisirait la première organisation de l'appelant), puis membre
+  //    org_admin de CETTE organisation (401 / 403 de l'aide partagée).
+  if (!UUID.test(texte(body.org_id))) return jsonResponse({ data: null, error: "service_indisponible" }, 200, req);
   const auth = await requireOrgMembership(req, { orgId: texte(body.org_id), requiredRole: "org_admin" });
   if (!auth.ok) return auth.response;
   const { orgId, userId, supabase } = auth;
@@ -89,9 +92,10 @@ Deno.serve(async (req: Request) => {
     const intention = texte(body.intention);
     const objet = texte(body.objet);
     const corps = texte(body.corps);
+    // Tailles d'abord : `validerDemande` lit tout le texte, rien n'est dépensé sur une demande démesurée.
+    if (intention.length > INTENTION_MAX || objet.length > OBJET_MAX || corps.length > CORPS_MAX) return refus("demande_trop_longue");
     const invalide = validerDemande({ consigne, intention, corps });
     if (invalide) return refus(invalide);
-    if (intention.length > INTENTION_MAX || objet.length > OBJET_MAX || corps.length > CORPS_MAX) return refus("demande_trop_longue");
     const nature = NATURES.includes(texte(body.nature)) ? texte(body.nature) : "manuelle";
 
     // Variables : celles que l'écran propose (bien formées, 40 au plus) ET celles déjà présentes dans le texte à
@@ -146,16 +150,24 @@ Deno.serve(async (req: Request) => {
     } finally {
       clearTimeout(minuterie);
     }
+    // Consommation : `usage.iterations` couvre toutes les tentatives (le `usage` de tête ne compte que la dernière
+    // quand un modèle de repli a pris le relais) ; aucun texte n'est journalisé.
     const u = final?.usage || {};
+    // deno-lint-ignore no-explicit-any
+    const tentatives: any[] = Array.isArray(u.iterations) && u.iterations.length ? u.iterations : [u];
+    // deno-lint-ignore no-explicit-any
+    const somme = (cle: string) => tentatives.reduce((t: number, e: any) => t + (Number(e?.[cle]) || 0), 0);
+    // deno-lint-ignore no-explicit-any
+    const repli = (final?.content || []).some((b: any) => b.type === "fallback");
     console.log("[mailing-rediger] conso", JSON.stringify({
-      org: orgId, consigne, modele: final?.model ?? MODEL, stop: final?.stop_reason,
-      input_tokens: u.input_tokens || 0, output_tokens: u.output_tokens || 0,
+      org: orgId, consigne, modele: final?.model ?? MODEL, stop: final?.stop_reason, repli,
+      input_tokens: somme("input_tokens"), output_tokens: somme("output_tokens"),
     }));
 
     // 7. Réponse contrôlée : rien n'atteint l'écran sans passer par `lireReponse`.
     if (final?.stop_reason !== "end_turn") return refus("reponse_illisible"); // refus, coupure à max_tokens…
     // deno-lint-ignore no-explicit-any
-    const brut = (final?.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
+    const brut = (final?.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join(""); // un seul document JSON, éventuellement coupé par un repli
     const reponse = lireReponse(brut, { consigne, variables, adresses });
     if (!reponse) return refus("reponse_illisible");
     return jsonResponse({ data: reponse, error: null }, 200, req);

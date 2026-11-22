@@ -231,6 +231,25 @@ test('edge : ordre des gardes — membre, module, validation, secret, plafond, a
   assert.deepEqual([...ordre].sort((a, b) => a - b), ordre);
 });
 
+test('edge : réponse recollée sans séparateur, tailles bornées, organisation exigée avant l’aide partagée', () => {
+  assert.match(EDGE, /b\.text\)\.join\(""\)/, 'les blocs de texte doivent être joints par ""');
+  assert.ok(!/b\.text\)\.join\("\n"\)/.test(EDGE));
+  assert.match(EDGE, /CORPS_MAX = 12_000/);
+  assert.match(EDGE, /MAX_TOKENS = 8_000/);
+  assert.match(EDGE, /DUREE_IA_MS = 60_000/);
+  assert.match(EDGE, /fallback/); // le passage par un modèle de repli est journalisé
+  assert.match(EDGE, /usage\??\.iterations|\.iterations/);
+  const uuid = EDGE.search(/\[0-9a-f\]\{8\}-/);
+  const membre = EDGE.search(/requireOrgMembership\(req/);
+  assert.ok(uuid >= 0 && uuid < membre, 'org_id doit être contrôlé (UUID) avant requireOrgMembership');
+});
+
+test('edge : les bornes de taille passent avant validerDemande', () => {
+  const bornes = EDGE.search(/CORPS_MAX\) return refus\("demande_trop_longue"\)|> CORPS_MAX/);
+  const valide = EDGE.search(/validerDemande\(\{/);
+  assert.ok(bornes >= 0 && valide >= 0 && bornes < valide);
+});
+
 test('migration du plafond : trois révocations, service_role seul, RLS, exception attendue', () => {
   assert.match(MIGRATION, /REVOKE ALL ON majordhome\.mailing_redaction_quotas FROM PUBLIC, anon, authenticated/);
   assert.match(MIGRATION, /ENABLE ROW LEVEL SECURITY/);
