@@ -481,6 +481,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const branding = await loadOrgBranding(orgId, mode === "bulk" && !testEmail && !sequence ? "nombre" : "individuel");
+    // Habillage : un envoi en liste (segment, séquence du planificateur, leur essai) est une campagne et reçoit les
+    // blocs fixes « sur vos campagnes » ; un envoi à un client seul (`single` : proposition de contrat, e-mail du
+    // registre) est individuel, comme son aperçu.
+    const usageHabillage = mode === "bulk" ? "campagne" : "individuel";
     // Pas d'adresse dans les réglages de l'organisation, ou envoi en nombre sans domaine vérifié ⇒
     // rien ne part (jamais l'adresse d'une autre entreprise à la place).
     if (branding.refus || !branding.fromEmail) {
@@ -526,8 +530,7 @@ Deno.serve(async (req: Request) => {
       const personalizedSubject = applyPlaceholders(subject, brandingReplacements);
 
       // Habillage de l'entreprise (ou par défaut) posé ici, juste avant les remplacements : un HTML déjà complet reste tel quel.
-      // `campagne` : les blocs fixes « sur vos campagnes » de l'habillage apparaissent (campagnes, séquences, essais).
-      const wrappedHtml = habillerMail(branding.reglages, htmlBody, { usage: 'campagne' });
+      const wrappedHtml = habillerMail(branding.reglages, htmlBody, { usage: usageHabillage });
 
       const html = personalizeHtml({
         htmlBody: wrappedHtml, salutation, lienPellets, unsubscribeUrl,

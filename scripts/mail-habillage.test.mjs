@@ -154,18 +154,32 @@ test("les edges d'habillage ne portent plus leur propre habillage ni leurs coule
 
 test('mail.ts : wrapWithSkeleton rend habillerMail, brandingReplacements rend valeursDeMarque', () => {
   const source = lireEdge('_shared', 'mail.ts');
-  assert.match(source, /export function wrapWithSkeleton[\s\S]*?habillerMail\(b\.reglages, body\)/);
+  assert.match(source, /export function wrapWithSkeleton\(b: OrgBranding, body: string, options\?: OptionsHabillage\)[\s\S]*?habillerMail\(b\.reglages, body, options\)/);
   assert.match(source, /export function brandingReplacements[\s\S]*?valeursDeMarque\(b\.reglages\)/);
 });
 
 test('mailing-send et contract-signed-notify : habillage et marque viennent du module', () => {
   const envoi = lireEdge('mailing-send', 'index.ts');
-  assert.match(envoi, /habillerMail\(branding\.reglages, htmlBody, \{ usage: 'campagne' \}\)/);
+  assert.match(envoi, /habillerMail\(branding\.reglages, htmlBody, \{ usage: usageHabillage \}\)/);
   assert.match(envoi, /valeursDeMarque\(/);
   assert.doesNotMatch(envoi, /function wrapInSkeleton/);
   const notif = lireEdge('contract-signed-notify', 'index.ts');
   assert.match(notif, /habillerMail\(/);
   assert.match(notif, /valeursDeMarque\(/);
+});
+
+test('mailing-send : « campagne » pour un envoi en liste (segment, séquence, essai), « individuel » pour un client seul', () => {
+  const envoi = lireEdge('mailing-send', 'index.ts');
+  assert.doesNotMatch(envoi, /habillerMail\([^)]*\{ usage: ["']campagne["'] \}\)/, 'campagne passé sans condition');
+  assert.match(envoi, /const usageHabillage = mode === "bulk" \? "campagne" : "individuel";/);
+});
+
+test('email-essai : un essai de séquence est habillé comme la séquence (campagne), les autres en individuel', () => {
+  const essai = lireEdge('email-essai', 'index.ts');
+  assert.match(essai, /import \{ estSequence \} from "\.\.\/_shared\/sequencesEmails\.js";/);
+  assert.match(essai, /wrapWithSkeleton\(branding, lecture\.texte\.html_body, \{ usage: estSequence\(cle\) \? "campagne" : "individuel" \}\)/);
+  // Les autres edges gardent l'appel à deux arguments (défaut individuel).
+  assert.match(lireEdge('invoice-send', 'index.ts'), /wrapWithSkeleton\(branding, template\.html_body \|\| ""\)/);
 });
 
 // ---------------------------------------------------------------------------

@@ -60,6 +60,7 @@ export default function BlocsGroupe({ form, erreurs, suggestions, setForm }) {
                 <button
                   type="button"
                   onClick={() => setForm((f) => monterBloc(f, i))}
+                  aria-label={`Monter le bloc ${i + 1}`}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-secondary-700 hover:bg-white"
                 >
                   <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />Monter
@@ -68,6 +69,7 @@ export default function BlocsGroupe({ form, erreurs, suggestions, setForm }) {
               <button
                 type="button"
                 onClick={() => setForm((f) => retirerBloc(f, i))}
+                aria-label={`Retirer le bloc ${i + 1}`}
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-red-700 hover:bg-white"
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />Retirer

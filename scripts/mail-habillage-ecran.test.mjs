@@ -360,3 +360,31 @@ test('choix de l’aperçu et du bloc : libellés en français, défaut en premi
   assert.deepEqual(OU_BLOC.map((o) => o.cle), ['campagnes', 'tous']);
   for (const o of [...USAGES_APERCU, ...OU_BLOC]) assert.ok(!/html|cta|template|\{/i.test(o.libelle), o.libelle);
 });
+
+// ── Reprise 1 ───────────────────────────────────────────────────────────────────
+import { lisibiliteBandeau } from '../src/lib/mailHabillageEcran.js';
+
+test('couleur du bandeau : lisibilité du texte blanc, suggestion plus foncée', () => {
+  const jaune = lisibiliteBandeau('#ffff00');
+  assert.equal(jaune.lisible, false);
+  assert.match(jaune.suggestion, /^#[0-9a-f]{6}$/);
+  assert.ok(contraste(jaune.suggestion, '#ffffff') >= 4.5);
+  assert.equal(lisibiliteBandeau('#1e3a8a').lisible, true);
+  assert.equal(lisibiliteBandeau('').couleur, DEFAUTS_MARQUE.bandeau);
+  assert.equal(lisibiliteBandeau('orange').couleur, DEFAUTS_MARQUE.bandeau);
+});
+
+test('téléphone saisi naturellement : suggestion sans espaces', () => {
+  const base = formulaireInitial({});
+  const avecTel = (v) => ({ ...base, pied: { ...base.pied, reseaux: { ...base.pied.reseaux, facebook: v } } });
+  const f = avecTel('tel:+33 6 12 34 56 78');
+  assert.ok(erreursFormulaire(f)['reseaux.facebook']);
+  assert.equal(suggestionsFormulaire(f)['reseaux.facebook'], 'tel:+33612345678');
+  assert.equal(suggestionsFormulaire(avecTel('06 12 34 56 78'))['reseaux.facebook'], 'tel:0612345678');
+  // Points et tirets sont des séparateurs admis dans un lien téléphone : acceptés tels quels.
+  assert.deepEqual(erreursFormulaire(avecTel('tel:06.12.34.56.78')), {});
+  // La suggestion est elle-même acceptée.
+  assert.deepEqual(erreursFormulaire(avecTel('tel:+33612345678')), {});
+  const bouton = { ...base, entete: 'logo_bandeau', phrase: 'P', boutonBandeau: { libelle: 'Appeler', adresse: 'tel:05 63 00 00 00' } };
+  assert.equal(suggestionsFormulaire(bouton).boutonBandeau, 'tel:0563000000');
+});

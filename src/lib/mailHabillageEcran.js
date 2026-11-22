@@ -176,6 +176,11 @@ function verdictAdresse(valeur) {
   const v = adresseDeLienValide(a, []);
   if (!v.valide) return v.suggestion ? { message: v.message, suggestion: v.suggestion } : { message: v.message };
   if (adresseSure(a)) return null;
+  // Un numéro de téléphone saisi avec ses espaces, points ou tirets : la même adresse, collée.
+  if (/^tel:/i.test(a)) {
+    const colle = `tel:${a.slice(4).replace(/[\s.-]/g, '')}`;
+    if (adresseSure(colle)) return { message: 'Un numéro de téléphone s’écrit ici sans espace.', suggestion: colle };
+  }
   if (/subject=D[eé]sabonnement/i.test(a)) return { message: 'Le lien pour se désabonner est déjà dans le pied de page.' };
   if (a.length > BORNES_HABILLAGE.adresse) return { message: `Cette adresse dépasse ${BORNES_HABILLAGE.adresse} caractères.` };
   return { message: 'Cette adresse n’est pas acceptée : saisissez-la sans espace.' };
@@ -478,7 +483,26 @@ export function couleurPourSelecteur(valeur, repli) {
  * @returns {{ couleur: string, ratio: number, lisible: boolean, suggestion: string | null }}
  */
 export function lisibiliteBoutons(valeur) {
-  const couleur = couleurValide(valeur, DEFAUTS_MARQUE.accent);
+  return lisibiliteSurCouleur(valeur, DEFAUTS_MARQUE.accent);
+}
+
+/**
+ * Un texte blanc se lit-il sur la couleur du bandeau (phrase, bouton du bandeau, pied sur sa couleur) ? Même règle
+ * que `lisibiliteBoutons`, jugée sur la couleur qui partira (vide ou mal formée ⇒ bandeau par défaut).
+ * @param {string} valeur
+ * @returns {{ couleur: string, ratio: number, lisible: boolean, suggestion: string | null }}
+ */
+export function lisibiliteBandeau(valeur) {
+  return lisibiliteSurCouleur(valeur, DEFAUTS_MARQUE.bandeau);
+}
+
+/**
+ * @param {string} valeur
+ * @param {string} defaut couleur qui partira si la valeur est vide ou mal formée
+ * @returns {{ couleur: string, ratio: number, lisible: boolean, suggestion: string | null }}
+ */
+function lisibiliteSurCouleur(valeur, defaut) {
+  const couleur = couleurValide(valeur, defaut);
   const ratio = contraste(couleur, '#ffffff');
   if (ratio >= SEUIL_LISIBLE) return { couleur, ratio, lisible: true, suggestion: null };
   let rgb = lireHex(couleur);

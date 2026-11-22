@@ -104,10 +104,14 @@ export function brandingReplacements(b: OrgBranding): Record<string, string> {
  * Habille `body` : l'habillage de l'entreprise (celui qu'elle a construit, sinon son ancien
  * habillage enregistré, sinon l'habillage par défaut) — sauf si `body` est déjà un HTML complet
  * (gabarits legacy, cf. `contract-signed-notify`). Règles : `habillerMail`, seule définition.
+ * `options.usage` : `campagne` pour un e-mail du Mailing (blocs « sur vos campagnes ») ; absent = individuel.
  */
-export function wrapWithSkeleton(b: OrgBranding, body: string): string {
-  return habillerMail(b.reglages, body);
+export function wrapWithSkeleton(b: OrgBranding, body: string, options?: OptionsHabillage): string {
+  return habillerMail(b.reglages, body, options);
 }
+
+/** Options d'habillage (`usage`), cf. `habillerMail`. */
+type OptionsHabillage = { usage?: "campagne" | "individuel" };
 
 export interface ResendAttachment {
   filename: string;

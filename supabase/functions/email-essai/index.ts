@@ -26,6 +26,7 @@ import {
 } from "../_shared/mail.ts";
 import { chargerTexteEmail } from "../_shared/texteEmail.ts";
 import { emailOuSequence } from "../_shared/emailsAutomatiques.js";
+import { estSequence } from "../_shared/sequencesEmails.js";
 import { moduleActif } from "../_shared/modules.js";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
@@ -70,7 +71,8 @@ Deno.serve(async (req: Request) => {
 
     const valeurs = { ...brandingReplacements(branding), ...entree.exemple };
     const subject = `[Essai] ${applyPlaceholders(lecture.texte.subject, valeurs)}`;
-    const html = applyPlaceholders(wrapWithSkeleton(branding, lecture.texte.html_body), valeurs);
+    // Une séquence part par `mailing-send` en liste (habillage « campagne ») : son essai lui ressemble.
+    const html = applyPlaceholders(wrapWithSkeleton(branding, lecture.texte.html_body, { usage: estSequence(cle) ? "campagne" : "individuel" }), valeurs);
 
     const envoi = await sendResendEmail(RESEND_API_KEY, {
       from: branding.fromName ? `${branding.fromName} <${branding.fromEmail}>` : branding.fromEmail,

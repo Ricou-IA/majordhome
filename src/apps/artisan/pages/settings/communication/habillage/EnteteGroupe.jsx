@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { Image as ImageIcon } from 'lucide-react';
 import { DEFAUTS_MARQUE } from '@/lib/mailHabillage';
 import {
-  bandeauVisible, couleurBandeauUtilisee, couleurPourSelecteur, lisibiliteBoutons, logoAffiche, ligneLogo, BORNES_HABILLAGE,
+  bandeauVisible, couleurBandeauUtilisee, couleurPourSelecteur, lisibiliteBandeau, lisibiliteBoutons, logoAffiche, ligneLogo, BORNES_HABILLAGE,
   PASTILLES_BOUTONS, PASTILLES_BANDEAU,
 } from '@/lib/mailHabillageEcran';
 import {
@@ -27,6 +27,21 @@ function MiniatureEntete({ bandeau, couleur, centre }) {
   );
 }
 
+/** Le texte blanc se lit mal sur la couleur choisie : on le dit, et on propose la même teinte plus foncée. */
+function AvertissementLisibilite({ texte, suggestion, onSuggestion }) {
+  return (
+    <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <p>{texte}</p>
+      {suggestion && (
+        <button type="button" onClick={() => onSuggestion(suggestion)} className="mt-1 inline-flex items-center gap-2 font-medium hover:underline">
+          <span className="inline-block h-4 w-4 rounded-sm border border-amber-300" style={{ background: suggestion }} aria-hidden="true" />
+          Prendre une teinte plus foncée ({suggestion})
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Miniature d'une taille de logo. */
 function MiniatureTaille({ hauteur }) {
   return (
@@ -40,6 +55,7 @@ export default function EnteteGroupe({ form, settings, erreurs, suggestions, cha
   const couleurBandeau = couleurPourSelecteur(form.couleurBandeau, DEFAUTS_MARQUE.bandeau);
   const centre = form.logo.position === 'centre';
   const lisibilite = lisibiliteBoutons(form.couleurBoutons);
+  const lisibiliteDuBandeau = lisibiliteBandeau(form.couleurBandeau);
   const logo = logoAffiche(settings);
   const etatLogo = ligneLogo(settings);
 
@@ -135,7 +151,15 @@ export default function EnteteGroupe({ form, settings, erreurs, suggestions, cha
           pastilles={PASTILLES_BANDEAU}
           erreur={erreurs.couleurBandeau}
           onChange={(v) => champ('couleurBandeau', v)}
-        />
+        >
+          {!erreurs.couleurBandeau && !lisibiliteDuBandeau.lisible && (
+            <AvertissementLisibilite
+              texte="Le texte blanc du bandeau et du pied de page se lit mal sur cette couleur."
+              suggestion={lisibiliteDuBandeau.suggestion}
+              onSuggestion={(c) => champ('couleurBandeau', c)}
+            />
+          )}
+        </ChampCouleur>
       )}
 
       <ChampCouleur
@@ -149,15 +173,11 @@ export default function EnteteGroupe({ form, settings, erreurs, suggestions, cha
         onChange={(v) => champ('couleurBoutons', v)}
       >
         {!erreurs.couleurBoutons && !lisibilite.lisible && (
-          <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            <p>Le texte blanc des boutons se lit mal sur cette couleur.</p>
-            {lisibilite.suggestion && (
-              <button type="button" onClick={() => champ('couleurBoutons', lisibilite.suggestion)} className="mt-1 inline-flex items-center gap-2 font-medium hover:underline">
-                <span className="inline-block h-4 w-4 rounded-sm border border-amber-300" style={{ background: lisibilite.suggestion }} aria-hidden="true" />
-                Prendre une teinte plus foncée ({lisibilite.suggestion})
-              </button>
-            )}
-          </div>
+          <AvertissementLisibilite
+            texte="Le texte blanc des boutons se lit mal sur cette couleur."
+            suggestion={lisibilite.suggestion}
+            onSuggestion={(c) => champ('couleurBoutons', c)}
+          />
         )}
       </ChampCouleur>
     </Groupe>
