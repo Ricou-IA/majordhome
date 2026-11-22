@@ -300,6 +300,24 @@ html[data-device-class="tablet"] .fc .fc-list-day-cushion {
   }
 }
 
+/* Kanbans (`KanbanBoard`, 2026-11-22). Sur ordinateur les colonnes se partagent la
+   largeur ; à parts égales, sept colonnes font 50 px chacune sur un téléphone et
+   105 px sur la tablette (rendue en 1 024 px) : plus aucun texte ne tient. Sur ces
+   deux appareils une colonne garde une largeur lisible et le tableau défile au doigt.
+   Téléphone : une colonne par écran, la suivante dépasse pour montrer qu'il y en a
+   d'autres. Tablette : trois colonnes environ. */
+html[data-device-class="phone"] .mdh-kanban {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+html[data-device-class="phone"] .mdh-kanban-col {
+  flex: 0 0 min(86%, 320px);
+  scroll-snap-align: start;
+}
+html[data-device-class="tablet"] .mdh-kanban-col {
+  flex: 0 0 240px;
+}
+
 /* Les animations d'apparition sont décoratives : coupées si l'OS le demande. */
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,

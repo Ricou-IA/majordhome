@@ -51,7 +51,7 @@ function ColumnContent({
   return (
     <div
       className={`
-        flex flex-col bg-gray-50 rounded-xl min-w-0 flex-1 basis-0
+        mdh-kanban-col flex flex-col bg-gray-50 rounded-xl min-w-0 flex-1 basis-0
         border transition-colors
         ${isDraggingOver ? 'border-blue-300 bg-blue-50/50' : 'border-gray-200'}
       `}
@@ -229,8 +229,11 @@ export function KanbanBoard({
   };
 
   // --- Board content (columns) ---
+  // Sur ordinateur les colonnes se partagent la largeur. Sur téléphone et tablette elles
+  // prennent une largeur fixe et le tableau défile (règles `.mdh-kanban` de index.css) :
+  // partagées à parts égales, sept colonnes font 50 px chacune sur un téléphone.
   const boardContent = (
-    <div className="flex gap-3 pb-4 overflow-x-auto">
+    <div className="mdh-kanban flex gap-3 pb-4 overflow-x-auto">
       {columns.map(renderColumn)}
     </div>
   );
@@ -239,7 +242,7 @@ export function KanbanBoard({
     <div className="space-y-4">
       {/* Header bar */}
       {(searchFilter || headerLeft || headerRight) && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex items-center gap-2">
             {headerLeft ?? (
               <p className="text-sm text-gray-500">
@@ -249,7 +252,7 @@ export function KanbanBoard({
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {headerRight}
             {searchFilter && (
               <div className="relative">
