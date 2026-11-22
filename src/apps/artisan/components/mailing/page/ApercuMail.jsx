@@ -41,16 +41,17 @@ function Bascule({ actif, onClick, icone: Icone, libelle }) {
  * @param {Record<string, any> | null} props.reglages réglages de l'organisation
  * @param {string} props.nature
  * @param {import('react').ReactNode} [props.children] sous l'aperçu (lien « Modifier l'habillage » de la page du mail)
+ * @param {'campagne' | 'individuel' | null} [props.usage] force l'usage de l'habillage (écran des réglages) ; absent, il suit le mail
  */
-export default function ApercuMail({ campagne, objet, corps, reglages, nature, children }) {
+export default function ApercuMail({ campagne, objet, corps, reglages, nature, children, usage = null }) {
   const [telephone, setTelephone] = useState(false);
   const [ouvert, setOuvert] = useState(false);
   const objetDiffere = useDebounce(objet, 250);
   const corpsDiffere = useDebounce(corps, 250);
 
   const apercu = useMemo(
-    () => rendreApercu({ campagne, objet: objetDiffere, corps: corpsDiffere, reglages }),
-    [campagne, objetDiffere, corpsDiffere, reglages],
+    () => rendreApercu({ campagne, objet: objetDiffere, corps: corpsDiffere, reglages, usage }),
+    [campagne, objetDiffere, corpsDiffere, reglages, usage],
   );
   const de = useMemo(() => ligneExpediteur(reglages, nature), [reglages, nature]);
 
