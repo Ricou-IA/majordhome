@@ -122,7 +122,7 @@ export default function PlanComptableTab() {
               {visible.map((n) => {
                 const any = (form[n.number] || []).length > 0;
                 return (
-                  <tr key={n.number} className={any ? 'bg-primary-50/40' : 'hover:bg-secondary-50'}>
+                  <tr key={n.number} className={any ? 'bg-st-info-bg/40' : 'hover:bg-secondary-50'}>
                     <td className="px-3 py-2 font-mono text-secondary-900">{n.number}</td>
                     <td className="px-3 py-2 text-secondary-700 truncate max-w-0" title={n.label}>{n.label || '—'}</td>
                     {PENNYLANE_CHART_CONTEXTS.map((c) => (

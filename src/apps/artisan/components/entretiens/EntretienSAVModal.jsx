@@ -881,7 +881,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                   disabled={!isDirty || isSavingFields}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg border transition-all ${
                     isDirty
-                      ? 'bg-primary-600 border-blue-600 text-white hover:bg-primary-700 shadow-sm'
+                      ? 'bg-primary-600 border-primary-600 text-white hover:bg-primary-700 shadow-sm'
                       : 'bg-secondary-100 border-secondary-200 text-secondary-400 cursor-not-allowed'
                   }`}
                 >

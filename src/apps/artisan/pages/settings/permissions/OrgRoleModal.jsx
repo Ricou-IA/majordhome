@@ -42,7 +42,7 @@ export function OrgRoleModal({ open, onClose, onSubmit, initial = null, isSaving
       <div className="relative z-10 w-full max-w-lg rounded-xl border border-secondary-200 bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2">
-            <UserCog className="w-5 h-5 text-primary-600" />
+            <UserCog className="w-5 h-5 text-secondary-400" />
             {isEdit ? 'Renommer le profil' : 'Nouveau profil'}
           </h2>
           <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary-100 transition-colors">

@@ -202,13 +202,13 @@ export default function AppLayout() {
   const getRoleBadge = () => {
     switch (effectiveRole) {
       case 'org_admin':
-        return { label: 'Admin', color: 'bg-purple-100 text-purple-700' };
+        return { label: 'Admin', color: 'bg-secondary-100 text-secondary-600' };
       case 'team_leader':
-        return { label: 'Responsable', color: 'bg-blue-100 text-blue-700' };
+        return { label: 'Responsable', color: 'bg-secondary-100 text-secondary-600' };
       case 'commercial':
-        return { label: 'Commercial', color: 'bg-amber-100 text-amber-700' };
+        return { label: 'Commercial', color: 'bg-secondary-100 text-secondary-600' };
       case 'technicien':
-        return { label: 'Technicien', color: 'bg-green-100 text-green-700' };
+        return { label: 'Technicien', color: 'bg-secondary-100 text-secondary-600' };
       default:
         return null;
     }

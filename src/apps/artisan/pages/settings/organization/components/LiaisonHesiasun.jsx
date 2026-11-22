@@ -206,7 +206,7 @@ export default function LiaisonHesiasun({ formulaireModifie }) {
           {etat?.ouverte && (
             <div className="space-y-2">
               <p className="text-sm text-secondary-900 flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-primary-700" />
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-st-ok" />
                 <span>
                   Relié à <span className="font-medium">{etat.entreprise || 'votre entreprise HésiaSun'}</span>
                   {etat.dernier_envoi_le ? ` — dernier envoi le ${formatDateFR(etat.dernier_envoi_le)}` : ''}. Dans HésiaSun, ces champs sont en lecture seule.

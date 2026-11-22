@@ -179,8 +179,8 @@ export default function Territoire() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
-            <Map className="w-5 h-5 text-primary-600" />
+          <div className="w-10 h-10 rounded-lg bg-secondary-100 flex items-center justify-center">
+            <Map className="w-5 h-5 text-secondary-500" />
           </div>
           <div>
             <h1 className="text-xl font-semibold text-secondary-900">Territoire</h1>

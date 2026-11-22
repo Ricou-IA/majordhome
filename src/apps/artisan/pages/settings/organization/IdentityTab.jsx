@@ -147,9 +147,9 @@ export default function IdentityTab() {
           )}
 
           {annuaire && isDirty && (
-            <div role="status" className="lg:col-span-3 lg:order-last rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-secondary-900 space-y-1">
+            <div role="status" className="lg:col-span-3 lg:order-last rounded-lg border border-st-info/20 bg-st-info-bg px-3 py-2 text-sm text-secondary-900 space-y-1">
               <p className="flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-primary-700" />
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-st-info" />
                 <span>{annuaire.detail}</span>
               </p>
               {immat?.detail && <p className="pl-6">{immat.detail}</p>}

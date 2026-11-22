@@ -216,7 +216,7 @@ function QuoteGroup({ group, tableHeader }) {
             className="flex items-center gap-2 text-xs font-medium text-secondary-700 hover:text-secondary-900 transition-colors"
           >
             {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-            <FileText className="w-3.5 h-3.5 text-primary-500" />
+            <FileText className="w-3.5 h-3.5 text-secondary-400" />
             <span className="font-semibold">Commande {group.quote_number ? `Devis ${group.quote_number}` : '—'}</span>
             <span className="text-secondary-400 font-normal">
               — {invoiceCount} facture{invoiceCount > 1 ? 's' : ''}
@@ -316,10 +316,10 @@ export function TabFacturesPL({ clientId, orgId }) {
       {/* Header global */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Receipt className="w-5 h-5 text-primary-600" />
+          <Receipt className="w-5 h-5 text-secondary-400" />
           <h3 className="text-sm font-semibold text-secondary-800">
             Vos Factures
-            <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-primary-100 text-primary-700">
+            <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-st-info-bg text-st-info">
               {invoices.length}
             </span>
           </h3>

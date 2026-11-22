@@ -44,7 +44,7 @@ function LigneCatalogue({ ligne, rap, action, etat, onChange }) {
         {NATURES.map((n) => <option key={n.value} value={n.value}>{n.label}</option>)}
       </select>
       <div className="text-xs min-w-0">
-        {action.action === 'creer' && <span className="text-primary-700 font-medium">Nouvelle référence · {action.nouveau != null ? formatEuro(action.nouveau) : '?'}</span>}
+        {action.action === 'creer' && <span className="text-st-info font-medium">Nouvelle référence · {action.nouveau != null ? formatEuro(action.nouveau) : '?'}</span>}
         {action.action === 'maj' && <span className="text-secondary-700">Achat {formatEuro(action.ancien)} → <b>{formatEuro(action.nouveau)}</b></span>}
         {action.action === 'identique' && <span className="text-secondary-400">Inchangé ({formatEuro(action.nouveau)})</span>}
         {action.avertissement && <p className="text-amber-600 flex gap-1 mt-0.5"><AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />{action.avertissement}</p>}

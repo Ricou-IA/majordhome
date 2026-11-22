@@ -74,7 +74,7 @@ export default function ArticleEnrichModal({ item, champs, onClose, propose, app
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col m-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b">
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-secondary-900 flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-primary-600" /> Enrichir depuis le web</h3>
+            <h3 className="text-base font-semibold text-secondary-900 flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-secondary-400" /> Enrichir depuis le web</h3>
             <p className="text-xs text-secondary-400 break-words">« {item.name} » — rien n&apos;est enregistré sans votre validation</p>
           </div>
           <button type="button" onClick={onClose} className="p-1 hover:bg-secondary-100 rounded"><X className="w-5 h-5 text-secondary-500" /></button>

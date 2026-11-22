@@ -30,8 +30,8 @@ export default function Webshop() {
   return (
     <div className={`p-6 mx-auto ${tab === 'orders' ? 'max-w-[1400px]' : 'max-w-6xl'}`}>
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-11 h-11 bg-primary-100 rounded-xl flex items-center justify-center">
-          <ShoppingCart className="w-6 h-6 text-primary-600" />
+        <div className="w-11 h-11 bg-secondary-100 rounded-xl flex items-center justify-center">
+          <ShoppingCart className="w-6 h-6 text-secondary-500" />
         </div>
         <div>
           <h1 className="text-xl font-bold text-secondary-900">Webshop</h1>

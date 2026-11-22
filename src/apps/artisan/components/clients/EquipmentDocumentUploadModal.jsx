@@ -19,7 +19,7 @@ const ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp';
 const MAX_SIZE = 20 * 1024 * 1024; // limite du bucket product-documents
 
 const segmentClass = (actif) => `px-3 py-1.5 text-sm rounded-lg border transition-colors ${actif
-  ? 'bg-primary-600 border-indigo-600 text-white'
+  ? 'bg-primary-600 border-primary-600 text-white'
   : 'bg-white border-secondary-300 text-secondary-700 hover:bg-secondary-50'}`;
 
 const PLACEHOLDERS_LIBELLE = { notice: 'ex. Notice d\'installation 2019', vue_eclatee: 'ex. Vue éclatée corps de chauffe' };

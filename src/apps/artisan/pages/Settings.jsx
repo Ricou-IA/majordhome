@@ -63,8 +63,8 @@ export default function Settings() {
       {organization && (
         <div className="card">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center">
-              <Building2 className="w-7 h-7 text-primary-600" />
+            <div className="w-14 h-14 rounded-xl bg-secondary-100 flex items-center justify-center">
+              <Building2 className="w-7 h-7 text-secondary-500" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-secondary-900">
@@ -114,8 +114,8 @@ export default function Settings() {
           volontairement inactifs en attendant ; ne pas retirer le bloc. */}
       <div className="card bg-secondary-50">
         <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
-            <HelpCircle className="w-5 h-5 text-primary-600" />
+          <div className="w-10 h-10 rounded-lg bg-secondary-100 flex items-center justify-center flex-shrink-0">
+            <HelpCircle className="w-5 h-5 text-secondary-500" />
           </div>
           <div>
             <h3 className="font-medium text-secondary-900">

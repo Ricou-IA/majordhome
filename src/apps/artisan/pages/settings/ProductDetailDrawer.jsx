@@ -262,7 +262,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
             {/* --------- Tab Identité --------- */}
             <TabsContent value="identity" className="flex-1 overflow-y-auto px-6 py-5 m-0 space-y-5">
               {verrouArticle && (
-                <p className="text-xs text-secondary-600 bg-primary-50 border border-primary-100 rounded px-3 py-2">
+                <p className="text-xs text-secondary-600 bg-st-info-bg border border-st-info/20 rounded px-3 py-2">
                   Libellé, marque, catégorie, gamme et prix de vente sont portés par l&apos;article Majord&apos;home (ce que voit le client) :
                   ils se corrigent sur sa fiche, pas sur la ligne fournisseur.{' '}
                   <Link to={`/settings/suppliers/articles?item=${product.catalog_item_id}`} className="text-primary-700 hover:underline">Ouvrir l&apos;article →</Link>

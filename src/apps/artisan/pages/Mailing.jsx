@@ -41,7 +41,7 @@ export default function Mailing() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
-          <Mail className="w-7 h-7 text-primary-600" />
+          <Mail className="w-7 h-7 text-secondary-400" />
           Mailing
         </h1>
       </div>

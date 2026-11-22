@@ -116,7 +116,7 @@ export default function MetaAds() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-secondary-900 flex items-center gap-2">
-          <Megaphone className="w-6 h-6 text-primary-600" />
+          <Megaphone className="w-6 h-6 text-secondary-400" />
           Meta Ads
         </h1>
         <button

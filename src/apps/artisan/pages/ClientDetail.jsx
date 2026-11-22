@@ -383,7 +383,7 @@ export default function ClientDetail() {
             </div>
             <p className="text-secondary-500 mt-0.5">
               {client.pennylane_account_number && (
-                <span className="text-xs font-mono text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded mr-2" title="Code comptable Pennylane">{client.pennylane_account_number}</span>
+                <span className="text-xs font-mono text-secondary-600 bg-secondary-100 px-1.5 py-0.5 rounded mr-2" title="Code comptable Pennylane">{client.pennylane_account_number}</span>
               )}
               {client.client_number && !client.pennylane_account_number && (
                 <span className="text-xs font-mono text-secondary-400 mr-2">{client.client_number}</span>

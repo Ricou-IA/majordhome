@@ -412,7 +412,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
           )}
           <div className="flex justify-between text-sm font-semibold">
             <span className="text-secondary-900">Total annuel</span>
-            <span className="text-primary-700 tabular-nums">{formatEuro(computedPricing.total)}</span>
+            <span className="text-secondary-900 tabular-nums">{formatEuro(computedPricing.total)}</span>
           </div>
 
           {isForced && !hasOverrides && amountMismatch && (

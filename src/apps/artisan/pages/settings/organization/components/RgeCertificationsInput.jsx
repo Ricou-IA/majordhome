@@ -65,7 +65,7 @@ export default function RgeCertificationsInput({ value = [], onChange, disabled 
         {value.map((item) => (
           <span
             key={item}
-            className="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 text-xs font-medium rounded-md"
+            className="inline-flex items-center gap-1 px-2 py-1 bg-secondary-100 text-secondary-700 text-xs font-medium rounded-md"
           >
             {item}
             {!disabled && (

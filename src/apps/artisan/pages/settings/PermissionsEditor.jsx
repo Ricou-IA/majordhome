@@ -265,7 +265,7 @@ export default function PermissionsEditor({ embedded = false }) {
             </button>
             <div>
               <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
-                <Shield className="w-7 h-7 text-primary-600" />
+                <Shield className="w-7 h-7 text-secondary-400" />
                 Droits d&apos;accès
               </h1>
               <p className="text-sm text-secondary-600 mt-1">

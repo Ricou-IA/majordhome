@@ -131,7 +131,7 @@ function InviteModal({ open, onClose, onInvite, isInviting, roleOptions }) {
       <div className="relative z-10 w-full max-w-md rounded-xl border border-secondary-200 bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-primary-600" />
+            <UserPlus className="w-5 h-5 text-secondary-400" />
             Inviter un membre
           </h2>
           <button
@@ -659,7 +659,7 @@ export default function TeamManagement() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
-              <Users className="w-7 h-7 text-primary-600" />
+              <Users className="w-7 h-7 text-secondary-400" />
               Administration utilisateurs
             </h1>
             <p className="text-sm text-secondary-600 mt-1">

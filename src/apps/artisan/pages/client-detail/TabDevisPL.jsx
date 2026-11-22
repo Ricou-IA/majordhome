@@ -134,10 +134,10 @@ export function TabDevisPL({ clientId, orgId }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-primary-600" />
+          <FileText className="w-5 h-5 text-secondary-400" />
           <h3 className="text-sm font-semibold text-secondary-800">
             Devis Pennylane
-            <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-primary-100 text-primary-700">
+            <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-st-info-bg text-st-info">
               {quotes.length}
             </span>
           </h3>

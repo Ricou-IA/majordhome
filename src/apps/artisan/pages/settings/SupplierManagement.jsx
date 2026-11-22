@@ -281,7 +281,7 @@ function ProductFormModal({ product, onClose, onSave, isSaving }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {verrouArticle && (
-              <p className="text-xs text-secondary-600 bg-primary-50 border border-primary-100 rounded px-3 py-2">
+              <p className="text-xs text-secondary-600 bg-st-info-bg border border-st-info/20 rounded px-3 py-2">
                 Libellé, catégorie, gamme et prix de vente se corrigent sur l&apos;article Majord&apos;home (ce que voit le client), pas sur la ligne fournisseur.{' '}
                 <Link to={`/settings/suppliers/articles?item=${product.catalog_item_id}`} className="text-primary-700 hover:underline">Ouvrir l&apos;article →</Link>
               </p>
@@ -1089,8 +1089,8 @@ export default function SupplierManagement() {
               className="card-hover flex items-center gap-4 cursor-pointer"
               onClick={() => setSelectedSupplier(supplier)}
             >
-              <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
-                <Building2 className="w-5 h-5 text-primary-600" />
+              <div className="w-10 h-10 rounded-lg bg-secondary-100 flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-5 h-5 text-secondary-500" />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-medium text-secondary-900">{supplier.name}</h3>

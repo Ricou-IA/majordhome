@@ -37,8 +37,8 @@ export default function GeoGrid() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary-100 rounded-lg">
-          <Grid3x3 className="w-6 h-6 text-primary-600" />
+        <div className="p-2 bg-secondary-100 rounded-lg">
+          <Grid3x3 className="w-6 h-6 text-secondary-500" />
         </div>
         <div>
           <h1 className="text-xl font-bold text-secondary-900">GeoGrid Rank Tracker</h1>
