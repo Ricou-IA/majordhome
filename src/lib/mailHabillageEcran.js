@@ -92,7 +92,7 @@ export function formulaireInitial(reglages) {
     phrase: texte(s.email_tagline),
     couleurBandeau: texte(s.secondary_color),
     couleurBoutons: texte(s.accent_color),
-    pied: { ...choix.pied },
+    pied: { coordonnees: choix.pied.coordonnees, certifications: choix.pied.certifications, site: choix.pied.site },
   };
 }
 

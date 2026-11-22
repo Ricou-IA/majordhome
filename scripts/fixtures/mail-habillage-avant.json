@@ -1,0 +1,72 @@
+{
+  "corps": "<h2>Titre</h2><p>Bonjour {{CLIENT_NAME}}, <a href=\"https://ex.fr\">lien</a></p>",
+  "cas": [
+    {
+      "nom": "defaut_vide",
+      "reglages": {
+        "email_habillage": {
+          "entete": "logo",
+          "pied": {
+            "coordonnees": true,
+            "certifications": false,
+            "site": false
+          }
+        }
+      },
+      "html": "<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body style=\"margin:0;padding:0;background:#f1f5f9;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f1f5f9;\"><tr><td align=\"center\" style=\"padding:24px 12px;\"><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#ffffff;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1e293b;\"><tr><td style=\"padding:24px 28px;\"><h2>Titre</h2><p>Bonjour {{CLIENT_NAME}}, <a href=\"https://ex.fr\">lien</a></p></td></tr></table></td></tr></table></body></html>"
+    },
+    {
+      "nom": "mayer_complet",
+      "reglages": {
+        "brand_name": "Mayer Énergie",
+        "address": "1 rue",
+        "postal_code": "81600",
+        "city": "Gaillac",
+        "phone": "05 00 00 00 00",
+        "from_email": "contact@mayer.fr",
+        "accent_color": "#c2410c",
+        "secondary_color": "#1e3a8a",
+        "email_tagline": "Chauffage & clim",
+        "rge_certifications": [
+          "QualiPAC",
+          "QualiBois"
+        ],
+        "website_url": "https://mayer.fr/",
+        "logo_url": "https://mayer.fr/logo.png",
+        "email_habillage": {
+          "entete": "logo_bandeau",
+          "pied": {
+            "coordonnees": true,
+            "certifications": true,
+            "site": true
+          }
+        }
+      },
+      "html": "<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body style=\"margin:0;padding:0;background:#f1f5f9;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f1f5f9;\"><tr><td align=\"center\" style=\"padding:24px 12px;\"><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#ffffff;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1e293b;\"><tr><td style=\"padding:24px 28px 0 28px;\"><img src=\"https://mayer.fr/logo.png\" alt=\"Mayer Énergie\" style=\"max-height:56px;max-width:220px;\"></td></tr><tr><td style=\"padding:12px 28px;background:#1e3a8a;color:#ffffff;font-size:14px;\">Chauffage &amp; clim</td></tr><tr><td style=\"padding:24px 28px;\"><h2>Titre</h2><p>Bonjour {{CLIENT_NAME}}, <a href=\"https://ex.fr\">lien</a></p></td></tr><tr><td style=\"padding:16px 28px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;\">Mayer Énergie · 1 rue, 81600 Gaillac · 05 00 00 00 00 · contact@mayer.fr<br>QualiPAC · QualiBois<br><a href=\"https://mayer.fr/\" style=\"color:#c2410c;text-decoration:underline;\">mayer.fr</a><br><a href=\"mailto:contact@mayer.fr?subject=Désabonnement\" style=\"color:#c2410c;text-decoration:underline;\">Se désabonner</a></td></tr></table></td></tr></table></body></html>"
+    },
+    {
+      "nom": "sans_logo_bandeau_sans_phrase",
+      "reglages": {
+        "brand_name": "Cimaj",
+        "from_email": "c@cimaj.fr",
+        "email_habillage": {
+          "entete": "logo_bandeau",
+          "pied": {
+            "coordonnees": false,
+            "certifications": false,
+            "site": false
+          }
+        }
+      },
+      "html": "<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body style=\"margin:0;padding:0;background:#f1f5f9;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f1f5f9;\"><tr><td align=\"center\" style=\"padding:24px 12px;\"><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#ffffff;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1e293b;\"><tr><td style=\"padding:24px 28px 0 28px;\"><span style=\"font-size:18px;font-weight:600;color:#0f172a;\">Cimaj</span></td></tr><tr><td style=\"padding:24px 28px;\"><h2>Titre</h2><p>Bonjour {{CLIENT_NAME}}, <a href=\"https://ex.fr\">lien</a></p></td></tr><tr><td style=\"padding:16px 28px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;\"><a href=\"mailto:c@cimaj.fr?subject=Désabonnement\" style=\"color:#64748b;text-decoration:underline;\">Se désabonner</a></td></tr></table></td></tr></table></body></html>"
+    },
+    {
+      "nom": "sans_email_habillage",
+      "reglages": {
+        "brand_name": "X",
+        "from_email": "x@x.fr"
+      },
+      "html": "<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body style=\"margin:0;padding:0;background:#f1f5f9;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f1f5f9;\"><tr><td align=\"center\" style=\"padding:24px 12px;\"><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#ffffff;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1e293b;\"><tr><td style=\"padding:24px 28px 0 28px;\"><span style=\"font-size:18px;font-weight:600;color:#0f172a;\">X</span></td></tr><tr><td style=\"padding:24px 28px;\"><h2>Titre</h2><p>Bonjour {{CLIENT_NAME}}, <a href=\"https://ex.fr\">lien</a></p></td></tr><tr><td style=\"padding:16px 28px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;\">X · x@x.fr<br><a href=\"mailto:x@x.fr?subject=Désabonnement\" style=\"color:#64748b;text-decoration:underline;\">Se désabonner</a></td></tr></table></td></tr></table></body></html>"
+    }
+  ]
+}

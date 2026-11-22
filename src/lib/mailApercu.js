@@ -15,7 +15,7 @@
 import { habillerMail, valeursDeMarque } from './mailHabillage.js';
 import { emailOuSequence } from './emailsAutomatiques.js';
 import { GABARITS_HABILLES_PAR_LE_SITE, VARIABLES_MARQUE_DU_SITE } from './webshop/emailTemplates.js';
-import { nomDeLien, variablesProposees, variablesAccepteesDansLObjet } from './mailVariables.js';
+import { nomDeLien, natureDuMail, variablesProposees, variablesAccepteesDansLObjet } from './mailVariables.js';
 
 const JETON = /\{\{([A-Za-z0-9_]+)\}\}/g;
 const DESABONNEMENT = /mailto:[^"'\s>]*\?subject=D[eé]sabonnement/gi;
@@ -70,6 +70,20 @@ function resolveur(campagne, reglages, html) {
   };
 }
 
+/** Natures d'un e-mail du Mailing : leurs envois passent par `mailing-send`, qui habille en `campagne`. */
+const NATURES_CAMPAGNE = ['manuelle', 'automatique', 'sequence'];
+
+/**
+ * Usage de l'habillage pour l'aperçu : celui demandé, sinon celui que l'envoi de ce mail utilisera.
+ * @param {{ key?: string | null, is_automated?: boolean | null, is_transactional?: boolean | null } | null} campagne
+ * @param {unknown} usage
+ * @returns {'campagne' | 'individuel'}
+ */
+function usageDeLApercu(campagne, usage) {
+  if (usage === 'campagne' || usage === 'individuel') return usage;
+  return NATURES_CAMPAGNE.includes(natureDuMail(campagne)) ? 'campagne' : 'individuel';
+}
+
 /**
  * L'aperçu d'un mail : habillage de l'entreprise, variables de marque, valeurs d'exemple, lien de
  * désabonnement neutralisé. Ne lève jamais : campagne, réglages ou texte absents donnent un résultat valide.
@@ -77,14 +91,15 @@ function resolveur(campagne, reglages, html) {
  * @param {{
  *   campagne?: { key?: string | null, is_automated?: boolean | null, is_transactional?: boolean | null } | null,
  *   objet?: string | null, corps?: string | null, reglages?: Record<string, any> | null,
- * }} [entree]
+ *   usage?: 'campagne' | 'individuel' | null,
+ * }} [entree] `usage` force l'usage de l'habillage (écran des réglages) ; absent, il suit la nature du mail
  * @returns {{ html: string, objet: string, habilleParLeSite: boolean }}
  */
-export function rendreApercu({ campagne = null, objet = '', corps = '', reglages = null } = {}) {
+export function rendreApercu({ campagne = null, objet = '', corps = '', reglages = null, usage = null } = {}) {
   const habilleParLeSite = GABARITS_HABILLES_PAR_LE_SITE.includes(campagne?.key ?? '');
   try {
     const texte = String(corps ?? '');
-    const base = habilleParLeSite ? texte : habillerMail(reglages, texte);
+    const base = habilleParLeSite ? texte : habillerMail(reglages, texte, { usage: usageDeLApercu(campagne, usage) });
     return {
       html: substituer(base, resolveur(campagne, reglages, true)).replace(DESABONNEMENT, '#'),
       objet: substituer(String(objet ?? ''), resolveur(campagne, reglages, false)),

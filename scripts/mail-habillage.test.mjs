@@ -90,7 +90,7 @@ test('lireHabillage : null hors objet, valeurs inconnues ramenées au défaut', 
   assert.equal(lireHabillage({ email_habillage: null }), null);
   assert.equal(lireHabillage({ email_habillage: 'x' }), null);
   assert.deepEqual(lireHabillage({ email_habillage: { entete: 'zzz', pied: { coordonnees: 'oui', site: true } } }), {
-    entete: 'logo', pied: { coordonnees: true, certifications: false, site: true },
+    ...HABILLAGE_DEFAUT, pied: { ...HABILLAGE_DEFAUT.pied, coordonnees: true, certifications: false, site: true },
   });
 });
 
@@ -98,10 +98,12 @@ test('choixDepuisReglages : réglages vides, ancien habillage seul, choix enregi
   assert.deepEqual(choixDepuisReglages({}), HABILLAGE_DEFAUT);
   assert.deepEqual(choixDepuisReglages(null), HABILLAGE_DEFAUT);
   assert.deepEqual(choixDepuisReglages({ email_skeleton_html: S }), {
-    entete: 'logo_bandeau', pied: { coordonnees: true, certifications: false, site: true },
+    ...HABILLAGE_DEFAUT, entete: 'logo_bandeau', pied: { ...HABILLAGE_DEFAUT.pied, coordonnees: true, certifications: false, site: true },
   });
   const enregistre = { entete: 'logo_bandeau', pied: { coordonnees: false, certifications: true, site: false } };
-  assert.deepEqual(choixDepuisReglages({ email_skeleton_html: S, email_habillage: enregistre }), enregistre);
+  assert.deepEqual(choixDepuisReglages({ email_skeleton_html: S, email_habillage: enregistre }), {
+    ...HABILLAGE_DEFAUT, entete: 'logo_bandeau', pied: { ...HABILLAGE_DEFAUT.pied, ...enregistre.pied },
+  });
 });
 
 test('ancien habillage : un corps portant $& ou $$ sort intact', () => {
@@ -158,10 +160,184 @@ test('mail.ts : wrapWithSkeleton rend habillerMail, brandingReplacements rend va
 
 test('mailing-send et contract-signed-notify : habillage et marque viennent du module', () => {
   const envoi = lireEdge('mailing-send', 'index.ts');
-  assert.match(envoi, /habillerMail\(branding\.reglages, htmlBody\)/);
+  assert.match(envoi, /habillerMail\(branding\.reglages, htmlBody, \{ usage: 'campagne' \}\)/);
   assert.match(envoi, /valeursDeMarque\(/);
   assert.doesNotMatch(envoi, /function wrapInSkeleton/);
   const notif = lireEdge('contract-signed-notify', 'index.ts');
   assert.match(notif, /habillerMail\(/);
   assert.match(notif, /valeursDeMarque\(/);
+});
+
+// ---------------------------------------------------------------------------
+// Habillage enrichi (spec 2026-11-22 § 2) : logo, bouton du bandeau, pied enrichi, blocs fixes
+// ---------------------------------------------------------------------------
+const AVANT = JSON.parse(readFileSync(join(RACINE, 'scripts', 'fixtures', 'mail-habillage-avant.json'), 'utf8'));
+const COMPLET = {
+  brand_name: 'Cimaj', from_email: 'c@cimaj.fr', accent_color: '#c2410c', secondary_color: '#1e3a8a',
+  email_tagline: 'Chauffage', logo_url: 'https://ex.fr/l.png',
+};
+/** Réglages complets avec un habillage enrichi. @param {Record<string, any>} h */
+const avec = (h) => ({ ...COMPLET, email_habillage: { entete: 'logo_bandeau', pied: { coordonnees: true }, ...h } });
+/** @param {string} html @param {string} motif */
+const compter = (html, motif) => html.split(motif).length - 1;
+
+test('sans les nouvelles clés : sortie identique, octet pour octet, à celle d’avant', () => {
+  assert.ok(AVANT.cas.length >= 3);
+  for (const c of AVANT.cas) {
+    assert.equal(habillerMail(c.reglages, AVANT.corps), c.html, c.nom);
+    assert.equal(habillerMail(c.reglages, AVANT.corps, { usage: 'campagne' }), c.html, `${c.nom} (campagne)`);
+  }
+});
+
+test('HABILLAGE_DEFAUT : défauts = comportement d’aujourd’hui', () => {
+  assert.deepEqual(HABILLAGE_DEFAUT.logo, { position: 'gauche', taille: 'moyen' });
+  assert.equal(HABILLAGE_DEFAUT.bouton_bandeau, null);
+  assert.deepEqual(HABILLAGE_DEFAUT.blocs, []);
+  assert.deepEqual(HABILLAGE_DEFAUT.pied, {
+    coordonnees: true, certifications: false, site: false, horaires: '', texte: '', fond: 'clair',
+    reseaux: { facebook: '', instagram: '', avis_google: '', linkedin: '' },
+  });
+  assert.deepEqual(lireHabillage({ email_habillage: {} }), HABILLAGE_DEFAUT);
+});
+
+test('logo : position et taille', () => {
+  const centre = habillerMail(avec({ logo: { position: 'centre', taille: 'grand' } }), '<p>a</p>');
+  assert.match(centre, /<td align="center"[^>]*><img [^>]*max-height:80px/);
+  const petit = habillerMail(avec({ logo: { position: 'gauche', taille: 'petit' } }), '<p>a</p>');
+  assert.match(petit, /max-height:40px/);
+  assert.ok(!/<td align="center"[^>]*><img/.test(petit));
+  // Sans logo : le nom, à la même position.
+  const nom = habillerMail({ ...avec({ logo: { position: 'centre', taille: 'petit' } }), logo_url: '' }, '<p>a</p>');
+  assert.match(nom, /<td align="center"[^>]*><span[^>]*>Cimaj<\/span>/);
+  // Valeurs inconnues : défaut.
+  assert.deepEqual(lireHabillage(avec({ logo: { position: 'haut', taille: 99 } })).logo, HABILLAGE_DEFAUT.logo);
+  assert.deepEqual(lireHabillage(avec({ logo: 'centre' })).logo, HABILLAGE_DEFAUT.logo);
+});
+
+test('bouton du bandeau : seulement quand le bandeau est dessiné', () => {
+  const b = { bouton_bandeau: { libelle: 'Prendre RDV', adresse: 'https://ex.fr/rdv' } };
+  assert.equal(compter(habillerMail(avec(b), '<p>a</p>'), 'href="https://ex.fr/rdv"'), 1);
+  assert.ok(!habillerMail(avec({ ...b, entete: 'logo' }), '<p>a</p>').includes('ex.fr/rdv'));
+  assert.ok(!habillerMail({ ...avec(b), email_tagline: '' }, '<p>a</p>').includes('ex.fr/rdv'));
+  // Un bouton sans libellé ou sans adresse valide n'existe pas.
+  assert.equal(lireHabillage(avec({ bouton_bandeau: { libelle: '', adresse: 'https://ex.fr' } })).bouton_bandeau, null);
+  assert.equal(lireHabillage(avec({ bouton_bandeau: { libelle: 'x', adresse: 'ex.fr' } })).bouton_bandeau, null);
+  assert.equal(lireHabillage(avec({ bouton_bandeau: 'x' })).bouton_bandeau, null);
+});
+
+test('adresses : https, http, mailto, tel seulement ; une adresse invalide rend l’élément absent', () => {
+  for (const ok of ['https://ex.fr', 'http://ex.fr/a?b=1', 'mailto:a@b.fr', 'tel:0563000000']) {
+    assert.equal(lireHabillage(avec({ bouton_bandeau: { libelle: 'x', adresse: ok } })).bouton_bandeau?.adresse, ok, ok);
+  }
+  for (const ko of ['javascript:alert(1)', 'JaVaScRiPt:1', 'data:text/html,x', 'ex.fr', 'https://', 'https://a b', '', 42,
+    'https://ex.fr/{{CLIENT_NAME}}', 'mailto:a@b.fr?subject=Désabonnement', 'tel:', ' https://ex.fr\n/x']) {
+    assert.equal(lireHabillage(avec({ bouton_bandeau: { libelle: 'x', adresse: ko } })).bouton_bandeau, null, String(ko));
+    assert.equal(lireHabillage(avec({ pied: { reseaux: { facebook: ko } } })).pied.reseaux.facebook, '', String(ko));
+  }
+});
+
+test('pied : horaires, ligne libre, réseaux en toutes lettres', () => {
+  const h = habillerMail(avec({ pied: {
+    coordonnees: false, horaires: 'Lun–ven 8 h – 18 h', texte: 'Entreprise familiale',
+    reseaux: { facebook: 'https://fb.com/x', instagram: '', avis_google: 'https://g.page/r/x', linkedin: 'https://linkedin.com/x' },
+  } }), '<p>a</p>');
+  assert.ok(h.includes('Lun–ven 8 h – 18 h') && h.includes('Entreprise familiale'));
+  assert.match(h, />Facebook<\/a> · <a [^>]*>Nos avis Google<\/a> · <a [^>]*>LinkedIn<\/a>/);
+  assert.ok(!h.includes('Instagram'));
+  assert.ok(!habillerMail(avec({}), '<p>a</p>').includes('Facebook'));
+});
+
+test('pied à fond « bandeau » : texte blanc, liens blancs soulignés', () => {
+  const h = habillerMail(avec({ pied: { coordonnees: true, site: true, fond: 'bandeau', reseaux: { facebook: 'https://fb.com/x' } } }),
+    '<p>a</p>');
+  const pied = h.slice(h.lastIndexOf('<tr><td style="padding:16px 28px;'));
+  assert.match(pied, /^<tr><td style="padding:16px 28px;background:#1e3a8a;[^"]*color:#ffffff;/);
+  for (const m of pied.matchAll(/<a [^>]*style="([^"]*)"/g)) {
+    assert.match(m[1], /color:#ffffff;/, m[1]);
+    assert.match(m[1], /text-decoration:underline;/, m[1]);
+  }
+  assert.ok(!pied.includes('#c2410c'), 'lien à la couleur des boutons sur le fond du bandeau');
+});
+
+const BLOC = { titre: 'Parrainez un proche', texte: 'Un mois offert', bouton: { libelle: 'Je parraine', adresse: 'https://ex.fr/p' } };
+
+test('blocs : « campagnes » seulement sur une campagne, « tous » partout, après le texte et avant le pied', () => {
+  const r = avec({ blocs: [BLOC, { ...BLOC, titre: 'Laissez-nous un avis', ou: 'tous', bouton: null }] });
+  const camp = habillerMail(r, '<p>CORPS</p>', { usage: 'campagne' });
+  const indiv = habillerMail(r, '<p>CORPS</p>');
+  assert.ok(camp.includes('Parrainez un proche') && camp.includes('Laissez-nous un avis'));
+  assert.ok(!indiv.includes('Parrainez un proche') && indiv.includes('Laissez-nous un avis'));
+  assert.ok(!habillerMail(r, '<p>CORPS</p>', /** @type {any} */ ({ usage: 'zzz' })).includes('Parrainez'));
+  assert.ok(camp.indexOf('CORPS') < camp.indexOf('Parrainez') && camp.indexOf('Laissez') < camp.indexOf('Se désabonner'));
+  // Bouton du bloc : couleur des boutons, texte blanc.
+  assert.match(camp, /<a href="https:\/\/ex\.fr\/p" style="[^"]*background:#c2410c;[^"]*color:#ffffff;/);
+  // Texte sur plusieurs lignes : retours à la ligne gardés.
+  assert.ok(habillerMail(avec({ blocs: [{ ...BLOC, texte: 'L1\nL2', ou: 'tous' }] }), 'x').includes('L1<br>L2'));
+});
+
+test('blocs : deux au plus, un bloc vide retiré, ou inconnu = campagnes', () => {
+  const lu = lireHabillage(avec({ blocs: [BLOC, { titre: '', texte: '  ', bouton: { libelle: '', adresse: '' } }, { ...BLOC, titre: 'B' }, { ...BLOC, titre: 'C' }] }));
+  assert.deepEqual(lu.blocs.map((b) => b.titre), ['Parrainez un proche', 'B']);
+  assert.equal(lu.blocs[0].ou, 'campagnes');
+  assert.deepEqual(lireHabillage(avec({ blocs: 'x' })).blocs, []);
+  assert.deepEqual(lireHabillage(avec({ blocs: [null, 3, 'a', { titre: 12 }] })).blocs, []);
+  // Bouton sans adresse valide : le bloc reste, sans bouton.
+  assert.equal(lireHabillage(avec({ blocs: [{ ...BLOC, bouton: { libelle: 'x', adresse: 'javascript:1' } }] })).blocs[0].bouton, null);
+});
+
+test('bornes : textes tronqués à leur longueur', () => {
+  const long = 'x'.repeat(1000);
+  const lu = lireHabillage(avec({
+    bouton_bandeau: { libelle: long, adresse: 'https://ex.fr' },
+    pied: { horaires: long, texte: long },
+    blocs: [{ titre: long, texte: long, bouton: { libelle: long, adresse: 'https://ex.fr' } }],
+  }));
+  assert.equal(lu.bouton_bandeau.libelle.length, 40);
+  assert.equal(lu.pied.horaires.length, 200);
+  assert.equal(lu.pied.texte.length, 300);
+  assert.equal(lu.blocs[0].titre.length, 80);
+  assert.equal(lu.blocs[0].texte.length, 300);
+  assert.equal(lu.blocs[0].bouton.libelle.length, 40);
+});
+
+test('valeurs malformées : jamais d’exception, retour aux défauts', () => {
+  for (const h of [{ logo: null, pied: 'x', blocs: {}, bouton_bandeau: [] }, { pied: { reseaux: 'x', fond: 3, horaires: {} } },
+    { pied: { reseaux: [1, 2] } }, { blocs: [{ bouton: 'x', ou: {} }] }, []]) {
+    assert.doesNotThrow(() => habillerMail({ email_habillage: h }, '<p>a</p>', { usage: 'campagne' }));
+    assert.doesNotThrow(() => habillerMail({ email_habillage: h }, '<p>a</p>', /** @type {any} */ ('x')));
+  }
+  assert.equal(lireHabillage({ email_habillage: { pied: { fond: 3 } } }).pied.fond, 'clair');
+  assert.deepEqual(lireHabillage({ email_habillage: { pied: { reseaux: 'x' } } }).pied.reseaux, HABILLAGE_DEFAUT.pied.reseaux);
+});
+
+test('valeurs hostiles dans les nouveaux textes et adresses : tout est échappé', () => {
+  const hostile = '<script>x</script>"onmouseover="y\'';
+  const r = avec({
+    bouton_bandeau: { libelle: hostile, adresse: `https://ex.fr/${hostile}` },
+    pied: { coordonnees: true, horaires: hostile, texte: hostile, fond: 'bandeau',
+      reseaux: { facebook: `https://fb.com/${hostile}`, instagram: 'javascript:alert(1)', avis_google: `mailto:${hostile}`, linkedin: 'tel:"><b>' } },
+    blocs: [{ titre: hostile, texte: hostile, bouton: { libelle: hostile, adresse: `https://ex.fr/${hostile}` }, ou: 'tous' }],
+  });
+  const h = habillerMail(r, '<p>a</p>', { usage: 'campagne' });
+  assert.ok(!h.includes('<script'), 'balise script brute');
+  assert.ok(!h.includes('<b>'), 'balise injectée');
+  assert.ok(!/javascript:/i.test(h), 'adresse javascript');
+  for (const m of h.matchAll(/(?:href|src|alt|style)="([^"]*)"/g)) assert.ok(!/[<>'"]/.test(m[1]), `attribut non échappé : ${m[1]}`);
+  assert.ok(!h.includes('onmouseover="y'), 'attribut injecté');
+  assert.equal(compter(h, 'Se désabonner'), 1);
+});
+
+test('toutes les options : HTML bien formé, un seul lien de désabonnement', () => {
+  const r = avec({
+    logo: { position: 'centre', taille: 'grand' },
+    bouton_bandeau: { libelle: 'Prendre RDV', adresse: 'https://ex.fr/rdv' },
+    pied: { coordonnees: true, certifications: true, site: true, horaires: 'Lun–ven', texte: 'Ligne', fond: 'bandeau',
+      reseaux: { facebook: 'https://fb.com/x', instagram: 'https://ig.com/x', avis_google: 'https://g.page/x', linkedin: 'https://li.com/x' } },
+    blocs: [BLOC, { ...BLOC, titre: 'Avis', ou: 'tous' }],
+  });
+  const h = habillerMail({ ...r, website_url: 'https://cimaj.fr', rge_certifications: ['QualiPAC'] }, '<p>a</p>', { usage: 'campagne' });
+  for (const balise of ['table', 'tr', 'td', 'a', 'p']) {
+    assert.equal(compter(h, `<${balise} `) + compter(h, `<${balise}>`), compter(h, `</${balise}>`), balise);
+  }
+  assert.equal(compter(h, 'subject=Désabonnement'), 1);
 });

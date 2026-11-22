@@ -526,7 +526,8 @@ Deno.serve(async (req: Request) => {
       const personalizedSubject = applyPlaceholders(subject, brandingReplacements);
 
       // Habillage de l'entreprise (ou par défaut) posé ici, juste avant les remplacements : un HTML déjà complet reste tel quel.
-      const wrappedHtml = habillerMail(branding.reglages, htmlBody);
+      // `campagne` : les blocs fixes « sur vos campagnes » de l'habillage apparaissent (campagnes, séquences, essais).
+      const wrappedHtml = habillerMail(branding.reglages, htmlBody, { usage: 'campagne' });
 
       const html = personalizeHtml({
         htmlBody: wrappedHtml, salutation, lienPellets, unsubscribeUrl,

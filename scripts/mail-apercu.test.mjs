@@ -145,6 +145,19 @@ test('variable de lien inconnue : [NOM], pas #', () => {
   assert.ok(r.html.includes('[LIEN_PELLETS] [FOO_URL] #'), r.html);
 });
 
+test('usage de l’aperçu : campagne pour le Mailing (manuelle, automatique, séquence), individuel sinon ; argument explicite prioritaire', () => {
+  const r = { ...REGLAGES, email_habillage: { entete: 'logo', pied: {}, blocs: [{ titre: 'BLOC_CAMPAGNES', texte: 't' }] } };
+  const voit = (entree) => rendreApercu({ corps: '<p>a</p>', reglages: r, ...entree }).html.includes('BLOC_CAMPAGNES');
+  assert.equal(voit({ campagne: null }), true);
+  assert.equal(voit({ campagne: { key: 'promo' } }), true);
+  assert.equal(voit({ campagne: { key: 'x', is_automated: true } }), true);
+  assert.equal(voit({ campagne: { key: 'sequence_accueil_lead' } }), true);
+  assert.equal(voit({ campagne: { key: 'pv_reception' } }), false);
+  assert.equal(voit({ campagne: { key: 'webshop_ordre_colis' } }), false);
+  assert.equal(voit({ campagne: null, usage: 'individuel' }), false);
+  assert.equal(voit({ campagne: { key: 'pv_reception' }, usage: 'campagne' }), true);
+});
+
 test('objet d’une campagne : la formule de politesse et le lien pellets se voient entre crochets (l’envoi ne les remplace pas dans l’objet)', () => {
   const r = rendreApercu({ campagne: { key: 'promo' }, objet: '{{SALUTATION}} {{CLIENT_NAME}} {{lien_pellets}}', corps: '<p>{{SALUTATION}}</p>', reglages: REGLAGES });
   assert.equal(r.objet, '[Formule de politesse] Jean Dupont [Lien de l’offre pellets]');
