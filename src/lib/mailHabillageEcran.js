@@ -12,7 +12,7 @@
 // reste en base, on peut y revenir).
 // ============================================================================
 import {
-  choixDepuisReglages, couleurValide, lireHabillage, valeursDeMarque, DEFAUTS_MARQUE,
+  choixDepuisReglages, couleurValide, lireHabillage, valeursDeMarque, DEFAUTS_MARQUE, HABILLAGE_DEFAUT,
 } from './mailHabillage.js';
 import { contraste } from './pagePublique.js';
 import { normaliser } from './mailCorps.js';
@@ -28,6 +28,36 @@ import { normaliser } from './mailCorps.js';
 export const SEUIL_LISIBLE = 4.5;
 
 const COULEUR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/**
+ * Couleurs proposées pour les boutons et les liens : sobres, toutes lisibles en texte blanc (4,5:1, testé).
+ * @type {ReadonlyArray<{ nom: string, couleur: string }>}
+ */
+export const PASTILLES_BOUTONS = Object.freeze([
+  { nom: 'Ardoise', couleur: '#475569' },
+  { nom: 'Bleu', couleur: '#1d4ed8' },
+  { nom: 'Bleu pétrole', couleur: '#0f766e' },
+  { nom: 'Vert', couleur: '#15803d' },
+  { nom: 'Orange brûlé', couleur: '#c2410c' },
+  { nom: 'Rouge brique', couleur: '#b91c1c' },
+  { nom: 'Bordeaux', couleur: '#9f1239' },
+  { nom: 'Violet', couleur: '#7e22ce' },
+]);
+
+/**
+ * Couleurs proposées pour le bandeau : la même famille, plus foncée (même ordre que `PASTILLES_BOUTONS`).
+ * @type {ReadonlyArray<{ nom: string, couleur: string }>}
+ */
+export const PASTILLES_BANDEAU = Object.freeze([
+  { nom: 'Ardoise foncé', couleur: '#1e293b' },
+  { nom: 'Bleu nuit', couleur: '#1e3a8a' },
+  { nom: 'Pétrole foncé', couleur: '#134e4a' },
+  { nom: 'Vert sapin', couleur: '#14532d' },
+  { nom: 'Brun', couleur: '#7c2d12' },
+  { nom: 'Rouge sombre', couleur: '#7f1d1d' },
+  { nom: 'Bordeaux foncé', couleur: '#881337' },
+  { nom: 'Violet foncé', couleur: '#581c87' },
+]);
 
 /** Objet du mail d'exemple de l'aperçu. */
 export const OBJET_EXEMPLE = 'Votre entretien annuel approche';
@@ -53,7 +83,10 @@ const texte = (v) => (typeof v === 'string' ? v.trim() : '');
  */
 export function formulaireInitial(reglages) {
   const s = reglages ?? {};
-  const choix = choixDepuisReglages(s);
+  // Même test « ancien habillage » que `situationHabillage` (et que l'envoi) : un ancien habillage sans
+  // emplacement du texte n'est pas utilisé, l'écran part donc du défaut.
+  const choix = lireHabillage(s)
+    ?? (aUnAncienHabillage(s) ? choixDepuisReglages(s) : { entete: HABILLAGE_DEFAUT.entete, pied: { ...HABILLAGE_DEFAUT.pied } });
   return {
     entete: choix.entete,
     phrase: texte(s.email_tagline),
@@ -91,19 +124,24 @@ export function erreursFormulaire(form) {
   /** @type {{ couleurBandeau?: string, couleurBoutons?: string }} */
   const erreurs = {};
   for (const cle of /** @type {const} */ (['couleurBandeau', 'couleurBoutons'])) {
+    // « Logo seul » : la couleur du bandeau ne sert pas, son erreur ne bloque rien (`couleurBandeauEcrite`).
+    if (cle === 'couleurBandeau' && form.entete !== 'logo_bandeau') continue;
     const v = texte(form[cle]);
     if (v && !COULEUR_RE.test(v)) erreurs[cle] = 'Couleur illisible : écrivez-la sous la forme #1e3a8a, ou choisissez-la dans la palette.';
   }
   return erreurs;
 }
 
-/** Forme comparée et enregistrée du formulaire (espaces retirés). @param {FormulaireHabillage} form */
+/** Couleur comparée et écrite en minuscules (le sélecteur natif rend des minuscules). @param {unknown} v */
+const couleurNormalisee = (v) => texte(v).toLowerCase();
+
+/** Forme comparée et enregistrée du formulaire (espaces retirés, couleurs en minuscules). @param {FormulaireHabillage} form */
 function normaliserFormulaire(form) {
   return {
     entete: form.entete === 'logo_bandeau' ? 'logo_bandeau' : 'logo',
     phrase: texte(form.phrase),
-    couleurBandeau: texte(form.couleurBandeau),
-    couleurBoutons: texte(form.couleurBoutons),
+    couleurBandeau: couleurNormalisee(form.couleurBandeau),
+    couleurBoutons: couleurNormalisee(form.couleurBoutons),
     pied: { coordonnees: !!form.pied?.coordonnees, certifications: !!form.pied?.certifications, site: !!form.pied?.site },
   };
 }
@@ -122,17 +160,82 @@ export function estModifie(form, initial) {
  * Ce que l'écran enregistre : exactement quatre clés, `email_habillage` entier (fusion de niveau 1).
  * Lève sur une couleur mal formée : elle n'arrive jamais jusqu'à l'enregistrement.
  * @param {FormulaireHabillage} form
+ * @param {Record<string, any> | null} [reglages] réglages en base (couleur du bandeau gardée avec « Logo seul »)
  * @returns {{ email_habillage: { entete: string, pied: object }, accent_color: string | null, secondary_color: string | null, email_tagline: string | null }}
  */
-export function patchAEnregistrer(form) {
+export function patchAEnregistrer(form, reglages = null) {
   if (Object.keys(erreursFormulaire(form)).length) throw new Error('couleur_mal_formee');
-  const f = normaliserFormulaire(form);
+  return quatreCles(normaliserFormulaire(form), reglages);
+}
+
+/**
+ * Couleur du bandeau à écrire : la saisie si elle est bien formée ; avec « Logo seul » et une saisie mal formée
+ * (la couleur ne sert pas, son erreur est ignorée), la dernière valeur enregistrée valide — jamais la saisie.
+ * @param {ReturnType<typeof normaliserFormulaire>} f
+ * @param {Record<string, any> | null | undefined} reglages
+ * @returns {string | null}
+ */
+function couleurBandeauEcrite(f, reglages) {
+  if (!f.couleurBandeau || COULEUR_RE.test(f.couleurBandeau)) return f.couleurBandeau || null;
+  return couleurNormalisee(couleurValide(reglages?.secondary_color, '')) || null;
+}
+
+/** @param {ReturnType<typeof normaliserFormulaire>} f @param {Record<string, any> | null | undefined} reglages */
+function quatreCles(f, reglages) {
   return {
     email_habillage: { entete: f.entete, pied: f.pied },
     accent_color: f.couleurBoutons || null,
-    secondary_color: f.couleurBandeau || null,
+    secondary_color: couleurBandeauEcrite(f, reglages),
     email_tagline: f.phrase || null,
   };
+}
+
+/**
+ * Peut-on enregistrer ? Couleurs valides, et un changement — ou une entreprise à l'ancien habillage sans choix :
+ * enregistrer tel quel remplace alors l'habillage de tous ses e-mails, c'est un vrai changement.
+ * @param {FormulaireHabillage} form
+ * @param {FormulaireHabillage} initial
+ * @param {Record<string, any> | null | undefined} reglages
+ * @returns {boolean}
+ */
+export function peutEnregistrer(form, initial, reglages) {
+  const valide = Object.keys(erreursFormulaire(form)).length === 0;
+  return valide && (estModifie(form, initial) || situationHabillage(reglages).remplacementAConfirmer);
+}
+
+/**
+ * Pourquoi « Enregistrer » est fermé, ou `null` s'il est ouvert.
+ * @param {FormulaireHabillage} form
+ * @param {FormulaireHabillage} initial
+ * @param {Record<string, any> | null | undefined} reglages
+ * @returns {string | null}
+ */
+export function raisonFermeture(form, initial, reglages) {
+  if (Object.keys(erreursFormulaire(form)).length) return 'Corrigez la couleur avant d’enregistrer.';
+  return peutEnregistrer(form, initial, reglages) ? null : 'Aucune modification.';
+}
+
+/**
+ * Libellé du bouton : « Adopter cet habillage » tant que l'ancien habillage est en place sans choix enregistré.
+ * @param {Record<string, any> | null | undefined} reglages
+ * @returns {string}
+ */
+export function libelleEnregistrer(reglages) {
+  return situationHabillage(reglages).remplacementAConfirmer ? 'Adopter cet habillage' : 'Enregistrer';
+}
+
+/** Réglages dont dépend l'écran (formulaire, situation, logo). */
+const CLES_HABILLAGE = ['email_habillage', 'accent_color', 'secondary_color', 'email_tagline', 'email_skeleton_html', 'logo_url'];
+
+/**
+ * Empreinte des réglages dont dépend l'écran : elle ne change que si l'habillage enregistré change (un autre
+ * réglage écrit ailleurs ne doit pas réinitialiser le formulaire).
+ * @param {Record<string, any> | null | undefined} reglages
+ * @returns {string}
+ */
+export function empreinteHabillage(reglages) {
+  const s = reglages ?? {};
+  return JSON.stringify(CLES_HABILLAGE.map((cle) => s[cle] ?? null));
 }
 
 /**
@@ -143,14 +246,20 @@ export function patchAEnregistrer(form) {
  * @returns {Record<string, any>}
  */
 export function reglagesApresEnregistrement(reglages, form) {
-  const f = normaliserFormulaire(form);
-  return {
-    ...(reglages ?? {}),
-    email_habillage: { entete: f.entete, pied: f.pied },
-    accent_color: f.couleurBoutons || null,
-    secondary_color: f.couleurBandeau || null,
-    email_tagline: f.phrase || null,
-  };
+  return { ...(reglages ?? {}), ...quatreCles(normaliserFormulaire(form), reglages) };
+}
+
+/**
+ * Réglages que l'aperçu habille : ceux en base quand « Voir l'habillage actuel » est demandé (seulement tant que
+ * l'ancien habillage est en place sans choix), sinon ceux d'après l'enregistrement.
+ * @param {Record<string, any> | null | undefined} reglages
+ * @param {FormulaireHabillage} form
+ * @param {boolean} voirActuel
+ * @returns {Record<string, any>}
+ */
+export function reglagesDeLApercu(reglages, form, voirActuel) {
+  if (voirActuel && situationHabillage(reglages).remplacementAConfirmer) return reglages ?? {};
+  return reglagesApresEnregistrement(reglages, form);
 }
 
 const VERS_COORDONNEES = { vers: '/settings/organization?tab=contact', libelle: 'Organisation → Coordonnées' };
@@ -220,6 +329,16 @@ export function lisibiliteBoutons(valeur) {
 export function logoAffiche(reglages) {
   const url = texte(reglages?.logo_url);
   return { url: /^https:\/\//i.test(url) ? url : null, nom: texte(reglages?.brand_name) };
+}
+
+/**
+ * Ce que l'écran dit du logo : `absent` (le nom est écrit), `non_sur` (adresse hors https, non utilisée), ou `null`.
+ * @param {Record<string, any> | null | undefined} reglages
+ * @returns {'absent' | 'non_sur' | null}
+ */
+export function ligneLogo(reglages) {
+  if (!texte(reglages?.logo_url)) return 'absent';
+  return logoAffiche(reglages).url ? null : 'non_sur';
 }
 
 /**

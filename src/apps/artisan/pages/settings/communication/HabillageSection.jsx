@@ -13,7 +13,7 @@
  * `email_tagline` — jamais l'ancien habillage, qu'on peut toujours retrouver.
  * ============================================================================
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Image as ImageIcon } from 'lucide-react';
@@ -22,9 +22,10 @@ import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { logger } from '@lib/logger';
 import { DEFAUTS_MARQUE } from '@/lib/mailHabillage';
 import {
-  formulaireInitial, situationHabillage, erreursFormulaire, estModifie, patchAEnregistrer,
-  reglagesApresEnregistrement, piedDisponible, lisibiliteBoutons, logoAffiche, bandeauVisible,
-  couleurPourSelecteur, TEXTE_EXEMPLE, OBJET_EXEMPLE,
+  formulaireInitial, situationHabillage, erreursFormulaire, estModifie, patchAEnregistrer, peutEnregistrer,
+  raisonFermeture, libelleEnregistrer, empreinteHabillage, reglagesDeLApercu, piedDisponible, lisibiliteBoutons,
+  logoAffiche, ligneLogo, bandeauVisible, couleurPourSelecteur, TEXTE_EXEMPLE, OBJET_EXEMPLE,
+  PASTILLES_BOUTONS, PASTILLES_BANDEAU,
 } from '@/lib/mailHabillageEcran';
 import ApercuMail from '@/apps/artisan/components/mailing/page/ApercuMail';
 
@@ -73,12 +74,32 @@ function Interrupteur({ actif, onClick, disabled, libelle }) {
   );
 }
 
-/** Palette du système + valeur écrite ; vide = la couleur par défaut. */
-function ChampCouleur({ id, libelle, aide, valeur, defaut, erreur, onChange, children }) {
+/** Pastilles proposées, palette du système et valeur écrite ; vide = la couleur par défaut. */
+function ChampCouleur({ id, libelle, aide, valeur, defaut, pastilles, erreur, onChange, children }) {
+  const choisie = valeur.trim().toLowerCase();
   return (
     <div>
       <label htmlFor={`${id}-texte`} className={LABEL_CLASS}>{libelle}</label>
       <p className={HINT_CLASS}>{aide}</p>
+      <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={`${libelle} : couleurs proposées`}>
+        {pastilles.map((p) => {
+          const active = choisie === p.couleur;
+          return (
+            <button
+              key={p.couleur}
+              type="button"
+              onClick={() => onChange(p.couleur)}
+              aria-label={p.nom}
+              aria-pressed={active}
+              title={p.nom}
+              className={`h-8 w-8 rounded-full border border-black/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
+                active ? 'ring-2 ring-secondary-900 ring-offset-2' : ''
+              }`}
+              style={{ background: p.couleur }}
+            />
+          );
+        })}
+      </div>
       <div className="mt-2 flex items-center gap-2">
         <input
           type="color"
@@ -111,13 +132,35 @@ function ChampCouleur({ id, libelle, aide, valeur, defaut, erreur, onChange, chi
 export default function HabillageSection() {
   const { settings, save, isSaving } = useOrgSettings();
   const location = useLocation();
-  const initial = useMemo(() => formulaireInitial(settings), [settings]);
+  const [initial, setInitial] = useState(() => formulaireInitial(settings));
   const [form, setForm] = useState(initial);
   const [dialogue, setDialogue] = useState(null); // 'remplacer' | 'revenir' | null
   const [voirActuel, setVoirActuel] = useState(false);
+  const [changeAilleurs, setChangeAilleurs] = useState(false); // habillage enregistré modifié ailleurs pendant une saisie
 
-  // Réglages relus (après un enregistrement) : le formulaire repart de ce qui est en base.
-  useEffect(() => { setForm(initial); }, [initial]);
+  // Le formulaire ne repart des réglages en base que si l'HABILLAGE enregistré change (un autre réglage écrit
+  // ailleurs ne touche à rien) ; une saisie en cours n'est jamais effacée : on prévient, « Recharger » la remplace.
+  const empreinte = empreinteHabillage(settings);
+  const courant = useRef({ settings, form, initial });
+  courant.current = { settings, form, initial };
+  const empreinteVue = useRef(empreinte);
+  useEffect(() => {
+    if (empreinteVue.current === empreinte) return;
+    empreinteVue.current = empreinte;
+    const { settings: s, form: f, initial: i } = courant.current;
+    if (estModifie(f, i)) { setChangeAilleurs(true); return; }
+    const neuf = formulaireInitial(s);
+    setInitial(neuf);
+    setForm(neuf);
+  }, [empreinte]);
+
+  /** Repart de ce qui est (ou sera, juste après un enregistrement) en base. @param {Record<string, any>} s */
+  const repartirDe = (s) => {
+    const neuf = formulaireInitial(s);
+    setInitial(neuf);
+    setForm(neuf);
+    setChangeAilleurs(false);
+  };
 
   // Lien « Modifier l'habillage » de la page d'un mail : on amène la section à l'écran.
   useEffect(() => {
@@ -126,25 +169,25 @@ export default function HabillageSection() {
 
   const situation = situationHabillage(settings);
   const erreurs = erreursFormulaire(form);
-  const valide = Object.keys(erreurs).length === 0;
   const modifie = estModifie(form, initial);
+  const ouvert = peutEnregistrer(form, initial, settings);
+  const raison = raisonFermeture(form, initial, settings);
   const pied = piedDisponible(settings);
   const lisibilite = lisibiliteBoutons(form.couleurBoutons);
   const logo = logoAffiche(settings);
-  const reglagesApercu = useMemo(
-    () => (voirActuel && situation.remplacementAConfirmer ? settings : reglagesApresEnregistrement(settings, form)),
-    [voirActuel, situation.remplacementAConfirmer, settings, form],
-  );
-  const raisonFermeture = !valide ? 'Corrigez la couleur avant d’enregistrer.' : (!modifie ? 'Aucune modification.' : null);
+  const etatLogo = ligneLogo(settings);
+  const reglagesApercu = useMemo(() => reglagesDeLApercu(settings, form, voirActuel), [settings, form, voirActuel]);
 
   const champ = (cle, valeur) => setForm((f) => ({ ...f, [cle]: valeur }));
   const basculerPied = (cle) => setForm((f) => ({ ...f, pied: { ...f.pied, [cle]: !f.pied[cle] } }));
 
   const enregistrer = async () => {
     setDialogue(null);
-    if (!valide || !modifie || isSaving) return;
+    if (!ouvert || isSaving) return;
     try {
-      await save(patchAEnregistrer(form));
+      const patch = patchAEnregistrer(form, settings);
+      await save(patch);
+      repartirDe({ ...settings, ...patch });
       setVoirActuel(false);
       toast.success('Habillage des e-mails enregistré : vos prochains e-mails partiront ainsi.');
     } catch (err) {
@@ -157,6 +200,7 @@ export default function HabillageSection() {
     setDialogue(null);
     try {
       await save({ email_habillage: null });
+      repartirDe({ ...settings, email_habillage: null });
       toast.success('Vos e-mails reprennent leur ancien habillage.');
     } catch (err) {
       logger.error('[HabillageSection] retour à l’ancien habillage', err);
@@ -165,7 +209,7 @@ export default function HabillageSection() {
   };
 
   const demanderEnregistrement = () => {
-    if (!valide || !modifie || isSaving) return;
+    if (!ouvert || isSaving) return;
     if (situation.remplacementAConfirmer) setDialogue('remplacer');
     else enregistrer();
   };
@@ -181,11 +225,20 @@ export default function HabillageSection() {
       {situation.remplacementAConfirmer && (
         <div className="mt-4 rounded-lg border border-secondary-200 bg-secondary-50 px-4 py-3 text-sm text-secondary-700">
           <p>
-            Vos e-mails partent aujourd’hui avec votre habillage précédent. En enregistrant cet écran, il est remplacé
-            par celui de l’aperçu. L’habillage précédent est conservé : vous pourrez y revenir.
+            Vos e-mails partent aujourd’hui avec votre habillage précédent. « Adopter cet habillage » le remplace par
+            celui de l’aperçu, que vous pouvez d’abord ajuster. L’habillage précédent est conservé : vous pourrez y revenir.
           </p>
           <button type="button" onClick={() => setVoirActuel((v) => !v)} className={`mt-2 text-sm ${LIEN_CLASS}`}>
             {voirActuel ? 'Voir le nouvel habillage' : 'Voir l’habillage actuel'}
+          </button>
+        </div>
+      )}
+
+      {changeAilleurs && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-secondary-200 bg-secondary-50 px-4 py-3 text-sm text-secondary-700">
+          <p>L’habillage enregistré a été modifié ailleurs pendant votre saisie.</p>
+          <button type="button" onClick={() => repartirDe(settings)} className={`text-sm ${LIEN_CLASS}`}>
+            Recharger
           </button>
         </div>
       )}
@@ -240,6 +293,7 @@ export default function HabillageSection() {
                 aide="La bande de couleur sous le logo."
                 valeur={form.couleurBandeau}
                 defaut={DEFAUTS_MARQUE.bandeau}
+                pastilles={PASTILLES_BANDEAU}
                 erreur={erreurs.couleurBandeau}
                 onChange={(v) => champ('couleurBandeau', v)}
               />
@@ -252,6 +306,7 @@ export default function HabillageSection() {
             aide="C’est aussi la couleur des pages que vos clients ouvrent sans compte (prise de rendez-vous, procès-verbal de réception)."
             valeur={form.couleurBoutons}
             defaut={DEFAUTS_MARQUE.accent}
+            pastilles={PASTILLES_BOUTONS}
             erreur={erreurs.couleurBoutons}
             onChange={(v) => champ('couleurBoutons', v)}
           >
@@ -305,8 +360,8 @@ export default function HabillageSection() {
                   : <ImageIcon className="h-6 w-6 text-secondary-300" aria-hidden="true" />}
               </div>
               <div className="min-w-0 text-xs text-secondary-500">
-                {!settings?.logo_url && <p>Pas de logo : le nom de l’entreprise est écrit à sa place{logo.nom ? ` (« ${logo.nom} »)` : ''}.</p>}
-                {settings?.logo_url && !logo.url && <p>Ce logo n’est pas hébergé de façon sûre : le nom de l’entreprise est écrit à sa place. Déposez-le à nouveau pour l’utiliser.</p>}
+                {etatLogo === 'absent' && <p>Pas de logo : le nom de l’entreprise est écrit à sa place{logo.nom ? ` (« ${logo.nom} »)` : ''}.</p>}
+                {etatLogo === 'non_sur' && <p>Ce logo n’est pas hébergé de façon sûre : le nom de l’entreprise est écrit à sa place. Déposez-le à nouveau pour l’utiliser.</p>}
                 <Link to="/settings/organization?tab=identity" className={LIEN_CLASS}>Changer le logo dans Organisation → Identité</Link>
               </div>
             </div>
@@ -325,7 +380,7 @@ export default function HabillageSection() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          {raisonFermeture && <span className="text-xs text-secondary-500">{raisonFermeture}</span>}
+          {raison && <span className="text-xs text-secondary-500">{raison}</span>}
           <button
             type="button"
             onClick={() => setForm(initial)}
@@ -337,10 +392,10 @@ export default function HabillageSection() {
           <button
             type="button"
             onClick={demanderEnregistrement}
-            disabled={!modifie || !valide || isSaving}
+            disabled={!ouvert || isSaving}
             className="px-4 py-2 text-sm bg-primary-700 text-white rounded-md hover:bg-primary-800 disabled:opacity-50"
           >
-            {isSaving ? 'Enregistrement…' : 'Enregistrer'}
+            {isSaving ? 'Enregistrement…' : libelleEnregistrer(settings)}
           </button>
         </div>
       </div>

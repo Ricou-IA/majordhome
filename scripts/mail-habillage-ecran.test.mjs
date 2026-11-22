@@ -52,7 +52,7 @@ test('rien changé ⇒ pas modifié ; une couleur changée ⇒ modifié ; espace
 
 test('couleurs : vide accepté, mal formée refusée avec sa raison', () => {
   assert.deepEqual(erreursFormulaire(formulaireInitial({})), {});
-  const e = erreursFormulaire({ ...formulaireInitial({}), couleurBoutons: 'orange', couleurBandeau: '#12' });
+  const e = erreursFormulaire({ ...formulaireInitial({}), entete: 'logo_bandeau', couleurBoutons: 'orange', couleurBandeau: '#12' });
   assert.ok(e.couleurBoutons && e.couleurBandeau);
   assert.deepEqual(erreursFormulaire({ ...formulaireInitial({}), couleurBoutons: '#abc' }), {});
   assert.throws(() => patchAEnregistrer({ ...formulaireInitial({}), couleurBoutons: 'red;}' }));
@@ -62,7 +62,7 @@ test('enregistrement : exactement les quatre clés, habillage entier, vide = nul
   const patch = patchAEnregistrer({ ...formulaireInitial({}), phrase: '  ', couleurBoutons: ' #C2410C ' });
   assert.deepEqual(Object.keys(patch).sort(), ['accent_color', 'email_habillage', 'email_tagline', 'secondary_color']);
   assert.deepEqual(patch.email_habillage, { entete: 'logo', pied: { coordonnees: true, certifications: false, site: false } });
-  assert.equal(patch.accent_color, '#C2410C');
+  assert.equal(patch.accent_color, '#c2410c'); // écrite en minuscules (correctif d)
   assert.equal(patch.secondary_color, null);
   assert.equal(patch.email_tagline, null);
   // null est lu comme « par défaut » par la règle de l'envoi.
@@ -134,4 +134,90 @@ test('sélecteur de couleur : toujours #rrggbb, la couleur qui partira', () => {
   assert.equal(couleurPourSelecteur('#abc', '#000000'), '#aabbcc');
   assert.equal(couleurPourSelecteur('', '#64748b'), '#64748b');
   assert.equal(couleurPourSelecteur('orange', '#334155'), '#334155');
+});
+
+// ── Correctifs, tour 1 ────────────────────────────────────────────────────────
+import {
+  peutEnregistrer, raisonFermeture, libelleEnregistrer, empreinteHabillage, PASTILLES_BOUTONS, PASTILLES_BANDEAU,
+  reglagesDeLApercu, ligneLogo,
+} from '../src/lib/mailHabillageEcran.js';
+
+test('ancien habillage sans choix : l\'habillage proposé s\'adopte tel quel', () => {
+  const init = formulaireInitial(MAYER);
+  assert.equal(peutEnregistrer(init, init, MAYER), true);
+  assert.equal(raisonFermeture(init, init, MAYER), null);
+  assert.equal(libelleEnregistrer(MAYER), 'Adopter cet habillage');
+  // Couleur mal formée : jamais.
+  assert.equal(peutEnregistrer({ ...init, couleurBoutons: 'orange' }, init, MAYER), false);
+  assert.ok(raisonFermeture({ ...init, couleurBoutons: 'orange' }, init, MAYER));
+});
+
+test('choix enregistré : « Enregistrer » fermé sans changement, ouvert avec', () => {
+  const r = { ...MAYER, email_habillage: { entete: 'logo', pied: {} } };
+  const init = formulaireInitial(r);
+  assert.equal(libelleEnregistrer(r), 'Enregistrer');
+  assert.equal(peutEnregistrer(init, init, r), false);
+  assert.equal(raisonFermeture(init, init, r), 'Aucune modification.');
+  assert.equal(peutEnregistrer({ ...init, phrase: 'Autre' }, init, r), true);
+  assert.equal(libelleEnregistrer({}), 'Enregistrer');
+  assert.equal(peutEnregistrer(formulaireInitial({}), formulaireInitial({}), {}), false);
+});
+
+test('empreinte : ne bouge pas pour un réglage sans rapport, bouge pour l\'habillage', () => {
+  const e = empreinteHabillage(MAYER);
+  assert.equal(empreinteHabillage({ ...MAYER, from_email: 'autre@x.fr', reply_to: 'b@x.fr' }), e);
+  for (const [cle, val] of [['email_habillage', { entete: 'logo' }], ['accent_color', '#000000'], ['secondary_color', '#111111'],
+    ['email_tagline', 'Autre'], ['email_skeleton_html', '<p>{{EMAIL_BODY}}</p>'], ['logo_url', 'https://x/y.png']]) {
+    assert.notEqual(empreinteHabillage({ ...MAYER, [cle]: val }), e, cle);
+  }
+});
+
+test('pastilles : boutons lisibles en blanc, bandeau de la même famille, noms français', () => {
+  assert.ok(PASTILLES_BOUTONS.length >= 6 && PASTILLES_BOUTONS.length <= 8);
+  assert.equal(PASTILLES_BANDEAU.length, PASTILLES_BOUTONS.length);
+  for (const p of [...PASTILLES_BOUTONS, ...PASTILLES_BANDEAU]) {
+    assert.match(p.couleur, /^#[0-9a-f]{6}$/);
+    assert.ok(p.nom.length > 0);
+    assert.ok(contraste(p.couleur, '#ffffff') >= 4.5, p.nom);
+  }
+  PASTILLES_BOUTONS.forEach((p, i) => assert.ok(contraste(PASTILLES_BANDEAU[i].couleur, '#ffffff') >= contraste(p.couleur, '#ffffff'), p.nom));
+});
+
+test('« Logo seul » : la couleur du bandeau n\'est pas utilisée, son erreur ne bloque rien et rien de faux n\'est écrit', () => {
+  const form = { ...formulaireInitial(MAYER), entete: 'logo', couleurBandeau: 'orange' };
+  assert.deepEqual(erreursFormulaire(form), {});
+  assert.equal(patchAEnregistrer(form, MAYER).secondary_color, '#1e3a8a');
+  assert.equal(patchAEnregistrer(form, {}).secondary_color, null);
+  assert.equal(reglagesApresEnregistrement(MAYER, form).secondary_color, '#1e3a8a');
+  // Avec bandeau, l'erreur reste.
+  assert.ok(erreursFormulaire({ ...form, entete: 'logo_bandeau' }).couleurBandeau);
+});
+
+test('ancien habillage sans emplacement du texte : traité partout comme « pas d\'ancien habillage »', () => {
+  const r = { email_skeleton_html: '<p>sans emplacement</p>' };
+  assert.deepEqual(formulaireInitial(r), formulaireInitial({}));
+  assert.equal(situationHabillage(r).ancien, false);
+  assert.equal(libelleEnregistrer(r), 'Enregistrer');
+});
+
+test('couleurs : comparées sans tenir compte des majuscules, écrites en minuscules', () => {
+  const r = { ...MAYER, accent_color: '#1E4D8C', email_habillage: { entete: 'logo', pied: {} } };
+  const init = formulaireInitial(r);
+  assert.equal(estModifie({ ...init, couleurBoutons: '#1e4d8c' }, init), false);
+  assert.equal(patchAEnregistrer({ ...init, phrase: 'x' }, r).accent_color, '#1e4d8c');
+});
+
+test('aperçu : « Voir l\'habillage actuel » montre les réglages en base, sinon ceux après enregistrement', () => {
+  const form = { ...formulaireInitial(MAYER), couleurBoutons: '#000000' };
+  assert.equal(reglagesDeLApercu(MAYER, form, true), MAYER);
+  assert.equal(reglagesDeLApercu(MAYER, form, false).accent_color, '#000000');
+  // Hors ancien habillage, la bascule n'a pas de sens : réglages après enregistrement.
+  const r = { ...MAYER, email_habillage: { entete: 'logo', pied: {} } };
+  assert.equal(reglagesDeLApercu(r, form, true).accent_color, '#000000');
+});
+
+test('ligne du logo : absent, non sûr, ou rien à dire', () => {
+  assert.equal(ligneLogo({}), 'absent');
+  assert.equal(ligneLogo({ logo_url: 'http://x/l.png' }), 'non_sur');
+  assert.equal(ligneLogo({ logo_url: 'https://x/l.png' }), null);
 });

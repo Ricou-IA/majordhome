@@ -95,9 +95,12 @@ La « forme » de tous les e-mails, réglée une fois par l'administrateur (sect
 | Pied de page | `email_habillage.pied` | chaque choix fermé (avec sa raison et le lien vers Organisation) quand il n'y a rien à montrer ; désabonnement toujours présent |
 | Logo | `logo_url` | lecture seule ; seul un `https` est utilisé, sinon le nom est écrit |
 
-- L'écran enregistre **exactement** `email_habillage` (entier), `accent_color`, `secondary_color`, `email_tagline`. **`email_skeleton_html` (ancien habillage) n'est jamais écrit ni effacé.** Couleur mal formée : jamais envoyée (`patchAEnregistrer` lève), « Enregistrer » fermé avec sa raison ; sans changement, fermé aussi.
+- L'écran enregistre **exactement** `email_habillage` (entier), `accent_color`, `secondary_color`, `email_tagline`. **`email_skeleton_html` (ancien habillage) n'est jamais écrit ni effacé.** Couleur mal formée : jamais envoyée (`patchAEnregistrer` lève), le bouton est fermé avec sa raison.
 - Entreprise avec un ancien habillage et aucun choix (Mayer au 2026-11-22) : écran prérempli (`choixDepuisReglages`), bandeau « habillage précédent » avec « Voir l'habillage actuel » (aperçu des réglages en base). Son **premier enregistrement remplace l'habillage de tous ses e-mails** : confirmation demandée. Ensuite, « Revenir à l'ancien habillage » = `save({ email_habillage: null })` ; les couleurs et la phrase restent (l'ancien habillage peut les lire), les choix d'en-tête et de pied sont perdus.
-- Un ancien habillage ne compte que s'il porte `{{EMAIL_BODY}}` (même test que `habillerMail`).
+- Un ancien habillage ne compte que s'il porte `{{EMAIL_BODY}}` (même test que `habillerMail`), pour la situation ET le préremplissage (`formulaireInitial`) ; sans lui, l'écran part du défaut.
+- Tant que l'ancien habillage est en place sans choix, le bouton s'appelle « Adopter cet habillage » et s'ouvre même sans changement (`peutEnregistrer`) ; ensuite « Enregistrer », fermé sans changement.
+- Le formulaire ne repart de la base que si l'habillage enregistré change (`empreinteHabillage` : les quatre clés, l'ancien habillage, le logo) ; si la saisie est en cours, elle est gardée et une ligne propose « Recharger ».
+- Pastilles proposées au-dessus de chaque couleur (`PASTILLES_BOUTONS`, toutes lisibles en blanc, testé ; `PASTILLES_BANDEAU`, même famille plus foncée). Couleurs comparées et écrites en minuscules. Avec « Logo seul », la couleur du bandeau ne sert pas : une saisie mal formée n'y bloque rien et la dernière valeur valide enregistrée est gardée.
 - Règles : `src/lib/mailHabillageEcran.js` (pur, testé `scripts/mail-habillage-ecran.test.mjs`, **non** copié pour Deno — `mailHabillage.js`, lui, est déployé dans les edges et n'est pas touché par l'écran).
 
 ### Edge function `mailing-send` (P0.8 V2 — remplace ancien workflow N8n)
