@@ -255,13 +255,15 @@ export function KanbanBoard({
           <div className="flex flex-wrap items-center gap-2">
             {headerRight}
             {searchFilter && (
-              <div className="relative">
+              <div className="relative min-w-0 max-w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-[220px] pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors min-h-[40px]"
+                  // Largeur d'après le texte d'aide : à 220 px fixes, « Rechercher un chantier... » était coupé.
+                  size={Math.max(18, searchPlaceholder.length)}
+                  className="min-w-[220px] max-w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors min-h-[40px]"
                   placeholder={searchPlaceholder}
                 />
                 {searchTerm && (

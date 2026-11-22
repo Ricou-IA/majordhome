@@ -249,7 +249,9 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 mt-1.5">
+        {/* Les repères passent à la ligne plutôt que d'écraser la source : « Bouche-à-oreille »
+            se lit en entier, c'est le délai ou le bouton des devis qui descend d'une ligne. */}
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1.5">
           {estHorsZone(lead) && (
             <span
               className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 font-medium whitespace-nowrap"
@@ -260,7 +262,7 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
           )}
           {sourceLabel && (
             <span
-              className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium truncate max-w-[100px]"
+              className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium truncate max-w-full"
               style={{ backgroundColor: sourceColor }}
               title={sourceLabel}
             >
