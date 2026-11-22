@@ -1,7 +1,7 @@
 # Recette — import des clients d'un autre logiciel (novembre 2026)
 
 - **Adresse testée** : https://majordhome.vercel.app
-- **Commit déployé** : `cfaefda1` (poussé le 2026-11-22, 31 commits depuis `5b0a9f3e`).
+- **Commit déployé** : `cfaefda1` (poussé le 2026-11-22, 31 commits depuis `5b0a9f3e`). Corrections de recette mises en ligne le 2026-11-22 : `c3c51be8`, `87842d63`, `2cc124ae` (déploiement prêt pour `2cc124ae`).
 - **Comptes** : celui d'Eric sur **Cimaj** (administrateur) pour tous les tests d'import ; celui d'Eric sur **Mayer Énergie** pour C101.
 - **Légende** : `[x]` validé · `[!]` anomalie · `[-]` non testable ou écarté, avec la raison
 - **Règle** : un test à la fois. Un point est coché après le retour d'Eric et la vérification.
@@ -100,18 +100,18 @@
 
 ## Anomalies
 
-- **R101 (2026-11-22, vu pendant C110). Accents abîmés quand un CSV a été ouvert puis enregistré par Excel.** Cause établie en lisant le fichier d'Eric cellule par cellule (`docs/recette-fichiers/import-clients-essai.xlsx`, non versionné) : c'est le fichier lui-même qui contient « RÃ©f. client », « SociÃ©tÃ© », « nÃ©ant »… Excel a ouvert le CSV d'essai, écrit en UTF-8 sans marque d'ordre des octets, comme un fichier Windows-1252, puis a enregistré le résultat. L'import a lu fidèlement ce qu'on lui a donné. Deux défauts de notre côté : (1) le fichier d'essai que j'ai fourni n'a pas la marque qui dit à Excel qu'il est en UTF-8 ; (2) le cas est courant chez un vrai utilisateur (ouvrir l'export dans Excel, le retoucher, l'enregistrer), et l'import ne répare rien : en-têtes non reconnus, noms et adresses faux en base. Correctif proposé, en attente de l'accord d'Eric : réparer ces accents à la lecture (une cellule dont le texte, repassé en octets Windows-1252, se relit proprement en UTF-8 est remplacée par sa version réparée ; sinon elle n'est pas touchée), avec ses tests, et ajouter la marque au fichier d'essai.
+- **R101 (2026-11-22, vu pendant C110) — corrigée (`c3c51be8`, `2cc124ae`), à retester en C113. Accents abîmés quand un CSV a été ouvert puis enregistré par Excel.** Cause établie en lisant le fichier d'Eric cellule par cellule (`docs/recette-fichiers/import-clients-essai.xlsx`, non versionné) : c'est le fichier lui-même qui contient « RÃ©f. client », « SociÃ©tÃ© », « nÃ©ant »… Excel a ouvert le CSV d'essai, écrit en UTF-8 sans marque d'ordre des octets, comme un fichier Windows-1252, puis a enregistré le résultat. L'import a lu fidèlement ce qu'on lui a donné. Deux défauts de notre côté : (1) le fichier d'essai que j'ai fourni n'a pas la marque qui dit à Excel qu'il est en UTF-8 ; (2) le cas est courant chez un vrai utilisateur (ouvrir l'export dans Excel, le retoucher, l'enregistrer), et l'import ne répare rien : en-têtes non reconnus, noms et adresses faux en base. Correctif proposé, en attente de l'accord d'Eric : réparer ces accents à la lecture (une cellule dont le texte, repassé en octets Windows-1252, se relit proprement en UTF-8 est remplacée par sa version réparée ; sinon elle n'est pas touchée), avec ses tests, et ajouter la marque au fichier d'essai.
 
 ## Remarques et améliorations
 
-- **A105 (2026-11-22, vu pendant C110).** Le type de client n'accepte que les mots exacts : « Particuliers » (au pluriel), « Privé », « Client », « SARL » sont illisibles. Par ailleurs le bloc de l'aperçu dit « le champ est laissé vide », alors que pour le type de client la fiche devient « particulier ». À proposer : accepter les pluriels et quelques mots courants, et dire la valeur prise par défaut.
+- **A105 — fait (c3c51be8, 2cc124ae), à retester en C117 (2026-11-22, vu pendant C110).** Le type de client n'accepte que les mots exacts : « Particuliers » (au pluriel), « Privé », « Client », « SARL » sont illisibles. Par ailleurs le bloc de l'aperçu dit « le champ est laissé vide », alors que pour le type de client la fiche devient « particulier ». À proposer : accepter les pluriels et quelques mots courants, et dire la valeur prise par défaut.
 
-- **A104 (2026-11-22, vu pendant C108).** Dans les raisons d'un doublon, « même nom et prénom » est suivi de « même nom », qui dit la même chose une seconde fois. À proposer : ne pas afficher « même nom » quand « même nom et prénom » y est déjà.
+- **A104 — fait (c3c51be8), à retester en C116 (2026-11-22, vu pendant C108).** Dans les raisons d'un doublon, « même nom et prénom » est suivi de « même nom », qui dit la même chose une seconde fois. À proposer : ne pas afficher « même nom » quand « même nom et prénom » y est déjà.
 
-- **A102 (2026-11-22, vu pendant C107).** Sur la fiche, le champ « Notes internes » ne fait que deux lignes de haut : les trois lignes venues de l'import ne se lisent qu'en faisant défiler le champ (la première est coupée). À proposer : un champ qui s'agrandit avec son contenu.
-- **A103 (2026-11-22, vu pendant C107).** Deux façons de nommer le même champ : la fiche dit « Notes visibles par toute l'équipe », le fichier type et l'écran de correspondance disent « Notes (visibles par le client) ». À trancher par Eric, puis aligner les deux.
+- **A102 — fait (87842d63), à retester en C115 (2026-11-22, vu pendant C107).** Sur la fiche, le champ « Notes internes » ne fait que deux lignes de haut : les trois lignes venues de l'import ne se lisent qu'en faisant défiler le champ (la première est coupée). À proposer : un champ qui s'agrandit avec son contenu.
+- **A103 — en attente de la réponse d'Eric (2026-11-22, vu pendant C107).** Deux façons de nommer le même champ : la fiche dit « Notes visibles par toute l'équipe », le fichier type et l'écran de correspondance disent « Notes (visibles par le client) ». À trancher par Eric, puis aligner les deux.
 
-- **A101 (2026-11-22, vu pendant C104).** Devant une colonne « Adresse complète », le réflexe d'Eric a été de choisir « Adresse » : toute la ligne (« 12 rue de la République 69003 Lyon ») irait alors dans l'adresse, et le code postal et la ville resteraient vides, sans que rien ne le dise. Le bon choix, « Adresse complète (rue, code postal, ville) », est en bas de la liste, dans un second groupe. Correctif proposé, en attente de son accord : (1) présélectionner la cible composée quand l'en-tête le dit (« Adresse complète », « Nom complet », « Nom et prénom », « CP Ville »…) ; (2) quand une colonne pointée sur « Adresse » contient des codes postaux et qu'aucune colonne ne va vers « Code postal », le dire sous la liste avec un bouton pour basculer ; même chose pour « Nom » quand les valeurs portent nom et prénom ; (3) à l'aperçu, compter les fiches sans code postal.
+- **A101 — fait (c3c51be8, 87842d63, 2cc124ae), à retester en C114 (2026-11-22, vu pendant C104).** Devant une colonne « Adresse complète », le réflexe d'Eric a été de choisir « Adresse » : toute la ligne (« 12 rue de la République 69003 Lyon ») irait alors dans l'adresse, et le code postal et la ville resteraient vides, sans que rien ne le dise. Le bon choix, « Adresse complète (rue, code postal, ville) », est en bas de la liste, dans un second groupe. Correctif proposé, en attente de son accord : (1) présélectionner la cible composée quand l'en-tête le dit (« Adresse complète », « Nom complet », « Nom et prénom », « CP Ville »…) ; (2) quand une colonne pointée sur « Adresse » contient des codes postaux et qu'aucune colonne ne va vers « Code postal », le dire sous la liste avec un bouton pour basculer ; même chose pour « Nom » quand les valeurs portent nom et prénom ; (3) à l'aperçu, compter les fiches sans code postal.
 
 - Connu avant recette : pendant un envoi, le menu latéral reste cliquable (l'envoi continue, l'import reste dans la liste).
 - Connu avant recette : un import arrêté en cours de route garde le libellé « En cours » dans la liste.
@@ -119,4 +119,32 @@
 
 ## Retest des corrections
 
-_(rien pour l'instant)_
+- [ ] **C113. Retest de R101 : le fichier Excel aux accents abîmés.**
+  Où : compte Cimaj → Clients → « Importer ».
+  Saisir : déposer de nouveau `import-clients-essai.xlsx` (celui enregistré depuis Excel).
+  Attendu : à l'étape Correspondance, la ligne « Des accents abîmés ont été réparés dans 11 cellules (fichier passé par un tableur). » ; les en-têtes se lisent « Réf. client », « Société », « Adresse complète », « Marque chaudière » ; les valeurs aussi (« République », « Jaurès », « néant », « m² », « peut-être »).
+  Vérification : hors navigateur, le même fichier passé par les règles donne 11 cellules réparées (fait le 2026-11-22).
+
+- [ ] **C114. Retest de A101 : « Adresse complète » et « Nom complet » présélectionnés.**
+  Où : la même étape Correspondance (ou en déposant `import-clients-essai.csv`).
+  Saisir : rien d'abord ; puis mettre « Adresse » à la main sur la colonne « Adresse complète ».
+  Attendu : « Nom complet » arrive sur « Nom et prénom, dans cet ordre » et « Adresse complète » sur « Adresse complète (rue, code postal, ville) » ; seules « Marque chaudière » et « ID interne » restent à choisir. Une fois « Adresse » mis à la main, un encadré sous la liste dit « Ces adresses contiennent le code postal et la ville. » avec un bouton « Séparer », qui remet le bon choix.
+  Vérification : rien (affichage seul).
+
+- [ ] **C115. Retest de A102 : les notes d'une fiche importée se lisent sans défiler.**
+  Où : une fiche importée qui a plusieurs lignes de notes internes.
+  Saisir : ouvrir la fiche, descendre aux notes.
+  Attendu : le champ « Notes internes » montre toutes ses lignes (jusqu'à douze) sans barre de défilement.
+  Vérification : rien (affichage seul).
+
+- [ ] **C116. Retest de A104 : les raisons d'un doublon.**
+  Où : l'aperçu d'un fichier dont les fiches existent déjà.
+  Saisir : déplier « Doublons ».
+  Attendu : « même nom et prénom » n'est plus suivi de « même nom ».
+  Vérification : rien (affichage seul).
+
+- [ ] **C117. Retest de A105 : le type de client.**
+  Où : le fichier type rempli, colonne « Type de client ».
+  Saisir : « Particuliers », « SARL », « Mairie » sur trois lignes, puis déposer.
+  Attendu : aucune de ces valeurs dans « Valeurs illisibles ». Avec une valeur vraiment illisible (« ? »), le bloc dit « Un accord illisible vaut « oui » ; un type de client illisible est déduit de la société, sinon « particulier ». »
+  Vérification : rien (affichage seul).
