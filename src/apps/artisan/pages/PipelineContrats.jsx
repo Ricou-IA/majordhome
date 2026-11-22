@@ -11,7 +11,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, AlertCircle, CheckCircle2, Archive, Clock, MapPin, Phone } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2, Archive, Clock, MapPin, Phone, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { contractKeys } from '@hooks/cacheKeys';
@@ -31,18 +31,34 @@ const STAT_COLORS = {
   blue:   'bg-blue-50 text-blue-600',
 };
 
-function StatCard({ icon: Icon, label, value, color = 'blue' }) {
+// Avec `onClick`, la carte est un bouton qui mène à la liste de ces contrats (flèche à droite) ;
+// sans, c'est un simple repère (« En attente » : ce sont les contrats de cette page).
+function StatCard({ icon: Icon, label, value, color = 'blue', onClick, title }) {
   const c = STAT_COLORS[color] || STAT_COLORS.blue;
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4">
+  const contenu = (
+    <>
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${c}`}>
         <Icon className="w-5 h-5" />
       </div>
-      <div>
+      <div className="flex-1 min-w-0">
         <p className="text-2xl font-bold text-gray-900">{value}</p>
         <p className="text-sm text-gray-500">{label}</p>
       </div>
-    </div>
+    </>
+  );
+  if (!onClick) {
+    return <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4">{contenu}</div>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4 text-left w-full hover:shadow-md hover:border-gray-300 transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+    >
+      {contenu}
+      <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" aria-hidden="true" />
+    </button>
   );
 }
 
@@ -358,6 +374,8 @@ export default function PipelineContrats() {
           label="Contrats actifs"
           value={statsLoading ? '...' : contractStats.active}
           color="green"
+          onClick={() => navigate('/entretiens?filter=actifs')}
+          title="Voir la liste des contrats actifs"
         />
         <StatCard
           icon={Clock}
@@ -370,6 +388,8 @@ export default function PipelineContrats() {
           label="Clos"
           value={statsLoading ? '...' : contractStats.cancelled}
           color="gray"
+          onClick={() => navigate('/entretiens?filter=clos')}
+          title="Voir la liste des contrats clos"
         />
       </div>
 
