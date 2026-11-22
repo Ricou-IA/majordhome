@@ -50,3 +50,12 @@ test('champParCle et cibles', () => {
   assert.deepEqual(CIBLES_COMPOSEES[3].remplit, ['adresse', 'code_postal', 'ville']);
   assert.deepEqual([CIBLE_NOTES, CIBLE_IGNORER, CIBLE_A_CHOISIR], ['@notes', '@ignorer', '']);
 });
+
+test('notes : les en-têtes génériques vont aux notes internes, jamais aux notes vues par le client', () => {
+  for (const e of ['Note', 'Observations', 'Informations', 'Remarques', 'Commentaires', 'Commentaire']) {
+    assert.equal(cibleDepuisEntete(e), 'notes_internes', e);
+  }
+  assert.equal(champParCle('notes').libelle, 'Notes (visibles par le client)');
+  assert.equal(champParCle('notes_internes').libelle, 'Notes internes');
+  assert.equal(champParCle('notes').synonymes.length, 0);
+});

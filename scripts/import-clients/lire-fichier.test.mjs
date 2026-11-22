@@ -77,10 +77,10 @@ test('en-tête : égalité = première ligne ; au-delà de dix lignes ignoré', 
   m.push(['a', 'b', 'c']);
   assert.equal(trouverEntete(m), 0);
 });
-test('tableau : cellules complétées ou coupées, textes d\'en-tête rognés, lettres au-delà de Z', () => {
+test('tableau : cellules complétées, colonne en trop gardée, textes d\'en-tête rognés, lettres au-delà de Z', () => {
   const t = tableau([[' Nom ', 'Ville'], ['A'], ['B', 'C', 'D'], ['  ', '']], 0);
-  assert.deepEqual(t.entetes, ['Nom', 'Ville']);
-  assert.deepEqual(t.lignes, [{ numero: 2, cellules: ['A', ''] }, { numero: 3, cellules: ['B', 'C'] }]);
+  assert.deepEqual(t.entetes, ['Nom', 'Ville', 'Colonne C']);
+  assert.deepEqual(t.lignes, [{ numero: 2, cellules: ['A', '', ''] }, { numero: 3, cellules: ['B', 'C', 'D'] }]);
   const large = tableau([[...Array(28).fill('x').map((v, i) => (i < 26 ? v : ''))]], 0);
   assert.deepEqual(large.entetes.slice(26), ['Colonne AA', 'Colonne AB']);
 });
@@ -111,4 +111,16 @@ test('guillemet ouvrant jamais fermé : pas de plantage', () => {
 });
 test('fin de ligne a;b; : cellule vide finale présente', () => {
   assert.deepEqual(lireCsv('a;b;\n1;2;'), [['a', 'b', ''], ['1', '2', '']]);
+});
+test('UTF-16 avec BOM, petit et grand boutiste', () => {
+  assert.equal(decoderTexte(Uint8Array.from([0xFF, 0xFE, 0x4C, 0x00, 0xE9, 0x00, 0x61, 0x00])), 'Léa');
+  assert.equal(decoderTexte(Uint8Array.from([0xFE, 0xFF, 0x00, 0x4C, 0x00, 0xE9, 0x00, 0x61])), 'Léa');
+});
+test('tableau : une colonne remplie au-delà de l\'en-tête est gardée sous « Colonne X »', () => {
+  const t = tableau([['Nom', 'Ville'], ['A', 'B', '', 'note'], ['C', 'D', '', '']], 0);
+  assert.deepEqual(t.entetes, ['Nom', 'Ville', 'Colonne C', 'Colonne D']);
+  assert.deepEqual(t.lignes[0].cellules, ['A', 'B', '', 'note']);
+  assert.deepEqual(t.lignes[1].cellules, ['C', 'D', '', '']);
+  // Cellules vides au-delà de l'en-tête : aucune colonne ajoutée
+  assert.deepEqual(tableau([['Nom'], ['A', '', '  ']], 0).entetes, ['Nom']);
 });

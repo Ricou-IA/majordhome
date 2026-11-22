@@ -1,5 +1,8 @@
 // src/lib/importClients/libelles.js
-// Libellés affichés de l'import de clients — module PUR (aucun import), testé par scripts/import-clients/libelles.test.mjs.
+// Libellés affichés de l'import de clients — module PUR (imports relatifs seulement), testé par
+// scripts/import-clients/libelles.test.mjs.
+
+import { CHAMPS } from './champs.js';
 
 const RAISONS_RAPPROCHEMENT = {
   phone: 'même téléphone',
@@ -38,7 +41,7 @@ export function phraseBilan(b) {
 }
 
 const nombreFR = (n) => Number(n).toLocaleString('fr-FR');
-const MOTIF_CONSERVEES = 'a déjà un contrat, une intervention ou un e-mail envoyé';
+const USAGES = '(contrat, intervention, devis, e-mail envoyé…)';
 
 /**
  * Texte de confirmation du retrait d'un import, construit sur l'aperçu.
@@ -50,16 +53,17 @@ export function texteRetrait({ retirables, conservees }) {
     const retrait = `${nombreFR(retirables)} ${retirables > 1 ? 'fiches seront retirées' : 'fiche sera retirée'}.`;
     if (conservees <= 0) return retrait;
     const reste = conservees > 1
-      ? `${nombreFR(conservees)} seront conservées : elles ont déjà un contrat, une intervention ou un e-mail envoyé.`
-      : `1 sera conservée : elle ${MOTIF_CONSERVEES}.`;
+      ? `${nombreFR(conservees)} seront conservées : elles sont déjà utilisées ailleurs ${USAGES}.`
+      : `1 sera conservée : elle est déjà utilisée ailleurs ${USAGES}.`;
     return `${retrait} ${reste}`;
   }
   if (conservees > 0) {
     return conservees > 1
-      ? `Aucune fiche ne peut être retirée : les ${nombreFR(conservees)} fiches de cet import ont déjà un contrat, une intervention ou un e-mail envoyé.`
-      : `Aucune fiche ne peut être retirée : la fiche de cet import ${MOTIF_CONSERVEES}.`;
+      ? `Aucune fiche ne peut être retirée : les ${nombreFR(conservees)} fiches de cet import sont déjà utilisées ailleurs ${USAGES}.`
+      : `Aucune fiche ne peut être retirée : la fiche de cet import est déjà utilisée ailleurs ${USAGES}.`;
   }
-  return 'Cet import ne contient plus aucune fiche.';
+  // Import sans aucune fiche (interrompu avant le premier lot, ou déjà vidé) : le retrait le sort de la liste.
+  return 'Cet import ne contient aucune fiche. Le retirer de la liste ?';
 }
 
 /**
@@ -68,6 +72,7 @@ export function texteRetrait({ retirables, conservees }) {
  * @returns {string}
  */
 export function texteRetraitFait({ retirees, conservees }) {
+  if (retirees <= 0 && conservees <= 0) return 'Import retiré de la liste.';
   const retire = retirees > 0
     ? `${nombreFR(retirees)} ${retirees > 1 ? 'fiches retirées' : 'fiche retirée'}`
     : 'Aucune fiche retirée';
@@ -82,4 +87,34 @@ export function texteRetraitFait({ retirees, conservees }) {
  */
 export function messageEchecRetrait(message) {
   return `${message} Des fiches ont pu être retirées avant l'arrêt : relancez le retrait pour terminer.`;
+}
+
+/**
+ * Fiches d'un import précédent, pour sa ligne de la liste : créées (bilan de fin), puis retirées et conservées si un
+ * retrait est passé. Sans bilan de fin, l'import a été interrompu : on ne dit pas combien de fiches il a créées.
+ * @param {{ importees?: number, retirees?: number, conservees?: number } | null | undefined} counts
+ * @returns {string}
+ */
+export function resumeFichesImport(counts) {
+  const n = counts?.importees;
+  const creees = typeof n === 'number' ? `${nombreFR(n)} ${n > 1 ? 'fiches créées' : 'fiche créée'}` : 'import interrompu';
+  const r = counts?.retirees;
+  if (typeof r !== 'number' || r <= 0) return creees;
+  const c = typeof counts.conservees === 'number' ? counts.conservees : 0;
+  const retrait = `${nombreFR(r)} ${r > 1 ? 'retirées' : 'retirée'}`;
+  return c > 0 ? `${creees} · ${retrait}, ${nombreFR(c)} ${c > 1 ? 'conservées' : 'conservée'}` : `${creees} · ${retrait}`;
+}
+
+const ACCORDS = new Set(CHAMPS.filter((c) => c.type === 'oui_non').map((c) => c.libelle));
+
+/**
+ * Bloc de l'aperçu sur les valeurs illisibles des lignes qui seront importées (cf. resumeCorrections).
+ * @param {Array<{ libelle: string, nombre: number }>} resume
+ * @returns {string | null} null quand il n'y a rien à signaler
+ */
+export function texteCorrections(resume) {
+  if (!resume || resume.length === 0) return null;
+  const liste = resume.map((r) => `${nombreFR(r.nombre)} × ${r.libelle}`).join(', ');
+  const accord = resume.some((r) => ACCORDS.has(r.libelle)) ? ' (« oui » pour un accord)' : '';
+  return `Valeurs illisibles : ${liste}. Le champ est laissé vide${accord} et la valeur d'origine est gardée dans les notes internes de la fiche.`;
 }

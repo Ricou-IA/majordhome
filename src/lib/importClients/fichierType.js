@@ -4,7 +4,7 @@
 // Ce module ne produit que des feuilles `{ nom, lignes }` ; l'écriture du classeur est dans classeur.js.
 
 import { CHAMPS } from './champs.js';
-import { aImporter, LIBELLE_RAISON } from './controles.js';
+import { aImporter, raisonAffichee } from './controles.js';
 
 /**
  * Feuilles du fichier type : « Clients » (la ligne d'en-tête seule, réimportable telle quelle) et « Mode d'emploi ».
@@ -38,7 +38,7 @@ export function feuilleLignesEcartees(entetes, lignesDuFichier, classees, choix)
   for (const l of classees) {
     if (aImporter(l, choix)) continue;
     const cellules = parNumero.get(l.numero) || [];
-    lignes.push([...entetes.map((_, i) => cellules[i] ?? ''), LIBELLE_RAISON[l.raison] || l.raison]);
+    lignes.push([...entetes.map((_, i) => cellules[i] ?? ''), raisonAffichee(l)]);
   }
   return { nom: 'Lignes écartées', lignes };
 }

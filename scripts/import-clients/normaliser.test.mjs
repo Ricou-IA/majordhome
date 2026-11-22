@@ -56,3 +56,18 @@ test('vide = null, jamais illisible', () => {
   assert.deepEqual(n('surface', '  '), { valeur: null, illisible: false });
   assert.deepEqual(n('nom', null), { valeur: null, illisible: false });
 });
+test('surface : bornée à moins de 100 000 m², arrondie au centième', () => {
+  assert.deepEqual(n('surface', '85.33333333333333'), { valeur: 85.33, illisible: false });
+  assert.deepEqual(n('surface', '99999,994'), { valeur: 99999.99, illisible: false });
+  for (const v of ['33612345678', '100000', '0', '0,001', '-5']) assert.deepEqual(n('surface', v), { valeur: null, illisible: true }, v);
+});
+test('année de construction : quatre chiffres entre 1000 et 2100', () => {
+  assert.deepEqual(n('annee_construction', '2100'), { valeur: 2100, illisible: false });
+  assert.deepEqual(n('annee_construction', '1000'), { valeur: 1000, illisible: false });
+  for (const v of ['19800', '0985', '2101', '980']) assert.deepEqual(n('annee_construction', v), { valeur: null, illisible: true }, v);
+});
+test('code postal : mention CEDEX retirée', () => {
+  assert.equal(n('code_postal', '81600 CEDEX').valeur, '81600');
+  assert.equal(n('code_postal', '81600 Cedex 2').valeur, '81600');
+  assert.equal(n('code_postal', '81600').valeur, '81600');
+});

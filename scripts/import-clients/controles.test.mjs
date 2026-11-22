@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  controlerFiche, classerLignes, aImporter, bilan, lignesPourEcriture, LIBELLE_RAISON,
+  controlerFiche, classerLignes, aImporter, bilan, lignesPourEcriture, LIBELLE_RAISON, resumeCorrections, raisonAffichee,
 } from '../../src/lib/importClients/controles.js';
+import { verifierLigne } from '../../src/lib/importClients/lots.js';
 import { CHAMPS } from '../../src/lib/importClients/champs.js';
 
 const cand = (numero, valeurs, notesAjoutees = []) => ({ numero, valeurs, notesAjoutees });
@@ -209,4 +210,58 @@ test('liste vide et clients existants sans nom ni coordonnées', () => {
   const r = classerLignes([cand(2, { nom: 'Nouveau' })], vides);
   assert.equal(r[0].statut, 'prete');
   assert.deepEqual(classerLignes([], null), []);
+});
+
+test('prénom seul, sans nom ni société : écartée', () => {
+  const r = controlerFiche(cand(2, { prenom: 'Jean', telephone: '0612345678' }));
+  assert.equal(r.ecartee, true); assert.equal(r.raison, 'sans_nom');
+  assert.equal(classerLignes([cand(2, { prenom: 'Jean' })], [])[0].statut, 'ecartee');
+});
+
+test('valeurs piégeuses : toute ligne gardée passe le contrôle de la base', () => {
+  const longue = 'X'.repeat(300);
+  const candidates = [
+    cand(2, { nom: 'Formule', surface: '85.33333333333333' }),
+    cand(3, { nom: 'Colonne', surface: '33612345678' }),
+    cand(4, { nom: 'Annee', annee_construction: '19800' }),
+    cand(5, { nom: 'Logement', type_logement: 'MAISON', type_client: 'PARTICULIER' }),
+    cand(6, { nom: 'Accord', accepte_emails: 'peut-être', accepte_sms: 'peut-être' }),
+    cand(7, { nom: longue, prenom: longue, societe: longue }),
+    cand(8, { nom: '   ', societe: '   ' }),
+    cand(9, { nom: 12345, telephone: 612345678, code_postal: 81600, ancien_numero: 42, surface: 120 }),
+    cand(10, { societe: 'Mairie', type_client: 'collectivité', annee_construction: 'vers 1980' }),
+    cand(11, { nom: 'Cedex', code_postal: '81600 CEDEX', email: ' A@B.FR ' }),
+  ];
+  const classees = classerLignes(candidates, []);
+  for (const l of classees) {
+    if (l.statut === 'ecartee') continue;
+    assert.equal(verifierLigne({ import_line: l.numero, ...l.fiche }), null, `ligne ${l.numero}`);
+  }
+  assert.equal(classees.find((l) => l.numero === 8).statut, 'ecartee');
+  assert.equal(classees.find((l) => l.numero === 2).fiche.surface, 85.33);
+  assert.equal(classees.find((l) => l.numero === 3).fiche.surface, null);
+  assert.equal(classees.find((l) => l.numero === 4).fiche.construction_year, null);
+  const b = bilan(classees, aucun());
+  assert.equal(b.lues, b.importees + b.doublons_ecartes + b.ecartees);
+});
+
+test('raison affichée : valeur refusée avec le champ, sinon le libellé', () => {
+  assert.equal(LIBELLE_RAISON.valeur_refusee, 'Valeur refusée par la base');
+  assert.equal(raisonAffichee({ raison: 'valeur_refusee', colonne: 'surface' }), 'Valeur refusée par la base (Surface)');
+  assert.equal(raisonAffichee({ raison: 'valeur_refusee', colonne: 'display_name' }), 'Valeur refusée par la base (display_name)');
+  assert.equal(raisonAffichee({ raison: 'valeur_refusee' }), 'Valeur refusée par la base');
+  assert.equal(raisonAffichee({ raison: 'sans_nom' }), 'Ni nom ni société');
+});
+
+test("résumé des valeurs corrigées : lignes importées seulement, la plus fréquente d'abord", () => {
+  const classees = classerLignes([
+    cand(2, { nom: 'A', email: 'x(at)y', telephone: 'néant' }),
+    cand(3, { nom: 'B', email: 'z(at)y' }),
+    cand(4, { email: 'w(at)y' }), // écartée : sans nom
+    cand(5, { nom: 'C', surface: 'grande' }),
+  ], []);
+  assert.deepEqual(resumeCorrections(classees, aucun()), [
+    { libelle: 'E-mail', nombre: 2 }, { libelle: 'Téléphone', nombre: 1 }, { libelle: 'Surface', nombre: 1 },
+  ]);
+  assert.deepEqual(resumeCorrections([], aucun()), []);
 });

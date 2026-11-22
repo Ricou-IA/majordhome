@@ -52,6 +52,9 @@ function telephone(texte) {
 }
 
 function codePostal(texte) {
+  // « 81600 CEDEX », « 81600 Cedex 2 » : les cinq chiffres de tête suivis d'autre chose qu'un chiffre.
+  const cedex = texte.match(/^(\d{5})\D/);
+  if (cedex) return ok(cedex[1]);
   const sansEspaces = texte.replace(/\s+/g, '');
   return ok(/^\d{4}$/.test(sansEspaces) ? '0' + sansEspaces : sansEspaces);
 }
@@ -83,10 +86,17 @@ export function normaliserValeur(champ, brut) {
     }
     case 'enum': return enumeration(texte, champ.cle === 'type_client' ? TYPES_CLIENT : TYPES_LOGEMENT);
     case 'nombre': {
+      // Surface en m² : plus de 0 et moins de 100 000, arrondie au centième (une formule rend 85.33333333333333,
+      // une colonne mal pointée un numéro de téléphone) — sinon la base refuserait tout le lot.
       const m = texte.match(/^(\d+(?:[.,]\d+)?)\s*(?:m²|m2)?$/i);
-      return m ? ok(parseFloat(m[1].replace(',', '.'))) : ILLISIBLE;
+      if (!m) return ILLISIBLE;
+      const surface = Math.round(parseFloat(m[1].replace(',', '.')) * 100) / 100;
+      return surface > 0 && surface < 100000 ? ok(surface) : ILLISIBLE;
     }
-    case 'entier': return /^\d{4}$/.test(texte) ? ok(parseInt(texte, 10)) : ILLISIBLE;
+    case 'entier': {
+      const annee = /^\d{4}$/.test(texte) ? parseInt(texte, 10) : NaN;
+      return annee >= 1000 && annee <= 2100 ? ok(annee) : ILLISIBLE;
+    }
     default: return ok(texte);
   }
 }

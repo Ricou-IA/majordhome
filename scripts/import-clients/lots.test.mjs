@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TAILLE_LOT, TAILLE_LOT_RETRAIT, decouperEnLots, messageErreurImport, executerLots, lireReponseRetrait,
+  TAILLE_LOT, TAILLE_LOT_RETRAIT, decouperEnLots, messageErreurImport, executerLots, lireReponseRetrait, verifierLigne,
 } from '../../src/lib/importClients/lots.js';
 
 test('découpe en lots sans perdre ni dupliquer', () => {
@@ -72,4 +72,66 @@ test('réponse de retrait : valide lue, nulle ou incomplète rejetée', () => {
   assert.throws(() => lireReponseRetrait(null), /n'est pas confirmé/);
   assert.throws(() => lireReponseRetrait({ retirees: 3 }), /n'est pas confirmé/);
   assert.throws(() => lireReponseRetrait({ restantes: 3 }), /n'est pas confirmé/);
+});
+
+test('ligne refusée par la base : numéro de ligne et libellé du champ', () => {
+  assert.equal(
+    messageErreurImport({ message: 'row_invalid', details: 'ligne 14 : surface', code: '22023' }),
+    "Ligne 14 du fichier : la valeur « Surface » est refusée. Aucune fiche de ce lot n'a été créée.",
+  );
+  assert.equal(
+    messageErreurImport({ message: 'row_invalid', details: 'ligne 3 : display_name' }),
+    "Ligne 3 du fichier : la valeur « display_name » est refusée. Aucune fiche de ce lot n'a été créée.",
+  );
+  // Détail sans numéro de ligne : message général
+  assert.equal(
+    messageErreurImport({ message: 'row_invalid', details: 'import_line' }),
+    "Une ligne du fichier n'a pas pu être écrite : aucune fiche de ce lot n'a été créée.",
+  );
+});
+
+test("délai dépassé, réseau coupé, lignes déjà en cours d'écriture", () => {
+  const lent = 'La base a mis trop de temps à répondre. Réessayez dans un instant.';
+  assert.equal(messageErreurImport({ code: '57014', message: 'canceling statement due to statement timeout' }), lent);
+  assert.equal(messageErreurImport({ code: '55P03', message: 'canceling statement due to lock timeout' }), lent);
+  const reseau = 'Connexion interrompue. Vérifiez votre réseau, puis reprenez.';
+  assert.equal(messageErreurImport(new TypeError('Failed to fetch')), reseau);
+  assert.equal(messageErreurImport({ message: 'TypeError: Failed to fetch' }), reseau);
+  assert.equal(messageErreurImport({ message: 'NetworkError when attempting to fetch resource.' }), reseau);
+  assert.equal(
+    messageErreurImport({ code: '23505', message: 'duplicate key value violates unique constraint "clients_import_line_key"' }),
+    "Ces lignes sont déjà en cours d'écriture par un autre envoi. Reprenez dans un instant.",
+  );
+  assert.equal(messageErreurImport({ code: '23505', message: 'duplicate key value violates unique constraint "autre"' }),
+    'duplicate key value violates unique constraint "autre"');
+});
+
+test('verifierLigne : ce que clients_import_batch accepte', () => {
+  const ok = { import_line: 2, display_name: 'DUPONT Jean', client_category: 'particulier', housing_type: 'maison',
+    surface: 85.33, construction_year: 1985, mail_optin: true, sms_optin: null, email: 'a@b.fr', phone: '06 12 34 56 78',
+    internal_notes: null, external_ref: 12 };
+  assert.equal(verifierLigne(ok), null);
+  assert.equal(verifierLigne({ import_line: 2, display_name: 'X' }), null);
+  assert.equal(verifierLigne({ import_line: 2, display_name: 'X', surface: '80,5', construction_year: '2001' }), null);
+  const refus = [
+    [{ ...ok, import_line: 0 }, 'import_line'],
+    [{ ...ok, import_line: 2.5 }, 'import_line'],
+    [{ ...ok, import_line: '2' }, 'import_line'],
+    [{ ...ok, import_line: 1234567890 }, 'import_line'],
+    [{ ...ok, display_name: '   ' }, 'display_name'],
+    [{ ...ok, display_name: null }, 'display_name'],
+    [{ ...ok, client_category: 'Particulier' }, 'client_category'],
+    [{ ...ok, housing_type: 'MAISON' }, 'housing_type'],
+    [{ ...ok, surface: 85.333333 }, 'surface'],
+    [{ ...ok, surface: 33612345678 }, 'surface'],
+    [{ ...ok, surface: -1 }, 'surface'],
+    [{ ...ok, construction_year: 19800 }, 'construction_year'],
+    [{ ...ok, mail_optin: 'oui' }, 'mail_optin'],
+    [{ ...ok, sms_optin: 1 }, 'sms_optin'],
+    [{ ...ok, phone: true }, 'phone'],
+    [{ ...ok, notes: { a: 1 } }, 'notes'],
+    [{ ...ok, inconnue: [1] }, 'inconnue'],
+  ];
+  for (const [ligne, colonne] of refus) assert.equal(verifierLigne(ligne), colonne, JSON.stringify(ligne));
+  assert.equal(verifierLigne(null), 'import_line');
 });

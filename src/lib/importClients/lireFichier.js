@@ -19,11 +19,13 @@ export function refusFichier({ nom, taille }) {
 }
 
 /**
- * Décode les octets d'un CSV : UTF-8 (BOM retiré), sinon Windows-1252.
+ * Décode les octets d'un CSV : UTF-16 si un BOM UTF-16 l'annonce, sinon UTF-8 (BOM retiré), sinon Windows-1252.
  * @param {Uint8Array} octets
  * @returns {string}
  */
 export function decoderTexte(octets) {
+  if (octets[0] === 0xFF && octets[1] === 0xFE) return new TextDecoder('utf-16le').decode(octets);
+  if (octets[0] === 0xFE && octets[1] === 0xFF) return new TextDecoder('utf-16be').decode(octets);
   let texte;
   try {
     texte = new TextDecoder('utf-8', { fatal: true }).decode(octets);
@@ -151,15 +153,22 @@ function lettreColonne(index) {
 }
 
 /**
- * Découpe la matrice en en-têtes et lignes de données.
+ * Découpe la matrice en en-têtes et lignes de données. Une colonne remplie au-delà de la ligne d'en-tête n'est pas
+ * perdue : elle reçoit l'en-tête « Colonne X » (lettre Excel), comme une colonne d'en-tête vide.
  * @param {string[][]} matrice
  * @param {number} indexEntete
  * @returns {{ entetes: string[], lignes: Array<{ numero: number, cellules: string[] }> }}
  */
 export function tableau(matrice, indexEntete) {
   const brut = matrice[indexEntete] || [];
-  const entetes = brut.map((c, i) => {
-    const t = String(c ?? '').trim();
+  let largeur = brut.length;
+  for (const ligne of matrice.slice(indexEntete + 1)) {
+    for (let k = ligne.length - 1; k >= largeur; k -= 1) {
+      if (String(ligne[k] ?? '').trim() !== '') { largeur = k + 1; break; }
+    }
+  }
+  const entetes = Array.from({ length: largeur }, (_, i) => {
+    const t = String(brut[i] ?? '').trim();
     return t || `Colonne ${lettreColonne(i)}`;
   });
   const lignes = [];

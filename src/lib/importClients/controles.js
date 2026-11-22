@@ -5,6 +5,7 @@
 
 import { CHAMPS } from './champs.js';
 import { normaliserValeur } from './normaliser.js';
+import { verifierLigne } from './lots.js';
 import { buildClientDisplayName } from '../clientDisplayName.js';
 import { buildClientDuplicateProbe, matchClientDuplicates, phoneTailKey } from '../clientDuplicateMatch.js';
 import { normalizeEmailKey, normalizeNameKey } from '../leadDuplicateMatch.js';
@@ -15,7 +16,19 @@ export const LIBELLE_RAISON = {
   doublon_fichier: 'Déjà présent plus haut dans le fichier',
   doublon_fort: 'Déjà dans vos clients',
   doublon_faible: 'Homonyme écarté',
+  valeur_refusee: 'Valeur refusée par la base',
 };
+
+/**
+ * Raison affichée d'une ligne écartée ; pour une valeur refusée, le champ en cause entre parenthèses.
+ * @param {{ raison: string, colonne?: string }} ligne
+ * @returns {string}
+ */
+export function raisonAffichee({ raison, colonne }) {
+  const libelle = LIBELLE_RAISON[raison] || raison;
+  if (raison !== 'valeur_refusee' || !colonne) return libelle;
+  return `${libelle} (${CHAMPS.find((c) => c.colonne === colonne)?.libelle || colonne})`;
+}
 
 const CATEGORIES = ['particulier', 'entreprise', 'public'];
 
@@ -25,8 +38,10 @@ const vide = (v) => v === null || v === undefined || v === '';
  * Transforme un candidat (sortie d'appliquerCorrespondance) en fiche prête à écrire.
  * Une valeur illisible laisse le champ vide et reste lisible dans les notes internes ; les accords e-mail et SMS
  * valent « oui » quand ils sont absents ou illisibles (colonnes non nulles).
+ * Une fiche sans nom de famille ni société (un prénom seul) est écartée ; une fiche que `clients_import_batch`
+ * refuserait (`verifierLigne`) l'est aussi, avec la colonne en cause : jamais un lot entier refusé par la base.
  * @param {{ numero: number, valeurs: Record<string, string>, notesAjoutees: string[] }} candidate
- * @returns {{ numero: number, fiche: Record<string, unknown>, ecartee: boolean, raison: ''|'sans_nom', corrections: Array<{ libelle: string, valeur: string }> }}
+ * @returns {{ numero: number, fiche: Record<string, unknown>, ecartee: boolean, raison: ''|'sans_nom'|'valeur_refusee', colonne?: string, corrections: Array<{ libelle: string, valeur: string }> }}
  */
 export function controlerFiche(candidate) {
   const { numero, valeurs = {}, notesAjoutees = [] } = candidate;
@@ -54,8 +69,12 @@ export function controlerFiche(candidate) {
     .filter((p) => !vide(p) && String(p).trim());
   fiche.internal_notes = parties.length ? parties.join('\n') : null;
 
-  const ecartee = !fiche.display_name;
-  return { numero, fiche, ecartee, raison: ecartee ? 'sans_nom' : '', corrections };
+  if (!fiche.display_name || (!fiche.last_name && !fiche.company_name)) {
+    return { numero, fiche, ecartee: true, raison: 'sans_nom', corrections };
+  }
+  const colonne = verifierLigne({ import_line: numero, ...fiche });
+  if (colonne) return { numero, fiche, ecartee: true, raison: 'valeur_refusee', colonne, corrections };
+  return { numero, fiche, ecartee: false, raison: '', corrections };
 }
 
 const cleRef = (ref) => (vide(ref) ? '' : String(ref).trim().toLowerCase());
@@ -163,8 +182,8 @@ export function classerLignes(candidates, clientsExistants) {
   const index = indexerExistants(clientsExistants || []);
   const memoire = nouvelleMemoireFichier();
   return candidates.map((candidate) => {
-    const { numero, fiche, ecartee, corrections } = controlerFiche(candidate);
-    if (ecartee) return { numero, fiche, statut: 'ecartee', raison: 'sans_nom', doublons: [], corrections };
+    const { numero, fiche, ecartee, raison, colonne, corrections } = controlerFiche(candidate);
+    if (ecartee) return { numero, fiche, statut: 'ecartee', raison, colonne, doublons: [], corrections };
 
     const codePostal = cp(fiche.postal_code);
     const ligne = {
@@ -228,4 +247,24 @@ export function bilan(classees, choix) {
  */
 export function lignesPourEcriture(classees, choix) {
   return classees.filter((l) => aImporter(l, choix)).map((l) => ({ import_line: l.numero, ...l.fiche }));
+}
+
+/**
+ * Valeurs corrigées (laissées vides, gardées en notes internes) parmi les lignes qui SERONT importées, par champ :
+ * la plus fréquente d'abord, à égalité dans l'ordre du catalogue.
+ * @param {Array<{ numero: number, statut: string, corrections?: Array<{ libelle: string }> }>} classees
+ * @param {{ importer: Set<number>, ecarter: Set<number> }} choix
+ * @returns {Array<{ libelle: string, nombre: number }>}
+ */
+export function resumeCorrections(classees, choix) {
+  const compte = new Map();
+  for (const l of classees) {
+    if (!aImporter(l, choix)) continue;
+    for (const libelle of new Set((l.corrections || []).map((c) => c.libelle))) {
+      compte.set(libelle, (compte.get(libelle) || 0) + 1);
+    }
+  }
+  const ordre = (libelle) => CHAMPS.findIndex((c) => c.libelle === libelle);
+  return [...compte].map(([libelle, nombre]) => ({ libelle, nombre }))
+    .sort((a, b) => b.nombre - a.nombre || ordre(a.libelle) - ordre(b.libelle));
 }
