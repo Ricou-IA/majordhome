@@ -89,6 +89,24 @@ export const mailCampaignsService = {
     return { data: data?.data ?? null, error: null };
   },
 
+  /**
+   * Rédaction assistée d'un e-mail (edge `mailing-rediger`). Rien n'est écrit : la page décide d'appliquer ou non
+   * la proposition. Le nom, le site et les adresses de l'entreprise sont relus côté serveur, jamais envoyés d'ici.
+   * @param {string} orgId
+   * @param {{ consigne: string, intention?: string, objet?: string, corps?: string, nature?: string, variables?: string[] }} demande
+   * @returns {Promise<{ data: { objet: string, objets: string[], corps: string } | null, error: { code: string } | null }>}
+   */
+  async rediger(orgId, demande) {
+    try {
+      const { data, error } = await supabase.functions.invoke('mailing-rediger', { body: { org_id: orgId, ...demande } });
+      if (error) return { data: null, error: { code: 'service_indisponible' } };
+      if (data?.error) return { data: null, error: { code: data.error } };
+      return { data: data?.data ?? null, error: null };
+    } catch {
+      return { data: null, error: { code: 'service_indisponible' } };
+    }
+  },
+
   async duplicate(campaign, newKey) {
     const {
       id: _id,

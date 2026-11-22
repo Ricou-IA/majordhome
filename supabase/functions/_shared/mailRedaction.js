@@ -37,6 +37,7 @@ export const REDACTION_CODES = Object.freeze({
   consigne_inconnue: 'Cette demande n’est pas reconnue. Choisissez l’une des propositions de la liste.',
   intention_requise: 'Dites en quelques mots ce que vous voulez écrire, puis relancez la rédaction.',
   texte_requis: 'Écrivez d’abord un texte : cette demande s’applique à un texte déjà écrit.',
+  demande_trop_longue: 'Votre demande ou votre texte est trop long pour la rédaction assistée. Raccourcissez-le, puis relancez.',
   plafond_atteint: 'Vous avez atteint le nombre de rédactions autorisées pour aujourd’hui. Réessayez demain, ou écrivez le texte vous-même.',
   service_indisponible: 'La rédaction assistée ne répond pas pour le moment. Réessayez dans quelques minutes : votre texte n’a pas été modifié.',
   reponse_illisible: 'La proposition reçue n’était pas utilisable. Votre texte n’a pas été modifié : relancez la rédaction.',

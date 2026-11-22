@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   CONSIGNES, REDACTION_CODES, messageErreurRedaction, adressesAutorisees, adressesDuTexte, validerDemande,
   construireConsigne, SCHEMA_REDACTION, lireReponse,
@@ -195,4 +196,54 @@ test('texte actuel montré au modèle : sans style, et il revient à l’identiq
 
 test('construireConsigne sans argument : lève consigne_inconnue', () => {
   assert.throws(() => construireConsigne(), /consigne_inconnue/);
+});
+
+// ── Côté serveur (tâche 6) : l'edge, sa migration et le service ───────────────
+
+const lire = (chemin) => readFileSync(new URL(`../${chemin}`, import.meta.url), 'utf8');
+const EDGE = lire('supabase/functions/mailing-rediger/index.ts');
+const MIGRATION = lire('supabase/migrations/20261122_4_mailing_redaction_quota.sql');
+
+test('edge : tout code rendu est une clé de REDACTION_CODES, et les gardes attendues y sont', () => {
+  const codes = [...EDGE.matchAll(/refus\(\s*"([a-z_]+)"/g)].map((m) => m[1]);
+  assert.ok(codes.length > 0);
+  for (const c of codes) assert.ok(c in REDACTION_CODES, `code hors REDACTION_CODES : ${c}`);
+  for (const c of ['module_communication_inactif', 'demande_trop_longue', 'plafond_atteint', 'service_indisponible', 'reponse_illisible'])
+    assert.ok(codes.includes(c), `l'edge ne rend jamais ${c}`);
+  assert.match(EDGE, /validerDemande\(/); // consigne_inconnue, intention_requise, texte_requis viennent de ce contrôle
+  assert.match(REDACTION_CODES.demande_trop_longue, /trop long/i);
+});
+
+test('edge : règles partagées depuis _shared, rien d’un destinataire n’est lu, rien n’est écrit sauf le plafond', () => {
+  assert.match(EDGE, /from "\.\.\/_shared\/mailRedaction\.js"/);
+  assert.match(EDGE, /from "\.\.\/_shared\/mailCorps\.js"/);
+  assert.match(EDGE, /requireOrgMembership\(req, \{[^}]*requiredRole: "org_admin"/);
+  for (const interdit of ['clients', 'leads', 'mailing_logs', 'mail_segments'])
+    assert.ok(!new RegExp(String.raw`\b${interdit}\b`).test(EDGE), `l'edge cite ${interdit}`);
+  assert.ok(!/\.(insert|update|upsert|delete)\(/.test(EDGE), 'l’edge écrit en base');
+  assert.ok(!/body\.(nom|site|brand|website|resources|adresses)/.test(EDGE), 'nom, site ou adresses pris de la requête');
+});
+
+test('edge : ordre des gardes — membre, module, validation, secret, plafond, appel', () => {
+  const i = (motif) => EDGE.search(motif);
+  const ordre = [i(/requireOrgMembership\(/), i(/moduleActif\(/), i(/validerDemande\(/), i(/ANTHROPIC_API_KEY\)/), i(/rpc\("increment_mailing_redaction_quota"/), i(/\.messages\.(stream|create)\(/)];
+  assert.ok(ordre.every((n) => n >= 0), JSON.stringify(ordre));
+  assert.deepEqual([...ordre].sort((a, b) => a - b), ordre);
+});
+
+test('migration du plafond : trois révocations, service_role seul, RLS, exception attendue', () => {
+  assert.match(MIGRATION, /REVOKE ALL ON majordhome\.mailing_redaction_quotas FROM PUBLIC, anon, authenticated/);
+  assert.match(MIGRATION, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(MIGRATION, /REVOKE EXECUTE ON FUNCTION public\.increment_mailing_redaction_quota\(uuid, uuid, int\) FROM PUBLIC, anon, authenticated/);
+  assert.match(MIGRATION, /GRANT EXECUTE ON FUNCTION public\.increment_mailing_redaction_quota\(uuid, uuid, int\) TO service_role/);
+  assert.match(MIGRATION, /SECURITY DEFINER/);
+  assert.match(MIGRATION, /SET search_path = majordhome, public/);
+  assert.match(MIGRATION, /mailing_redaction_quota_exceeded/);
+});
+
+test('service : rediger appelle l’edge et rend un code, jamais une exception', () => {
+  const svc = lire('src/shared/services/mailCampaigns.service.js');
+  assert.match(svc, /async rediger\(orgId, demande\)/);
+  assert.match(svc, /functions\.invoke\('mailing-rediger'/);
+  assert.match(svc, /service_indisponible/);
 });

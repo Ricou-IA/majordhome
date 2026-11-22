@@ -111,6 +111,8 @@ const FUNCTIONS = [
   // 20261024_2 / 20261025_2 / 20261025_4 : catalogue fournisseur (écrivain unique) et secrets Vault par org — relus
   // de la prod pour répéter une migration qui ne fait que les remplacer (assert-catalogue-connexion.sql).
   'public.supplier_catalog_upsert(uuid, uuid, text, jsonb, jsonb)',
+  // 20261122_4 : plafond de la rédaction assistée des e-mails — un snapshot pris après sa mise en prod la rejoue avec ses ACL
+  'public.increment_mailing_redaction_quota(uuid, uuid, integer)',
   // 20261111_1 : relevé de pièces détachées — supplier_pieces_upsert enveloppe l'écrivain (qui appelle
   // catalog_items_ensure), les modèles d'appareil dérivent leurs clés d'equipment_model_key
   'public.catalog_items_ensure(uuid, integer)',
