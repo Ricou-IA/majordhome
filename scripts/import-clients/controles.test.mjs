@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  controlerFiche, classerLignes, aImporter, bilan, lignesPourEcriture, LIBELLE_RAISON, resumeCorrections, raisonAffichee,
+  controlerFiche, classerLignes, aImporter, bilan, lignesPourEcriture, LIBELLE_RAISON, resumeCorrections, raisonAffichee, fichesSansCodePostal,
 } from '../../src/lib/importClients/controles.js';
 import { verifierLigne } from '../../src/lib/importClients/lots.js';
 import { CHAMPS } from '../../src/lib/importClients/champs.js';
@@ -264,4 +264,19 @@ test("résumé des valeurs corrigées : lignes importées seulement, la plus fr�
     { libelle: 'E-mail', nombre: 2 }, { libelle: 'Téléphone', nombre: 1 }, { libelle: 'Surface', nombre: 1 },
   ]);
   assert.deepEqual(resumeCorrections([], aucun()), []);
+});
+
+test('fiches sans code postal : lignes importées seulement', () => {
+  const classees = classerLignes([
+    cand(2, { nom: 'A', code_postal: '81600' }),
+    cand(3, { nom: 'B' }),
+    cand(4, { prenom: 'Seul' }), // écartée : sans nom
+    cand(5, { nom: 'C', code_postal: '  ' }),
+    cand(6, { nom: 'A', code_postal: '81600' }), // doublon du fichier, écarté par défaut
+  ], []);
+  assert.equal(fichesSansCodePostal(classees, aucun()), 2);
+  const choix = aucun();
+  choix.importer.add(6);
+  assert.equal(fichesSansCodePostal(classees, choix), 2);
+  assert.equal(fichesSansCodePostal([], aucun()), 0);
 });

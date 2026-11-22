@@ -11,13 +11,31 @@ test('vingt champs, clés et colonnes uniques', () => {
   assert.equal(new Set(CHAMPS.map((c) => c.colonne)).size, 20);
 });
 
-test('un synonyme ne désigne qu\'un champ', () => {
+test('un synonyme ne désigne qu\'un champ (cibles composées comprises)', () => {
   const vus = new Map();
-  for (const c of CHAMPS) for (const s of [c.libelle, ...c.synonymes]) {
+  const entrees = [
+    ...CHAMPS.flatMap((c) => [c.libelle, ...c.synonymes].map((s) => [s, c.cle])),
+    ...CIBLES_COMPOSEES.flatMap((c) => c.synonymes.map((s) => [s, c.cle])),
+  ];
+  for (const [s, cle] of entrees) {
     const k = cleEntete(s);
-    assert.ok(!vus.has(k) || vus.get(k) === c.cle, `${s} désigne ${vus.get(k)} et ${c.cle}`);
-    vus.set(k, c.cle);
+    assert.ok(!vus.has(k) || vus.get(k) === cle, `${s} désigne ${vus.get(k)} et ${cle}`);
+    vus.set(k, cle);
   }
+});
+
+test('en-têtes d\'une colonne qui remplit plusieurs champs', () => {
+  for (const e of ['Adresse complète', 'ADRESSE COMPLETE', 'Adresse postale complète', 'Adresse de facturation', 'Adresse du client']) {
+    assert.equal(cibleDepuisEntete(e), '@adresse_complete', e);
+  }
+  for (const e of ['Nom complet', 'Nom et prénom', 'Nom prénom', 'Nom du client', 'Client', 'Contact']) assert.equal(cibleDepuisEntete(e), '@nom_prenom', e);
+  for (const e of ['Prénom et nom', 'Prénom nom']) assert.equal(cibleDepuisEntete(e), '@prenom_nom', e);
+  for (const e of ['CP Ville', 'CP / Ville', 'Code postal et ville', 'Code postal ville', 'CP et ville']) assert.equal(cibleDepuisEntete(e), '@cp_ville', e);
+  // Les en-têtes simples restent les leurs.
+  assert.equal(cibleDepuisEntete('Adresse'), 'adresse');
+  assert.equal(cibleDepuisEntete('Adresse postale'), 'adresse');
+  assert.equal(cibleDepuisEntete('Nom client'), 'nom');
+  assert.equal(cibleDepuisEntete('Code postal'), 'code_postal');
 });
 
 test('en-têtes courants reconnus', () => {

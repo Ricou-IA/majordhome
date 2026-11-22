@@ -44,6 +44,18 @@ test('type de logement et de client', () => {
   assert.equal(n('type_client', 'Mairie').valeur, 'public');
   assert.equal(n('type_client', 'Particulier').valeur, 'particulier');
 });
+test('type de client : pluriels et mots courants, le reste illisible', () => {
+  const attendu = {
+    particulier: ['Particuliers', 'Privé', 'privées', 'Personne physique', 'Personnes physiques', 'Client particulier', 'Clients particuliers',
+      'Résidentiel', 'Propriétaire', 'Locataires', 'M', 'Mme', 'Mlle', 'Monsieur', 'Madame', 'PARTICULIER', ' particulier '],
+    entreprise: ['Entreprises', 'Sociétés', 'Pro', 'PROS', 'Professionnel', 'Professionnelles', 'Personne morale', 'Artisan', 'Commerce',
+      'Commerçant', 'SARL', 'SAS', 'SASU', 'EURL', 'SA', 'SCI', 'SNC', 'EI', 'Association', 'Syndic', 'Copropriété'],
+    public: ['Public', 'Publique', 'Secteur public', 'Collectivités', 'Mairie', 'Commune', 'Administration', 'État', 'Département',
+      'Région', 'Hôpital', 'École', 'Écoles'],
+  };
+  for (const [valeur, mots] of Object.entries(attendu)) for (const m of mots) assert.equal(n('type_client', m).valeur, valeur, m);
+  for (const m of ['?', '3', 'Client', 'divers']) assert.deepEqual(n('type_client', m), { valeur: null, illisible: true }, m);
+});
 test('surface « 120 m² » = 120 ; année « vers 1980 » illisible', () => {
   assert.equal(n('surface', '120 m²').valeur, 120);
   assert.equal(n('surface', '85,5').valeur, 85.5);

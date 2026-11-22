@@ -2,13 +2,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   libellesRapprochement, phraseBilan, texteRetrait, texteRetraitFait, messageEchecRetrait, resumeFichesImport, texteCorrections, texteArret,
+  texteAccentsRepares, texteSansCodePostal,
 } from '../../src/lib/importClients/libelles.js';
 
 test('chaque raison de rapprochement a son libellé, dans l\'ordre reçu', () => {
   assert.deepEqual(
     libellesRapprochement({ matchReasons: ['phone', 'email', 'name', 'name_cp', 'nom_affiche'] }),
-    ['même téléphone', 'même e-mail', 'même nom et prénom', 'même nom dans la même commune', 'même nom'],
+    ['même téléphone', 'même e-mail', 'même nom et prénom', 'même nom dans la même commune'],
   );
+});
+
+test('« même nom » omis quand « même nom et prénom » y est déjà, gardé sinon', () => {
+  assert.deepEqual(libellesRapprochement({ matchReasons: ['name', 'nom_affiche'], raisonAncienNumero: true }), ['même nom et prénom', 'même ancien numéro']);
+  assert.deepEqual(libellesRapprochement({ matchReasons: ['nom_affiche', 'name'] }), ['même nom et prénom']);
+  assert.deepEqual(libellesRapprochement({ matchReasons: ['phone', 'nom_affiche'] }), ['même téléphone', 'même nom']);
 });
 
 test('ancien numéro ajouté en dernier', () => {
@@ -93,6 +100,27 @@ test("valeurs illisibles : une phrase, la plus fréquente d'abord", () => {
     texteCorrections([{ libelle: 'Accepte les SMS', nombre: 2 }]),
     "Valeurs illisibles : 2 × Accepte les SMS. Le champ est laissé vide (« oui » pour un accord) et la valeur d'origine est gardée dans les notes internes de la fiche.",
   );
+  assert.equal(
+    texteCorrections([{ libelle: 'Type de client', nombre: 1 }]),
+    "Valeurs illisibles : 1 × Type de client. Le champ est laissé vide (« particulier » pour un type de client) et la valeur d'origine est gardée dans les notes internes de la fiche.",
+  );
+  assert.equal(
+    texteCorrections([{ libelle: 'Type de client', nombre: 2 }, { libelle: 'Accepte les SMS', nombre: 1 }]),
+    "Valeurs illisibles : 2 × Type de client, 1 × Accepte les SMS. Le champ est laissé vide (« oui » pour un accord, « particulier » pour un type de client) et la valeur d'origine est gardée dans les notes internes de la fiche.",
+  );
+});
+
+test('accents réparés : rien à dire à zéro, singulier et pluriel', () => {
+  assert.equal(texteAccentsRepares(0), null);
+  assert.equal(texteAccentsRepares(undefined), null);
+  assert.equal(texteAccentsRepares(1), 'Des accents abîmés ont été réparés dans 1 cellule (fichier passé par un tableur).');
+  assert.equal(texteAccentsRepares(23), 'Des accents abîmés ont été réparés dans 23 cellules (fichier passé par un tableur).');
+});
+
+test('fiches sans code postal : rien à dire à zéro, singulier et pluriel', () => {
+  assert.equal(texteSansCodePostal(0), null);
+  assert.equal(texteSansCodePostal(1), '1 fiche sans code postal : elle ne sera pas placée sur la carte.');
+  assert.equal(texteSansCodePostal(4), '4 fiches sans code postal : elles ne seront pas placées sur la carte.');
 });
 
 test("import arrêté : combien de fiches sont déjà créées, et où les retirer", () => {

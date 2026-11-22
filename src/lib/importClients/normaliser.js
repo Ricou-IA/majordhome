@@ -11,11 +11,23 @@ import { cleEntete } from './champs.js';
 const OUI = new Set(['oui', 'o', 'yes', 'y', 'vrai', 'true', '1', 'ok', 'accord', 'accepte']);
 const NON = new Set(['non', 'n', 'no', 'faux', 'false', '0', 'refus', 'refuse']);
 
-const TYPES_CLIENT = {
-  particulier: 'particulier',
-  entreprise: 'entreprise', societe: 'entreprise', pro: 'entreprise', professionnel: 'entreprise',
-  public: 'public', collectivite: 'public', mairie: 'public', administration: 'public',
+// Formes comparées après cleEntete (minuscules, sans accent) et retrait du « s » final de chaque mot (pluriel).
+const MOTS_TYPE_CLIENT = {
+  particulier: ['particulier', 'prive', 'privee', 'personne', 'personne physique', 'client particulier', 'residentiel',
+    'proprietaire', 'locataire', 'm', 'mme', 'mlle', 'monsieur', 'madame'],
+  entreprise: ['entreprise', 'societe', 'pro', 'professionnel', 'professionnelle', 'personne morale', 'artisan', 'commerce',
+    'commercant', 'sarl', 'sas', 'sasu', 'eurl', 'sa', 'sci', 'snc', 'ei', 'association', 'syndic', 'copropriete'],
+  public: ['public', 'publique', 'secteur public', 'collectivite', 'mairie', 'commune', 'administration', 'etat',
+    'departement', 'region', 'hopital', 'ecole'],
 };
+const TYPES_CLIENT = Object.fromEntries(Object.entries(MOTS_TYPE_CLIENT).flatMap(([valeur, mots]) => mots.map((m) => [m, valeur])));
+const auSingulier = (cle) => cle.split(' ').map((mot) => (mot.length > 1 ? mot.replace(/s$/, '') : mot)).join(' ');
+
+function typeClient(texte) {
+  const cle = cleEntete(texte);
+  const valeur = TYPES_CLIENT[cle] || TYPES_CLIENT[auSingulier(cle)];
+  return valeur ? ok(valeur) : ILLISIBLE;
+}
 
 const TYPES_LOGEMENT = {
   maison: 'maison',
@@ -84,7 +96,7 @@ export function normaliserValeur(champ, brut) {
       if (NON.has(k)) return ok(false);
       return ILLISIBLE;
     }
-    case 'enum': return enumeration(texte, champ.cle === 'type_client' ? TYPES_CLIENT : TYPES_LOGEMENT);
+    case 'enum': return champ.cle === 'type_client' ? typeClient(texte) : enumeration(texte, TYPES_LOGEMENT);
     case 'nombre': {
       // Surface en m² : plus de 0 et moins de 100 000, arrondie au centième (une formule rend 85.33333333333333,
       // une colonne mal pointée un numéro de téléphone) — sinon la base refuserait tout le lot.

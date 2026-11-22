@@ -23,8 +23,12 @@ export function libellesRapprochement(doublon) {
     const l = RAISONS_RAPPROCHEMENT[r];
     if (l && !libelles.includes(l)) libelles.push(l);
   }
-  if (doublon?.raisonAncienNumero) libelles.push('même ancien numéro');
-  return libelles;
+  // « même nom » redit « même nom et prénom » : omis quand celui-ci y est.
+  const sansRedite = libelles.includes(RAISONS_RAPPROCHEMENT.name)
+    ? libelles.filter((l) => l !== RAISONS_RAPPROCHEMENT.nom_affiche)
+    : libelles;
+  if (doublon?.raisonAncienNumero) sansRedite.push('même ancien numéro');
+  return sansRedite;
 }
 
 const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
@@ -106,6 +110,7 @@ export function resumeFichesImport(counts) {
 }
 
 const ACCORDS = new Set(CHAMPS.filter((c) => c.type === 'oui_non').map((c) => c.libelle));
+const TYPE_CLIENT = CHAMPS.find((c) => c.cle === 'type_client').libelle;
 
 /**
  * Bloc de l'aperçu sur les valeurs illisibles des lignes qui seront importées (cf. resumeCorrections).
@@ -115,8 +120,35 @@ const ACCORDS = new Set(CHAMPS.filter((c) => c.type === 'oui_non').map((c) => c.
 export function texteCorrections(resume) {
   if (!resume || resume.length === 0) return null;
   const liste = resume.map((r) => `${nombreFR(r.nombre)} × ${r.libelle}`).join(', ');
-  const accord = resume.some((r) => ACCORDS.has(r.libelle)) ? ' (« oui » pour un accord)' : '';
-  return `Valeurs illisibles : ${liste}. Le champ est laissé vide${accord} et la valeur d'origine est gardée dans les notes internes de la fiche.`;
+  // Valeurs prises d'office quand la valeur du fichier est illisible (cf. controlerFiche).
+  const parDefaut = [
+    resume.some((r) => ACCORDS.has(r.libelle)) && '« oui » pour un accord',
+    resume.some((r) => r.libelle === TYPE_CLIENT) && '« particulier » pour un type de client',
+  ].filter(Boolean);
+  const precision = parDefaut.length ? ` (${parDefaut.join(', ')})` : '';
+  return `Valeurs illisibles : ${liste}. Le champ est laissé vide${precision} et la valeur d'origine est gardée dans les notes internes de la fiche.`;
+}
+
+/**
+ * Ligne de l'étape Correspondance quand des accents abîmés par un tableur ont été réparés à la lecture.
+ * @param {number} n cellules réparées
+ * @returns {string | null} null quand rien n'a été réparé
+ */
+export function texteAccentsRepares(n) {
+  if (!(n > 0)) return null;
+  return `Des accents abîmés ont été réparés dans ${nombreFR(n)} ${n > 1 ? 'cellules' : 'cellule'} (fichier passé par un tableur).`;
+}
+
+/**
+ * Ligne de l'aperçu sur les fiches à importer sans code postal.
+ * @param {number} n fiches à importer sans code postal (cf. fichesSansCodePostal)
+ * @returns {string | null} null quand toutes en ont un
+ */
+export function texteSansCodePostal(n) {
+  if (!(n > 0)) return null;
+  return n > 1
+    ? `${nombreFR(n)} fiches sans code postal : elles ne seront pas placées sur la carte.`
+    : '1 fiche sans code postal : elle ne sera pas placée sur la carte.';
 }
 
 /**

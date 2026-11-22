@@ -250,6 +250,16 @@ export function lignesPourEcriture(classees, choix) {
 }
 
 /**
+ * Fiches qui seront importées sans code postal (elles ne seront pas placées sur la carte).
+ * @param {Array<{ numero: number, statut: string, fiche: Record<string, unknown> }>} classees
+ * @param {{ importer: Set<number>, ecarter: Set<number> }} choix
+ * @returns {number}
+ */
+export function fichesSansCodePostal(classees, choix) {
+  return classees.filter((l) => aImporter(l, choix) && !cp(l.fiche?.postal_code)).length;
+}
+
+/**
  * Valeurs corrigées (laissées vides, gardées en notes internes) parmi les lignes qui SERONT importées, par champ :
  * la plus fréquente d'abord, à égalité dans l'ordre du catalogue.
  * @param {Array<{ numero: number, statut: string, corrections?: Array<{ libelle: string }> }>} classees

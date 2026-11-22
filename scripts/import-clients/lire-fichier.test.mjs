@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LIGNES_MAX, OCTETS_MAX, refusFichier, decoderTexte, lireCsv, celluleEnTexte, trouverEntete, tableau,
+  reparerAccents, reparerMatrice,
 } from '../../src/lib/importClients/lireFichier.js';
 
 test('limites', () => {
@@ -123,4 +124,52 @@ test('tableau : une colonne remplie au-delà de l\'en-tête est gardée sous « 
   assert.deepEqual(t.lignes[1].cellules, ['C', 'D', '', '']);
   // Cellules vides au-delà de l'en-tête : aucune colonne ajoutée
   assert.deepEqual(tableau([['Nom'], ['A', '', '  ']], 0).entetes, ['Nom']);
+});
+
+// Ce que fait un tableur qui lit en Windows-1252 un texte écrit en UTF-8.
+const abime = (texte) => new TextDecoder('windows-1252').decode(new TextEncoder().encode(texte));
+
+test('accents abîmés par un tableur : réparés', () => {
+  assert.equal(reparerAccents('RÃ©f. client'), 'Réf. client');
+  assert.equal(reparerAccents('SociÃ©tÃ©'), 'Société');
+  assert.equal(reparerAccents('Adresse complÃ¨te'), 'Adresse complète');
+  assert.equal(reparerAccents('nÃ©ant'), 'néant');
+  assert.equal(reparerAccents('120 mÂ²'), '120 m²');
+  assert.equal(reparerAccents('peut-Ãªtre'), 'peut-être');
+});
+
+test('caractères du bloc 0x80–0x9F de Windows-1252 : réparés aussi', () => {
+  for (const t of ['L’Église', '100 €', 'œuvre', 'Noël « Sœur »', 'Á bientôt — ½', 'Ÿ Š Ž']) {
+    assert.equal(reparerAccents(abime(t)), t, t);
+  }
+});
+
+test('texte français correct : rendu tel quel', () => {
+  for (const t of ["Élodie Müller, 12 rue de l'Église", 'café', 'À côté', '100 €', 'œuvre', 'DUPONT Jean', 'Bâtiment B']) {
+    assert.equal(reparerAccents(t), t, t);
+  }
+});
+
+test('partie abîmée et caractère hors Windows-1252 : rien n\'est réparé', () => {
+  assert.equal(reparerAccents('SociÃ©tÃ© ★'), 'SociÃ©tÃ© ★');
+  assert.equal(reparerAccents('SociÃ©tÃ© 中'), 'SociÃ©tÃ© 中');
+  // Partie abîmée à côté d'un accent correct : le décodage strict échoue, rien n'est touché.
+  assert.equal(reparerAccents('Société SociÃ©tÃ©'), 'Société SociÃ©tÃ©');
+});
+
+test('chaîne vide ou sans accent', () => {
+  assert.equal(reparerAccents(''), '');
+  assert.equal(reparerAccents('Lyon 69003'), 'Lyon 69003');
+});
+
+test('matrice : chaque cellule, compte des cellules changées', () => {
+  const { matrice, reparees } = reparerMatrice([
+    ['RÃ©f. client', 'Nom', 'SociÃ©tÃ©'],
+    ['A-1', 'nÃ©ant', ''],
+    [],
+    ['A-2', 'Élodie', '120 mÂ²'],
+  ]);
+  assert.deepEqual(matrice, [['Réf. client', 'Nom', 'Société'], ['A-1', 'néant', ''], [], ['A-2', 'Élodie', '120 m²']]);
+  assert.equal(reparees, 4);
+  assert.deepEqual(reparerMatrice([['a', 'b']]), { matrice: [['a', 'b']], reparees: 0 });
 });

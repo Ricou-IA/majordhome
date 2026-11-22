@@ -59,10 +59,14 @@ export const CHAMPS = [
 
 /** Colonnes du fichier qui remplissent plusieurs champs à la fois. */
 export const CIBLES_COMPOSEES = [
-  { cle: '@nom_prenom', libelle: 'Nom et prénom, dans cet ordre', remplit: ['nom', 'prenom'] },
-  { cle: '@prenom_nom', libelle: 'Prénom et nom, dans cet ordre', remplit: ['prenom', 'nom'] },
-  { cle: '@cp_ville', libelle: 'Code postal et ville', remplit: ['code_postal', 'ville'] },
-  { cle: '@adresse_complete', libelle: 'Adresse complète (rue, code postal, ville)', remplit: ['adresse', 'code_postal', 'ville'] },
+  { cle: '@nom_prenom', libelle: 'Nom et prénom, dans cet ordre', remplit: ['nom', 'prenom'],
+    synonymes: ['Nom complet', 'Nom et prénom', 'Nom prénom', 'Nom du client', 'Client', 'Contact'] },
+  { cle: '@prenom_nom', libelle: 'Prénom et nom, dans cet ordre', remplit: ['prenom', 'nom'],
+    synonymes: ['Prénom et nom', 'Prénom nom'] },
+  { cle: '@cp_ville', libelle: 'Code postal et ville', remplit: ['code_postal', 'ville'],
+    synonymes: ['CP Ville', 'CP / Ville', 'Code postal et ville', 'Code postal ville', 'CP et ville'] },
+  { cle: '@adresse_complete', libelle: 'Adresse complète (rue, code postal, ville)', remplit: ['adresse', 'code_postal', 'ville'],
+    synonymes: ['Adresse complète', 'Adresse postale complète', 'Adresse de facturation', 'Adresse du client'] },
 ];
 
 /**
@@ -89,13 +93,14 @@ export function cleEntete(texte) {
 const INDEX_ENTETES = (() => {
   const index = new Map();
   for (const c of CHAMPS) for (const s of [c.libelle, ...c.synonymes]) index.set(cleEntete(s), c.cle);
+  for (const c of CIBLES_COMPOSEES) for (const s of c.synonymes) index.set(cleEntete(s), c.cle);
   return index;
 })();
 
 /**
- * Champ désigné par l'en-tête d'une colonne (libellé exact du catalogue ou synonyme).
+ * Champ (ou cible composée) désigné par l'en-tête d'une colonne : libellé exact du catalogue ou synonyme.
  * @param {string} entete
- * @returns {string} la clé du champ, ou '' si l'en-tête n'est pas reconnu
+ * @returns {string} la clé du champ ou de la cible composée, ou '' si l'en-tête n'est pas reconnu
  */
 export function cibleDepuisEntete(entete) {
   return INDEX_ENTETES.get(cleEntete(entete)) || CIBLE_A_CHOISIR;

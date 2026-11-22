@@ -29,22 +29,91 @@ export function estFichierType(entetes) {
   return noms.every((n) => libelles.has(n));
 }
 
+const VALEURS_REGARDEES = 50;
+
+/** Les 50 premières valeurs non vides d'une colonne. */
+function premieresValeurs(lignes, index) {
+  const valeurs = [];
+  for (const l of lignes || []) {
+    const v = String(l?.cellules?.[index] ?? '').trim();
+    if (v) valeurs.push(v);
+    if (valeurs.length >= VALEURS_REGARDEES) break;
+  }
+  return valeurs;
+}
+
 /**
- * Propose un champ pour chaque colonne. Un champ déjà pris par une colonne précédente n'est pas reproposé.
+ * Ordre d'une colonne « nom et prénom » lu sur ses valeurs : prénom puis nom quand plus de valeurs finissent par un mot
+ * tout en majuscules et commencent par un mot qui ne l'est pas (« Jean DUPONT ») que l'inverse ; sinon nom puis prénom.
+ * La civilité de tête est retirée avant (« Mme Claire MARTIN »).
+ * @param {string[]} valeurs
+ * @returns {'@nom_prenom' | '@prenom_nom'}
+ */
+function ordreNomPrenom(valeurs) {
+  let prenomNom = 0;
+  let nomPrenom = 0;
+  for (const v of valeurs) {
+    const mots = sansCivilite(v.split(/\s+/).filter(Boolean));
+    if (mots.length < 2) continue;
+    const debut = estMajuscules(mots[0]);
+    const fin = estMajuscules(mots[mots.length - 1]);
+    if (fin && !debut) prenomNom += 1;
+    else if (debut && !fin) nomPrenom += 1;
+  }
+  return prenomNom > nomPrenom ? '@prenom_nom' : '@nom_prenom';
+}
+
+/**
+ * Propose un champ pour chaque colonne. Un champ déjà pris par une colonne précédente n'est pas reproposé ; une cible
+ * composée prend tous les champs qu'elle remplit, et n'est pas proposée si l'un d'eux est déjà pris.
+ * Avec les lignes du fichier, une colonne « nom et prénom » est mise dans l'ordre que disent ses valeurs.
  * @param {string[]} entetes
+ * @param {Array<{ numero: number, cellules: string[] }>} [lignes]
  * @returns {Correspondance}
  */
-export function proposerCorrespondance(entetes) {
+export function proposerCorrespondance(entetes, lignes) {
   const type = estFichierType(entetes);
   const pris = new Set();
   return (entetes || []).map((brut, index) => {
     const entete = String(brut ?? '');
     if (!entete.trim()) return { index, entete, cible: CIBLE_IGNORER, origine: '' };
-    const cle = cibleDepuisEntete(entete);
-    if (!cle || pris.has(cle)) return { index, entete, cible: CIBLE_A_CHOISIR, origine: '' };
-    pris.add(cle);
+    let cle = cibleDepuisEntete(entete);
+    if (cle === '@nom_prenom' && lignes) cle = ordreNomPrenom(premieresValeurs(lignes, index));
+    const champs = champsDeCible(cle);
+    if (!cle || champs.some((c) => pris.has(c))) return { index, entete, cible: CIBLE_A_CHOISIR, origine: '' };
+    for (const c of champs) pris.add(c);
     return { index, entete, cible: cle, origine: type ? 'fichier_type' : 'synonyme' };
   });
+}
+
+const CP_SUIVI_DE_TEXTE = /(?<!\d)\d{5}(?!\d)[\s,;-]*\p{L}/u;
+
+/**
+ * Conseils de l'étape Correspondance, lus sur les 50 premières valeurs non vides d'une colonne : une colonne « Adresse »
+ * dont au moins la moitié des valeurs portent un code postal suivi d'une ville, quand aucune colonne ne va vers le code
+ * postal ; une colonne « Nom » dont au moins la moitié des valeurs ont deux mots ou plus, quand aucune ne va vers le
+ * prénom. Un conseil ne bloque rien.
+ * @param {Correspondance} correspondance
+ * @param {Array<{ numero: number, cellules: string[] }>} lignes
+ * @returns {Array<{ index: number, message: string, cible: string }>}
+ */
+export function conseilsCorrespondance(correspondance, lignes) {
+  const couverts = new Set((correspondance || []).flatMap((col) => champsDeCible(col.cible)));
+  const auMoinsLaMoitie = (valeurs, test) => valeurs.length > 0 && valeurs.filter(test).length * 2 >= valeurs.length;
+  const conseils = [];
+  for (const col of correspondance || []) {
+    if (col.cible === 'adresse' && !couverts.has('code_postal')) {
+      if (auMoinsLaMoitie(premieresValeurs(lignes, col.index), (v) => CP_SUIVI_DE_TEXTE.test(v))) {
+        conseils.push({ index: col.index, message: 'Ces adresses contiennent le code postal et la ville.', cible: '@adresse_complete' });
+      }
+    } else if (col.cible === 'nom' && !couverts.has('prenom')) {
+      const valeurs = premieresValeurs(lignes, col.index);
+      if (auMoinsLaMoitie(valeurs, (v) => sansCivilite(v.split(/\s+/).filter(Boolean)).length >= 2)) {
+        conseils.push({ index: col.index, message: 'Ces valeurs contiennent le nom et le prénom.', cible: ordreNomPrenom(valeurs) });
+      }
+    }
+  }
+  return conseils;
 }
 
 /**
