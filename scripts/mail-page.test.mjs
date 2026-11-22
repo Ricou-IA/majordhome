@@ -4,9 +4,13 @@ import {
   cartesDuMail, cleDepuisLibelle, cleDeCopie, libelleDeCopie, nomVerrouille, etatDuNom,
   formulaireDepuisCampagne, champsAEnregistrer, estModifie, raisonsEnregistrement, raisonsDeBlocage,
   raisonsRedaction, demandeRedaction, appliquerRedaction, refaireAvecNouvelEditeur, revenirALAncien,
-  rappelObjet, avertissementsTexte, ligneExpediteur, ligneEnvoi, etatEnregistrement, corpsVide,
+  rappelObjet, avertissementsTexte, ligneExpediteur, etatEnregistrement, corpsVide,
   LIMITES_REDACTION, champsDeCopie, objetsSuggeres, sansElementsDe, miseEnFormeSimplifiee, cleReservee,
+  segmentsRanges, etatSegment, segmentSurLaCampagne, modesEnvoi, raisonsAutomatisation, cadenceEnMots,
+  prochainEnvoiEnMots, basculerAutomatisation, texteConfirmationLancement, peutOuvrirMail, raisonsEnvoiPage,
+  dejaServis, metEnRoute, texteConfirmationActivation, raisonsReglageAutomatique, raisonsSauvegardePage,
 } from '../src/lib/mailPage.js';
+import { texteParDefaut } from '../src/lib/mailVariables.js';
 import { EMAILS_AUTOMATIQUES } from '../src/lib/emailsAutomatiques.js';
 import { SEQUENCES_EMAILS } from '../src/lib/sequencesEmails.js';
 import { WEBSHOP_EMAIL_KEYS } from '../src/lib/webshop/emailTemplates.js';
@@ -202,10 +206,18 @@ test('raisonsDeBlocage : variable inconnue nommée sans accolades', () => {
   assert.ok(r.every((m) => !m.includes('{')));
 });
 
-test('raisonsDeBlocage : segment absent pour lancer et automatiser, pas pour tester', () => {
+test('raisonsDeBlocage : segment absent ferme aussi « Tester » (l’essai d’une campagne passe par son segment)', () => {
   assert.ok(raisonsDeBlocage({ ...PRET, segmentId: null }, 'lancer').length > 0);
   assert.ok(raisonsDeBlocage({ ...PRET, segmentId: null }, 'automatiser').length > 0);
-  assert.deepEqual(raisonsDeBlocage({ ...PRET, segmentId: null }, 'tester'), []);
+  assert.ok(raisonsDeBlocage({ ...PRET, segmentId: null }, 'tester').length > 0);
+});
+
+test('raisonsDeBlocage : adresse d’essai requise et lisible quand elle est fournie', () => {
+  assert.ok(raisonsDeBlocage({ ...PRET, adresseTest: '' }, 'tester').some((m) => /adresse/i.test(m)));
+  assert.ok(raisonsDeBlocage({ ...PRET, adresseTest: 'pas une adresse' }, 'tester').some((m) => /adresse/i.test(m)));
+  assert.deepEqual(raisonsDeBlocage({ ...PRET, adresseTest: ' moi@exemple.fr ' }, 'tester'), []);
+  // L'adresse d'essai ne concerne que l'essai.
+  assert.deepEqual(raisonsDeBlocage({ ...PRET, adresseTest: '' }, 'lancer'), []);
 });
 
 test('raisonsDeBlocage : nombre inconnu ou nul ferme « Lancer »', () => {
@@ -330,18 +342,6 @@ test('ligneExpediteur : envoi en nombre sans domaine vérifié ⇒ refus, indivi
   assert.match(ok.texte, /a@mayer\.fr/);
 });
 
-test('ligneEnvoi : renvoi provisoire vers l’onglet Envoi pour les campagnes, Réglages pour les autres', () => {
-  const admin = { isOrgAdmin: true };
-  assert.match(ligneEnvoi('manuelle', cartesDuMail('manuelle', admin)).texte, /onglet Envoi/);
-  const auto = ligneEnvoi('automatique', cartesDuMail('automatique', admin)).texte;
-  // L'envoi automatique continue tel que réglé ; archiver l'arrête (mail_campaigns_due écarte les archivées).
-  assert.match(auto, /continue/);
-  assert.match(auto, /archiv/i);
-  assert.equal(ligneEnvoi('sequence', cartesDuMail('sequence', admin)).lien.vers, '/settings/communication');
-  assert.equal(ligneEnvoi('auto_registre', cartesDuMail('auto_registre', admin)).lien.vers, '/settings/communication');
-  assert.equal(ligneEnvoi('boutique', cartesDuMail('boutique', admin)), null);
-});
-
 test('etatEnregistrement : nouveau, modifié, enregistré, en cours', () => {
   assert.equal(etatEnregistrement({ nouveau: false, modifie: false, enCours: false }), 'Enregistré');
   assert.equal(etatEnregistrement({ nouveau: false, modifie: true, enCours: false }), 'Modifications non enregistrées');
@@ -445,4 +445,198 @@ test('miseEnFormeSimplifiee : texte simple ou déjà au format ⇒ faux ; couleu
   assert.equal(miseEnFormeSimplifiee('<p style="text-align:center">Centré</p>'), true);
   // Un ancien format (non éditable) part tel quel : pas concerné.
   assert.equal(miseEnFormeSimplifiee('<!DOCTYPE html><html><body><table><tr><td>x</td></tr></table></body></html>'), false);
+});
+
+// ── Fix round 2 : mise en forme ───────────────────────────────────────────────
+
+test('miseEnFormeSimplifiee : un texte par défaut intact n’est pas « simplifié » (le marqueur de bouton ne compte pas)', () => {
+  for (const key of ['proposition_contrat', 'auto_rdv', 'pv_reception', 'pv_levee_reserves']) {
+    const defaut = texteParDefaut({ key });
+    assert.ok(defaut?.html_body, key);
+    assert.equal(miseEnFormeSimplifiee(defaut.html_body), false, key);
+  }
+  assert.equal(miseEnFormeSimplifiee('<p style="color:red">Rouge</p>'), true);
+});
+
+// ── Destinataires et envoi ───────────────────────────────────────────────────
+
+const SEGMENTS = [
+  { id: 's1', name: 'Clients poêle', audience: 'clients', is_archived: false, filters: { a: 1 } },
+  { id: 's2', name: 'Prospects chauds', audience: 'leads', is_archived: false, filters: { b: 1 } },
+  { id: 's3', name: 'Ancien', audience: 'clients', is_archived: true, filters: {} },
+];
+
+test('segmentsRanges : Clients / Prospects, sans les archivés', () => {
+  const r = segmentsRanges(SEGMENTS);
+  assert.deepEqual(r.clients.map((s) => s.id), ['s1']);
+  assert.deepEqual(r.prospects.map((s) => s.id), ['s2']);
+});
+
+test('etatSegment : aucun, liste inconnue, introuvable, archivé, prêt', () => {
+  assert.equal(etatSegment(null, SEGMENTS, { chargee: true }).etat, 'aucun');
+  assert.equal(etatSegment('s1', [], { chargee: false }).etat, 'inconnu');
+  const perdu = etatSegment('zz', SEGMENTS, { chargee: true });
+  assert.equal(perdu.etat, 'introuvable');
+  assert.ok(perdu.raison);
+  const archive = etatSegment('s3', SEGMENTS, { chargee: true });
+  assert.equal(archive.etat, 'archive');
+  assert.match(archive.raison, /archivé/);
+  const ok = etatSegment('s1', SEGMENTS, { chargee: true });
+  assert.equal(ok.etat, 'ok');
+  assert.equal(ok.segment.name, 'Clients poêle');
+  assert.equal(ok.raison, null);
+});
+
+test('segmentSurLaCampagne : seul le choix d’un administrateur devient le segment de la campagne', () => {
+  assert.equal(segmentSurLaCampagne({ isOrgAdmin: true, cartes: cartesDuMail('manuelle', { isOrgAdmin: true }) }), true);
+  assert.equal(segmentSurLaCampagne({ isOrgAdmin: false, cartes: cartesDuMail('manuelle', { isOrgAdmin: false }) }), false);
+  assert.equal(segmentSurLaCampagne({ isOrgAdmin: true, cartes: cartesDuMail('sequence', { isOrgAdmin: true }) }), false);
+});
+
+test('modesEnvoi : administrateur une fois / automatiquement, autre rôle une fois, lecture et essai sans mode', () => {
+  const a = { isOrgAdmin: true };
+  const r = { isOrgAdmin: false };
+  assert.deepEqual(modesEnvoi({ cartes: cartesDuMail('manuelle', a), isOrgAdmin: true }), ['une_fois', 'automatique']);
+  assert.deepEqual(modesEnvoi({ cartes: cartesDuMail('automatique', a), isOrgAdmin: true }), ['une_fois', 'automatique']);
+  assert.deepEqual(modesEnvoi({ cartes: cartesDuMail('manuelle', r), isOrgAdmin: false }), ['une_fois']);
+  assert.deepEqual(modesEnvoi({ cartes: cartesDuMail('sequence', a), isOrgAdmin: true }), []);
+  assert.deepEqual(modesEnvoi({ cartes: cartesDuMail('auto_registre', a), isOrgAdmin: true }), []);
+});
+
+const PRET_AUTO = { ...PRET, cadenceJours: 7, cadenceMinutes: null, heure: '09:00' };
+
+test('raisonsAutomatisation : reprend les gestes d’envoi, exige une cadence et une heure', () => {
+  assert.deepEqual(raisonsAutomatisation(PRET_AUTO), []);
+  assert.ok(raisonsAutomatisation({ ...PRET_AUTO, cadenceJours: null }).some((m) => /jours/.test(m)));
+  assert.ok(raisonsAutomatisation({ ...PRET_AUTO, cadenceJours: 0 }).length > 0);
+  assert.ok(raisonsAutomatisation({ ...PRET_AUTO, cadenceJours: 2.5 }).length > 0);
+  assert.ok(raisonsAutomatisation({ ...PRET_AUTO, heure: '' }).length > 0);
+  // Une cadence en minutes déjà enregistrée suffit.
+  assert.deepEqual(raisonsAutomatisation({ ...PRET_AUTO, cadenceJours: null, cadenceMinutes: 10 }), []);
+  assert.ok(raisonsAutomatisation({ ...PRET_AUTO, segmentId: null }).length > 0);
+  assert.ok(raisonsAutomatisation({ ...PRET_AUTO, refusExpediteur: 'domaine_requis' }).length > 0);
+  // Le nombre n'est pas exigé : il change d'un passage à l'autre.
+  assert.deepEqual(raisonsAutomatisation({ ...PRET_AUTO, nombre: undefined }), []);
+});
+
+test('cadenceEnMots : jours, semaine, minutes conservées, rien', () => {
+  assert.equal(cadenceEnMots({ auto_cadence_days: 1, auto_time_of_day: '08:30:00' }), 'tous les jours à 8 h 30');
+  assert.equal(cadenceEnMots({ auto_cadence_days: 7, auto_time_of_day: '09:00' }), 'toutes les semaines à 9 h');
+  assert.equal(cadenceEnMots({ auto_cadence_days: 3, auto_time_of_day: null }), 'tous les 3 jours à 9 h');
+  assert.equal(cadenceEnMots({ auto_cadence_minutes: 10, auto_cadence_days: 7 }), 'toutes les 10 minutes');
+  assert.equal(cadenceEnMots({ auto_cadence_minutes: 60 }), 'toutes les heures');
+  assert.equal(cadenceEnMots({}), null);
+});
+
+test('prochainEnvoiEnMots : arrêté, au prochain passage, à une date', () => {
+  const maintenant = new Date('2026-11-22T10:00:00Z');
+  assert.match(prochainEnvoiEnMots({ is_automated: false }, { maintenant }), /ne part pas/);
+  assert.match(prochainEnvoiEnMots({ is_automated: true, next_run_at: null }, { maintenant }), /10 minutes/);
+  assert.match(prochainEnvoiEnMots({ is_automated: true, next_run_at: '2026-11-22T09:00:00Z' }, { maintenant }), /10 minutes/);
+  const futur = prochainEnvoiEnMots({ is_automated: true, next_run_at: '2026-11-29T08:00:00Z' }, { maintenant });
+  assert.match(futur, /29 novembre/);
+  assert.match(prochainEnvoiEnMots({ is_automated: true, next_run_at: null }, { maintenant, nonEnregistre: true }), /enregistr/);
+});
+
+test('basculerAutomatisation : allumer part au prochain passage, éteindre ne touche à rien d’autre', () => {
+  const initial = formulaireDepuisCampagne(MANUELLE);
+  const maintenant = new Date('2026-11-22T10:00:00Z');
+  const on = basculerAutomatisation(initial, initial, true, maintenant);
+  assert.equal(on.is_automated, true);
+  assert.equal(on.next_run_at, maintenant.toISOString());
+  assert.equal(on.auto_cadence_days, 7);
+  const off = basculerAutomatisation(on, initial, false, maintenant);
+  assert.equal(off.is_automated, false);
+  assert.deepEqual(champsAEnregistrer(off, initial), { auto_cadence_days: 7 });
+  // Une campagne déjà automatique rallumée garde sa date prévue.
+  const auto = formulaireDepuisCampagne({ ...MANUELLE, is_automated: true, auto_cadence_days: 3, next_run_at: '2026-12-01T09:00:00Z' });
+  const eteinte = basculerAutomatisation(auto, auto, false, maintenant);
+  const rallumee = basculerAutomatisation(eteinte, auto, true, maintenant);
+  assert.equal(rallumee.next_run_at, '2026-12-01T09:00:00Z');
+  assert.equal(rallumee.auto_cadence_days, 3);
+  assert.deepEqual(champsAEnregistrer(eteinte, auto), { is_automated: false });
+  // Une cadence en minutes : pas de cadence en jours ajoutée, la page ne convertit rien.
+  const minutes = formulaireDepuisCampagne({ ...MANUELLE, auto_cadence_minutes: 10 });
+  assert.equal(basculerAutomatisation(minutes, minutes, true, maintenant).auto_cadence_days, null);
+});
+
+test('texteConfirmationLancement : segment, nombre, nom, et la promesse « pas deux fois »', () => {
+  const t = texteConfirmationLancement({ segmentNom: 'Clients poêle', nombre: 1234, nomCampagne: 'Promo automne' });
+  assert.match(t, /Clients poêle/);
+  assert.match(t, /1\s234/);
+  assert.match(t, /Promo automne/);
+  assert.match(t, /déjà reçu/);
+  assert.equal(texteConfirmationLancement({ segmentNom: 'X', nombre: undefined, nomCampagne: 'Y' }), null);
+  assert.equal(texteConfirmationLancement({ segmentNom: 'X', nombre: 0, nomCampagne: 'Y' }), null);
+});
+
+test('metEnRoute / texteConfirmationActivation : seul l’allumage d’une campagne éteinte est confirmé', () => {
+  const eteinte = formulaireDepuisCampagne(MANUELLE);
+  const allumee = { ...eteinte, is_automated: true };
+  assert.equal(metEnRoute(allumee, eteinte), true);
+  assert.equal(metEnRoute(allumee, allumee), false);
+  assert.equal(metEnRoute(eteinte, eteinte), false);
+  assert.equal(metEnRoute(allumee, null), true);
+  const t = texteConfirmationActivation({ segmentNom: 'Clients poêle', nombre: 40, cadence: 'toutes les semaines à 9 h' });
+  assert.match(t, /10 minutes/);
+  assert.match(t, /40 destinataires/);
+  assert.match(t, /toutes les semaines/);
+  assert.match(texteConfirmationActivation({ segmentNom: 'X', nombre: undefined, cadence: null }), /groupe « X »/);
+});
+
+test('raisonsReglageAutomatique : allumer ou changer la cadence exige un réglage complet ; retoucher le texte non', () => {
+  const eteinte = formulaireDepuisCampagne(MANUELLE);
+  const pret = { ...PRET_AUTO, envoiEnCours: true };
+  assert.deepEqual(raisonsReglageAutomatique({ form: eteinte, initial: eteinte, etat: { ...pret, segmentId: null } }), []);
+  const allumee = { ...eteinte, is_automated: true, auto_cadence_days: 7 };
+  assert.deepEqual(raisonsReglageAutomatique({ form: allumee, initial: eteinte, etat: pret }), []);
+  assert.ok(raisonsReglageAutomatique({ form: allumee, initial: eteinte, etat: { ...pret, segmentId: null } }).length > 0);
+  const auto = formulaireDepuisCampagne({ ...MANUELLE, is_automated: true, auto_cadence_days: 7, auto_segment_id: 's1' });
+  // Texte seul retouché : rien n'est exigé (domaine absent compris).
+  assert.deepEqual(raisonsReglageAutomatique({ form: { ...auto, subject: 'Autre' }, initial: auto, etat: { ...pret, refusExpediteur: 'domaine_requis' } }), []);
+  assert.ok(raisonsReglageAutomatique({ form: { ...auto, auto_cadence_days: 0 }, initial: auto, etat: { ...pret, cadenceJours: 0 } }).length > 0);
+});
+
+test('dejaServis : écart entre la taille du segment et le nombre pour cette campagne, 0 si inconnu', () => {
+  assert.equal(dejaServis(100, 80), 20);
+  assert.equal(dejaServis(undefined, 80), 0);
+  assert.equal(dejaServis(100, undefined), 0);
+  assert.equal(dejaServis(50, 80), 0);
+});
+
+test('peutOuvrirMail : administrateur tout ; autre rôle seulement une campagne manuelle non archivée', () => {
+  assert.equal(peutOuvrirMail({ campagne: null, nouveau: true, isOrgAdmin: true }), true);
+  assert.equal(peutOuvrirMail({ campagne: null, nouveau: true, isOrgAdmin: false }), false);
+  assert.equal(peutOuvrirMail({ campagne: MANUELLE, nouveau: false, isOrgAdmin: false }), true);
+  assert.equal(peutOuvrirMail({ campagne: { ...MANUELLE, is_archived: true }, nouveau: false, isOrgAdmin: false }), false);
+  assert.equal(peutOuvrirMail({ campagne: { ...MANUELLE, is_automated: true }, nouveau: false, isOrgAdmin: false }), false);
+  assert.equal(peutOuvrirMail({ campagne: { ...MANUELLE, is_transactional: true }, nouveau: false, isOrgAdmin: false }), false);
+  assert.equal(peutOuvrirMail({ campagne: { ...MANUELLE, key: SEQUENCES_EMAILS[0].gabarit.key }, nouveau: false, isOrgAdmin: false }), false);
+  assert.equal(peutOuvrirMail({ campagne: { ...MANUELLE, is_automated: true }, nouveau: false, isOrgAdmin: true }), true);
+});
+
+test('raisonsEnvoiPage : mail archivé, segment perdu, mail impossible à enregistrer ferment l’envoi', () => {
+  const base = { geste: 'lancer', etat: PRET, archive: false, segment: { etat: 'ok', raison: null }, raisonsEnregistrement: [], modifie: false };
+  assert.deepEqual(raisonsEnvoiPage(base), []);
+  assert.ok(raisonsEnvoiPage({ ...base, archive: true }).some((m) => /archivé/.test(m)));
+  assert.ok(raisonsEnvoiPage({ ...base, segment: { etat: 'archive', raison: 'Ce groupe de destinataires est archivé.' } }).some((m) => /archivé/.test(m)));
+  assert.ok(raisonsEnvoiPage({ ...base, segment: { etat: 'inconnu', raison: null } }).length > 0);
+  // Un mail modifié s'enregistre avant l'envoi : s'il ne peut pas l'être, l'envoi est fermé avec la raison.
+  const r = raisonsEnvoiPage({ ...base, modifie: true, raisonsEnregistrement: ['Donnez un nom à ce mail.'] });
+  assert.ok(r.some((m) => /nom/.test(m)));
+  assert.deepEqual(raisonsEnvoiPage({ ...base, modifie: false, raisonsEnregistrement: ['Donnez un nom à ce mail.'] }), []);
+  // Sans doublon de phrase.
+  const doublon = raisonsEnvoiPage({ ...base, etat: { ...PRET, segmentId: null }, segment: { etat: 'aucun', raison: null } });
+  assert.equal(new Set(doublon).size, doublon.length);
+  // Une mise en route automatique non enregistrée ferme essai et envoi (l'enregistrement se confirme à part).
+  assert.ok(raisonsEnvoiPage({ ...base, geste: 'tester', miseEnRoute: true }).some((m) => /mise en route/.test(m)));
+  assert.ok(!raisonsEnvoiPage({ ...base, geste: 'automatiser', etat: PRET_AUTO, miseEnRoute: true }).some((m) => /mise en route/.test(m)));
+  // L'automatisation passe par raisonsAutomatisation.
+  assert.ok(raisonsEnvoiPage({ ...base, geste: 'automatiser', etat: { ...PRET_AUTO, cadenceJours: null } }).some((m) => /jours/.test(m)));
+});
+
+test('raisonsSauvegardePage : un envoi en cours ferme « Enregistrer », sans doublon', () => {
+  assert.deepEqual(raisonsSauvegardePage({ envoiEnCours: false, raisonsEnregistrement: [], raisonsReglage: [] }), []);
+  assert.ok(raisonsSauvegardePage({ envoiEnCours: true, raisonsEnregistrement: [], raisonsReglage: [] })[0].includes('envoi est en cours'));
+  assert.deepEqual(raisonsSauvegardePage({ envoiEnCours: false, raisonsEnregistrement: ['A'], raisonsReglage: ['A', 'B'] }), ['A', 'B']);
 });

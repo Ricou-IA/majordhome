@@ -99,12 +99,11 @@ export default function SegmentBuilderDrawer({ initial = null, onClose, onSaved 
       filters,
     };
     try {
-      if (initial?.id) {
-        await updateSegment({ id: initial.id, patch: payload });
-      } else {
-        await createSegment(payload);
-      }
-      onSaved?.();
+      // `onSaved(ligne)` : la page du mail choisit le segment qu'elle vient de faire créer.
+      const ligne = initial?.id
+        ? await updateSegment({ id: initial.id, patch: payload })
+        : await createSegment(payload);
+      onSaved?.(ligne);
       onClose();
     } catch {
       // toast déjà affiché par le hook

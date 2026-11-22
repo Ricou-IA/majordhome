@@ -23,7 +23,8 @@ import { WEBSHOP_EMAIL_KEYS } from './webshop/emailTemplates.js';
  * @typedef {{ destinataires: 'oui' | 'lecture' | 'non', message: 'oui' | 'lecture', envoi: 'complet' | 'lecture' | 'essai' | 'non' }} CartesMail
  * @typedef {{ key: string, label: string, subject: string, html_body: string, blocks: Record<string, any>,
  *   auto_segment_id: string | null, is_automated: boolean, auto_cadence_days: number | null,
- *   auto_time_of_day: string | null, next_run_at: string | null, tracking_type_value: string | null }} FormulaireMail
+ *   auto_cadence_minutes: number | null, auto_time_of_day: string | null, next_run_at: string | null,
+ *   tracking_type_value: string | null }} FormulaireMail
  */
 
 // ── Cartes ────────────────────────────────────────────────────────────────────
@@ -167,6 +168,8 @@ export function formulaireDepuisCampagne(campagne) {
     auto_segment_id: c.auto_segment_id ?? null,
     is_automated: !!c.is_automated,
     auto_cadence_days: c.auto_cadence_days ?? null,
+    // Lu pour l'affichage seulement : absent de CHAMPS, la page ne l'écrit jamais (cadence en minutes conservée).
+    auto_cadence_minutes: c.auto_cadence_minutes ?? null,
     auto_time_of_day: c.auto_time_of_day ?? '09:00',
     next_run_at: c.next_run_at ?? null,
     tracking_type_value: c.tracking_type_value ?? null,
@@ -330,15 +333,20 @@ export function champsDeCopie(campagne, cle, libelle) {
 
 // ── Gestes d'envoi ───────────────────────────────────────────────────────────
 
+/** Adresse e-mail lisible (forme seulement). */
+const ADRESSE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * Pourquoi un geste d'envoi est fermé (phrases affichées telles quelles à côté du bouton) ; liste vide = ouvert.
- * `nombre` inconnu (chargement, erreur) ou nul ferme « Lancer », jamais « Tester ».
+ * `nombre` inconnu (chargement, erreur) ou nul ferme « Lancer », jamais « Tester ». Un essai d'une campagne
+ * passe lui aussi par son segment (`mailing-send` en mode liste l'exige) : sans segment, « Tester » est fermé.
+ * `adresseTest` n'est contrôlée que pour « Tester », et seulement si elle est fournie.
  * @param {{ objet?: string, corps?: string, variablesInconnues?: string[], segmentId?: string | null,
- *   nombre?: number | null, refusExpediteur?: string | null, envoiEnCours?: boolean }} etat
+ *   nombre?: number | null, refusExpediteur?: string | null, envoiEnCours?: boolean, adresseTest?: string }} etat
  * @param {'tester' | 'lancer' | 'automatiser'} geste
  * @returns {string[]}
  */
-export function raisonsDeBlocage({ objet, corps, variablesInconnues: inconnues = [], segmentId, nombre, refusExpediteur, envoiEnCours }, geste) {
+export function raisonsDeBlocage({ objet, corps, variablesInconnues: inconnues = [], segmentId, nombre, refusExpediteur, envoiEnCours, adresseTest }, geste) {
   if (!['tester', 'lancer', 'automatiser'].includes(geste)) return ['Ce geste n’est pas possible ici.'];
   const raisons = [];
   if (envoiEnCours) raisons.push('Un envoi est déjà en cours : attendez qu’il se termine.');
@@ -349,12 +357,267 @@ export function raisonsDeBlocage({ objet, corps, variablesInconnues: inconnues =
     raisons.push(`Le texte contient ${noms}, que rien ne remplace : il arriverait tel quel chez le client.`);
   }
   if (refusExpediteur) raisons.push(EXPEDITEUR_REFUS[refusExpediteur] ?? 'L’adresse d’envoi de votre entreprise n’est pas prête.');
-  if (geste !== 'tester' && !segmentId) raisons.push('Choisissez les destinataires.');
+  if (!segmentId) raisons.push('Choisissez les destinataires.');
+  if (geste === 'tester' && adresseTest !== undefined) {
+    const a = String(adresseTest ?? '').trim();
+    if (!a) raisons.push('Indiquez l’adresse qui recevra l’essai.');
+    else if (!ADRESSE.test(a)) raisons.push('L’adresse de l’essai n’est pas une adresse e-mail.');
+  }
   if (geste === 'lancer' && segmentId) {
     if (typeof nombre !== 'number') raisons.push('Le nombre de destinataires n’est pas encore connu.');
     else if (nombre <= 0) raisons.push('Personne à qui envoyer ce mail dans ces destinataires.');
   }
   return raisons;
+}
+
+// ── Destinataires ────────────────────────────────────────────────────────────
+
+/**
+ * Segments proposés, rangés Clients / Prospects, sans les archivés.
+ * @param {Array<{ id: string, name?: string, audience?: string, is_archived?: boolean }>} segments
+ */
+export function segmentsRanges(segments) {
+  const vivants = (segments ?? []).filter((s) => !s.is_archived);
+  return {
+    clients: vivants.filter((s) => s.audience !== 'leads'),
+    prospects: vivants.filter((s) => s.audience === 'leads'),
+  };
+}
+
+/**
+ * Le segment choisi existe-t-il encore ? Liste des segments (archivés compris) pas encore lue ⇒ inconnu.
+ * @param {string | null | undefined} segmentId
+ * @param {Array<Record<string, any>>} segments archivés compris
+ * @param {{ chargee: boolean }} options
+ * @returns {{ etat: 'aucun' | 'inconnu' | 'introuvable' | 'archive' | 'ok', segment: Record<string, any> | null, raison: string | null }}
+ */
+export function etatSegment(segmentId, segments, { chargee }) {
+  if (!segmentId) return { etat: 'aucun', segment: null, raison: null };
+  if (!chargee) return { etat: 'inconnu', segment: null, raison: null };
+  const segment = (segments ?? []).find((s) => s.id === segmentId) ?? null;
+  if (!segment) return { etat: 'introuvable', segment: null, raison: 'Ce groupe de destinataires n’existe plus : choisissez-en un autre.' };
+  if (segment.is_archived) return { etat: 'archive', segment, raison: 'Ce groupe de destinataires est archivé : choisissez-en un autre.' };
+  return { etat: 'ok', segment, raison: null };
+}
+
+/**
+ * Le segment choisi devient-il celui de la campagne (enregistré) ? Seulement pour un administrateur qui
+ * règle les destinataires ; pour un autre rôle, il vaut pour son envoi seulement, comme avec l'ancien onglet Envoi.
+ * @param {{ isOrgAdmin: boolean, cartes: CartesMail }} entree
+ * @returns {boolean}
+ */
+export function segmentSurLaCampagne({ isOrgAdmin, cartes }) {
+  return !!isOrgAdmin && cartes?.destinataires === 'oui';
+}
+
+/**
+ * Écart entre la taille du segment et le nombre pour cette campagne : ceux qui l'ont déjà reçue. 0 si inconnu.
+ * @param {number | null | undefined} taille
+ * @param {number | null | undefined} nombre
+ */
+export function dejaServis(taille, nombre) {
+  if (!Number.isFinite(taille) || !Number.isFinite(nombre)) return 0;
+  return Math.max(0, taille - nombre);
+}
+
+// ── Envoi ────────────────────────────────────────────────────────────────────
+
+/**
+ * Façons d'envoyer proposées par la carte Envoi. L'automatisation est un réglage de la campagne : administrateur seul.
+ * @param {{ cartes: CartesMail, isOrgAdmin: boolean }} entree
+ * @returns {Array<'une_fois' | 'automatique'>}
+ */
+export function modesEnvoi({ cartes, isOrgAdmin }) {
+  if (cartes?.envoi !== 'complet') return [];
+  return isOrgAdmin ? ['une_fois', 'automatique'] : ['une_fois'];
+}
+
+/**
+ * Pourquoi l'envoi automatique ne peut pas être allumé. Mêmes motifs que les autres gestes (« automatiser »), plus
+ * une cadence : sans elle, le planificateur reprendrait la campagne à chaque passage. Une cadence en minutes déjà
+ * enregistrée suffit (elle est conservée, jamais proposée).
+ * @param {Parameters<typeof raisonsDeBlocage>[0] & { cadenceJours?: number | null, cadenceMinutes?: number | null, heure?: string | null }} etat
+ * @returns {string[]}
+ */
+export function raisonsAutomatisation(etat) {
+  const raisons = raisonsDeBlocage(etat, 'automatiser');
+  const minutes = Number(etat.cadenceMinutes);
+  if (!(Number.isInteger(minutes) && minutes > 0)) {
+    const jours = Number(etat.cadenceJours);
+    if (etat.cadenceJours == null || !Number.isInteger(jours) || jours < 1 || jours > 365) {
+      raisons.push('Indiquez tous les combien de jours ce mail part (un nombre entier de 1 à 365).');
+    }
+    if (!/^\d{1,2}:\d{2}/.test(String(etat.heure ?? ''))) raisons.push('Indiquez l’heure d’envoi.');
+  }
+  return raisons;
+}
+
+/** « 9 h », « 8 h 30 ». @param {string | null | undefined} heure */
+function heureEnMots(heure) {
+  const m = String(heure || '09:00').match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return '9 h';
+  const h = Number(m[1]);
+  const mn = Number(m[2]);
+  return mn ? `${h} h ${String(mn).padStart(2, '0')}` : `${h} h`;
+}
+
+/**
+ * Cadence en mots. Une cadence en minutes l'emporte (c'est elle que le planificateur applique).
+ * @param {{ auto_cadence_days?: number | null, auto_cadence_minutes?: number | null, auto_time_of_day?: string | null }} c
+ * @returns {string | null}
+ */
+export function cadenceEnMots(c) {
+  const minutes = Number(c?.auto_cadence_minutes);
+  if (Number.isFinite(minutes) && minutes > 0) {
+    if (minutes === 60) return 'toutes les heures';
+    return `toutes les ${minutes} minutes`;
+  }
+  const jours = Number(c?.auto_cadence_days);
+  if (!Number.isFinite(jours) || jours <= 0) return null;
+  const a = heureEnMots(c?.auto_time_of_day);
+  if (jours === 1) return `tous les jours à ${a}`;
+  if (jours === 7) return `toutes les semaines à ${a}`;
+  return `tous les ${jours} jours à ${a}`;
+}
+
+/**
+ * Prochain envoi en mots, à partir de ce qui est ENREGISTRÉ (le planificateur ne lit que la base).
+ * Le planificateur passe toutes les 10 minutes ; une date prévue nulle ou passée part au prochain passage.
+ * @param {{ is_automated?: boolean, next_run_at?: string | null }} enregistre
+ * @param {{ maintenant?: Date, nonEnregistre?: boolean }} [options] `nonEnregistre` : la page porte un réglage à enregistrer
+ * @returns {string}
+ */
+export function prochainEnvoiEnMots(enregistre, { maintenant = new Date(), nonEnregistre = false } = {}) {
+  if (nonEnregistre) return 'Rien ne change tant que le mail n’est pas enregistré.';
+  if (!enregistre?.is_automated) return 'Ce mail ne part pas tout seul.';
+  const t = enregistre.next_run_at ? new Date(enregistre.next_run_at) : null;
+  if (!t || Number.isNaN(t.getTime()) || t.getTime() <= maintenant.getTime()) {
+    return 'Prochain envoi : dans les 10 minutes.';
+  }
+  const date = t.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
+  const heure = t.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }).replace(':', ' h ');
+  return `Prochain envoi : ${date} vers ${heure}.`;
+}
+
+/**
+ * Allumer ou éteindre l'envoi automatique dans le formulaire (rien n'est écrit avant « Enregistrer »).
+ * Allumer une campagne qui ne l'était pas : premier envoi au prochain passage (`next_run_at` = maintenant, comme
+ * l'ancien assistant), cadence de 7 jours proposée s'il n'y en a aucune. Rallumer une campagne déjà automatique :
+ * sa date prévue enregistrée. Une cadence en minutes n'est jamais convertie.
+ * @param {FormulaireMail & Record<string, any>} form
+ * @param {FormulaireMail | null} initial
+ * @param {boolean} actif
+ * @param {Date} [maintenant]
+ * @returns {FormulaireMail & Record<string, any>}
+ */
+export function basculerAutomatisation(form, initial, actif, maintenant = new Date()) {
+  if (!actif) return { ...form, is_automated: false, next_run_at: initial ? initial.next_run_at : null };
+  const minutes = Number(form.auto_cadence_minutes);
+  const aDesMinutes = Number.isFinite(minutes) && minutes > 0;
+  return {
+    ...form,
+    is_automated: true,
+    next_run_at: initial?.is_automated ? initial.next_run_at : maintenant.toISOString(),
+    auto_cadence_days: form.auto_cadence_days ?? (aDesMinutes ? null : 7),
+  };
+}
+
+/**
+ * Phrase de la confirmation de « Lancer ». Nombre inconnu ou nul ⇒ `null` : pas de confirmation possible.
+ * @param {{ segmentNom: string, nombre: number | null | undefined, nomCampagne: string }} entree
+ * @returns {string | null}
+ */
+export function texteConfirmationLancement({ segmentNom, nombre, nomCampagne }) {
+  if (typeof nombre !== 'number' || nombre <= 0) return null;
+  const n = nombre.toLocaleString('fr-FR');
+  return `« ${nomCampagne} » va partir maintenant vers ${n} destinataire${nombre > 1 ? 's' : ''} du groupe « ${segmentNom} ». `
+    + 'Les personnes qui ont déjà reçu ce mail ne le recevront pas une seconde fois. Un envoi parti ne se rattrape pas.';
+}
+
+/**
+ * L'enregistrement met-il en route un envoi automatique (éteint en base, allumé dans le formulaire) ?
+ * C'est lui qui fera partir le mail : la page le fait confirmer.
+ * @param {FormulaireMail} form
+ * @param {FormulaireMail | null} initial
+ */
+export function metEnRoute(form, initial) {
+  return !!form?.is_automated && !initial?.is_automated;
+}
+
+/**
+ * Ce qui empêche d'ENREGISTRER un réglage d'envoi automatique : quand l'enregistrement le met en route, ou en change
+ * la cadence, l'heure ou le segment, les motifs de `raisonsAutomatisation` (sans « envoi en cours »). Un mail
+ * automatique dont on ne retouche que le texte s'enregistre comme avant.
+ * @param {{ form: FormulaireMail, initial: FormulaireMail | null, etat: Parameters<typeof raisonsAutomatisation>[0] }} entree
+ * @returns {string[]}
+ */
+export function raisonsReglageAutomatique({ form, initial, etat }) {
+  if (!form?.is_automated) return [];
+  const change = metEnRoute(form, initial)
+    || ['auto_cadence_days', 'auto_time_of_day', 'auto_segment_id'].some((c) => !egaux(c, form[c], initial?.[c]));
+  if (!change) return [];
+  return raisonsAutomatisation({ ...etat, envoiEnCours: false });
+}
+
+/**
+ * Ce qui ferme « Enregistrer » sur la page : un envoi en cours (les vagues suivantes partiraient avec un autre texte),
+ * les règles d'enregistrement, le réglage automatique incomplet.
+ * @param {{ envoiEnCours: boolean, raisonsEnregistrement: string[], raisonsReglage: string[] }} entree
+ * @returns {string[]}
+ */
+export function raisonsSauvegardePage({ envoiEnCours, raisonsEnregistrement: r1, raisonsReglage: r2 }) {
+  return [...new Set([
+    ...(envoiEnCours ? ['Un envoi est en cours : attendez qu’il se termine pour enregistrer.'] : []),
+    ...(r1 ?? []), ...(r2 ?? []),
+  ])];
+}
+
+/**
+ * Phrase de la confirmation d'une mise en route automatique. Nombre inconnu ⇒ phrase sans nombre.
+ * @param {{ segmentNom: string, nombre: number | null | undefined, cadence: string | null }} entree
+ * @returns {string}
+ */
+export function texteConfirmationActivation({ segmentNom, nombre, cadence }) {
+  const qui = typeof nombre === 'number'
+    ? `${nombre.toLocaleString('fr-FR')} destinataire${nombre > 1 ? 's' : ''} du groupe « ${segmentNom} »`
+    : `le groupe « ${segmentNom} »`;
+  return `Une fois enregistré, ce mail partira tout seul dans les 10 minutes vers ${qui}, puis ${cadence ?? 'selon sa cadence'} `
+    + 'vers les nouvelles personnes du groupe. Personne ne le reçoit deux fois.';
+}
+
+/**
+ * Qui peut ouvrir la page d'un mail : l'administrateur, tout ; un autre rôle, une campagne manuelle non archivée
+ * (celles que lui montrait l'onglet Envoi). Un mail neuf : administrateur seul.
+ * @param {{ campagne: Record<string, any> | null, nouveau: boolean, isOrgAdmin: boolean }} entree
+ * @returns {boolean}
+ */
+export function peutOuvrirMail({ campagne, nouveau, isOrgAdmin }) {
+  if (isOrgAdmin) return true;
+  if (nouveau || !campagne) return false;
+  return !campagne.is_archived && natureDuMail(campagne) === 'manuelle';
+}
+
+/**
+ * Toutes les raisons qui ferment un geste d'envoi sur la page, sans doublon : celles du geste (`raisonsDeBlocage`,
+ * `raisonsAutomatisation`), le mail archivé, le segment perdu ou pas encore relu, et un mail modifié qui ne peut pas
+ * être enregistré (ce qui part est ce qui est enregistré).
+ * @param {{ geste: 'tester' | 'lancer' | 'automatiser', etat: Record<string, any>, archive: boolean,
+ *   segment: { etat: string, raison: string | null }, raisonsEnregistrement: string[], modifie: boolean,
+ *   miseEnRoute?: boolean }} entree
+ * @returns {string[]}
+ */
+export function raisonsEnvoiPage({ geste, etat, archive, segment, raisonsEnregistrement: aEnregistrer, modifie, miseEnRoute = false }) {
+  const raisons = [];
+  if (archive) raisons.push('Ce mail est archivé : il ne part plus.');
+  // Enregistrer pour un essai mettrait aussi l'envoi automatique en route : cela se confirme à part.
+  if (miseEnRoute && geste !== 'automatiser') raisons.push('Enregistrez d’abord la mise en route automatique (bouton « Enregistrer »).');
+  if (segment?.raison) raisons.push(segment.raison);
+  else if (segment?.etat === 'inconnu') raisons.push('Les groupes de destinataires ne sont pas encore lus.');
+  if (modifie && aEnregistrer?.length) {
+    raisons.push(...aEnregistrer.map((r) => `Avant l’envoi, le mail doit être enregistré : ${r.charAt(0).toLowerCase()}${r.slice(1)}`));
+  }
+  raisons.push(...(geste === 'automatiser' ? raisonsAutomatisation(etat) : raisonsDeBlocage(etat, geste)));
+  return [...new Set(raisons)];
 }
 
 // ── Rédaction assistée ───────────────────────────────────────────────────────
@@ -483,6 +746,8 @@ function baliseCanonique(balise) {
   const re = /([^\s=/]+)(?:\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
   for (const a of m[3].matchAll(re)) {
     const nom = a[1].toLowerCase();
+    // Marqueur posé par la normalisation sur un lien-bouton : il ne change rien à ce que lit le client.
+    if (nom === 'data-bouton') continue;
     const val = decoder(a[3] ?? a[4] ?? a[5] ?? '');
     attrs.push(`${nom}=${nom === 'style' ? styleCanonique(val) : val}`);
   }
@@ -549,31 +814,6 @@ export function ligneExpediteur(reglages, nature) {
   if (r.refus) return { texte: EXPEDITEUR_REFUS[r.refus], refus: r.refus };
   if (r.mode === 'domaine') return { texte: r.from, refus: null };
   return { texte: `${r.fromName || 'Votre entreprise'}, depuis l’adresse d’envoi commune`, refus: null };
-}
-
-/**
- * Où se fait l'envoi de ce mail tant que la page n'a pas sa carte d'envoi : une phrase et, le cas échéant, un lien.
- * @param {string} nature
- * @param {CartesMail} cartes
- * @returns {{ texte: string, lien: { vers: string, libelle: string } | null } | null}
- */
-export function ligneEnvoi(nature, cartes) {
-  const ongletEnvoi = { vers: '/mailing?tab=send', libelle: 'Ouvrir l’onglet Envoi' };
-  const reglages = { vers: '/settings/communication', libelle: 'Ouvrir les réglages des e-mails' };
-  if (cartes.envoi === 'complet') {
-    return nature === 'automatique'
-      ? { texte: 'Cette campagne part toute seule selon sa cadence : son envoi automatique continue tel qu’il est réglé, et l’archiver depuis la liste des campagnes l’arrête. Pour l’envoyer maintenant à la main, passez par l’onglet Envoi.', lien: ongletEnvoi }
-      : { texte: 'Pour envoyer cette campagne, passez par l’onglet Envoi.', lien: ongletEnvoi };
-  }
-  if (cartes.envoi === 'essai') {
-    return { texte: 'Pour vous envoyer un essai de ce mail, passez par Réglages → E-mails & SMS. L’essai part avec le texte enregistré.', lien: reglages };
-  }
-  if (cartes.envoi === 'lecture') {
-    return nature === 'sequence'
-      ? { texte: 'Ce mail part tout seul vers vos prospects : sa mise en route et son délai se règlent dans Réglages → E-mails & SMS.', lien: reglages }
-      : { texte: 'Cette campagne part toute seule, selon la cadence réglée par l’administrateur.', lien: null };
-  }
-  return null;
 }
 
 /**

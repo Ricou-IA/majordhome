@@ -3,10 +3,11 @@
 > Déporté de CLAUDE.md (restructuration 2026-06-18). Pointeur + règles qui mordent : CLAUDE.md § Modules.
 
 ### Architecture
-- **Page** : `src/apps/artisan/pages/Mailing.jsx` — Wrapper 3 onglets : **Envoi** (tous rôles) + **Segments** (admin only) + **Éditeur** (admin only)
-- **Onglet Envoi** : `src/apps/artisan/components/mailing/SendTab.jsx` — sélecteur campagne + dropdown segment (depuis `mail_segments`) + carte d'identité + preview + envoi N8n
-- **Onglet Segments** : `src/apps/artisan/components/mailing/SegmentsTab.jsx` — catalogue de segments réutilisables (presets + perso) avec CRUD via `SegmentBuilderDrawer.jsx`
-- **Onglet Éditeur** : `src/apps/artisan/components/mailing/EditorTab.jsx` — liste cards + actions (Éditer / Dupliquer / Archiver) + wizard `CampaignWizard.jsx` (inclut bloc Automatisation)
+- **Page** : `src/apps/artisan/pages/Mailing.jsx` — 3 onglets : **Campagnes** (par défaut) + **Stats** + **Segments** (administrateur ; un autre rôle n'a que les Campagnes). Anciens liens : `?tab=send` et `?tab=editor` mènent aux Campagnes, `?tab=editor&edit=<clé>` (Réglages → E-mails & SMS, « Modifier le texte ») ouvre le mail. `?mail=<id>` / `?mail=nouveau` = la page d'un mail, à la place des onglets.
+- **Onglet Campagnes** : `src/apps/artisan/components/mailing/EditorTab.jsx` — cartes rangées Automatiques / Transactionnelles / Manuelles, « Éditer » (« Ouvrir » pour un autre rôle, qui ne voit que les manuelles), « Dupliquer », « Archiver », « Nouvelle campagne ».
+- **Page du mail** : `src/apps/artisan/components/mailing/page/` (cf. § Page du mail ci-dessous).
+- **Onglet Segments** : `src/apps/artisan/components/mailing/SegmentsTab.jsx` — catalogue de segments réutilisables (presets + perso) avec CRUD via `SegmentBuilderDrawer.jsx` (aussi ouvert depuis la page du mail, « Nouveau segment »)
+- **Retirés le 2026-11-21/22** : l'assistant en trois étapes `CampaignWizard.jsx` et sa consigne à copier, l'onglet Envoi `SendTab.jsx`, la carte d'identité `CampaignIdentityPanel.jsx`, `resources.js` (catalogue d'adresses : `settings.mailing_resources`). Les colonnes `purpose`, `audience`, `tone`, `trigger_description`, `notes` restent mais ne sont plus affichées ni écrites.
 - **Onglet client** : `src/apps/artisan/pages/client-detail/TabMailings.jsx` — Historique des mails + badges status + timeline events + compteurs opens/clics (polling 30s)
 - **Tables** :
   - `majordhome.mail_campaigns` (key, label, subject, preheader, html_body, purpose, audience, tone, trigger_description, notes, blocks JSONB, tracking_type_value, **is_automated**, **auto_segment_id** FK, **auto_cadence_days**, **auto_cadence_minutes**, **auto_time_of_day**, **last_run_at**, **next_run_at**). Colonnes legacy `default_segment` / `allowed_segments` conservées (nullables) mais non utilisées par l'UI.
@@ -30,7 +31,7 @@
   - `public.mail_campaign_mark_run(campaign_id) RETURNS timestamptz` — update `last_run_at=NOW()` + calcule `next_run_at` selon cadence
 - **Constantes shared** :
   - `src/apps/artisan/components/mailing/segmentBuilder.constants.js` — audiences/housing/DPE/order_by + `buildEmptyFilters()` + `updateFilters()` (immutable path update)
-  - `src/apps/artisan/components/mailing/resources.js` — 📌 caisse à outils URLs Mayer (CTA, services, blog, zones, contact). Source de vérité pour l'IA — à mettre à jour à chaque nouvelle ressource
+  - Catalogue d'adresses de l'entreprise (liens proposés à la rédaction assistée) : `core.organizations.settings.mailing_resources`, lu par l'edge `mailing-rediger`
 - **Provider email** : Resend (API `https://api.resend.com/emails`) — bascule depuis Gmail le 2026-04-11
 - **Edge function `mailing-send`** (P0.8 V2, 2026-05-21) : moteur d'envoi mailing pilote par le frontend / scheduler. Accepte `{ segment_id, campaign_id }` (broadcast) OU `{ client_id, campaign_id }` (transactionnel) — JAMAIS de SQL brut. RPC `mail_fetch_recipients(segment_id?, client_id?, campaign_name?)` membership-checked compile et exécute côté DB. Squelette HTML commun (`core.organizations.settings.email_skeleton_html`) appliqué automatiquement aux templates body-only.
 - **Edge function `contract-signed-notify`** (P0.14 transactionnel, 2026-05-21) : envoi transactionnel "contrat signé" multi-tenant. Charge contract + org settings + template `contrat_signature_confirm` depuis DB, télécharge PDF, envoie via Resend avec PDF en attachement, log dans `mailing_logs`. Remplace l'ancien workflow N8N "Mayer - Entretien Contrat".
@@ -53,14 +54,34 @@ Builder à facettes 4 blocs : **Population** (audience + base filters) / **Attri
 ### Onboarding domaine Resend (multi-tenant, 2026-06-02)
 Pour qu'une org envoie depuis `@<son-domaine>`, l'admin passe par **Settings → Organization → Coordonnées → « Domaine d'envoi (Resend) »** (`ResendDomainSection.jsx`, visible une fois `from_email` enregistré). Edge `resend-domain-onboard` (`verify_jwt:true`, `requireOrgMembership(requiredRole:'org_admin')`) = proxy mince vers l'API Domains Resend (région `eu-west-1` RGPD), actions `setup`/`status`/`verify`. **Archi app-level vs org-level** : le moteur Resend (clé API) est app-level (1 compte partagé entre orgs cohabitantes) ; le domaine est org-level, **strictement dérivé de `settings.from_email`** (pas d'input libre — un admin ne peut pas enregistrer un domaine arbitraire dans le compte partagé). Statut persisté dans `settings.resend` (cache d'affichage). Pattern à reprendre pour toute intégration tierce app-level : dériver la ressource org d'un setting déjà validé par l'UI.
 
-### Éditeur de campagne (wizard 3 étapes)
-1. **Identité** : libellé (clé technique auto-générée par slugify), Contexte (objectif, cible, notes), ton éditorial (5 choix + Autre), **bloc Automatisation** (toggle + choix `auto_segment_id` dans le catalogue + cadence jours OU minutes + heure d'envoi)
-2. **Brief** : ligne éditoriale (textarea libre — l'IA structure les blocs elle-même), objet/preheader facultatifs (l'IA propose sinon)
-3. **Génération** : prompt système copiable (inclut carte d'identité + brief + caisse à outils URLs + types de blocs disponibles + contraintes techniques) + JSON structuré + textarea HTML final + bouton Prévisualiser (iframe overlay)
+### Page du mail (2026-11-22) — spec `docs/superpowers/specs/2026-11-21-createur-mail-une-page-habillage-design.md`
+Une page par mail, trois cartes lues de haut en bas, l'aperçu fidèle à droite. **Toutes les règles sont dans `src/lib/mailPage.js`** (pur, testé `scripts/mail-page.test.mjs`) ; l'état est un réducteur (`page/etatPageMail.js`) ; les composants ne calculent rien.
 
-**Workflow V1 (copier-coller)** : wizard → prompt copié → chat Claude → HTML généré → coller dans textarea (auto-extraction OBJET/PREHEADER depuis commentaire HTML en tête) → Sauvegarder. Validation : impossible de save/envoyer si subject vide.
+| Fichier (`components/mailing/page/`) | Rôle |
+|---|---|
+| `PageMail.jsx` | assemble : en-tête, cartes, aperçu, confirmations (quitter, lancer, mise en route) |
+| `EnTetePage.jsx` | nom (figé au premier envoi, `etatDuNom`), état d'enregistrement, « Enregistrer » |
+| `CarteDestinataires.jsx` | **À qui ?** segment (Clients / Prospects), nombre compté avec le nom de la campagne, « Voir des exemples » (20, `useSegmentPreview`), « Nouveau segment » (`SegmentBuilderDrawer`, le segment créé est choisi) |
+| `CarteMessage.jsx`, `BlocAssistant.jsx`, `AncienFormat.jsx`, `../editeur/` | **Quoi ?** intention et rédaction assistée, objet, éditeur de texte, ancien format |
+| `CarteEnvoi.jsx`, `DialoguesEnvoi.jsx` | **Quand ?** « Une fois » (essai à une adresse, « Lancer » confirmé, vagues) ou « Automatiquement » (tous les N jours à une heure) ; essai seul pour un e-mail du registre ; lecture pour une séquence |
+| `useEnvoiDeLaPage.js` | relie les cartes à `useEnvoiCampagne`, aux segments et aux règles |
+| `ApercuMail.jsx` | aperçu (`src/lib/mailApercu.js` : `habillerMail` + variables d'exemple) |
 
-**Vdef prévue** : remplacer l'étape 3 par appel API direct Anthropic au lieu du copier-coller.
+**Cartes selon la nature** (`cartesDuMail`) : manuelle et automatique = les trois cartes ; séquence = Destinataires et Envoi en lecture (réglés dans Réglages → E-mails & SMS) ; e-mail du registre = pas de Destinataires, Envoi « M'envoyer un essai » (edge `email-essai`) ; boutique = Message seul.
+
+**Format du texte** : `src/lib/mailCorps.js`, seule définition de ce qui est enregistré dans `html_body` (assainisseur : paragraphes, gras, italique, listes, liens, titre, bouton `data-bouton`, encadré, variables ; styles en ligne posés), copié pour Deno. Un texte non éditable (ancienne page HTML complète) = « ancien format », il part tel quel ; « Refaire avec le nouvel éditeur » le garde dans `blocks.ancien_html`. **L'habillage est rendu à l'envoi** par `habillerMail` (`src/lib/mailHabillage.js`, copié pour Deno) : aperçu = envoi ; douze edges l'embarquent (`mailing-send`, `contract-signed-notify`, et via `_shared/mail.ts` `auto-rdv`, `auto-rdv-cron`, `chantier-pv`, `dpe-lien`, `email-essai`, `invoice-send`, `lead-welcome-email`, `maintenance-digest`, `sav-report-send`, `webshop-process`) — toute modif ⇒ `sync:tournee-engine` + redéploiement.
+
+**Variables** : `src/lib/mailVariables.js` (nature du mail, variables proposées, inconnues). Les deux e-mails habillés par le site (`webshop_confirmation`, `webshop_feuille_route`) n'ont que `{{BRAND_NAME}}`, `{{ORG_EMAIL}}`, `{{ORG_PHONE}}`.
+
+**Rédaction assistée** : edge `mailing-rediger` (org_admin, module Communication, 50 demandes par utilisateur et par jour), règles `src/lib/mailRedaction.js` ; rien d'un client n'est envoyé au modèle, la réponse est normalisée et ses liens bornés au catalogue de l'entreprise et à son site.
+
+**Envoi** :
+- **`useEnvoiCampagne` (`src/shared/hooks/`) est la seule voie d'envoi depuis l'écran** : corps de l'ancien `sendCampaign` déplacé tel quel (requête `{ mode: 'bulk', segment_id, subject, html_body, campaign_name, test_email? }`, vagues d'environ 300 tant que `complete` est faux, 40 vagues au plus, sortie si une vague ne traite rien, reprise sans doublon par l'exclusion `mailing_logs.campaign_name`). Un seul envoi à la fois (référence) ; page quittée = la vague en cours finit côté serveur, la suivante n'est pas demandée (message) ; l'écran prévient avant de quitter (bouton de retour, fermeture de l'onglet ; pas le menu latéral).
+- **Ce qui part est ce qui est enregistré** : un mail modifié est enregistré avant « Tester », « Lancer » ou l'essai ; objet, texte et nom envoyés sont ceux de la ligne rendue par la base. Un enregistrement refusé = rien ne part.
+- « Lancer » : confirmation avec le segment, le nombre (même compte que la carte, avec le nom qui partira) et le nom ; fermée tant que le nombre est inconnu ou nul. Le refus d'adresse d'envoi (`resoudreExpediteur`, `usage: 'nombre'`) s'affiche dès l'ouverture de la carte et ferme « Lancer » et l'automatisation ; l'essai reste possible quand un e-mail individuel l'est.
+- L'essai (`test_email`) part au nom de « Test Destinataire » et n'est pas écrit au journal : il n'écarte personne. Il exige un segment (l'edge en mode liste le demande).
+- **Automatiquement** : interrupteur `is_automated` enregistré comme un autre champ. L'allumer (confirmé à l'enregistrement) pose `next_run_at` = maintenant : premier passage du planificateur dans les 10 minutes, puis `mail_campaign_mark_run` selon la cadence. L'éteindre suffit : `mail_campaigns_due` ne prend que `is_automated = true`, campagne et segment non archivés, objet et texte non vides, `next_run_at` nul ou passé (définition lue en base le 2026-11-22). Une cadence en minutes existante (`lead_bienvenue`) est affichée, jamais convertie ni écrite. L'allumage exige une cadence (sans elle, `mark_run` remet `next_run_at` à NULL et la campagne repasse à chaque passage).
+- **Autre rôle que l'administrateur** : campagnes manuelles non archivées seulement (`peutOuvrirMail`), message en lecture, segment choisi pour son envoi et jamais enregistré, « Une fois » seulement. Garde d'écran : la RLS de `mail_campaigns` (SELECT / INSERT / UPDATE / DELETE pour tout membre de l'organisation, lue le 2026-11-22) et `mailing-send` (appartenance seule, via `mail_fetch_recipients`) ne le distinguent pas. L'accès à `/mailing` reste sous `RouteGuard resource="settings"`.
 
 ### Edge function `mailing-send` (P0.8 V2 — remplace ancien workflow N8n)
 Moteur d'envoi mailing centralisé. Le frontend appelle `supabase.functions.invoke('mailing-send', { body: {...} })`. Le scheduler N8n auto-campagnes appelle l'edge avec `service_role` au lieu d'un webhook public.
@@ -72,7 +93,7 @@ Moteur d'envoi mailing centralisé. Le frontend appelle `supabase.functions.invo
 **Sécurité** :
 - `verify_jwt:false` — auth interne via `requireSharedSecret(MDH_CRON_SECRET)` (appel du scheduler `mailing-scheduler`) OU validation JWT user en début de handler (frontend). ⚠️ **Gotcha clé `sb_secret`** : le projet utilise une clé service_role au format `sb_secret` (non-JWT, récent) → une edge `verify_jwt:true` ne peut PAS être appelée avec cette clé via le gateway. Conséquence : tout appel inter-edges doit être `verify_jwt:false` + secret partagé. ⚠️ **Drift repo/prod** : la v11+ prod (badge cron + INSERT via vue publique `majordhome_mailing_logs`) n'est pas resynchronisée dans le repo → faire `get_edge_function` avant toute modif de `mailing-send`.
 - Le SQL n'est JAMAIS accepté du client — toujours compilé côté DB après check `auth.uid() ∈ org_members`
-- `mail_campaigns.is_transactional=true` → exclu de l'onglet Envoi broadcast (sécurité UX)
+- `mail_campaigns.is_transactional=true` → e-mail du registre ou de la boutique sur la page du mail : jamais de carte d'envoi en nombre (sécurité UX)
 
 **Templates** :
 - Squelette HTML commun dans `core.organizations.settings.email_skeleton_html` (+ `secondary_color`, `email_tagline`) appliqué automatiquement aux templates body-only.
@@ -187,14 +208,14 @@ Pipeline de désinscription conforme RFC 8058 avec plusieurs canaux.
 | `mail_g` | Leads Perdu | Remerciement — ressources site web |
 
 ### Templates transactionnels (`mail_campaigns.is_transactional=true`)
-Déclenchés 1-à-1 sur événement (pas envoyés en broadcast). Exclus de l'onglet Envoi.
+Déclenchés 1-à-1 sur événement (pas envoyés en broadcast) : la page du mail ne leur donne pas de carte d'envoi en nombre.
 
 | Template | Trigger | Placeholders custom | Lieu de remplacement |
 |----------|---------|---------------------|---------------------|
 | `contrat_signature_confirm` | Signature contrat | `{{CLIENT_NAME}}`, `{{BRAND_NAME}}`, `{{ORG_EMAIL}}`, `{{ORG_PHONE}}`, `{{ORG_ADDRESS}}`, `{{ORG_POSTAL_CODE}}`, `{{ORG_CITY}}`, `{{ACCENT_COLOR}}` | Edge function `contract-signed-notify` (charge `core.organizations.settings`) |
 | `proposition_contrat` | Envoi devis depuis fiche client | `{{EQUIP_RECAP}}`, `{{TOTAL_AMOUNT}}`, `{{PDF_URL}}` | Frontend `ContractPdfSection.jsx:handleSendProposal` (replaceAll côté client) |
 
-**Convention** : éditables via onglet Mailing → Éditeur. La colonne `mail_campaigns.is_transactional BOOLEAN` distingue les transactionnels des broadcast. Pour ajouter une 3ᵉ campagne transactionnelle, considérer centraliser le `replaceAll` dans `mailCampaignsService.renderTemplate(orgId, key, vars)` plutôt qu'inline.
+**Convention** : éditables via Mailing → Campagnes (page du mail). La colonne `mail_campaigns.is_transactional BOOLEAN` distingue les transactionnels des broadcast. Pour ajouter une 3ᵉ campagne transactionnelle, considérer centraliser le `replaceAll` dans `mailCampaignsService.renderTemplate(orgId, key, vars)` plutôt qu'inline.
 
 ### Segments de ciblage (catalogue `mail_segments`, 8 presets seed)
 | Segment preset | Audience | Description |

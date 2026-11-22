@@ -14,13 +14,17 @@
  * Quitter avec des modifications demande confirmation (bouton de retour, et
  * fermeture ou rechargement de l'onglet ; le menu latéral n'est pas retenu).
  *
- * Destinataires et Envoi arriveront comme cartes 1 et 3 : en attendant, une
- * ligne dit où se fait l'envoi de ce mail.
+ * Trois cartes, trois questions lues de haut en bas : À qui ? (Destinataires),
+ * Quoi ? (Message), Quand ? (Envoi) — selon la nature du mail (`cartesDuMail`).
+ * Ce qui part est ce qui est enregistré ; l'envoi passe par `useEnvoiCampagne`
+ * (via `useEnvoiDeLaPage`), seule voie. Quitter pendant un envoi demande
+ * confirmation : la vague en cours va à son terme, la suivante n'est pas demandée.
+ * Un autre rôle que l'administrateur n'ouvre qu'une campagne manuelle (`peutOuvrirMail`).
  * ============================================================================
  */
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -31,29 +35,19 @@ import { natureDuMail, variablesProposees, elementsPermis, texteParDefaut } from
 import { messageErreurRedaction } from '@/lib/mailRedaction';
 import {
   cartesDuMail, etatDuNom, champsAEnregistrer, estModifie, raisonsEnregistrement, raisonsRedaction, demandeRedaction,
-  appliquerRedaction, refaireAvecNouvelEditeur, revenirALAncien, rappelObjet, avertissementsTexte, ligneEnvoi,
-  etatEnregistrement, corpsVide, objetsSuggeres, sansElementsDe, miseEnFormeSimplifiee,
+  appliquerRedaction, refaireAvecNouvelEditeur, revenirALAncien, rappelObjet, avertissementsTexte,
+  etatEnregistrement, corpsVide, objetsSuggeres, sansElementsDe, miseEnFormeSimplifiee, peutOuvrirMail,
 } from '@/lib/mailPage';
 import { etatInitial, reducteurPageMail } from './etatPageMail';
 import EnTetePage from './EnTetePage';
 import CarteMessage from './CarteMessage';
 import ApercuMail from './ApercuMail';
+import CarteDestinataires from './CarteDestinataires';
+import CarteEnvoi from './CarteEnvoi';
+import DialoguesEnvoi from './DialoguesEnvoi';
+import { useEnvoiDeLaPage } from './useEnvoiDeLaPage';
 
 const CONSIGNES_ECRAN = ['rediger', 'court', 'chaleureux', 'reformuler', 'objets'];
-
-function LigneEnvoi({ ligne, onAller }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-secondary-300 px-5 py-4 text-sm text-secondary-600">
-      <span>{ligne.texte}</span>
-      {ligne.lien && (
-        <button type="button" onClick={() => onAller(ligne.lien.vers)} className="inline-flex items-center gap-1 font-medium text-primary-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-          {ligne.lien.libelle}
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </button>
-      )}
-    </div>
-  );
-}
 
 /** Erreur de rédaction au format du service (`{ code }`). @param {string} code */
 const erreurRedaction = (code) => Object.assign(new Error(code), { code });
@@ -74,6 +68,8 @@ export default function PageMail({ mailId, onRetour, onCree }) {
   const [etat, dispatch] = useReducer(reducteurPageMail, undefined, etatInitial);
   const navigate = useNavigate();
   const [quitter, setQuitter] = useState(null); // { vers } : départ en attente de confirmation (vers null = la liste)
+  const [activation, setActivation] = useState(false); // mise en route automatique à confirmer avant d'enregistrer
+  const sauverRef = useRef(null); // enregistrement avant un envoi (posé plus bas, lu par useEnvoiDeLaPage)
 
   const neuf = mailId === 'nouveau';
   const campagneEnBase = neuf ? null : campaigns.find((c) => c.id === mailId) ?? null;
@@ -114,25 +110,38 @@ export default function PageMail({ mailId, onRetour, onCree }) {
     consigne, raisonsRedaction({ consigne, intention: form.blocks?.brief ?? '', objet: form.subject, corps: form.html_body }),
   ])), [form.blocks, form.subject, form.html_body]);
 
-  // Fermer ou recharger l'onglet avec des modifications : le navigateur demande confirmation.
+  const envoi = useEnvoiDeLaPage({
+    orgId, isOrgAdmin, cartes, etat, dispatch, settings, modifie, raisonsEnregistrement: raisons, isMutating, sauverRef,
+  });
+  const { raisonsSauvegarde } = envoi;
+
+  // Fermer ou recharger l'onglet avec des modifications ou pendant un envoi : le navigateur demande confirmation.
+  const retenirDepart = modifie || envoi.enCours;
   useEffect(() => {
-    if (!modifie) return undefined;
+    if (!retenirDepart) return undefined;
     const retenir = (e) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', retenir);
     return () => window.removeEventListener('beforeunload', retenir);
-  }, [modifie]);
+  }, [retenirDepart]);
 
+  /** Enregistre le mail ; rend la ligne enregistrée, ou `null` (rien d'enregistré, message déjà affiché). */
   const enregistrer = useCallback(async () => {
-    if (isMutating || !modifie || raisons.length) return;
+    if (isMutating || !modifie || raisonsSauvegarde.length) return null;
     const patch = champsAEnregistrer(form, initial);
     try {
       const ligne = nouveau ? await createCampaign(patch) : await updateCampaign({ id: base.id, patch });
       dispatch({ type: 'enregistre', campagne: ligne });
       if (nouveau) onCree(ligne.id);
+      return ligne;
     } catch {
       // Message déjà affiché par le hook ; le formulaire reste tel quel.
+      return null;
     }
-  }, [isMutating, modifie, raisons.length, form, initial, nouveau, createCampaign, updateCampaign, base, onCree]);
+  }, [isMutating, modifie, raisonsSauvegarde.length, form, initial, nouveau, createCampaign, updateCampaign, base, onCree]);
+  sauverRef.current = enregistrer;
+
+  // « Enregistrer » qui mettrait l'envoi automatique en route : confirmé d'abord (c'est lui qui fera partir le mail).
+  const enregistrerDepuisEnTete = () => (envoi.miseEnRoute ? setActivation(true) : enregistrer());
 
   const demander = useCallback(async (consigne) => {
     if (etat.redaction || raisonsParConsigne[consigne]?.length) return;
@@ -170,7 +179,7 @@ export default function PageMail({ mailId, onRetour, onCree }) {
   }), [demander, form, defaut]);
 
   const partir = (vers) => (vers ? navigate(vers) : onRetour());
-  const aller = (vers = null) => (modifie ? setQuitter({ vers }) : partir(vers));
+  const aller = (vers = null) => (modifie || envoi.enCours ? setQuitter({ vers, envoi: envoi.enCours }) : partir(vers));
 
   if (!ouvert) {
     return (
@@ -188,29 +197,41 @@ export default function PageMail({ mailId, onRetour, onCree }) {
     );
   }
 
-  const envoi = ligneEnvoi(nature, cartes);
+  if (!peutOuvrirMail({ campagne: base, nouveau, isOrgAdmin })) {
+    return (
+      <div className="card flex flex-col items-center justify-center gap-3 p-10 text-secondary-500">
+        <p>Ce mail se règle par l’administrateur de votre entreprise.</p>
+        <button type="button" onClick={onRetour} className="font-medium text-primary-700 hover:underline">Revenir aux campagnes</button>
+      </div>
+    );
+  }
+
+  // Numéros des cartes affichées, dans l'ordre À qui ? · Quoi ? · Quand ?
+  const avecDestinataires = cartes.destinataires !== 'non';
+  const avecEnvoi = cartes.envoi !== 'non';
+  const numeroMessage = avecDestinataires ? 2 : 1;
 
   return (
     <div className="space-y-6">
       <EnTetePage
         nom={form.label}
         onNom={(valeur) => dispatch({ type: 'champ', champ: 'label', valeur })}
-        nomModifiable={nom.modifiable}
+        nomModifiable={nom.modifiable && !envoi.enCours}
         raisonNom={nom.raison}
         etat={etatEnregistrement({ nouveau, modifie, enCours: isMutating })}
         coche={!nouveau && !modifie && !isMutating}
         modifie={modifie}
-        raisons={raisons}
+        raisons={raisonsSauvegarde}
         enCours={isMutating}
-        onEnregistrer={enregistrer}
+        onEnregistrer={enregistrerDepuisEnTete}
         onRetour={() => aller()}
       />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-6">
-          {/* Carte « Destinataires » (tâche 10) : ici, numéro 1, quand `cartes.destinataires` ≠ 'non'. */}
+          {avecDestinataires && <CarteDestinataires numero={1} d={envoi.destinataires} />}
           <CarteMessage
-            numero={1}
+            numero={numeroMessage}
             form={form}
             version={etat.version}
             lecture={lecture}
@@ -230,19 +251,29 @@ export default function PageMail({ mailId, onRetour, onCree }) {
             simplifiee={simplifiee}
             actions={actions}
           />
-          {/* Carte « Envoi » (tâche 10) remplacera cette ligne. */}
-          {envoi && <LigneEnvoi ligne={envoi} onAller={aller} />}
+          {avecEnvoi && <CarteEnvoi numero={numeroMessage + 1} e={envoi.envoi} nature={nature} />}
         </div>
 
         <ApercuMail campagne={base} objet={form.subject} corps={form.html_body} reglages={settings} nature={nature} />
       </div>
 
+      <DialoguesEnvoi
+        confirmation={envoi.confirmation}
+        activation={{
+          ouverte: activation,
+          texte: envoi.texteActivation,
+          fermer: () => setActivation(false),
+          confirmer: () => { setActivation(false); enregistrer(); },
+        }}
+      />
       <ConfirmDialog
         open={!!quitter}
         onOpenChange={(o) => { if (!o) setQuitter(null); }}
-        title="Quitter sans enregistrer ?"
-        description="Les modifications de ce mail seront perdues."
-        confirmLabel="Quitter sans enregistrer"
+        title={quitter?.envoi ? 'Quitter pendant l’envoi ?' : 'Quitter sans enregistrer ?'}
+        description={quitter?.envoi
+          ? 'La vague en cours ira à son terme, mais la suivante ne partira pas. Rouvrez le mail et cliquez sur « Lancer » pour continuer : personne ne le recevra deux fois.'
+          : 'Les modifications de ce mail seront perdues.'}
+        confirmLabel={quitter?.envoi ? 'Quitter quand même' : 'Quitter sans enregistrer'}
         cancelLabel="Rester sur le mail"
         onConfirm={() => { const vers = quitter?.vers ?? null; setQuitter(null); partir(vers); }}
       />

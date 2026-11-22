@@ -7,13 +7,13 @@ import { useAuth } from '@contexts/AuthContext';
 import { useMailCampaigns } from '@hooks/useMailCampaigns';
 import { useMailSegments } from '@hooks/useMailSegments';
 import { formatRelativeFR } from '@/lib/utils';
-import { cleDeCopie, libelleDeCopie } from '@/lib/mailPage';
+import { cleDeCopie, libelleDeCopie, peutOuvrirMail } from '@/lib/mailPage';
 
 // --- Natures de campagne -----------------------------------------------------
 // Une campagne tombe dans exactement un groupe, selon son mode d'envoi :
 //   automated     → part seule à cadence régulière (scheduler N8n)  [is_automated]
 //   transactional → part sur un événement (signature, devis…)        [is_transactional]
-//   manual        → broadcast lancé à la main depuis l'onglet Envoi  [ni l'un ni l'autre]
+//   manual        → broadcast lancé à la main depuis la page du mail [ni l'un ni l'autre]
 function classifyNature(c) {
   if (c.is_transactional) return 'transactional';
   if (c.is_automated) return 'automated';
@@ -25,7 +25,7 @@ function classifyNature(c) {
 const GROUPS = [
   { key: 'automated', title: 'Automatiques', subtitle: 'Partent toutes seules, selon une cadence', icon: RefreshCw, accent: 'amber' },
   { key: 'transactional', title: 'Transactionnelles', subtitle: 'Partent sur un événement précis', icon: Zap, accent: 'blue' },
-  { key: 'manual', title: 'Manuelles', subtitle: "À lancer depuis l'onglet Envoi", icon: Send, accent: 'slate' },
+  { key: 'manual', title: 'Manuelles', subtitle: 'À lancer à la main, depuis la page du mail', icon: Send, accent: 'slate' },
 ];
 
 // Classes Tailwind statiques (les classes construites dynamiquement sont purgées).
@@ -48,16 +48,17 @@ function formatCadence(c) {
 }
 
 /**
- * Onglet Éditeur — vue d'ensemble des campagnes regroupées par mode d'envoi.
+ * Onglet Campagnes — vue d'ensemble des campagnes regroupées par mode d'envoi.
  * « Éditer » et « Nouvelle campagne » ouvrent la page du mail (`?mail=<id>` / `?mail=nouveau`, `PageMail`).
- * Accessible en org_admin (gate appliqué au niveau page Mailing).
+ * Un autre rôle que l'administrateur ne voit que les campagnes manuelles, qu'il « Ouvre » pour les envoyer
+ * (ce que lui donnait l'ancien onglet Envoi) : ni création, ni copie, ni archivage (`peutOuvrirMail`).
  */
 export default function EditorTab() {
-  const { organization } = useAuth();
+  const { organization, isOrgAdmin } = useAuth();
   // Archivés compris pour les clés et noms déjà pris (contrainte unique et journal des envois) ; seuls les
   // mails actifs sont listés.
   const { campaigns: tous, isLoading, duplicateCampaign, archiveCampaign, isMutating } = useMailCampaigns(organization?.id, { includeArchived: true });
-  const campaigns = tous.filter((c) => !c.is_archived);
+  const campaigns = tous.filter((c) => !c.is_archived && peutOuvrirMail({ campagne: c, nouveau: false, isOrgAdmin }));
   const { segments } = useMailSegments(organization?.id);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -98,7 +99,7 @@ export default function EditorTab() {
       );
       return;
     }
-    if (!window.confirm(`Archiver "${campaign.label}" ? Elle disparaîtra du sélecteur d'envoi.`)) return;
+    if (!window.confirm(`Archiver "${campaign.label}" ? Elle ne partira plus, ni à la main ni toute seule.`)) return;
     try {
       await archiveCampaign(campaign.id);
     } catch {
@@ -129,22 +130,28 @@ export default function EditorTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-secondary-900">Campagnes</h2>
-          <p className="text-sm text-secondary-500">Tout ce qui peut partir par email, regroupé par mode d&apos;envoi.</p>
+          <p className="text-sm text-secondary-500">
+            {isOrgAdmin ? 'Tout ce qui peut partir par email, regroupé par mode d’envoi.' : 'Les campagnes que vous pouvez envoyer.'}
+          </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nouvelle campagne
-        </Button>
+        {isOrgAdmin && (
+          <Button onClick={openCreate}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nouvelle campagne
+          </Button>
+        )}
       </div>
 
       {campaigns.length === 0 ? (
         <div className="card p-8 text-center text-secondary-500">
           <Mail className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p>Aucune campagne pour l&apos;instant.</p>
-          <Button onClick={openCreate} className="mt-4">
-            <Plus className="w-4 h-4 mr-2" />
-            Créer la première
-          </Button>
+          {isOrgAdmin && (
+            <Button onClick={openCreate} className="mt-4">
+              <Plus className="w-4 h-4 mr-2" />
+              Créer la première
+            </Button>
+          )}
         </div>
       ) : (
         GROUPS.map((group) => (
@@ -157,6 +164,7 @@ export default function EditorTab() {
             onDuplicate={handleDuplicate}
             onArchive={handleArchive}
             disabled={isMutating}
+            gerer={isOrgAdmin}
           />
         ))
       )}
@@ -164,7 +172,7 @@ export default function EditorTab() {
   );
 }
 
-function CampaignGroup({ group, campaigns, segmentById, onEdit, onDuplicate, onArchive, disabled }) {
+function CampaignGroup({ group, campaigns, segmentById, onEdit, onDuplicate, onArchive, disabled, gerer }) {
   if (!campaigns.length) return null;
   const { icon: Icon, accent, title, subtitle } = group;
   return (
@@ -189,6 +197,7 @@ function CampaignGroup({ group, campaigns, segmentById, onEdit, onDuplicate, onA
             onDuplicate={() => onDuplicate(c)}
             onArchive={() => onArchive(c)}
             disabled={disabled}
+            gerer={gerer}
           />
         ))}
       </div>
@@ -247,8 +256,8 @@ function CampaignMeta({ campaign, nature, segment }) {
   );
 }
 
-function CampaignCard({ campaign, nature, accent, segment, onEdit, onDuplicate, onArchive, disabled }) {
-  const canArchive = nature !== 'transactional';
+function CampaignCard({ campaign, nature, accent, segment, onEdit, onDuplicate, onArchive, disabled, gerer }) {
+  const canArchive = gerer && nature !== 'transactional';
   return (
     <div className={`card border-l-4 ${ACCENT[accent].bar} p-4 flex flex-col gap-3`}>
       <div className="min-w-0">
@@ -267,12 +276,14 @@ function CampaignCard({ campaign, nature, accent, segment, onEdit, onDuplicate, 
       <div className="flex gap-2 mt-auto pt-3 border-t border-secondary-100">
         <Button variant="secondary" size="sm" onClick={onEdit} disabled={disabled}>
           <Edit className="w-3.5 h-3.5 mr-1" />
-          Éditer
+          {gerer ? 'Éditer' : 'Ouvrir'}
         </Button>
-        <Button variant="ghost" size="sm" onClick={onDuplicate} disabled={disabled}>
-          <Copy className="w-3.5 h-3.5 mr-1" />
-          Dupliquer
-        </Button>
+        {gerer && (
+          <Button variant="ghost" size="sm" onClick={onDuplicate} disabled={disabled}>
+            <Copy className="w-3.5 h-3.5 mr-1" />
+            Dupliquer
+          </Button>
+        )}
         {canArchive && (
           <Button variant="ghost" size="sm" onClick={onArchive} disabled={disabled} className="ml-auto text-red-600 hover:text-red-700 hover:bg-red-50">
             <Archive className="w-3.5 h-3.5 mr-1" />

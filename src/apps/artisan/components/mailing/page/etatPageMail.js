@@ -10,7 +10,23 @@
  * Les règles (ce qui s'enregistre, ce qui est modifié…) sont dans `src/lib/mailPage.js`.
  * ============================================================================
  */
-import { formulaireDepuisCampagne } from '@/lib/mailPage';
+import { formulaireDepuisCampagne, basculerAutomatisation } from '@/lib/mailPage';
+
+/**
+ * État des cartes Destinataires et Envoi (rien de tout cela ne s'enregistre tel quel : le segment d'un
+ * administrateur et l'envoi automatique passent par le formulaire).
+ * @param {Record<string, any> | null} campagne
+ */
+const envoiInitial = (campagne) => ({
+  segmentLocal: null,       // segment choisi par un autre rôle que l'administrateur : vaut pour son envoi, jamais enregistré
+  mode: campagne?.is_automated ? 'automatique' : 'une_fois',
+  adresseTest: '',
+  confirmation: null,       // envoi à confirmer : ce qui est enregistré, photographié après l'enregistrement
+  activation: false,        // confirmation de la mise en route automatique avant d'enregistrer
+  dessinSegment: false,     // fenêtre « Nouveau segment »
+  exemples: false,          // « Voir des exemples »
+  essaiEnCours: false,      // « M'envoyer un essai » d'un e-mail automatique
+});
 
 /**
  * @typedef {{
@@ -22,6 +38,7 @@ import { formulaireDepuisCampagne } from '@/lib/mailPage';
  *   annulation: { subject: string, html_body: string } | null,
  *   objetsProposes: string[],
  *   redaction: string | null,         // consigne en cours
+ *   envoi: ReturnType<typeof envoiInitial>,
  * }} EtatPageMail
  */
 
@@ -35,6 +52,7 @@ export const etatInitial = () => ({
   annulation: null,
   objetsProposes: [],
   redaction: null,
+  envoi: envoiInitial(null),
 });
 
 /**
@@ -53,8 +71,13 @@ export function reducteurPageMail(etat, action) {
         initial: c ? formulaireDepuisCampagne(c) : null,
         form: formulaireDepuisCampagne(c),
         version: etat.version + 1,
+        envoi: envoiInitial(c),
       };
     }
+    case 'envoi':
+      return { ...etat, envoi: { ...etat.envoi, ...action.patch } };
+    case 'automatiser':
+      return { ...etat, form: basculerAutomatisation(etat.form, etat.initial, action.actif, action.maintenant) };
     case 'champ':
       // Retoucher l'objet à la main referme le retour en arrière de l'assistant (rien de tapé n'est perdu).
       return {
