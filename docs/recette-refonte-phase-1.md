@@ -1,7 +1,7 @@
 # Recette — refonte de l'interface, phase 1 (jetons et polices)
 
 - **Adresse testée** : https://majordhome.vercel.app
-- **Commit déployé** : à compléter à la mise en ligne (six commits de phase 1, du 2026-11-22 : couleurs cuivre et pierre, polices, bouton d'action, gris repris, contrôle anti-régression, cuivre retiré des statuts)
+- **Commit déployé** : `c0db379d` (2026-11-23), au bout de huit commits de phase 1 depuis `f00ac93c` : couleurs cuivre et pierre, polices, bouton d'action, gris repris, contrôle anti-régression, cuivre retiré des statuts, corrections de la relecture d'ensemble
 - **Comptes** : celui d'Eric (Mayer Énergie, administrateur) ; pour R3, un compte d'un autre rôle s'il est sous la main
 - **Légende** : `[x]` validé · `[!]` anomalie · `[-]` non testable ou écarté, avec la raison
 - **Règle** : un test à la fois. Un point est coché après le retour d'Eric et la vérification.
