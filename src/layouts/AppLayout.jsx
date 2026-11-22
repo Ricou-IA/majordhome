@@ -42,21 +42,22 @@ import { chantierGaillacVisible } from '@apps/chantier-gaillac/config';
 // `groupe` = clé de GROUPES_MENU (src/lib/menuGroupes.js). Au-delà de 8 entrées visibles le
 // menu se range en groupes repliables ; en dessous il reste cette liste, dans cet ordre.
 // Toute nouvelle entrée porte son groupe (scripts/menu-groupes.test.mjs le vérifie).
+// `alias` = ancien nom d'une page renommée : Ctrl K la trouve encore par lui (jamais affiché).
 const navigation = [
-  { name: 'Accueil',    href: '/',           icon: LayoutDashboard, resource: 'dashboard', groupe: 'quotidien' },
+  { name: 'Accueil',    alias: 'Dashboard', href: '/',           icon: LayoutDashboard, resource: 'dashboard', groupe: 'quotidien' },
   { name: 'Planning',   href: '/planning',   icon: Calendar,        resource: 'planning', groupe: 'quotidien' },
   { name: 'Clients',    href: '/clients',    icon: Users,           resource: 'clients', groupe: 'ventes' },
-  { name: 'Carte',      href: '/territoire', icon: MapPin,          resource: 'territoire', groupe: 'outils' },
-  { name: 'Leads',      href: '/pipeline',   icon: Kanban,          resource: 'pipeline', groupe: 'ventes' },
-  { name: 'Boutique',   href: '/webshop',    icon: ShoppingCart,    resource: 'pipeline', module: 'webshop', groupe: 'ventes' },
+  { name: 'Carte',      alias: 'Territoire', href: '/territoire', icon: MapPin,          resource: 'territoire', groupe: 'outils' },
+  { name: 'Leads',      alias: 'Pipeline', href: '/pipeline',   icon: Kanban,          resource: 'pipeline', groupe: 'ventes' },
+  { name: 'Boutique',   alias: 'Webshop', href: '/webshop',    icon: ShoppingCart,    resource: 'pipeline', module: 'webshop', groupe: 'ventes' },
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,         resource: 'chantiers', groupe: 'terrain' },
   { name: 'Contrats',   href: '/contrats',   icon: FileText,        resource: 'entretiens', module: 'entretiens', groupe: 'ventes' },
   { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens', module: 'entretiens', groupe: 'terrain' },
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants', module: 'cedants', groupe: 'developpement' },
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale', module: 'prospection', groupe: 'developpement' },
-  { name: 'Visibilité locale', href: '/geogrid', icon: Grid3x3,     resource: 'settings', module: 'geogrid', groupe: 'outils' },
-  { name: 'Messages',    href: '/mailing',     icon: Mail,          resource: 'settings', module: 'communication', groupe: 'ventes' },
-  { name: 'Publicité',   href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads', module: 'meta_ads', groupe: 'outils' },
+  { name: 'Visibilité locale', alias: 'GeoGrid', href: '/geogrid', icon: Grid3x3,     resource: 'settings', module: 'geogrid', groupe: 'outils' },
+  { name: 'Messages',    alias: 'Mailing', href: '/mailing',     icon: Mail,          resource: 'settings', module: 'communication', groupe: 'ventes' },
+  { name: 'Publicité',   alias: 'Meta Ads', href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads', module: 'meta_ads', groupe: 'outils' },
   { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator', module: 'solaire', groupe: 'etudes' },
   { name: 'Thermique',   href: '/thermique',   icon: Thermometer,   resource: 'thermal_study', module: 'thermique', groupe: 'etudes' },
   // Dimensionnement clim : module activable, ouvert à qui voit les devis.
@@ -134,6 +135,7 @@ export default function AppLayout() {
   const pagesDuMenu = [
     ...groupesDuMenu.flatMap((groupe) => groupe.items).map((item) => ({
       name: libelleEntree(item),
+      alias: item.alias,
       href: item.href,
     })),
     ...(peutOuvrirReglages ? [{ name: 'Paramètres', href: '/settings' }] : []),

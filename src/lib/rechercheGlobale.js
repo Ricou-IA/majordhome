@@ -27,17 +27,18 @@ export function normaliser(texte) {
 }
 
 /**
- * Pages du menu qui répondent à la saisie (tous les mots saisis dans le libellé).
- * @param {Array<{ name: string, href: string }>} pages  entrées VISIBLES du menu (droits déjà appliqués)
+ * Pages du menu qui répondent à la saisie (tous les mots saisis dans le libellé ou dans
+ * l'ancien nom de la page, `alias` : « pipeline » trouve toujours « Leads »).
+ * @param {Array<{ name: string, href: string, alias?: string }>} pages  entrées VISIBLES du menu (droits déjà appliqués)
  * @param {string} saisie
- * @returns {Array<{ name: string, href: string }>}  au plus cinq ; rien pour une saisie vide
+ * @returns {Array<{ name: string, href: string, alias?: string }>}  au plus cinq ; rien pour une saisie vide
  */
 export function pagesCorrespondantes(pages = [], saisie = '') {
   const mots = normaliser(saisie).split(/\s+/).filter(Boolean);
   if (mots.length === 0) return [];
   return (pages || [])
     .filter((page) => {
-      const libelle = normaliser(page.name);
+      const libelle = normaliser(`${page.name} ${page.alias ?? ''}`);
       return mots.every((mot) => libelle.includes(mot));
     })
     .slice(0, PAGES_MAX);
