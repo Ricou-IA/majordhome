@@ -174,7 +174,7 @@
 
 - **A4 (2026-11-22, vue sur la capture Chantiers de C14, non signalée par Eric).** Le texte d'aide du champ de recherche des chantiers est coupé (« Rechercher un chantie »). Antérieur à ce lot. Non corrigé : à décider en fin de recette.
 
-- **A5 (2026-11-22, trouvée en vérifiant C15).** La recherche de CLIENTS ne passe pas les accents : « helene » trouve 19 clients sur 23, « jerome » 22 sur 28 (mesuré en base, Mayer ; 134 clients ont un accent dans leur nom). La recherche de leads, elle, les ignore (`lead_search` utilise `unaccent`). Antérieur à ce lot : c'est la recherche de clients de toute l'application (liste des clients, fenêtre de RDV), que la recherche globale réutilise. La corriger demande une migration (recherche sans accent côté base) : non faite, à décider en fin de recette.
+- **A5 (2026-11-22, trouvée en vérifiant C15).** La recherche de CLIENTS ne passe pas les accents : « helene » trouve 19 clients sur 23, « jerome » 22 sur 28 (mesuré en base, Mayer ; 134 clients ont un accent dans leur nom). La recherche de leads, elle, les ignore (`lead_search` utilise `unaccent`). Antérieur à ce lot : c'est la recherche de clients de toute l'application (liste des clients, fenêtre de RDV), que la recherche globale réutilise. Accord d'Eric en fin de recette (« Oui, corrige »). Corrigé (`0e14a698`) : migration `20261122_3` appliquée en production et vérifiée (colonne `recherche`, sans accent, en fin de la vue des clients ; essayée d'abord dans une transaction annulée) ; la liste des clients et la recherche rapide y cherchent nom et ville. Lu en base après application : « helene » 23 clients, « jerome » 28, vue toujours modifiable et en `security_invoker`, aucun droit pour `anon`. Retest C25.
 
 - **A6 (2026-11-22, sur C23).** Eric, sur téléphone : « la navigation n'est pas super, peut-être qu'on peut mettre des menus de manière plus "mobile" plutôt que d'adapter le site desktop ». Aujourd'hui le téléphone reprend le menu latéral de l'ordinateur dans un tiroir qu'on ouvre par le bouton en haut à gauche : deux touchers pour changer de page, bouton loin du pouce. Proposé puis accepté (« Oui, fais-la »). Fait (`73a7ad3c`) : une barre fixe en bas de l'écran, sur téléphone seulement — Accueil, Planning, « Créer » au centre, Clients, « Plus » qui ouvre le menu complet. Les pages suivent les droits (une page fermée à la personne laisse sa place à la suivante ; quatre pages quand elle ne peut rien créer). Le bandeau du haut porte le nom de l'entreprise et la loupe, le bouton de menu est parti dans la barre. Les messages (« Nouvelle version disponible ») s'affichent au-dessus de la barre. Tablette et ordinateur inchangés. Écrit sans voir l'écran : retest C24.
 
@@ -219,6 +219,14 @@
   - C19 est remplacé par C23 (anomalie R4, corrigée).
 - **Anomalies** : R1 à R4, toutes corrigées et retestées, sauf R4 sur la tablette.
 - **Améliorations faites pendant la recette** : A1 (groupe « Développement »), A2 (cartes de la page Contrats), A6 (barre du bas sur téléphone).
-- **Remarques anciennes, non corrigées, à décider** : A3 (étiquette de source d'un lead coupée), A4 (texte d'aide de la recherche des chantiers coupé), A5 (la recherche de clients ne passe pas les accents — demande une migration).
+- **Remarques anciennes** : A5 (la recherche de clients ne passait pas les accents) corrigée après ce bilan, retest C25 ; A3 (étiquette de source d'un lead coupée) et A4 (texte d'aide de la recherche des chantiers coupé) non corrigées, à décider.
 - **Non testable par un agent** : tout l'affichage ; chaque point coché l'est sur le retour d'Eric, complété d'une lecture de la base ou de ses captures quand c'était possible.
 - **Dernier commit en ligne** : `73a7ad3c` (barre du bas), déploiement prêt, rattaché à `majordhome.vercel.app`.
+
+## Après le bilan
+
+- [ ] **C25. La recherche de clients passe les accents (A5).**
+  Où : `Ctrl K` (ou la loupe sur téléphone), puis menu → Clients, champ de recherche. Après « Mettre à jour ».
+  Saisir : `helene`, puis `jerome`, dans la recherche globale ; `helene` dans la liste des clients.
+  Attendu : des clients dont le prénom s'écrit « Hélène » ou « Jérôme » apparaissent, mêlés à ceux écrits sans accent ; la liste des clients annonce 23 résultats pour `helene` (19 avant). Taper `hélène` avec ses accents donne les mêmes fiches.
+  Vérification : `select count(*) from public.majordhome_clients where org_id = '<Mayer>' and is_archived = false and recherche ilike '%helene%'` — 23 lu le 2026-11-22.
