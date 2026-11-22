@@ -1,17 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Edit, Copy, Archive, Loader2, Mail, Users, Clock, Play, Check, Zap, Target, Send, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Copy, Archive, ArchiveRestore, Trash2, ChevronDown, ChevronRight, Loader2, Mail, Users, Clock, Play, Check, Zap, Target, Send, RefreshCw } from 'lucide-react';
 import { Button } from '@components/ui/button';
+import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { useAuth } from '@contexts/AuthContext';
-import { useMailCampaigns } from '@hooks/useMailCampaigns';
+import { useMailCampaigns, useNombreEnvois } from '@hooks/useMailCampaigns';
 import { useMailSegments } from '@hooks/useMailSegments';
 import { formatRelativeFR } from '@/lib/utils';
-import { cleDeCopie, libelleDeCopie, peutOuvrirMail } from '@/lib/mailPage';
+import { cleDeCopie, cleEnvoi, libelleDeCopie, peutOuvrirMail } from '@/lib/mailPage';
+import { enCours } from '@/lib/envoiEnCours';
+import {
+  gestesDeCampagne, texteArchivage, texteSuppression, champsDeRestauration, messageRestauration, separerArchivees,
+} from '@/lib/mailCampagnesListe';
 
 // --- Natures de campagne -----------------------------------------------------
 // Une campagne tombe dans exactement un groupe, selon son mode d'envoi :
-//   automated     → part seule à cadence régulière (scheduler N8n)  [is_automated]
+//   automated     → part seule à cadence régulière (planificateur)  [is_automated]
 //   transactional → part sur un événement (signature, devis…)        [is_transactional]
 //   manual        → broadcast lancé à la main depuis la page du mail [ni l'un ni l'autre]
 function classifyNature(c) {
@@ -51,16 +56,26 @@ function formatCadence(c) {
  * Onglet Campagnes — vue d'ensemble des campagnes regroupées par mode d'envoi.
  * « Éditer » et « Nouvelle campagne » ouvrent la page du mail (`?mail=<id>` / `?mail=nouveau`, `PageMail`).
  * Un autre rôle que l'administrateur ne voit que les campagnes manuelles, qu'il « Ouvre » pour les envoyer
- * (ce que lui donnait l'ancien onglet Envoi) : ni création, ni copie, ni archivage (`peutOuvrirMail`).
+ * (ce que lui donnait l'ancien onglet Envoi) : ni création, ni copie, ni archivage, ni suppression.
+ * Archiver, restaurer, supprimer : ce qui est permis et ce que dit chaque confirmation vient de
+ * `src/lib/mailCampagnesListe.js` (administrateur seul ; les e-mails de la boutique sont protégés).
  */
 export default function EditorTab() {
   const { organization, isOrgAdmin } = useAuth();
-  // Archivés compris pour les clés et noms déjà pris (contrainte unique et journal des envois) ; seuls les
-  // mails actifs sont listés.
-  const { campaigns: tous, isLoading, duplicateCampaign, archiveCampaign, isMutating } = useMailCampaigns(organization?.id, { includeArchived: true });
-  const campaigns = tous.filter((c) => !c.is_archived && peutOuvrirMail({ campagne: c, nouveau: false, isOrgAdmin }));
-  const { segments } = useMailSegments(organization?.id);
+  const orgId = organization?.id;
+  // Archivés compris pour les clés et noms déjà pris (contrainte unique et journal des envois).
+  const {
+    campaigns: tous, isLoading, duplicateCampaign, archiveCampaign, restoreCampaign, deleteCampaign, isMutating,
+  } = useMailCampaigns(orgId, { includeArchived: true });
+  const { actives, archivees } = separerArchivees(tous);
+  const campaigns = actives.filter((c) => peutOuvrirMail({ campagne: c, nouveau: false, isOrgAdmin }));
+  const { segments } = useMailSegments(orgId);
   const [searchParams, setSearchParams] = useSearchParams();
+  // Geste en attente de confirmation : { geste: 'archiver' | 'supprimer', campagne }.
+  const [demande, setDemande] = useState(null);
+  const [voirArchivees, setVoirArchivees] = useState(false);
+  // Envois déjà faits sous ce nom : dits dans la confirmation de suppression (inconnu = on ne chiffre pas).
+  const { nombre: nbEnvois } = useNombreEnvois(orgId, demande?.campagne?.label, { enabled: demande?.geste === 'supprimer' });
 
   // Ouverture directe depuis Réglages → E-mails & SMS (« Modifier le texte ») : /mailing?tab=editor&edit=<clé>.
   const editKey = searchParams.get('edit');
@@ -79,6 +94,7 @@ export default function EditorTab() {
 
   const openCreate = () => setSearchParams({ mail: 'nouveau' });
   const openEdit = (campaign) => setSearchParams({ mail: campaign.id });
+  const gestes = (campagne) => gestesDeCampagne({ campagne, isOrgAdmin, envoiEnCours: enCours(cleEnvoi(orgId, campagne.label)) });
 
   const handleDuplicate = async (campaign) => {
     try {
@@ -92,16 +108,36 @@ export default function EditorTab() {
     }
   };
 
-  const handleArchive = async (campaign) => {
-    if (campaign.is_transactional) {
-      window.alert(
-        `"${campaign.label}" est une campagne transactionnelle utilisée par le code (ex: envoi de proposition de contrat depuis la fiche client). L'archiver casserait l'envoi. Édite-la plutôt si tu veux modifier le contenu.`
-      );
+  /** Ouvre la confirmation, ou dit pourquoi le geste est fermé (relu au clic : un envoi a pu démarrer). */
+  const demander = (geste, campagne) => {
+    const verdict = gestes(campagne)[geste];
+    if (!verdict.possible) {
+      if (verdict.raison) toast.info(verdict.raison);
       return;
     }
-    if (!window.confirm(`Archiver "${campaign.label}" ? Elle ne partira plus, ni à la main ni toute seule.`)) return;
+    setDemande({ geste, campagne });
+  };
+
+  const confirmer = async () => {
+    if (!demande) return;
+    const { geste, campagne } = demande;
+    if (!gestes(campagne)[geste].possible) {
+      setDemande(null);
+      return;
+    }
     try {
-      await archiveCampaign(campaign.id);
+      if (geste === 'archiver') await archiveCampaign(campagne.id);
+      else await deleteCampaign(campagne.id);
+      setDemande(null);
+    } catch {
+      // toast déjà affiché ; la fenêtre reste ouverte pour réessayer ou annuler
+    }
+  };
+
+  const handleRestore = async (campagne) => {
+    try {
+      await restoreCampaign({ id: campagne.id, patch: champsDeRestauration(campagne) });
+      toast.success(messageRestauration(campagne));
     } catch {
       // toast déjà affiché
     }
@@ -124,6 +160,8 @@ export default function EditorTab() {
       </div>
     );
   }
+
+  const texte = demande && (demande.geste === 'archiver' ? texteArchivage(demande.campagne) : texteSuppression(demande.campagne, nbEnvois));
 
   return (
     <div className="space-y-8">
@@ -162,17 +200,63 @@ export default function EditorTab() {
             segmentById={segmentById}
             onEdit={openEdit}
             onDuplicate={handleDuplicate}
-            onArchive={handleArchive}
+            onDemander={demander}
+            gestes={gestes}
             disabled={isMutating}
             gerer={isOrgAdmin}
           />
         ))
       )}
+
+      {isOrgAdmin && archivees.length > 0 && (
+        <section>
+          <button
+            type="button"
+            onClick={() => setVoirArchivees((v) => !v)}
+            aria-expanded={voirArchivees}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-secondary-600 hover:text-secondary-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+          >
+            {voirArchivees ? <ChevronDown className="w-4 h-4" aria-hidden="true" /> : <ChevronRight className="w-4 h-4" aria-hidden="true" />}
+            Campagnes archivées ({archivees.length})
+          </button>
+          {voirArchivees && (
+            <ul className="mt-3 card divide-y divide-secondary-100 p-0">
+              {archivees.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-secondary-800 truncate">{c.label}</p>
+                    <p className="text-xs text-secondary-500 truncate">{c.subject || 'Objet à définir'}</p>
+                  </div>
+                  <Button variant="secondary" size="sm" onClick={() => handleRestore(c)} disabled={isMutating}>
+                    <ArchiveRestore className="w-3.5 h-3.5 mr-1" />
+                    Restaurer
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => demander('supprimer', c)} disabled={isMutating} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    Supprimer
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      <ConfirmDialog
+        open={!!demande}
+        onOpenChange={(ouvert) => { if (!ouvert) setDemande(null); }}
+        title={texte?.titre}
+        description={texte?.message}
+        confirmLabel={texte?.confirmer}
+        variant={demande?.geste === 'supprimer' ? 'destructive' : 'default'}
+        onConfirm={confirmer}
+        loading={isMutating}
+      />
     </div>
   );
 }
 
-function CampaignGroup({ group, campaigns, segmentById, onEdit, onDuplicate, onArchive, disabled, gerer }) {
+function CampaignGroup({ group, campaigns, segmentById, onEdit, onDuplicate, onDemander, gestes, disabled, gerer }) {
   if (!campaigns.length) return null;
   const { icon: Icon, accent, title, subtitle } = group;
   return (
@@ -195,7 +279,9 @@ function CampaignGroup({ group, campaigns, segmentById, onEdit, onDuplicate, onA
             segment={c.auto_segment_id ? segmentById[c.auto_segment_id] : null}
             onEdit={() => onEdit(c)}
             onDuplicate={() => onDuplicate(c)}
-            onArchive={() => onArchive(c)}
+            onArchive={() => onDemander('archiver', c)}
+            onDelete={() => onDemander('supprimer', c)}
+            gestes={gestes(c)}
             disabled={disabled}
             gerer={gerer}
           />
@@ -222,7 +308,7 @@ function CampaignMeta({ campaign, nature, segment }) {
     return (
       <>
         <MetaRow icon={Users}>
-          {segment?.name || <span className="italic text-secondary-400">Segment manquant</span>}
+          {segment?.name || <span className="italic text-secondary-400">Groupe de destinataires manquant</span>}
         </MetaRow>
         <MetaRow icon={Clock}>
           {cadence || <span className="italic text-secondary-400">Cadence non définie</span>}
@@ -256,8 +342,7 @@ function CampaignMeta({ campaign, nature, segment }) {
   );
 }
 
-function CampaignCard({ campaign, nature, accent, segment, onEdit, onDuplicate, onArchive, disabled, gerer }) {
-  const canArchive = gerer && nature !== 'transactional';
+function CampaignCard({ campaign, nature, accent, segment, onEdit, onDuplicate, onArchive, onDelete, gestes, disabled, gerer }) {
   return (
     <div className={`card border-l-4 ${ACCENT[accent].bar} p-4 flex flex-col gap-3`}>
       <div className="min-w-0">
@@ -273,7 +358,7 @@ function CampaignCard({ campaign, nature, accent, segment, onEdit, onDuplicate, 
         <CampaignMeta campaign={campaign} nature={nature} segment={segment} />
       </div>
 
-      <div className="flex gap-2 mt-auto pt-3 border-t border-secondary-100">
+      <div className="flex flex-wrap gap-2 mt-auto pt-3 border-t border-secondary-100">
         <Button variant="secondary" size="sm" onClick={onEdit} disabled={disabled}>
           <Edit className="w-3.5 h-3.5 mr-1" />
           {gerer ? 'Éditer' : 'Ouvrir'}
@@ -284,10 +369,22 @@ function CampaignCard({ campaign, nature, accent, segment, onEdit, onDuplicate, 
             Dupliquer
           </Button>
         )}
-        {canArchive && (
-          <Button variant="ghost" size="sm" onClick={onArchive} disabled={disabled} className="ml-auto text-red-600 hover:text-red-700 hover:bg-red-50">
+        {gestes.archiver.affiche && (
+          <Button variant="ghost" size="sm" onClick={onArchive} disabled={disabled} className="ml-auto">
             <Archive className="w-3.5 h-3.5 mr-1" />
             Archiver
+          </Button>
+        )}
+        {gestes.supprimer.affiche && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDelete}
+            disabled={disabled}
+            className={`text-red-600 hover:text-red-700 hover:bg-red-50 ${gestes.archiver.affiche ? '' : 'ml-auto'}`}
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
+            Supprimer
           </Button>
         )}
       </div>

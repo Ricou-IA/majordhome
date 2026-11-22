@@ -74,14 +74,29 @@ export const mailCampaignsService = {
     return this.update(id, { is_archived: false }, orgId);
   },
 
+  /**
+   * Restaure une campagne archivée. `patch` = `champsDeRestauration(campagne)` (`src/lib/mailCampagnesListe.js`) :
+   * une campagne automatique revient éteinte.
+   */
+  async restore(id, patch, orgId) {
+    return this.update(id, patch, orgId);
+  },
+
+  /**
+   * Suppression définitive. Rend la ligne supprimée ; aucune ligne supprimée (règle d'accès, id d'une autre
+   * organisation) est une erreur, pas un succès silencieux.
+   */
   async remove(id, orgId) {
     if (!orgId) return sansOrganisation();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('majordhome_mail_campaigns')
       .delete()
       .eq('id', id)
-      .eq('org_id', orgId);
-    return { error };
+      .eq('org_id', orgId)
+      .select('id');
+    if (error) return { data: null, error };
+    if (!data?.length) return { data: null, error: new Error('campagne_non_supprimee') };
+    return { data: data[0], error: null };
   },
 
   /**

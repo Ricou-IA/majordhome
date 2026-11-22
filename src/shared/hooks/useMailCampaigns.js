@@ -75,6 +75,29 @@ export function useMailCampaigns(orgId, { includeArchived = false } = {}) {
     onError: echec('L’archivage n’a pas abouti. Réessayez.'),
   });
 
+  const restoreMutation = useMutation({
+    mutationFn: async ({ id, patch }) => {
+      const { data, error } = await mailCampaignsService.restore(id, patch, orgId);
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => invalidate(),
+    onError: echec('La restauration n’a pas abouti. Réessayez.'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      const { data, error } = await mailCampaignsService.remove(id, orgId);
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      invalidate();
+      toast.success('Campagne supprimée');
+    },
+    onError: echec('La suppression n’a pas abouti. Réessayez.'),
+  });
+
   const duplicateMutation = useMutation({
     mutationFn: async ({ campaign, newKey, newLabel }) => {
       const { data, error } = await mailCampaignsService.duplicate(campaign, newKey, newLabel, orgId);
@@ -97,11 +120,15 @@ export function useMailCampaigns(orgId, { includeArchived = false } = {}) {
     createCampaign: createMutation.mutateAsync,
     updateCampaign: updateMutation.mutateAsync,
     archiveCampaign: archiveMutation.mutateAsync,
+    restoreCampaign: restoreMutation.mutateAsync,
+    deleteCampaign: deleteMutation.mutateAsync,
     duplicateCampaign: duplicateMutation.mutateAsync,
     isMutating:
       createMutation.isPending ||
       updateMutation.isPending ||
       archiveMutation.isPending ||
+      restoreMutation.isPending ||
+      deleteMutation.isPending ||
       duplicateMutation.isPending,
   };
 }
