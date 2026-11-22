@@ -114,6 +114,7 @@ const FilterDropdown = ({ label, icon: Icon, value, options, onChange }) => {
 
 export function ContractsList({
   contracts,
+  totalCount = 0,
   isLoading,
   loadingMore,
   hasMore,
@@ -214,6 +215,23 @@ export function ContractsList({
           )}
         </div>
       </div>
+
+      {/* Liste des contrats clos : le dire en clair, avec le retour aux actifs. Sans cette
+          ligne, rien à l'écran ne distinguait cette liste de celle des contrats actifs. */}
+      {isArchivedMode && !isLoading && (
+        <p className="text-sm text-gray-700">
+          <span className="font-semibold">
+            {totalCount} contrat{totalCount > 1 ? 's' : ''} clos.
+          </span>{' '}
+          <button
+            type="button"
+            onClick={() => onToggleArchived?.(false)}
+            className="font-medium text-primary-700 underline underline-offset-2 hover:text-primary-800"
+          >
+            Revenir aux contrats actifs
+          </button>
+        </p>
+      )}
 
       {/* Grille de contrats */}
       {isLoading ? (

@@ -14,6 +14,7 @@
 
 import { FileCheck, Clock, Archive, MapPin, Phone, ChevronRight, Globe } from 'lucide-react';
 import { statutVisiteAnnee } from '@/lib/entretienVisitStatus';
+import { CONTRACT_STATUSES } from '@services/contracts.service';
 import { VisitBadge } from './VisitBadge';
 import { EquipmentKindIcons } from '../shared/EquipmentKindIcons';
 
@@ -90,6 +91,9 @@ export function ContractCard({ contract, onClick, selected = false }) {
   };
 
   const isArchived = status === 'archived';
+  const statutHorsActif = status && status !== 'active'
+    ? CONTRACT_STATUSES.find((s) => s.value === status) || null
+    : null;
 
   return (
     <div
@@ -116,7 +120,15 @@ export function ContractCard({ contract, onClick, selected = false }) {
               Web
             </span>
           )}
-          <VisitBadge status={visitStatus} />
+          {/* « À faire » ne vaut que pour un contrat actif : un contrat clos, en attente ou
+              archivé affiche son statut, pas un entretien à faire qu'il n'a pas. */}
+          {statutHorsActif ? (
+            <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border ${statutHorsActif.color}`}>
+              {statutHorsActif.label}
+            </span>
+          ) : (
+            <VisitBadge status={visitStatus} />
+          )}
         </div>
       </div>
 
