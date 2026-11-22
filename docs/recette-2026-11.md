@@ -170,9 +170,9 @@
 
 - **A2 (2026-11-22, sur C10).** Eric, sur la page « Contrats » du menu : « il ne se passe rien si je clique sur la carte clos ». Les trois cartes de chiffres n'étaient que des repères. Fait : « Contrats actifs » et « Clos » sont des boutons (flèche à droite) qui ouvrent Entretiens → onglet Contrats, filtré sur ces contrats ; « En attente » reste un repère, ce sont les contrats de la page elle-même. Retest C21.
 
-- **A3 (2026-11-22, vue sur la capture Pipeline de C14, non signalée par Eric).** L'étiquette de source d'une carte de lead est coupée : « Bouche-à-or… », « Client Exista… », « Boutique en l… ». Antérieur à ce lot (largeur limitée à 100 px, inchangée ; le nom complet est en infobulle). Non corrigé : à décider en fin de recette.
+- **A3 (2026-11-22, vue sur la capture Pipeline de C14, non signalée par Eric).** L'étiquette de source d'une carte de lead est coupée : « Bouche-à-or… », « Client Exista… », « Boutique en l… ». Antérieur à ce lot (largeur limitée à 100 px, inchangée ; le nom complet est en infobulle). Accord d'Eric après le bilan (« Oui, corrige »). Corrigé (`6b05291b`) : les repères de la carte passent à la ligne, la source se lit en entier ; une carte chargée gagne une ligne. Retest C26.
 
-- **A4 (2026-11-22, vue sur la capture Chantiers de C14, non signalée par Eric).** Le texte d'aide du champ de recherche des chantiers est coupé (« Rechercher un chantie »). Antérieur à ce lot. Non corrigé : à décider en fin de recette.
+- **A4 (2026-11-22, vue sur la capture Chantiers de C14, non signalée par Eric).** Le texte d'aide du champ de recherche des chantiers est coupé (« Rechercher un chantie »). Antérieur à ce lot. Corrigé (`6b05291b`) : la largeur du champ suit son texte d'aide, pour tous les Kanbans, sans dépasser l'écran. Retest C26.
 
 - **A5 (2026-11-22, trouvée en vérifiant C15).** La recherche de CLIENTS ne passe pas les accents : « helene » trouve 19 clients sur 23, « jerome » 22 sur 28 (mesuré en base, Mayer ; 134 clients ont un accent dans leur nom). La recherche de leads, elle, les ignore (`lead_search` utilise `unaccent`). Antérieur à ce lot : c'est la recherche de clients de toute l'application (liste des clients, fenêtre de RDV), que la recherche globale réutilise. Accord d'Eric en fin de recette (« Oui, corrige »). Corrigé (`0e14a698`) : migration `20261122_3` appliquée en production et vérifiée (colonne `recherche`, sans accent, en fin de la vue des clients ; essayée d'abord dans une transaction annulée) ; la liste des clients et la recherche rapide y cherchent nom et ville. Lu en base après application : « helene » 23 clients, « jerome » 28, vue toujours modifiable et en `security_invoker`, aucun droit pour `anon`. Retest C25.
 
@@ -219,7 +219,7 @@
   - C19 est remplacé par C23 (anomalie R4, corrigée).
 - **Anomalies** : R1 à R4, toutes corrigées et retestées, sauf R4 sur la tablette.
 - **Améliorations faites pendant la recette** : A1 (groupe « Développement »), A2 (cartes de la page Contrats), A6 (barre du bas sur téléphone).
-- **Remarques anciennes** : A5 (la recherche de clients ne passait pas les accents) corrigée après ce bilan, retest C25 ; A3 (étiquette de source d'un lead coupée) et A4 (texte d'aide de la recherche des chantiers coupé) non corrigées, à décider.
+- **Remarques anciennes** : A5 (la recherche de clients ne passait pas les accents) corrigée après ce bilan, retest C25 ; A3 (étiquette de source d'un lead coupée) et A4 (texte d'aide de la recherche des chantiers coupé) corrigées après ce bilan, retest C26.
 - **Non testable par un agent** : tout l'affichage ; chaque point coché l'est sur le retour d'Eric, complété d'une lecture de la base ou de ses captures quand c'était possible.
 - **Dernier commit en ligne** : `73a7ad3c` (barre du bas), déploiement prêt, rattaché à `majordhome.vercel.app`.
 
@@ -230,3 +230,9 @@
   Saisir : `helene`, puis `jerome`, dans la recherche globale ; `helene` dans la liste des clients.
   Attendu : des clients dont le prénom s'écrit « Hélène » ou « Jérôme » apparaissent, mêlés à ceux écrits sans accent ; la liste des clients annonce 23 résultats pour `helene` (19 avant). Taper `hélène` avec ses accents donne les mêmes fiches.
   Vérification : `select count(*) from public.majordhome_clients where org_id = '<Mayer>' and is_archived = false and recherche ilike '%helene%'` — 23 lu le 2026-11-22.
+
+- [ ] **C26. La source d'un lead et le texte d'aide de la recherche se lisent en entier (A3, A4).**
+  Où : Pipeline → Kanban, puis Chantiers, sur ordinateur, après « Mettre à jour ».
+  Saisir : lire les cartes des colonnes « Devis envoyé », « Gagné » et « Perdu » ; lire le champ de recherche en haut à droite des deux écrans.
+  Attendu : « Bouche-à-oreille », « Client Existant », « Boutique en ligne » en toutes lettres ; sur une carte chargée, le délai ou le bouton des devis passe sur une seconde ligne, sans rien qui déborde. « Rechercher un chantier... » et « Rechercher un lead... » en entier.
+  Vérification : rien (affichage seul).
