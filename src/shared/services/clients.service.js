@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, withErrorHandlingCount } from '@/lib/serviceHelpers';
 import { cleanPhone, formatPhoneForSearch } from '@/lib/phoneUtils';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { normaliser } from '@/lib/catalogue/recherchePieces';
 import { buildClientDuplicateProbe, matchClientDuplicates, phoneSearchPatterns } from '@/lib/clientDuplicateMatch';
 import { buildClientDisplayName } from '@/lib/clientDisplayName';
 import { equipmentsService } from '@services/equipments.service';
@@ -130,10 +131,12 @@ export const clientsService = {
         if (term && term.length >= 2) {
           const phoneSpaced = formatPhoneForSearch(term);
           const conditions = [
-            `display_name.ilike.%${term}%`,
+            // Nom et ville : colonne `recherche` de la vue (minuscules, sans accent, migration
+            // 20261122_3), interrogée avec le terme normalisé de la même façon. « helene »
+            // trouve « Hélène » ; un `ilike` sur `display_name` ne le trouvait pas.
+            `recherche.ilike.%${normaliser(term)}%`,
             `email.ilike.%${term}%`,
             `phone.ilike.%${term}%`,
-            `city.ilike.%${term}%`,
             `postal_code.ilike.%${term}%`,
             // `external_ref` vient de la migration 20261121_13_clients_import.sql (vue majordhome_clients) :
             // sans elle, toute recherche de clients répond 400.
@@ -943,10 +946,10 @@ export const clientsService = {
       const terms = phoneSpaced ? [safeQuery] : safeQuery.split(/\s+/).filter(Boolean);
       for (const term of terms) {
         const conditions = [
-          `display_name.ilike.%${term}%`,
+          // Nom et ville sans accent : même colonne `recherche` que la liste des clients.
+          `recherche.ilike.%${normaliser(term)}%`,
           `email.ilike.%${term}%`,
           `phone.ilike.%${term}%`,
-          `city.ilike.%${term}%`,
         ];
         if (phoneSpaced && phoneSpaced !== term) {
           conditions.push(`phone.ilike.%${phoneSpaced}%`);
