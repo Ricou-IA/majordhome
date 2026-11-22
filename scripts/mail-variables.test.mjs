@@ -67,6 +67,27 @@ test('boutique : les variables de la clé ; un tableau seul à la racine est un 
   assert.ok(!noms({ key: 'webshop_confirmation' }).includes('{{ARRETS}}'));
 });
 
+test('texte : ce qui s’insère dans une phrase (le site de l’entreprise compris), jamais un lien d’action ni un bloc', () => {
+  const v = (c, nom) => variablesProposees(c).find((x) => x.nom === nom);
+  for (const nom of ['{{SALUTATION}}', '{{CLIENT_NAME}}', '{{BRAND_NAME}}', '{{ORG_PHONE}}']) assert.equal(v(MANUELLE, nom).texte, true, nom);
+  // Le site se lit dans une phrase ET sert d'adresse de lien.
+  assert.equal(v(MANUELLE, '{{ORG_WEBSITE_URL}}').texte, true);
+  assert.equal(v(MANUELLE, '{{ORG_WEBSITE_URL}}').lien, true);
+  assert.equal(v(MANUELLE, '{{lien_pellets}}').texte, false);
+  assert.equal(v({ key: 'pv_reception' }, '{{LIEN_PV}}').texte, false);
+  assert.equal(v({ key: 'webshop_feuille_route' }, '{{ITINERAIRE_URL}}').texte, false);
+  assert.equal(v({ key: 'webshop_confirmation' }, '{{ITEMS}}').texte, false);
+  assert.equal(v({ key: 'webshop_confirmation' }, '{{CLIENT_NAME}}').texte, true);
+  // Tout `lien: true` autre que le site est un lien d'action ; tout bloc est hors du texte.
+  const toutes = [MANUELLE, { key: 'pv_reception' }, { key: 'webshop_confirmation' }, { key: 'webshop_feuille_route' },
+    ...EMAILS_AUTOMATIQUES.map((e) => ({ key: e.gabarit.key }))].flatMap((c) => variablesProposees(c));
+  for (const x of toutes) {
+    assert.equal(typeof x.texte, 'boolean', x.nom);
+    if (x.bloc) assert.equal(x.texte, false, x.nom);
+    else assert.equal(x.texte, !x.lien || x.nom === '{{ORG_WEBSITE_URL}}', x.nom);
+  }
+});
+
 test('libelleVariable : libellé d’artisan, sinon nom brut sans accolades', () => {
   assert.equal(libelleVariable('{{SALUTATION}}'), 'Formule de politesse');
   assert.equal(libelleVariable('CLIENT_NAME'), 'Nom du client');

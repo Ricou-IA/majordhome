@@ -82,8 +82,56 @@ export function voisin(ed, plage, sens) {
   }
 }
 
+/** Nœud qui porte du contenu (texte visible, étiquette, élément non vide) ; un retour à la ligne seul n'en porte pas. */
+const estUtile = (n) => (n.nodeType === 3 ? /\S/.test(n.textContent.replace(/\u200b/g, ''))
+  : n.nodeType === 1 && n.nodeName !== 'BR' && (estEtiquette(n) || !!n.textContent.trim() || !!n.querySelector('[data-var]')));
+
+/**
+ * Un bouton est seul dans son paragraphe, sinon le texte enregistré n'y voit plus qu'un lien. Ce qui a été
+ * tapé (ou fusionné par un effacement) à côté de lui part dans un paragraphe avant ou après, curseur gardé.
+ */
+export function reparerBoutons(ed) {
+  const utiles = (liste) => liste.some(estUtile);
+  for (let bloc = ed.firstChild; bloc; bloc = bloc.nextSibling) {
+    // Bouton dans un paragraphe, ou fusionné dans un titre / un encadré par un effacement (pas dans une liste).
+    const a = bloc.nodeType === 1 && !['UL', 'OL'].includes(bloc.nodeName) && !estVariableBloc(bloc) ? bloc.querySelector('a[data-bouton]') : null;
+    if (!a) continue;
+    let porteur = a;
+    while (porteur.parentNode !== bloc) porteur = porteur.parentNode;
+    const avant = [];
+    const apres = [];
+    let passe = false;
+    for (let n = bloc.firstChild; n; n = n.nextSibling) {
+      if (n === porteur) passe = true;
+      else (passe ? apres : avant).push(n);
+    }
+    const dansUnParagraphe = bloc.nodeName === 'P';
+    if (dansUnParagraphe && !utiles(avant) && !utiles(apres)) continue;
+    const r = bloc;
+    avecCurseur(ed, () => {
+      // Paragraphe : il reste celui du bouton, le texte voisin part dans des paragraphes avant / après.
+      // Titre ou encadré : il garde ce qui précède, le bouton reprend son paragraphe, la suite un bloc du même genre.
+      const bouton = dansUnParagraphe ? r : document.createElement('p');
+      if (!dansUnParagraphe) { bouton.appendChild(porteur); ed.insertBefore(bouton, r.nextSibling); }
+      if (dansUnParagraphe && utiles(avant)) {
+        const pa = document.createElement('p');
+        avant.forEach((n) => pa.appendChild(n));
+        ed.insertBefore(pa, r);
+      }
+      if (utiles(apres)) {
+        const suite = dansUnParagraphe ? document.createElement('p') : r.cloneNode(false);
+        apres.forEach((n) => suite.appendChild(n));
+        ed.insertBefore(suite, bouton.nextSibling);
+      }
+      if (!dansUnParagraphe && !utiles(avant)) r.remove();
+    }, () => { const p = a.closest('p'); return p?.nextSibling ?? p; });
+    if (!dansUnParagraphe) bloc = a.closest('p'); // reprendre après le bouton déplacé
+  }
+}
+
 /** Le texte commence et finit par un paragraphe, et deux blocs posés (bouton, information sur sa ligne) ne se touchent pas : le curseur peut toujours aller avant, entre et après eux. */
 export function garantirParagraphes(ed) {
+  reparerBoutons(ed);
   // Une étiquette insérée par le navigateur garde sa nature (il peut perdre l'attribut en route).
   ed.querySelectorAll('[data-var]:not([contenteditable="false"]), [data-var-bloc]:not([contenteditable="false"])').forEach((n) => {
     n.setAttribute('contenteditable', 'false');

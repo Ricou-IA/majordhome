@@ -210,6 +210,10 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
+  /* Focus du texte : même anneau que les champs de l'application (`inputClass`), sur le cadre entier. */
+  .mdh-editeur-cadre:has(.mdh-editeur-mail:focus) {
+    @apply border-primary-500 ring-2 ring-primary-500;
+  }
   .mdh-editeur-mail p { @apply mb-3; }
   .mdh-editeur-mail h2 { @apply mb-2 mt-5 text-lg font-semibold leading-snug text-secondary-900; }
   .mdh-editeur-mail > :first-child { @apply mt-0; }

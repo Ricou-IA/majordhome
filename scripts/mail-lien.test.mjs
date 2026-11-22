@@ -7,7 +7,8 @@ const LIENS = ['{{LIEN_PV}}', '{{ORG_WEBSITE_URL}}'];
 
 const VALIDES = ['https://ex.fr', 'http://ex.fr', 'mailto:a@ex.fr', 'tel:+33612345678', '{{LIEN_PV}}', '  https://ex.fr/contact  '];
 const INVALIDES = ['', '   ', 'javascript:alert(1)', 'ex.fr', '{{ORG_WEBSITE_URL}}/contact', '{{LIEN_PV}}{{ORG_WEBSITE_URL}}',
-  'https://ex.fr/{{LIEN_PV}}', '{{CLIENT_NAME}}', 'data:text/html,x', 'https://ex.\u0007fr'];
+  'https://ex.fr/{{LIEN_PV}}', '{{CLIENT_NAME}}', 'data:text/html,x', 'https://ex.\u0007fr',
+  'https://', 'http://', 'mailto:', 'tel:', 'HTTPS://  ', 'https://ex fr'];
 
 const garde = (adresse) => /<a /.test(normaliser(`<p><a href="${adresse}">x</a></p>`));
 
@@ -49,9 +50,14 @@ test('accord avec normaliser : une adresse acceptée garde son lien, une adresse
   // Deux écarts voulus, où la fenêtre est plus stricte que `normaliser` (qui garderait le lien) :
   // `{{CLIENT_NAME}}` n'est pas une adresse ; `https://ex.fr/{{LIEN_PV}}` mêle une adresse proposée et
   // du texte, et deviendrait une adresse double à l'envoi.
-  const PLUS_STRICTS = new Set(['{{CLIENT_NAME}}', 'https://ex.fr/{{LIEN_PV}}']);
+  // Et une adresse réduite à son début (`https://`, `mailto:`…) ou une adresse web avec une espace : `normaliser`
+  // garderait un lien vide ou cassé.
+  const PLUS_STRICTS = new Set(['{{CLIENT_NAME}}', 'https://ex.fr/{{LIEN_PV}}', 'https://', 'http://', 'mailto:', 'tel:',
+    'HTTPS://  ', 'https://ex fr']);
   for (const a of INVALIDES.filter((x) => !PLUS_STRICTS.has(x))) assert.equal(garde(a), false, a);
   for (const a of PLUS_STRICTS) assert.equal(garde(a), true, a);
+  // Un numéro écrit avec ses espaces reste accepté : seule l'adresse web refuse une espace.
+  assert.equal(adresseDeLienValide('tel:+33 6 12 34 56 78', LIENS).valide, true);
 });
 
 test('la liste des adresses proposées accepte des jetons ou des objets { nom }', () => {

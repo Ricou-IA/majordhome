@@ -23,24 +23,41 @@ import BarreOutils from './BarreOutils';
 import FenetreLien from './FenetreLien';
 import {
   basculerEncadre, blocRacine, elementDe, estBouton, estElement, estEtiquette, estFixe, estVariableBloc, garantirParagraphes,
-  insererApres, nouveauParagraphe, placerCurseur, plageDans, rangerTexteRacine, sortirEncadreParEntree, texteDeCollage, voisin,
+  insererApres, nouveauParagraphe, placerCurseur, plageDans, rangerTexteRacine, reparerBoutons, sortirEncadreParEntree, texteDeCollage, voisin,
 } from './editeurDom';
 
 const TOUS = { titre: true, bouton: true, encadre: true };
-const ETAT_VIDE = { gras: false, italique: false, puces: false, numeros: false, titre: false, encadre: false };
+
+/**
+ * Gras / italique au curseur : le texte d'un bouton est enregistré sans mise en forme (elle disparaîtrait),
+ * et un titre est déjà en gras (l'italique y est gardé). Rend la raison du refus, ou `null`.
+ */
+function raisonSansMiseEnForme(nom, dansBouton, dansTitre) {
+  if (dansBouton) return nom === 'gras' ? 'Le texte d’un bouton ne se met pas en gras.' : 'Le texte d’un bouton ne se met pas en italique.';
+  if (dansTitre && nom === 'gras') return 'Un titre est déjà en gras.';
+  return null;
+}
+
+function miseEnFormePossible(nom, plage) {
+  const ancre = elementDe(plage?.startContainer);
+  return !raisonSansMiseEnForme(nom, !!ancre?.closest('a[data-bouton]'), !!ancre?.closest('h2'));
+}
+const ETAT_VIDE = { gras: false, italique: false, puces: false, numeros: false, titre: false, encadre: false, bouton: false };
 
 /**
  * @param {object} props
  * @param {string} props.valeur texte enregistré
  * @param {number | string} props.version relu dans l'éditeur quand elle change
  * @param {(html: string) => void} props.onChange texte normalisé
- * @param {Array<{ nom: string, libelle: string, bloc: boolean, lien: boolean }>} [props.variables]
+ * @param {Array<{ nom: string, libelle: string, bloc: boolean, lien: boolean, texte: boolean }>} [props.variables]
+ *   `variablesProposees` : « Insérer » liste celles qui ont `texte` ou `bloc`, la fenêtre de lien celles qui ont `lien`
  * @param {{ titre: boolean, bouton: boolean, encadre: boolean }} [props.elements]
  * @param {boolean} [props.disabled]
  */
 export default function EditeurTexte({ valeur, version, onChange, variables = [], elements = TOUS, disabled = false }) {
   const ref = useRef(null);
   const derniere = useRef(null); // dernière sélection connue dans le texte, pour la barre et la fenêtre
+  const enPause = useRef(false); // collage en cours : une seule émission, à la fin
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const [etat, setEtat] = useState(ETAT_VIDE);
@@ -49,8 +66,12 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
 
   const sansElements = !elements.titre && !elements.bouton && !elements.encadre;
   const libelles = useMemo(() => Object.fromEntries(variables.map((v) => [v.nom, v.libelle])), [variables]);
-  const aInserer = useMemo(() => variables.filter((v) => !v.lien), [variables]);
+  const aInserer = useMemo(() => variables.filter((v) => v.texte || v.bloc), [variables]);
   const adressesProposees = useMemo(() => variables.filter((v) => v.lien), [variables]);
+  const interdits = {
+    gras: raisonSansMiseEnForme('gras', etat.bouton, etat.titre),
+    italique: raisonSansMiseEnForme('italique', etat.bouton, etat.titre),
+  };
 
   const lireEtat = useCallback(() => {
     const ed = ref.current;
@@ -59,7 +80,7 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
     const ancre = elementDe(plage.startContainer);
     const dans = (sel) => { const n = ancre?.closest(sel); return !!n && ed.contains(n); };
     const q = (c) => { try { return document.queryCommandState(c); } catch { return false; } };
-    const suivant = { gras: q('bold'), italique: q('italic'), puces: dans('ul'), numeros: dans('ol'), titre: dans('h2'), encadre: dans('[data-encadre]') };
+    const suivant = { gras: q('bold'), italique: q('italic'), puces: dans('ul'), numeros: dans('ol'), titre: dans('h2'), encadre: dans('[data-encadre]'), bouton: dans('a[data-bouton]') };
     setEtat((avant) => (Object.keys(suivant).every((k) => avant[k] === suivant[k]) ? avant : suivant));
   }, []);
 
@@ -70,7 +91,7 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
 
   const emettre = useCallback(() => {
     const ed = ref.current;
-    if (!ed) return;
+    if (!ed || enPause.current) return;
     const html = depuisEditeur(ed.innerHTML, { sansElements });
     mesurerVide(html);
     onChangeRef.current?.(html);
@@ -158,7 +179,9 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
     const n = Date.now();
     if (a && ed.contains(a)) {
       const bouton = a.hasAttribute('data-bouton');
-      setFenetre({ n, mode: bouton ? 'bouton' : 'lien', existant: true, texte: a.textContent, adresse: a.getAttribute('href') || '', cible: a });
+      // Texte rogné, comme celui que rend la fenêtre : changer seulement l'adresse ne touche pas au contenu du lien.
+      const texte = a.textContent.replace(/\s+/g, ' ').trim();
+      setFenetre({ n, mode: bouton ? 'bouton' : 'lien', existant: true, texte, adresse: a.getAttribute('href') || '', cible: a });
       return;
     }
     const texte = mode === 'lien' && plage && !plage.collapsed ? plage.toString().replace(/\s+/g, ' ').trim() : '';
@@ -214,8 +237,10 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
     if (nom === 'inserer') { insererVariable(arg); return; }
     const plage = restaurer();
     const bloc = plage && blocRacine(ed, plage.startContainer, plage.startOffset);
-    if (nom === 'gras' || nom === 'italique') executer(nom === 'gras' ? 'bold' : 'italic');
-    else if (bloc && !estFixe(bloc)) {
+    if (nom === 'gras' || nom === 'italique') {
+      if (!miseEnFormePossible(nom, plage)) return;
+      executer(nom === 'gras' ? 'bold' : 'italic');
+    } else if (bloc && !estFixe(bloc)) {
       // Un titre, une liste, un encadré ne s'emboîtent pas : on sort d'abord de l'encadré ou de la liste
       // (le texte enregistré les aplatirait sans le dire).
       if (estElement(bloc, 'data-encadre') && nom !== 'encadre') basculerEncadre(ed, plageDans(ed));
@@ -238,13 +263,19 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
     const ancre = elementDe(plage.startContainer);
     const dansBouton = !!ancre?.closest('a[data-bouton]');
     const entreParagraphes = dansBouton ? 'insertText' : ancre?.closest('[data-encadre]') ? 'insertLineBreak' : 'insertParagraph';
-    texteDeCollage(texte).forEach((lignes, i) => {
-      if (i) document.execCommand(entreParagraphes, false, ' ');
-      lignes.forEach((ligne, j) => {
-        if (j) document.execCommand(dansBouton ? 'insertText' : 'insertLineBreak', false, ' ');
-        if (ligne) document.execCommand('insertText', false, ligne);
+    enPause.current = true;
+    try {
+      texteDeCollage(texte).forEach((lignes, i) => {
+        if (i) document.execCommand(entreParagraphes, false, ' ');
+        lignes.forEach((ligne, j) => {
+          if (j) document.execCommand(dansBouton ? 'insertText' : 'insertLineBreak', false, ' ');
+          if (ligne) document.execCommand('insertText', false, ligne);
+        });
       });
-    });
+    } finally {
+      enPause.current = false;
+    }
+    rangerTexteRacine(ref.current);
     apres();
   };
 
@@ -302,14 +333,16 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
 
   const surSaisie = () => {
     const ed = ref.current;
+    if (enPause.current) return;
     rangerTexteRacine(ed);
+    reparerBoutons(ed); // du texte tapé à côté d'un bouton n'en fait pas un simple lien
     if (!ed.firstChild) { ed.appendChild(nouveauParagraphe()); placerCurseur(ed.firstChild, 'debut'); }
     emettre();
   };
 
   return (
-    <div className={`rounded-lg border border-secondary-300 ${disabled ? 'bg-secondary-50' : 'bg-white'} focus-within:border-primary-500`}>
-      <BarreOutils etat={etat} elements={elements} aInserer={aInserer} onAction={action} disabled={disabled} />
+    <div className={`mdh-editeur-cadre rounded-lg border border-secondary-300 transition-colors ${disabled ? 'bg-secondary-50' : 'bg-white'}`}>
+      <BarreOutils etat={etat} interdits={interdits} elements={elements} aInserer={aInserer} onAction={action} disabled={disabled} />
       <div className="relative">
         {vide && !disabled && (
           <div aria-hidden="true" className="pointer-events-none absolute left-4 top-3 select-none text-[15px] leading-6 text-secondary-400">
@@ -339,7 +372,7 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
         adressesProposees={adressesProposees}
         onValider={validerFenetre}
         onRetirer={retirerLien}
-        onFermer={() => setFenetre(null)}
+        onFermer={() => { setFenetre(null); restaurer(); }}
       />
     </div>
   );

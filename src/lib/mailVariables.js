@@ -20,8 +20,10 @@ import {
 } from './webshop/emailTemplates.js';
 
 /**
- * @typedef {{ nom: string, libelle: string, bloc: boolean, lien: boolean }} VariableProposee
- *   `nom` est le jeton complet `{{NOM}}`, tel que l'éditeur l'insère.
+ * @typedef {{ nom: string, libelle: string, bloc: boolean, lien: boolean, texte: boolean }} VariableProposee
+ *   `nom` est le jeton complet `{{NOM}}`, tel que l'éditeur l'insère. `lien` : peut servir d'adresse à un lien
+ *   ou un bouton. `texte` : se lit dans une phrase (menu « Insérer ») — toute variable qui n'est ni un lien ni un
+ *   bloc, plus le site de l'entreprise, une adresse qui se lit bien ; jamais un lien d'action (`LIEN_…`).
  * @typedef {{ key?: string | null, is_automated?: boolean | null, is_transactional?: boolean | null,
  *   html_body?: string | null, subject?: string | null }} CampagneMail
  * @typedef {'manuelle' | 'automatique' | 'sequence' | 'auto_registre' | 'boutique'} NatureMail
@@ -168,6 +170,9 @@ function liensDe(html) {
 /** @param {string} nom @returns {boolean} Le nom d'une variable dit-il que c'est une adresse (`LIEN_…`, `…_URL`, `lien_pellets`) ? */
 export const nomDeLien = (nom) => /^lien_/i.test(sansAccolades(nom)) || /_url$/i.test(sansAccolades(nom));
 
+/** Adresses qui se lisent aussi dans une phrase (le site de l'entreprise) : proposées dans le texte ET comme lien. */
+const LIENS_LISIBLES = Object.freeze(['{{ORG_WEBSITE_URL}}']);
+
 /** Valeur unique, ordre conservé. @param {string[]} liste @returns {string[]} */
 const uniques = (liste) => [...new Set(liste)];
 
@@ -206,12 +211,11 @@ export function variablesProposees(campagne) {
   const defaut = texteParDefaut(campagne);
   const blocs = defaut ? blocsDe(defaut.html_body) : new Set();
   const liens = defaut ? liensDe(defaut.html_body) : new Set();
-  return jetonsProposes(campagne).map((nom) => ({
-    nom,
-    libelle: libelleVariable(nom),
-    bloc: blocs.has(nom),
-    lien: liens.has(nom) || nomDeLien(nom),
-  }));
+  return jetonsProposes(campagne).map((nom) => {
+    const bloc = blocs.has(nom);
+    const lien = liens.has(nom) || nomDeLien(nom);
+    return { nom, libelle: libelleVariable(nom), bloc, lien, texte: !bloc && (!lien || LIENS_LISIBLES.includes(nom)) };
+  });
 }
 
 /**

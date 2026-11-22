@@ -7,8 +7,9 @@
 // Accord avec `normaliser` (mailCorps.js) : toute adresse acceptée ici y garde son lien. L'inverse est
 // plus strict ici : une adresse que `normaliser` transformerait en texte simple (une adresse proposée
 // suivie d'un chemin, `javascript:`…) est refusée avec une phrase au lieu de disparaître à
-// l'enregistrement ; et une information qui n'est pas une adresse (le nom du client) est refusée même si
-// `normaliser`, qui n'en connaît pas le sens, la garderait.
+// l'enregistrement ; et sont refusées même si `normaliser`, qui n'en connaît pas le sens, les garderait :
+// une information qui n'est pas une adresse (le nom du client), une adresse proposée suivie d'un texte, une
+// adresse réduite à son début (`https://`, `mailto:`) et une adresse de site contenant une espace.
 // ============================================================================
 
 const JETON_SEUL = /^\{\{[A-Za-z0-9_]+\}\}$/;
@@ -55,7 +56,13 @@ export function adresseDeLienValide(adresse, variablesDeLien = []) {
       message: 'Saisissez l’adresse complète, ou choisissez l’adresse proposée seule, sans rien ajouter avant ni après.',
     };
   }
-  if (SCHEMA.test(a)) return { valide: true, adresse: a };
+  const debut = SCHEMA.exec(a);
+  if (debut) {
+    const reste = a.slice(debut[0].length);
+    if (!reste.trim()) return { valide: false, message: `Il manque la suite de l’adresse après « ${debut[0]} ».` };
+    if (/^https?:/i.test(a) && /\s/.test(reste)) return { valide: false, message: 'Une adresse de site ne contient pas d’espace.' };
+    return { valide: true, adresse: a };
+  }
   const suggestion = /^[a-z][a-z0-9+.-]*:/i.test(a) && !/^[^:]+:\d/.test(a) ? undefined : suggestionPour(a);
   return suggestion
     ? { valide: false, message: `Il manque le début de l’adresse. ${MESSAGE_SCHEMA}`, suggestion }
