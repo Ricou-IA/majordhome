@@ -6,7 +6,7 @@ import {
 import { EMAILS_AUTOMATIQUES, VARIABLES_MARQUE, variablesDe } from '../src/lib/emailsAutomatiques.js';
 import { SEQUENCES_EMAILS } from '../src/lib/sequencesEmails.js';
 import {
-  WEBSHOP_EMAIL_KEYS, WEBSHOP_EMAIL_DEFAULTS, WEBSHOP_EMAIL_PLACEHOLDERS, GABARITS_HABILLES_PAR_LE_SITE,
+  WEBSHOP_EMAIL_KEYS, WEBSHOP_EMAIL_DEFAULTS, WEBSHOP_EMAIL_PLACEHOLDERS, GABARITS_HABILLES_PAR_LE_SITE, VARIABLES_MARQUE_DU_SITE,
 } from '../src/lib/webshop/emailTemplates.js';
 
 const MANUELLE = { key: 'promo_automne', is_automated: false, is_transactional: false };
@@ -110,4 +110,18 @@ test('variablesManquantes : libellés des variables du texte par défaut absente
   assert.deepEqual(variablesManquantes(MANUELLE, '<p>x</p>'), []);
   assert.deepEqual(variablesManquantes({ key: 'pv_reception' }, ''), variablesManquantes({ key: 'pv_reception' }, null));
   assert.ok(!variablesManquantes({ key: 'pv_reception' }, '').includes('Couleur principale'));
+});
+
+test('mails habillés par le site : seules BRAND_NAME, ORG_EMAIL et ORG_PHONE sont des variables d’entreprise', () => {
+  assert.deepEqual([...VARIABLES_MARQUE_DU_SITE], ['{{BRAND_NAME}}', '{{ORG_EMAIL}}', '{{ORG_PHONE}}']);
+  for (const key of GABARITS_HABILLES_PAR_LE_SITE) {
+    const n = noms({ key });
+    assert.deepEqual(n.filter((v) => VARIABLES_MARQUE.includes(v)).sort(), [...VARIABLES_MARQUE_DU_SITE].sort(), key);
+    assert.equal(n.filter((v) => VARIABLES_MARQUE.includes(v)).length, 3, key);
+    assert.deepEqual(variablesInconnues({ key }, '<p>{{BRAND_NAME}} {{ORG_EMAIL}} {{ORG_PHONE}}</p>'), []);
+    assert.deepEqual(variablesInconnues({ key }, '<p>{{ORG_WEBSITE_URL}} {{ACCENT_COLOR}}</p>'), ['{{ORG_WEBSITE_URL}}', '{{ACCENT_COLOR}}']);
+  }
+  assert.equal(noms(MANUELLE).filter((v) => VARIABLES_MARQUE.includes(v)).length, 7);
+  assert.deepEqual(variablesInconnues(MANUELLE, '<p>{{ORG_WEBSITE_URL}} {{ACCENT_COLOR}}</p>'), []);
+  assert.deepEqual(variablesInconnues({ key: 'webshop_ordre_colis' }, '<p>{{ACCENT_COLOR}}</p>'), []);
 });

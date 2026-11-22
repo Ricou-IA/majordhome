@@ -14,8 +14,8 @@
 // ============================================================================
 import { habillerMail, valeursDeMarque } from './mailHabillage.js';
 import { emailOuSequence } from './emailsAutomatiques.js';
-import { GABARITS_HABILLES_PAR_LE_SITE } from './webshop/emailTemplates.js';
-import { variablesProposees } from './mailVariables.js';
+import { GABARITS_HABILLES_PAR_LE_SITE, VARIABLES_MARQUE_DU_SITE } from './webshop/emailTemplates.js';
+import { nomDeLien, variablesProposees } from './mailVariables.js';
 
 const JETON = /\{\{([A-Za-z0-9_]+)\}\}/g;
 const DESABONNEMENT = /mailto:[^"'\s>]*\?subject=D[eé]sabonnement/gi;
@@ -47,7 +47,10 @@ const substituer = (texte, valeurDe) => texte.replace(JETON, (jetonComplet, nom)
  * @returns {(nom: string, jetonComplet: string) => string}
  */
 function resolveur(campagne, reglages, html) {
-  const marque = valeursDeMarque(reglages);
+  // Un mail habillé par le site : seules ses trois variables d'entreprise sont remplacées ; les autres se voient.
+  const duSite = GABARITS_HABILLES_PAR_LE_SITE.includes(campagne?.key ?? '');
+  const marque = Object.fromEntries(Object.entries(valeursDeMarque(reglages))
+    .filter(([j]) => !duSite || VARIABLES_MARQUE_DU_SITE.includes(j)));
   const exemples = { '{{SALUTATION}}': SALUTATION_EXEMPLE, '{{CLIENT_NAME}}': CLIENT_EXEMPLE,
     ...(campagne?.key ? emailOuSequence(campagne.key)?.exemple : null) };
   const proposees = new Map(variablesProposees(campagne).map((v) => [v.nom, v]));
@@ -55,7 +58,7 @@ function resolveur(campagne, reglages, html) {
   return (nom, j) => {
     if (Object.prototype.hasOwnProperty.call(marque, j)) return sortie(marque[j]);
     const connue = proposees.get(j);
-    if (connue ? connue.lien : /^lien_|_url$/i.test(nom)) return '#';
+    if (connue && (connue.lien || nomDeLien(nom))) return '#';
     if (Object.prototype.hasOwnProperty.call(exemples, j)) return sortie(exemples[j], true);
     if (connue?.bloc && html) return emplacementDeBloc(connue.libelle);
     // Une variable que ce mail ne connaît pas garde son nom brut : elle partirait telle quelle, l'aperçu le montre.

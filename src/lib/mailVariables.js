@@ -16,7 +16,7 @@ import { emailAutomatique, emailOuSequence, variablesDe, VARIABLES_MARQUE } from
 import { estSequence } from './sequencesEmails.js';
 import { normaliser } from './mailCorps.js';
 import {
-  WEBSHOP_EMAIL_KEYS, WEBSHOP_EMAIL_DEFAULTS, WEBSHOP_EMAIL_PLACEHOLDERS, GABARITS_HABILLES_PAR_LE_SITE,
+  WEBSHOP_EMAIL_KEYS, WEBSHOP_EMAIL_DEFAULTS, WEBSHOP_EMAIL_PLACEHOLDERS, GABARITS_HABILLES_PAR_LE_SITE, VARIABLES_MARQUE_DU_SITE,
 } from './webshop/emailTemplates.js';
 
 /**
@@ -165,8 +165,8 @@ function liensDe(html) {
   return out;
 }
 
-/** Le nom d'une variable dit-il que c'est une adresse (`LIEN_…`, `…_URL`, `lien_pellets`) ? */
-const nomDeLien = (nom) => /^lien_/i.test(sansAccolades(nom)) || /_url$/i.test(sansAccolades(nom));
+/** @param {string} nom @returns {boolean} Le nom d'une variable dit-il que c'est une adresse (`LIEN_…`, `…_URL`, `lien_pellets`) ? */
+export const nomDeLien = (nom) => /^lien_/i.test(sansAccolades(nom)) || /_url$/i.test(sansAccolades(nom));
 
 /** Valeur unique, ordre conservé. @param {string[]} liste @returns {string[]} */
 const uniques = (liste) => [...new Set(liste)];
@@ -191,7 +191,9 @@ function jetonsProposes(campagne) {
   } else {
     propres = [...DE_CAMPAGNE];
   }
-  return uniques([...propres.filter((v) => !VARIABLES_MARQUE.includes(v)), ...MARQUE_DANS_UNE_PHRASE]);
+  // Un mail habillé par le site n'a que les trois variables d'entreprise que le site remplace.
+  const marque = GABARITS_HABILLES_PAR_LE_SITE.includes(cle) ? VARIABLES_MARQUE_DU_SITE : MARQUE_DANS_UNE_PHRASE;
+  return uniques([...propres.filter((v) => !VARIABLES_MARQUE.includes(v)), ...marque]);
 }
 
 /**
@@ -236,7 +238,8 @@ export function variablesManquantes(campagne, html) {
  * @returns {string[]} jetons `{{X}}`
  */
 export function variablesInconnues(campagne, html) {
-  const connues = new Set([...jetonsProposes(campagne), ...VARIABLES_MARQUE]);
+  const duSite = GABARITS_HABILLES_PAR_LE_SITE.includes(campagne?.key ?? '');
+  const connues = new Set([...jetonsProposes(campagne), ...(duSite ? [] : VARIABLES_MARQUE)]);
   return variablesDe(html).filter((v) => !connues.has(v));
 }
 

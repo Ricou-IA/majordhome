@@ -21,6 +21,13 @@ export { WEBSHOP_EMAIL_KEYS };
 export const GABARITS_HABILLES_PAR_LE_SITE = Object.freeze(['webshop_confirmation', 'webshop_feuille_route']);
 
 /**
+ * Variables d'entreprise que le site remplace dans ces deux e-mails — les trois seules : toute autre
+ * (`{{ORG_WEBSITE_URL}}`, `{{ACCENT_COLOR}}`, `{{LOGO_URL}}`…) partirait telle quelle chez le client de la boutique.
+ * Autre bout du contrat : `lib/boutique/emails.ts` du dépôt du site Mayer (`C:\Dev\Landing Page - Mayer`).
+ */
+export const VARIABLES_MARQUE_DU_SITE = Object.freeze(['{{BRAND_NAME}}', '{{ORG_EMAIL}}', '{{ORG_PHONE}}']);
+
+/**
  * @typedef {'client' | 'transporteur' | 'prestataire'} DestinataireGabarit
  * @typedef {{
  *   key: string, label: string, subject: string, html_body: string,

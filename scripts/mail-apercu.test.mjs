@@ -125,3 +125,22 @@ test('texte avec une variable inconnue et une salutation, sur chaque nature', ()
     assert.ok(!SANS_ACCOLADES.test(r.html) && !SANS_ACCOLADES.test(r.objet));
   }
 });
+
+test('mails habillés par le site : seules ses trois variables d’entreprise sont remplacées, les autres se voient', () => {
+  for (const key of GABARITS_HABILLES_PAR_LE_SITE) {
+    const r = rendreApercu({ campagne: { key }, objet: '{{ORG_CITY}} {{BRAND_NAME}}',
+      corps: '<p>{{BRAND_NAME}} {{ORG_EMAIL}} {{ORG_PHONE}} {{ORG_WEBSITE_URL}} {{ACCENT_COLOR}}</p>', reglages: REGLAGES });
+    assert.ok(r.html.includes('Cimaj contact@cimaj.fr 05 00 00 00 00'), key);
+    assert.ok(r.html.includes('[ORG_WEBSITE_URL] [ACCENT_COLOR]') || r.html.includes('[Site de l’entreprise] [Couleur principale]'), r.html);
+    assert.ok(!r.html.includes('#ff6600') && !r.html.includes('https://cimaj.fr'));
+    assert.equal(r.objet, '[ORG_CITY] Cimaj');
+    assert.ok(!SANS_ACCOLADES.test(r.html));
+  }
+  const manuelle = rendreApercu({ campagne: { key: 'promo' }, corps: '<p>{{ORG_CITY}} {{ACCENT_COLOR}}</p>', reglages: REGLAGES });
+  assert.ok(manuelle.html.includes('Albi #ff6600'));
+});
+
+test('variable de lien inconnue : [NOM], pas #', () => {
+  const r = rendreApercu({ campagne: { key: 'promo' }, corps: '<p>{{LIEN_PELLETS}} {{FOO_URL}} {{lien_pellets}}</p>', reglages: REGLAGES });
+  assert.ok(r.html.includes('[LIEN_PELLETS] [FOO_URL] #'), r.html);
+});
