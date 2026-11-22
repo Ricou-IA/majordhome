@@ -38,11 +38,18 @@ function raisonSansMiseEnForme(nom, dansBouton, dansTitre) {
   return null;
 }
 
-function miseEnFormePossible(nom, plage) {
-  const ancre = elementDe(plage?.startContainer);
-  return !raisonSansMiseEnForme(nom, !!ancre?.closest('a[data-bouton]'), !!ancre?.closest('h2'));
+/** La sélection touche-t-elle un élément `sel` : un de ses bouts y est, ou elle le traverse ? */
+function touche(ed, plage, sel) {
+  if (!plage) return false;
+  const dans = (n) => { const e = elementDe(n)?.closest(sel); return !!e && ed.contains(e); };
+  if (dans(plage.startContainer) || dans(plage.endContainer)) return true;
+  return !plage.collapsed && [...ed.querySelectorAll(sel)].some((e) => plage.intersectsNode(e));
 }
-const ETAT_VIDE = { gras: false, italique: false, puces: false, numeros: false, titre: false, encadre: false, bouton: false };
+
+function miseEnFormePossible(nom, ed, plage) {
+  return !raisonSansMiseEnForme(nom, touche(ed, plage, 'a[data-bouton]'), touche(ed, plage, 'h2'));
+}
+const ETAT_VIDE = { gras: false, italique: false, puces: false, numeros: false, titre: false, encadre: false, toucheBouton: false, toucheTitre: false };
 
 /**
  * @param {object} props
@@ -58,6 +65,7 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
   const ref = useRef(null);
   const derniere = useRef(null); // dernière sélection connue dans le texte, pour la barre et la fenêtre
   const enPause = useRef(false); // collage en cours : une seule émission, à la fin
+  const enComposition = useRef(false); // touche morte ou saisie composée en cours : on ne déplace rien
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const [etat, setEtat] = useState(ETAT_VIDE);
@@ -69,8 +77,8 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
   const aInserer = useMemo(() => variables.filter((v) => v.texte || v.bloc), [variables]);
   const adressesProposees = useMemo(() => variables.filter((v) => v.lien), [variables]);
   const interdits = {
-    gras: raisonSansMiseEnForme('gras', etat.bouton, etat.titre),
-    italique: raisonSansMiseEnForme('italique', etat.bouton, etat.titre),
+    gras: raisonSansMiseEnForme('gras', etat.toucheBouton, etat.toucheTitre),
+    italique: raisonSansMiseEnForme('italique', etat.toucheBouton, etat.toucheTitre),
   };
 
   const lireEtat = useCallback(() => {
@@ -80,7 +88,8 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
     const ancre = elementDe(plage.startContainer);
     const dans = (sel) => { const n = ancre?.closest(sel); return !!n && ed.contains(n); };
     const q = (c) => { try { return document.queryCommandState(c); } catch { return false; } };
-    const suivant = { gras: q('bold'), italique: q('italic'), puces: dans('ul'), numeros: dans('ol'), titre: dans('h2'), encadre: dans('[data-encadre]'), bouton: dans('a[data-bouton]') };
+    const suivant = { gras: q('bold'), italique: q('italic'), puces: dans('ul'), numeros: dans('ol'), titre: dans('h2'), encadre: dans('[data-encadre]'),
+      toucheBouton: touche(ed, plage, 'a[data-bouton]'), toucheTitre: touche(ed, plage, 'h2') };
     setEtat((avant) => (Object.keys(suivant).every((k) => avant[k] === suivant[k]) ? avant : suivant));
   }, []);
 
@@ -238,7 +247,7 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
     const plage = restaurer();
     const bloc = plage && blocRacine(ed, plage.startContainer, plage.startOffset);
     if (nom === 'gras' || nom === 'italique') {
-      if (!miseEnFormePossible(nom, plage)) return;
+      if (!miseEnFormePossible(nom, ed, plage)) return;
       executer(nom === 'gras' ? 'bold' : 'italic');
     } else if (bloc && !estFixe(bloc)) {
       // Un titre, une liste, un encadré ne s'emboîtent pas : on sort d'abord de l'encadré ou de la liste
@@ -297,16 +306,17 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
       if (v?.parentNode === ed && (estBouton(v) || estBouton(blocRacine(ed, plage.startContainer, plage.startOffset)))) e.preventDefault();
       return;
     }
-    if (e.key !== 'Enter' || e.shiftKey) return;
+    if (e.key !== 'Enter') return;
     const bloc = blocRacine(ed, plage.startContainer, plage.startOffset);
     if (estBouton(bloc)) {
-      // Entrée dans un bouton : une ligne après lui, jamais un second bouton.
+      // Entrée (ou Maj+Entrée) dans un bouton : une ligne après lui, jamais un second bouton ni un retour à
+      // la ligne à côté de lui (le texte enregistré n'y verrait plus qu'un lien).
       e.preventDefault();
       const p = nouveauParagraphe();
       insererApres(ed, bloc, p, false);
       placerCurseur(p, 'debut');
       apres();
-    } else if (elementDe(plage.startContainer)?.closest('[data-encadre]')) {
+    } else if (!e.shiftKey && elementDe(plage.startContainer)?.closest('[data-encadre]')) {
       // Dans un encadré : un retour à la ligne ; sur une ligne vide à la fin, on sort de l'encadré.
       e.preventDefault();
       if (!sortirEncadreParEntree(ed, plage)) document.execCommand('insertLineBreak');
@@ -331,11 +341,15 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
     insererTexte(texte);
   };
 
-  const surSaisie = () => {
+  const surSaisie = (e) => {
     const ed = ref.current;
     if (enPause.current) return;
-    rangerTexteRacine(ed);
-    reparerBoutons(ed); // du texte tapé à côté d'un bouton n'en fait pas un simple lien
+    // Pendant une composition (« ^ » puis « e »), déplacer le texte ferait avorter ou doubler la lettre :
+    // les réparations attendent `compositionend`.
+    if (!(enComposition.current || e?.nativeEvent?.isComposing)) {
+      rangerTexteRacine(ed);
+      reparerBoutons(ed); // du texte tapé à côté d'un bouton n'en fait pas un simple lien
+    }
     if (!ed.firstChild) { ed.appendChild(nouveauParagraphe()); placerCurseur(ed.firstChild, 'debut'); }
     emettre();
   };
@@ -358,6 +372,8 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
           contentEditable={!disabled}
           suppressContentEditableWarning
           onInput={surSaisie}
+          onCompositionStart={() => { enComposition.current = true; }}
+          onCompositionEnd={() => { enComposition.current = false; surSaisie(); }}
           onFocus={() => document.execCommand('defaultParagraphSeparator', false, 'p')}
           onKeyDown={disabled ? undefined : surTouche}
           onPaste={(e) => { e.preventDefault(); if (!disabled) insererTexte(e.clipboardData?.getData('text/plain') ?? ''); }}

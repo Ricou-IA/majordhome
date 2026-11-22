@@ -82,13 +82,41 @@ export function voisin(ed, plage, sens) {
   }
 }
 
-/** Nœud qui porte du contenu (texte visible, étiquette, élément non vide) ; un retour à la ligne seul n'en porte pas. */
-const estUtile = (n) => (n.nodeType === 3 ? /\S/.test(n.textContent.replace(/\u200b/g, ''))
-  : n.nodeType === 1 && n.nodeName !== 'BR' && (estEtiquette(n) || !!n.textContent.trim() || !!n.querySelector('[data-var]')));
+// ── Bouton seul dans son paragraphe ──────────────────────────────────────────
+// Le texte enregistré (`paragrapheOuBouton` de mailCorps.js) ne voit un bouton que si le lien est le SEUL
+// élément utile de son paragraphe, une fois déroulées les balises de mise en forme tolérées (`span`, `font`,
+// `u`…) et les commentaires sautés. Il tolère à côté de lui un texte fait seulement de blancs au sens de
+// JavaScript (`\s` : espace, tabulation, retour, U+00A0, U+FEFF, espaces fines…). Tout le reste en fait un
+// simple lien : un `<br>`, un U+200B (qui n'est pas un blanc pour `\s`), un `<b>` ou `<em>` même vide.
+// Sondé le 2026-11-22, voir le rapport de la tâche 8 (fix round 2).
+
+const ZWSP = String.fromCharCode(0x200b);
+/** Balises que le texte enregistré déroule (liste `DEROULES` de mailCorps.js), en majuscules comme le DOM. */
+const DEROULEES = new Set(['SPAN', 'FONT', 'U', 'S', 'SMALL', 'SUB', 'SUP', 'MARK', 'ABBR', 'CITE', 'CODE', 'DEL', 'INS',
+  'Q', 'TIME', 'LABEL', 'BIG', 'STRIKE', 'TT', 'KBD', 'VAR', 'SAMP', 'BDI', 'BDO', 'DATA', 'NOBR']);
+const MISE_EN_FORME = new Set(['B', 'STRONG', 'I', 'EM']);
+
+/** Nœud qui porte du contenu : une étiquette, ou un caractère qui n'est ni un blanc ni U+200B. */
+function estUtile(n) {
+  if (n.nodeType === 3) return n.textContent.split(ZWSP).join('').trim() !== '';
+  if (n.nodeType !== 1) return false;
+  return estEtiquette(n) || !!n.querySelector('[data-var]') || n.textContent.split(ZWSP).join('').trim() !== '';
+}
+
+/** Nœud que le texte enregistré laisse à côté d'un bouton sans en faire un lien. */
+function estTolere(n) {
+  if (n.nodeType === 8) return true; // commentaire
+  if (n.nodeType === 3) return /^\s*$/.test(n.textContent);
+  return n.nodeType === 1 && (DEROULEES.has(n.nodeName) || n.nodeName.includes(':')) && !estEtiquette(n)
+    && [...n.childNodes].every(estTolere);
+}
 
 /**
  * Un bouton est seul dans son paragraphe, sinon le texte enregistré n'y voit plus qu'un lien. Ce qui a été
- * tapé (ou fusionné par un effacement) à côté de lui part dans un paragraphe avant ou après, curseur gardé.
+ * tapé (ou fusionné par un effacement) à côté de lui part dans un paragraphe avant ou après ; un reste sans
+ * contenu que le texte enregistré ne tolère pas (`<br>` d'un Maj+Entrée, U+200B, gras vide) est retiré. Le
+ * DOM n'est touché que s'il y a quelque chose à corriger ; le curseur reste dans le texte déplacé, sinon il
+ * va dans le paragraphe qui a reçu ce texte.
  */
 export function reparerBoutons(ed) {
   const utiles = (liste) => liste.some(estUtile);
@@ -96,6 +124,12 @@ export function reparerBoutons(ed) {
     // Bouton dans un paragraphe, ou fusionné dans un titre / un encadré par un effacement (pas dans une liste).
     const a = bloc.nodeType === 1 && !['UL', 'OL'].includes(bloc.nodeName) && !estVariableBloc(bloc) ? bloc.querySelector('a[data-bouton]') : null;
     if (!a) continue;
+    // Gras ou italique autour du bouton : le texte enregistré n'y verrait qu'un lien ; on retire l'enveloppe.
+    if (a.parentNode !== bloc && MISE_EN_FORME.has(a.parentNode.nodeName)) {
+      avecCurseur(ed, () => {
+        for (let w = a.parentNode; w !== bloc && MISE_EN_FORME.has(w.nodeName); w = a.parentNode) w.replaceWith(...w.childNodes);
+      }, () => a.closest('p') ?? bloc);
+    }
     let porteur = a;
     while (porteur.parentNode !== bloc) porteur = porteur.parentNode;
     const avant = [];
@@ -106,25 +140,38 @@ export function reparerBoutons(ed) {
       else (passe ? apres : avant).push(n);
     }
     const dansUnParagraphe = bloc.nodeName === 'P';
-    if (dansUnParagraphe && !utiles(avant) && !utiles(apres)) continue;
+    // Côté sans contenu : on retire ce que le texte enregistré ne tolère pas (dans un titre ou un encadré, le
+    // bouton en sort de toute façon : rien à retirer).
+    const retrait = (cote) => (utiles(cote) ? [] : cote.filter((n) => !estTolere(n)));
+    const aRetirer = dansUnParagraphe ? [...retrait(avant), ...retrait(apres)] : [];
+    const deplacement = !dansUnParagraphe || utiles(avant) || utiles(apres);
+    if (!deplacement && !aRetirer.length) continue;
+    // Côté du curseur, pour le replacer dans le paragraphe qui reçoit le texte s'il n'était pas dans un texte.
+    const r0 = plageDans(ed);
+    let aGauche = false;
+    try { aGauche = !!r0 && r0.comparePoint(porteur, 0) > 0; } catch { aGauche = false; }
+    let pa = null;
+    let suite = null;
     const r = bloc;
     avecCurseur(ed, () => {
+      aRetirer.forEach((n) => n.remove());
       // Paragraphe : il reste celui du bouton, le texte voisin part dans des paragraphes avant / après.
       // Titre ou encadré : il garde ce qui précède, le bouton reprend son paragraphe, la suite un bloc du même genre.
       const bouton = dansUnParagraphe ? r : document.createElement('p');
       if (!dansUnParagraphe) { bouton.appendChild(porteur); ed.insertBefore(bouton, r.nextSibling); }
       if (dansUnParagraphe && utiles(avant)) {
-        const pa = document.createElement('p');
+        pa = document.createElement('p');
         avant.forEach((n) => pa.appendChild(n));
         ed.insertBefore(pa, r);
       }
       if (utiles(apres)) {
-        const suite = dansUnParagraphe ? document.createElement('p') : r.cloneNode(false);
+        suite = dansUnParagraphe ? document.createElement('p') : r.cloneNode(false);
         apres.forEach((n) => suite.appendChild(n));
         ed.insertBefore(suite, bouton.nextSibling);
       }
       if (!dansUnParagraphe && !utiles(avant)) r.remove();
-    }, () => { const p = a.closest('p'); return p?.nextSibling ?? p; });
+      if (!dansUnParagraphe && utiles(avant)) pa = r;
+    }, () => (aGauche ? pa : suite) ?? pa ?? suite ?? a.closest('p'));
     if (!dansUnParagraphe) bloc = a.closest('p'); // reprendre après le bouton déplacé
   }
 }
