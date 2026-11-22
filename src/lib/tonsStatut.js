@@ -45,13 +45,14 @@ const CHANTIER = Object.freeze({
   facture: 'ok',
 });
 
-// Contrat : `contracts.status` (active, pending, cancelled, archived) ;
+// Contrat : `contracts.status` (active, pending, cancelled, archived), `workflow_status` proposal_sent ;
 // `expired` et `a_renouveler` sont des états dérivés (non stockés).
 const CONTRAT = Object.freeze({
   active: 'ok',
   a_renouveler: 'attente',
   expired: 'alerte',
-  cancelled: 'alerte',
+  cancelled: 'neutre', // Clos : aucune action attendue
+  proposal_sent: 'attente', // proposition envoyée, sans réponse
   pending: 'neutre',
   archived: 'neutre',
 });

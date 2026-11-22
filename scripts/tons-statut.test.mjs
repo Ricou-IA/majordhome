@@ -40,7 +40,8 @@ test('chantier', () => {
 test('contrat (contracts.status + états dérivés)', () => {
   assert.equal(toneFor('contrat', 'active'), 'ok');
   assert.equal(toneFor('contrat', 'pending'), 'neutre');
-  assert.equal(toneFor('contrat', 'cancelled'), 'alerte');
+  assert.equal(toneFor('contrat', 'cancelled'), 'neutre');
+  assert.equal(toneFor('contrat', 'proposal_sent'), 'attente');
   assert.equal(toneFor('contrat', 'archived'), 'neutre');
   assert.equal(toneFor('contrat', 'expired'), 'alerte');
   assert.equal(toneFor('contrat', 'a_renouveler'), 'attente');
