@@ -233,12 +233,13 @@ test('edge : ordre des gardes — membre, module, validation, secret, plafond, a
 
 test('edge : réponse recollée sans séparateur, tailles bornées, organisation exigée avant l’aide partagée', () => {
   assert.match(EDGE, /b\.text\)\.join\(""\)/, 'les blocs de texte doivent être joints par ""');
-  assert.ok(!/b\.text\)\.join\("\n"\)/.test(EDGE));
+  assert.ok(!EDGE.includes('.join("'+String.fromCharCode(92)+'n")'), 'jointure par retour à la ligne');
+  assert.match(EDGE, /client\.messages\.stream\(/);
+  for (const interdit of ['beta.messages', 'betas', 'fallbacks', 'repli'])
+    assert.ok(!EDGE.includes(interdit), `l'edge contient ${interdit}`);
   assert.match(EDGE, /CORPS_MAX = 12_000/);
   assert.match(EDGE, /MAX_TOKENS = 8_000/);
   assert.match(EDGE, /DUREE_IA_MS = 60_000/);
-  assert.match(EDGE, /fallback/); // le passage par un modèle de repli est journalisé
-  assert.match(EDGE, /usage\??\.iterations|\.iterations/);
   const uuid = EDGE.search(/\[0-9a-f\]\{8\}-/);
   const membre = EDGE.search(/requireOrgMembership\(req/);
   assert.ok(uuid >= 0 && uuid < membre, 'org_id doit être contrôlé (UUID) avant requireOrgMembership');

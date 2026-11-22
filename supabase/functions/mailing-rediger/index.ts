@@ -137,37 +137,29 @@ Deno.serve(async (req: Request) => {
       // deno-lint-ignore no-explicit-any
       const params: any = {
         model: MODEL, max_tokens: MAX_TOKENS,
-        // rédiger un court e-mail : effort bas ; un refus des garde-fous est rejoué côté serveur sur le modèle recommandé
+        // rédiger un court e-mail : effort bas ; format strict (forme éprouvée en production : supplier-offer-import)
         output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA_REDACTION } },
         system,
         messages: [{ role: "user", content: user }],
-        betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
       };
-      final = await client.beta.messages.stream(params, { signal: ctrl.signal }).finalMessage();
+      final = await client.messages.stream(params, { signal: ctrl.signal }).finalMessage();
     } catch (e) {
       console.error(`[mailing-rediger] appel au modèle en échec${ctrl.signal.aborted ? " (délai dépassé)" : ""} : ${sanitizeError(e, "erreur du modèle")}`);
       return refus("service_indisponible");
     } finally {
       clearTimeout(minuterie);
     }
-    // Consommation : `usage.iterations` couvre toutes les tentatives (le `usage` de tête ne compte que la dernière
-    // quand un modèle de repli a pris le relais) ; aucun texte n'est journalisé.
+    // Consommation journalisée (jamais un texte).
     const u = final?.usage || {};
-    // deno-lint-ignore no-explicit-any
-    const tentatives: any[] = Array.isArray(u.iterations) && u.iterations.length ? u.iterations : [u];
-    // deno-lint-ignore no-explicit-any
-    const somme = (cle: string) => tentatives.reduce((t: number, e: any) => t + (Number(e?.[cle]) || 0), 0);
-    // deno-lint-ignore no-explicit-any
-    const repli = (final?.content || []).some((b: any) => b.type === "fallback");
     console.log("[mailing-rediger] conso", JSON.stringify({
-      org: orgId, consigne, modele: final?.model ?? MODEL, stop: final?.stop_reason, repli,
-      input_tokens: somme("input_tokens"), output_tokens: somme("output_tokens"),
+      org: orgId, consigne, modele: final?.model ?? MODEL, stop: final?.stop_reason,
+      input_tokens: u.input_tokens || 0, output_tokens: u.output_tokens || 0,
     }));
 
     // 7. Réponse contrôlée : rien n'atteint l'écran sans passer par `lireReponse`.
     if (final?.stop_reason !== "end_turn") return refus("reponse_illisible"); // refus, coupure à max_tokens…
     // deno-lint-ignore no-explicit-any
-    const brut = (final?.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join(""); // un seul document JSON, éventuellement coupé par un repli
+    const brut = (final?.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
     const reponse = lireReponse(brut, { consigne, variables, adresses });
     if (!reponse) return refus("reponse_illisible");
     return jsonResponse({ data: reponse, error: null }, 200, req);
