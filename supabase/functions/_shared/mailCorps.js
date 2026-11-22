@@ -236,10 +236,21 @@ function rogner(noeuds) {
   };
   rognerBout(feuilles, /^[ \u00a0]+/);
   rognerBout([...feuilles].reverse(), /[ \u00a0]+$/);
+  // Autour d'un retour : on rogne de feuille en feuille tant qu'elles ne sont que des blancs,
+  // quelle que soit la mise en forme qui les enveloppe (sinon un second passage rognerait encore).
+  const rognerAutour = (k, pas, re) => {
+    for (let j = k + pas; j >= 0 && j < feuilles.length && !feuilles[j].br; j += pas) {
+      const f = feuilles[j];
+      if (retire.has(f)) continue;
+      f.texte = f.texte.replace(re, '');
+      if (f.texte) break;
+      retire.add(f);
+    }
+  };
   feuilles.forEach((f, k) => {
     if (!f.br || retire.has(f)) return;
-    if (feuilles[k - 1] && estTexte(feuilles[k - 1])) feuilles[k - 1].texte = feuilles[k - 1].texte.replace(/[ \u00a0]+$/, '');
-    if (feuilles[k + 1] && estTexte(feuilles[k + 1])) feuilles[k + 1].texte = feuilles[k + 1].texte.replace(/^[ \u00a0]+/, '');
+    rognerAutour(k, -1, /[ \u00a0]+$/);
+    rognerAutour(k, 1, /^[ \u00a0]+/);
   });
   const filtrer = (liste) => liste.filter((x) => !retire.has(x) && !(estTexte(x) && x.texte === ''))
     .map((x) => (x.br || estTexte(x) ? x : { ...x, enfants: filtrer(x.enfants) }));

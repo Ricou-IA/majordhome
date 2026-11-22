@@ -247,6 +247,36 @@ test('estEditable : tolérant sur les styles, refuse ce qui ne se reprend pas', 
   for (const h of ['<p>a<script>x</script></p>', '<hr>', '<p><iframe></iframe></p>', '<html><body><p>x</p></body></html>', '<video src="x"></video>', '<form><input></form>']) assert.equal(estEditable(h), false, h);
 });
 
+test('blanc enveloppé à côté d\'un retour à la ligne : stable dès le premier passage', () => {
+  for (const h of ['<p>a <em><span> </span><br>b</em></p>', '<p>a <b><br></b>b</p>', '<p>a<br><em><span> </span> b</em></p>', '<p>a <i> <span> </span></i><br>b</p>']) {
+    const n = normaliser(h);
+    assert.equal(normaliser(n), n, h);
+  }
+  assert.equal(normaliser('<p>a <em><span> </span><br>b</em></p>'), '<p>a<em><br>b</em></p>');
+});
+
+test('soupe de balises au hasard (graine fixe) : stable, aller-retour éditeur, éditable', () => {
+  let graine = 20261122;
+  const hasard = () => { graine = (graine + 0x6d2b79f5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const choisir = (l) => l[Math.floor(hasard() * l.length)];
+  const MORCEAUX = [
+    '<p>', '</p>', '<strong>', '</strong>', '<b>', '</b>', '<em>', '</em>', '<i>', '</i>', '<br>', '<span>', '</span>', '<font color="red">', '</font>',
+    '<div>', '</div>', '<div data-encadre>', '<div style="padding:4px">', '<ul>', '</ul>', '<ol>', '</ol>', '<li>', '</li>', '<h2>', '</h2>', '<h1>', '</h1>',
+    '<a href="https://x.fr">', '<a href="{{LIEN}}">', '<a href="javascript:1">', '</a>', '<a data-bouton href="{{L}}">', '<a style="background:red" href="tel:1">',
+    '<table><tr><td>', '</td></tr></table>', '<o:p>', '</o:p>', '<img src=x>', '<script>x</script>', '<!-- c -->', '<u>', '</u>',
+    ' ', '  ', '\n', '\u00a0', '&nbsp;', 'a', 'mot', 'É', '&amp;', '<3', '{{X}}', '{{ITEMS}}', '"', '’',
+  ];
+  for (let k = 0; k < 4000; k++) {
+    let x = '';
+    const longueur = 1 + Math.floor(hasard() * 14);
+    for (let m = 0; m < longueur; m++) x += choisir(MORCEAUX);
+    const n = normaliser(x);
+    if (normaliser(n) !== n || depuisEditeur(versEditeur(n, {})) !== n || !estEditable(n)) {
+      assert.fail(`entrée fautive : ${JSON.stringify(x)}\n n = ${JSON.stringify(n)}\n n2 = ${JSON.stringify(normaliser(n))}\n éditeur = ${JSON.stringify(depuisEditeur(versEditeur(n, {})))}`);
+    }
+  }
+});
+
 test('variablesDe et texteBrut', () => {
   assert.deepEqual(variablesDe('<p>{{B}} {{A}} {{B}}</p><a href="{{L}}">x</a>'), ['{{B}}', '{{A}}', '{{L}}']);
   assert.equal(texteBrut('<p>Bonjour&nbsp;<strong>{{X}}</strong>,<br>ligne</p>{{ITEMS}}<ul><li>a</li><li>b &amp; c</li></ul>'),
