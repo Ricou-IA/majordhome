@@ -98,15 +98,15 @@ test("valeurs illisibles : une phrase, la plus fréquente d'abord", () => {
   );
   assert.equal(
     texteCorrections([{ libelle: 'Accepte les SMS', nombre: 2 }]),
-    "Valeurs illisibles : 2 × Accepte les SMS. Le champ est laissé vide (« oui » pour un accord) et la valeur d'origine est gardée dans les notes internes de la fiche.",
+    "Valeurs illisibles : 2 × Accepte les SMS. Le champ est laissé vide et la valeur d'origine est gardée dans les notes internes de la fiche. Un accord illisible vaut « oui » ; un type de client illisible est déduit de la société, sinon « particulier ».",
   );
   assert.equal(
     texteCorrections([{ libelle: 'Type de client', nombre: 1 }]),
-    "Valeurs illisibles : 1 × Type de client. Le champ est laissé vide (« particulier » pour un type de client) et la valeur d'origine est gardée dans les notes internes de la fiche.",
+    "Valeurs illisibles : 1 × Type de client. Le champ est laissé vide et la valeur d'origine est gardée dans les notes internes de la fiche. Un accord illisible vaut « oui » ; un type de client illisible est déduit de la société, sinon « particulier ».",
   );
   assert.equal(
     texteCorrections([{ libelle: 'Type de client', nombre: 2 }, { libelle: 'Accepte les SMS', nombre: 1 }]),
-    "Valeurs illisibles : 2 × Type de client, 1 × Accepte les SMS. Le champ est laissé vide (« oui » pour un accord, « particulier » pour un type de client) et la valeur d'origine est gardée dans les notes internes de la fiche.",
+    "Valeurs illisibles : 2 × Type de client, 1 × Accepte les SMS. Le champ est laissé vide et la valeur d'origine est gardée dans les notes internes de la fiche. Un accord illisible vaut « oui » ; un type de client illisible est déduit de la société, sinon « particulier ».",
   );
 });
 

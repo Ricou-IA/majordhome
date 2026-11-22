@@ -60,17 +60,42 @@ function octetCp1252(code) {
  */
 export function reparerAccents(texte) {
   const t = String(texte ?? '');
-  const codes = Array.from(t, (c) => c.codePointAt(0));
-  const octets = codes.map(octetCp1252);
+  if (toutAscii(t)) return t; // rien à réparer, aucun tableau d'octets créé
+  const repare = tenterReparation(t);
+  if (repare !== null) return repare;
+  // « à » en fin de cellule : « Ã » suivi d'une espace insécable, que la lecture de la cellule a rognée.
+  if (/\p{Ll}Ã$/u.test(t)) {
+    const avecInsecable = tenterReparation(`${t}\u00A0`);
+    if (avecInsecable !== null) return avecInsecable;
+  }
+  return t;
+}
+
+function toutAscii(t) {
+  for (let i = 0; i < t.length; i += 1) if (t.charCodeAt(i) > 0x7F) return false;
+  return true;
+}
+
+// Caractères admis dans un texte réparé : latin accentué (U+00A0–U+017F), ponctuation typographique (U+2010–U+203A),
+// €, ™ et émojis. Une majuscule accentuée collée à « ’ », « € », « ° »… forme une suite UTF-8 valide mais rend un
+// caractère d'un autre alphabet (« PAYÉ€ » → « PAYɀ ») : ce n'était pas un texte abîmé.
+const caractereAdmis = (code) => code < 0x80 || (code >= 0xA0 && code <= 0x17F) || (code >= 0x2010 && code <= 0x203A)
+  || code === 0x20AC || code === 0x2122 || code >= 0x1F000;
+
+/** Réparation d'un texte, ou null si elle n'a pas lieu d'être ou ne tient pas. */
+function tenterReparation(t) {
+  const octets = Array.from(t, (c) => octetCp1252(c.codePointAt(0)));
   const temoin = octets.some((o, i) => o >= 0xC2 && o <= 0xF4 && i + 1 < octets.length && octets[i + 1] >= 0x80 && octets[i + 1] <= 0xBF);
-  if (!temoin || octets.includes(-1)) return t;
+  if (!temoin || octets.includes(-1)) return null;
   let repare;
   try {
     repare = new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(octets));
   } catch {
-    return t;
+    return null;
   }
-  return repare === t ? t : repare;
+  if (repare === t) return null;
+  for (const c of repare) if (!caractereAdmis(c.codePointAt(0))) return null;
+  return repare;
 }
 
 /**

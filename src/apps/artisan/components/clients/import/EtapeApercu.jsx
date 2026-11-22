@@ -6,7 +6,7 @@
 import { useMemo } from 'react';
 import { ArrowLeft, Download, Loader2, AlertCircle, RefreshCw, Upload, Info } from 'lucide-react';
 import { ListePretes, ListeDoublons, ListeEcartees } from './ListeLignes';
-import { phraseBilan, texteCorrections, texteSansCodePostal } from '@/lib/importClients/libelles';
+import { phraseBilan, texteCorrections, texteSansCodePostal, texteAccentsRepares } from '@/lib/importClients/libelles';
 import { resumeCorrections, fichesSansCodePostal } from '@/lib/importClients/controles';
 
 const DOUBLONS = new Set(['doublon_fort', 'doublon_faible', 'doublon_fichier']);
@@ -22,7 +22,7 @@ function Compteur({ libelle, valeur }) {
 }
 
 export default function EtapeApercu({
-  classees, bilan, existants, choix, enCours, libelleRetour, avis,
+  classees, bilan, existants, choix, enCours, libelleRetour, avis, reparees,
   onRelire, onImporter, onEcarter, onTelechargerEcartees, onRetour, onLancer,
 }) {
   const groupes = useMemo(() => {
@@ -36,6 +36,8 @@ export default function EtapeApercu({
 
   // Valeurs illisibles des lignes qui seront importées : dites avant l'écriture, pas seulement dans les notes.
   const corrections = useMemo(() => (classees ? texteCorrections(resumeCorrections(classees, choix)) : null), [classees, choix]);
+  // Dit aussi ici : un fichier type passé par un tableur saute l'étape Correspondance.
+  const accents = texteAccentsRepares(reparees);
   const sansCodePostal = useMemo(() => (classees ? texteSansCodePostal(fichesSansCodePostal(classees, choix)) : null), [classees, choix]);
 
   const n = bilan?.importees ?? 0;
@@ -84,6 +86,12 @@ export default function EtapeApercu({
               <Compteur libelle="écartées" valeur={bilan.ecartees} />
             </div>
             <p className="text-sm text-gray-700">{phraseBilan(bilan)}</p>
+            {accents && (
+              <p className="flex items-start gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" aria-hidden="true" />
+                {accents}
+              </p>
+            )}
             {corrections && (
               <p className="flex items-start gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-4 py-3">
                 <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" aria-hidden="true" />

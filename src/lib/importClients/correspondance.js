@@ -91,7 +91,7 @@ const CP_SUIVI_DE_TEXTE = /(?<!\d)\d{5}(?!\d)[\s,;-]*\p{L}/u;
 /**
  * Conseils de l'étape Correspondance, lus sur les 50 premières valeurs non vides d'une colonne : une colonne « Adresse »
  * dont au moins la moitié des valeurs portent un code postal suivi d'une ville, quand aucune colonne ne va vers le code
- * postal ; une colonne « Nom » dont au moins la moitié des valeurs ont deux mots ou plus, quand aucune ne va vers le
+ * postal ni vers la ville ; une colonne « Nom » dont au moins la moitié des valeurs ont deux mots ou plus, quand aucune ne va vers le
  * prénom. Un conseil ne bloque rien.
  * @param {Correspondance} correspondance
  * @param {Array<{ numero: number, cellules: string[] }>} lignes
@@ -102,7 +102,7 @@ export function conseilsCorrespondance(correspondance, lignes) {
   const auMoinsLaMoitie = (valeurs, test) => valeurs.length > 0 && valeurs.filter(test).length * 2 >= valeurs.length;
   const conseils = [];
   for (const col of correspondance || []) {
-    if (col.cible === 'adresse' && !couverts.has('code_postal')) {
+    if (col.cible === 'adresse' && !couverts.has('code_postal') && !couverts.has('ville')) {
       if (auMoinsLaMoitie(premieresValeurs(lignes, col.index), (v) => CP_SUIVI_DE_TEXTE.test(v))) {
         conseils.push({ index: col.index, message: 'Ces adresses contiennent le code postal et la ville.', cible: '@adresse_complete' });
       }

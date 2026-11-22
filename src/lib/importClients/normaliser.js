@@ -18,13 +18,13 @@ const MOTS_TYPE_CLIENT = {
   entreprise: ['entreprise', 'societe', 'pro', 'professionnel', 'professionnelle', 'personne morale', 'artisan', 'commerce',
     'commercant', 'sarl', 'sas', 'sasu', 'eurl', 'sa', 'sci', 'snc', 'ei', 'association', 'syndic', 'copropriete'],
   public: ['public', 'publique', 'secteur public', 'collectivite', 'mairie', 'commune', 'administration', 'etat',
-    'departement', 'region', 'hopital', 'ecole'],
+    'departement', 'region', 'hopital', 'hopitaux', 'ecole'],
 };
 const TYPES_CLIENT = Object.fromEntries(Object.entries(MOTS_TYPE_CLIENT).flatMap(([valeur, mots]) => mots.map((m) => [m, valeur])));
 const auSingulier = (cle) => cle.split(' ').map((mot) => (mot.length > 1 ? mot.replace(/s$/, '') : mot)).join(' ');
 
 function typeClient(texte) {
-  const cle = cleEntete(texte);
+  const cle = cleEntete(texte.replace(/\./g, '')); // « S.A.R.L. », « M. »
   const valeur = TYPES_CLIENT[cle] || TYPES_CLIENT[auSingulier(cle)];
   return valeur ? ok(valeur) : ILLISIBLE;
 }

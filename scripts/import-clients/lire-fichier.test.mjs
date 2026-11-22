@@ -150,6 +150,27 @@ test('texte français correct : rendu tel quel', () => {
   }
 });
 
+test('majuscule accentuée collée à un caractère du bloc 0x80–0xBF : rendu tel quel', () => {
+  for (const t of ['RAMONAGE EFFECTUÉ…', 'PAYÉ€', 'NOTÉ°', 'JOSÉ’S', '10×²', 'Ô’', 'Ç»',
+    'ENTRETIEN EFFECTUÉ…', 'RÉGLÉ€', 'N° 12', '2×²', 'CÔTÉ', "À L'ÉCOLE"]) {
+    assert.equal(reparerAccents(t), t, t);
+  }
+});
+
+test('réparations attendues après le contrôle des caractères', () => {
+  const attendu = {
+    'RÃ©f. client': 'Réf. client', 'SociÃ©tÃ©': 'Société', 'complÃ¨te': 'complète', 'nÃ©ant': 'néant',
+    '120 mÂ²': '120 m²', 'peut-Ãªtre': 'peut-être', 'Å“uvre': 'œuvre', 'â‚¬': '€', 'dâ€™Ã‰glise': 'd’Église',
+  };
+  for (const [abimee, juste] of Object.entries(attendu)) assert.equal(reparerAccents(abimee), juste, abimee);
+});
+
+test('« à » en fin de cellule, son espace insécable rognée', () => {
+  assert.equal(reparerAccents('dÃ©jÃ'), 'déjà');
+  assert.equal(reparerAccents('voilÃ'), 'voilà');
+  assert.equal(reparerAccents('Ã'), 'Ã');
+});
+
 test('partie abîmée et caractère hors Windows-1252 : rien n\'est réparé', () => {
   assert.equal(reparerAccents('SociÃ©tÃ© ★'), 'SociÃ©tÃ© ★');
   assert.equal(reparerAccents('SociÃ©tÃ© 中'), 'SociÃ©tÃ© 中');

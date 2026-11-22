@@ -184,6 +184,7 @@ export default function ClientsImport() {
             enCours={run.etat === 'en_cours'}
             libelleRetour="Revoir la correspondance"
             avis={etat.avis}
+            reparees={fichier.reparees}
             onRelire={relireExistants}
             onImporter={actions.basculerImporter}
             onEcarter={actions.basculerEcarter}

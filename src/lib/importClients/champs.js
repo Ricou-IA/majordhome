@@ -16,7 +16,7 @@ export const CHAMPS = [
   { cle: 'type_client', libelle: 'Type de client', colonne: 'client_category', type: 'enum', valeurs: ['particulier', 'entreprise', 'public'],
     synonymes: ['Catégorie', 'Catégorie client', 'Nature du client', 'Type'], exemple: 'particulier', aide: 'Particulier, entreprise ou collectivité (public). Vide : particulier.' },
   { cle: 'nom', libelle: 'Nom', colonne: 'last_name', type: 'texte',
-    synonymes: ['Nom de famille', 'Nom client', 'Patronyme'], exemple: 'Dupont', aide: 'Nom de famille du client.' },
+    synonymes: ['Nom de famille', 'Nom client', 'Nom du client', 'Patronyme'], exemple: 'Dupont', aide: 'Nom de famille du client.' },
   { cle: 'prenom', libelle: 'Prénom', colonne: 'first_name', type: 'texte',
     synonymes: ['Prénom client'], exemple: 'Jean', aide: 'Prénom du client.' },
   { cle: 'societe', libelle: 'Société', colonne: 'company_name', type: 'texte',
@@ -60,7 +60,8 @@ export const CHAMPS = [
 /** Colonnes du fichier qui remplissent plusieurs champs à la fois. */
 export const CIBLES_COMPOSEES = [
   { cle: '@nom_prenom', libelle: 'Nom et prénom, dans cet ordre', remplit: ['nom', 'prenom'],
-    synonymes: ['Nom complet', 'Nom et prénom', 'Nom prénom', 'Nom du client', 'Client', 'Contact'] },
+    // Ni « Client » ni « Contact » : dans beaucoup d'exports ils portent un numéro, un téléphone ou un e-mail.
+    synonymes: ['Nom complet', 'Nom et prénom', 'Nom prénom'] },
   { cle: '@prenom_nom', libelle: 'Prénom et nom, dans cet ordre', remplit: ['prenom', 'nom'],
     synonymes: ['Prénom et nom', 'Prénom nom'] },
   { cle: '@cp_ville', libelle: 'Code postal et ville', remplit: ['code_postal', 'ville'],

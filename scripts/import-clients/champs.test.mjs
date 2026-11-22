@@ -28,7 +28,11 @@ test('en-têtes d\'une colonne qui remplit plusieurs champs', () => {
   for (const e of ['Adresse complète', 'ADRESSE COMPLETE', 'Adresse postale complète', 'Adresse de facturation', 'Adresse du client']) {
     assert.equal(cibleDepuisEntete(e), '@adresse_complete', e);
   }
-  for (const e of ['Nom complet', 'Nom et prénom', 'Nom prénom', 'Nom du client', 'Client', 'Contact']) assert.equal(cibleDepuisEntete(e), '@nom_prenom', e);
+  for (const e of ['Nom complet', 'Nom et prénom', 'Nom prénom']) assert.equal(cibleDepuisEntete(e), '@nom_prenom', e);
+  // « Contact » et « Client » portent souvent un téléphone ou un numéro : jamais présélectionnés en nom + prénom.
+  assert.equal(cibleDepuisEntete('Contact'), '');
+  assert.equal(cibleDepuisEntete('Client'), '');
+  assert.equal(cibleDepuisEntete('Nom du client'), 'nom');
   for (const e of ['Prénom et nom', 'Prénom nom']) assert.equal(cibleDepuisEntete(e), '@prenom_nom', e);
   for (const e of ['CP Ville', 'CP / Ville', 'Code postal et ville', 'Code postal ville', 'CP et ville']) assert.equal(cibleDepuisEntete(e), '@cp_ville', e);
   // Les en-têtes simples restent les leurs.

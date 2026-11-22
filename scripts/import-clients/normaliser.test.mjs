@@ -54,7 +54,10 @@ test('type de client : pluriels et mots courants, le reste illisible', () => {
       'Région', 'Hôpital', 'École', 'Écoles'],
   };
   for (const [valeur, mots] of Object.entries(attendu)) for (const m of mots) assert.equal(n('type_client', m).valeur, valeur, m);
-  for (const m of ['?', '3', 'Client', 'divers']) assert.deepEqual(n('type_client', m), { valeur: null, illisible: true }, m);
+  for (const m of ['S.A.R.L.', 'S.A.', 'E.I.', 'Sarl.']) assert.equal(n('type_client', m).valeur, 'entreprise', m);
+  assert.equal(n('type_client', 'M.').valeur, 'particulier');
+  assert.equal(n('type_client', 'Hôpitaux').valeur, 'public');
+  for (const m of ['?', '3', 'Client', 'divers', '.']) assert.deepEqual(n('type_client', m), { valeur: null, illisible: true }, m);
 });
 test('surface « 120 m² » = 120 ; année « vers 1980 » illisible', () => {
   assert.equal(n('surface', '120 m²').valeur, 120);

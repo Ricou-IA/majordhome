@@ -121,12 +121,10 @@ export function texteCorrections(resume) {
   if (!resume || resume.length === 0) return null;
   const liste = resume.map((r) => `${nombreFR(r.nombre)} × ${r.libelle}`).join(', ');
   // Valeurs prises d'office quand la valeur du fichier est illisible (cf. controlerFiche).
-  const parDefaut = [
-    resume.some((r) => ACCORDS.has(r.libelle)) && '« oui » pour un accord',
-    resume.some((r) => r.libelle === TYPE_CLIENT) && '« particulier » pour un type de client',
-  ].filter(Boolean);
-  const precision = parDefaut.length ? ` (${parDefaut.join(', ')})` : '';
-  return `Valeurs illisibles : ${liste}. Le champ est laissé vide${precision} et la valeur d'origine est gardée dans les notes internes de la fiche.`;
+  const parDefaut = resume.some((r) => ACCORDS.has(r.libelle) || r.libelle === TYPE_CLIENT)
+    ? ' Un accord illisible vaut « oui » ; un type de client illisible est déduit de la société, sinon « particulier ».'
+    : '';
+  return `Valeurs illisibles : ${liste}. Le champ est laissé vide et la valeur d'origine est gardée dans les notes internes de la fiche.${parDefaut}`;
 }
 
 /**

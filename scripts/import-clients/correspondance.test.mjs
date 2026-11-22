@@ -119,7 +119,7 @@ test('fichier d\'essai de la recette : seules deux colonnes restent à choisir',
 });
 
 test('nom et prénom : l\'ordre se lit sur les valeurs quand elles sont données', () => {
-  const entetes = ['Client', 'Ville'];
+  const entetes = ['Nom complet', 'Ville'];
   const prenomNom = lignesDe(['Jean DUPONT', 'Mme Claire MARTIN', 'DURAND Paul', '', 'Léa ROUX'], ['Lyon', 'Lyon', 'Lyon', 'Lyon', 'Lyon']);
   assert.equal(proposerCorrespondance(entetes, prenomNom)[0].cible, '@prenom_nom');
   assert.equal(proposerCorrespondance(entetes)[0].cible, '@nom_prenom');
@@ -141,6 +141,8 @@ test('conseil : une colonne « Adresse » qui porte code postal et ville', () =>
   const avec = (cible, valeur) => conseilsCorrespondance([...c, { index: 2, entete: 'X', cible }], lignes.map((l) => ({ ...l, cellules: [...l.cellules, valeur] })));
   assert.deepEqual(avec('code_postal', '69003'), []);
   assert.deepEqual(avec('@cp_ville', '69003 Lyon'), []);
+  // Une colonne va vers la ville : « Séparer » mènerait à « Deux colonnes vont vers « Ville » ».
+  assert.deepEqual(avec('ville', 'Lyon'), []);
   // Code postal en fin de texte, sans rien derrière : pas un code postal suivi de texte.
   assert.deepEqual(conseilsCorrespondance(c, lignesDe(['A', 'B'], ['12 rue X 69003', 'Rue Y 69002'])), []);
 });
