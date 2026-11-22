@@ -178,6 +178,8 @@
 
 - **A6 (2026-11-22, sur C23).** Eric, sur téléphone : « la navigation n'est pas super, peut-être qu'on peut mettre des menus de manière plus "mobile" plutôt que d'adapter le site desktop ». Aujourd'hui le téléphone reprend le menu latéral de l'ordinateur dans un tiroir qu'on ouvre par le bouton en haut à gauche : deux touchers pour changer de page, bouton loin du pouce. Proposé puis accepté (« Oui, fais-la »). Fait (`73a7ad3c`) : une barre fixe en bas de l'écran, sur téléphone seulement — Accueil, Planning, « Créer » au centre, Clients, « Plus » qui ouvre le menu complet. Les pages suivent les droits (une page fermée à la personne laisse sa place à la suivante ; quatre pages quand elle ne peut rien créer). Le bandeau du haut porte le nom de l'entreprise et la loupe, le bouton de menu est parti dans la barre. Les messages (« Nouvelle version disponible ») s'affichent au-dessus de la barre. Tablette et ordinateur inchangés. Écrit sans voir l'écran : retest C24.
 
+- **A7 (2026-11-22, sur C26).** Eric : « je veux aussi que les cartes soient de taille uniforme, c'est le plus important ». Ma correction d'A3 faisait passer les repères à la ligne : les cartes portant un bouton de devis gagnaient une ligne. Corrigé (`64c57be3`) : une seule ligne de repères, tous à leur taille ; la source prend la place qui reste et ne se coupe que si la ligne est pleine (avant A3 elle était coupée à 100 px même avec de la place). Conséquence assumée : dans « Devis envoyé », « Gagné » et « Perdu », une source longue peut encore être abrégée, le nom complet restant au survol. La hauteur uniforme prime sur la source en entier. Aucun lead ne porte de « prochaine action » (0 sur 649, lu en base), la ligne qui l'afficherait ne joue donc pas. Retest C27.
+
 ## Retest des corrections
 
 - [x] **C22. La liste des contrats clos se reconnaît (R3).** 2026-11-22 — retour : « Oui, c'est clair ».
@@ -231,8 +233,14 @@
   Attendu : des clients dont le prénom s'écrit « Hélène » ou « Jérôme » apparaissent, mêlés à ceux écrits sans accent ; la liste des clients annonce 23 résultats pour `helene` (19 avant). Taper `hélène` avec ses accents donne les mêmes fiches.
   Vérification : `select count(*) from public.majordhome_clients where org_id = '<Mayer>' and is_archived = false and recherche ilike '%helene%'` — 23 lu le 2026-11-22.
 
-- [ ] **C26. La source d'un lead et le texte d'aide de la recherche se lisent en entier (A3, A4).**
+- [ ] **C26. La source d'un lead et le texte d'aide de la recherche se lisent en entier (A3, A4).** 2026-11-22 — première capture d'Eric : sources encore coupées à la même largeur qu'avant (« Bouche-à-or… » sur une carte qui a la place). Le site en ligne sert pourtant la correction (vérifié dans le fichier `Pipeline-*.js` servi : `max-w-full` et `flex-wrap` présents) : la page affichée était l'ancienne version. À refaire après un rechargement forcé. Seconde capture, page rechargée : les sources se lisent en entier, mais les cartes n'ont plus la même hauteur (bouton des devis sur une seconde ligne dans « Gagné » et « Perdu »). Eric : « je veux aussi que les cartes soient de taille uniforme, c'est le plus important » (A7).
   Où : Pipeline → Kanban, puis Chantiers, sur ordinateur, après « Mettre à jour ».
   Saisir : lire les cartes des colonnes « Devis envoyé », « Gagné » et « Perdu » ; lire le champ de recherche en haut à droite des deux écrans.
   Attendu : « Bouche-à-oreille », « Client Existant », « Boutique en ligne » en toutes lettres ; sur une carte chargée, le délai ou le bouton des devis passe sur une seconde ligne, sans rien qui déborde. « Rechercher un chantier... » et « Rechercher un lead... » en entier.
+  Vérification : rien (affichage seul).
+
+- [ ] **C27. Les cartes du pipeline ont toutes la même hauteur (A7).**
+  Où : Pipeline → Kanban, sur ordinateur, après Ctrl + Maj + R.
+  Saisir : parcourir les six colonnes.
+  Attendu : toutes les cartes ont la même hauteur, sur deux lignes (nom et montant, puis repères) ; aucun bouton de devis sur une troisième ligne. Dans « Nouveau », « Contacté » et « RDV planifié », la source se lit en entier (« Bouche-à-oreille », « Boutique en ligne ») ; dans les trois autres colonnes elle peut être abrégée quand la ligne est pleine. Seule exception voulue : une carte « Devis envoyé » sans devis rattaché porte une ligne d'alerte « Devis à rapprocher ».
   Vérification : rien (affichage seul).
