@@ -1,4 +1,4 @@
-import { cn } from './classes';
+import { cn } from './classes.js';
 
 export { cn };
 
