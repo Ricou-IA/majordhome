@@ -1,9 +1,6 @@
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from './classes';
 
-export function cn(...inputs) {
-  return twMerge(clsx(inputs));
-}
+export { cn };
 
 // Date | string → YYYY-MM-DD (pour les <input type="date">)
 export function formatDateForInput(dateOrString) {
