@@ -206,7 +206,9 @@ export default function ClientsImport() {
             onRetourApercu={actions.retourApercu}
           />
         )}
-        {run.etat !== 'en_cours' && <ImportsPrecedents orgId={orgId} />}
+        {/* Masquée aussi quand l'import est interrompu : le retirer en partie puis « Reprendre » recréerait
+            les fiches retirées. On reprend ou on arrête d'abord ; la liste revient ensuite. */}
+        {run.etat !== 'en_cours' && run.etat !== 'interrompu' && <ImportsPrecedents orgId={orgId} />}
       </div>
     </div>
   );
