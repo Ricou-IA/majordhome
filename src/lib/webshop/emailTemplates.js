@@ -14,6 +14,13 @@ import { WEBSHOP_EMAIL_KEYS } from './reglages.js';
 export { WEBSHOP_EMAIL_KEYS };
 
 /**
+ * E-mails que le SITE de l'entreprise habille et envoie lui-même (confirmation de commande, feuille de
+ * route) : il ne remplace pas `{{ACCENT_COLOR}}`, donc ni titre, ni bouton, ni encadré dans leur texte, et
+ * l'aperçu les montre sans habillage. SEULE liste : l'éditeur (`elementsPermis`) et l'aperçu la lisent ici.
+ */
+export const GABARITS_HABILLES_PAR_LE_SITE = Object.freeze(['webshop_confirmation', 'webshop_feuille_route']);
+
+/**
  * @typedef {'client' | 'transporteur' | 'prestataire'} DestinataireGabarit
  * @typedef {{
  *   key: string, label: string, subject: string, html_body: string,
