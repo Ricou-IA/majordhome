@@ -28,6 +28,7 @@ import {
   couleurPourSelecteur, TEXTE_EXEMPLE, OBJET_EXEMPLE, USAGES_APERCU,
 } from '@/lib/mailHabillageEcran';
 import ApercuMail from '@/apps/artisan/components/mailing/page/ApercuMail';
+import CouleursGroupe from './habillage/CouleursGroupe';
 import EnteteGroupe from './habillage/EnteteGroupe';
 import PiedGroupe from './habillage/PiedGroupe';
 import BlocsGroupe from './habillage/BlocsGroupe';
@@ -177,6 +178,7 @@ export default function HabillageSection() {
 
       <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-6">
+          <CouleursGroupe form={form} erreurs={erreurs} champ={champ} />
           <EnteteGroupe form={form} settings={settings} erreurs={erreurs} suggestions={suggestions} champ={champ} />
           <PiedGroupe
             form={form}
