@@ -99,6 +99,8 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/tournee/populations.js',
   'src/lib/mailVariables.js', // variables d'un mail : à retirer quand la page du mail les importera (tâche 9)
   'src/lib/mailApercu.js', // aperçu fidèle d'un mail : à retirer quand la page du mail les importera (tâche 9)
+  'src/apps/artisan/components/mailing/editeur/EditeurTexte.jsx', // à retirer quand la page du mail les importera (tâche 9)
+  'src/apps/artisan/components/mailing/editeur/FenetreLien.jsx', // à retirer quand la page du mail les importera (tâche 9)
   'src/lib/mailRedaction.js', // rédaction assistée des mails : consommée par l'edge mailing-rediger via sa copie _shared (sync-tournee-engine), à retirer quand la page du mail l'importera (tâche 9)
   'src/lib/maintenance/digestModel.js', // consommé par l'edge maintenance-digest via sa copie _shared/maintenance (sync-tournee-engine), jamais importé depuis src/
   'src/lib/agentTelephonique.js', // consommé par l'edge agent-verifier-client via sa copie _shared/ (sync-tournee-engine), jamais importé depuis src/

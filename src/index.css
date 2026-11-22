@@ -200,6 +200,43 @@
            max-h-[90vh] overflow-y-auto
            animate-slide-up;
   }
+
+  /* Éditeur du texte d'un mail (`mailing/editeur/EditeurTexte`) : le texte s'y lit à peu
+     près comme dans le mail. Les couleurs de l'entreprise ne sont pas connues ici
+     (`{{ACCENT_COLOR}}`, que le navigateur ignore) : la couleur principale de l'application
+     en tient lieu ; le vrai rendu est l'aperçu. `pre-wrap` : une espace tapée après une
+     étiquette reste visible et le curseur peut s'y poser. */
+  .mdh-editeur-mail {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .mdh-editeur-mail p { @apply mb-3; }
+  .mdh-editeur-mail h2 { @apply mb-2 mt-5 text-lg font-semibold leading-snug text-secondary-900; }
+  .mdh-editeur-mail > :first-child { @apply mt-0; }
+  .mdh-editeur-mail ul { @apply mb-3 list-disc pl-6; }
+  .mdh-editeur-mail ol { @apply mb-3 list-decimal pl-6; }
+  .mdh-editeur-mail li { @apply mb-1; }
+  .mdh-editeur-mail a { @apply text-primary-700 underline underline-offset-2; }
+  .mdh-editeur-mail p:has(> a[data-bouton]) { @apply my-6 text-center; }
+  .mdh-editeur-mail a[data-bouton] {
+    @apply inline-block rounded-md bg-primary-700 px-5 py-2.5 font-semibold text-white no-underline;
+  }
+  .mdh-editeur-mail [data-encadre] {
+    @apply my-4 rounded-r-md border-l-4 border-primary-600 bg-secondary-50 px-4 py-3;
+  }
+  .mdh-editeur-mail .variable-mail {
+    @apply mx-px inline-block whitespace-nowrap rounded-full bg-primary-50 px-2 align-baseline text-xs font-medium
+           leading-5 text-primary-800 ring-1 ring-inset ring-primary-200;
+    cursor: default;
+  }
+  .mdh-editeur-mail a[data-bouton] .variable-mail {
+    @apply bg-white/20 text-white ring-white/40;
+  }
+  .mdh-editeur-mail .variable-bloc {
+    @apply my-3 block rounded-lg border border-dashed border-primary-300 bg-primary-50 px-3 py-2 text-sm font-medium
+           text-primary-800;
+    cursor: default;
+  }
 }
 
 /* =============================================================================

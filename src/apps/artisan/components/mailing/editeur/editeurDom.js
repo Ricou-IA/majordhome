@@ -1,0 +1,186 @@
+// src/apps/artisan/components/mailing/editeur/editeurDom.js
+// ============================================================================
+// Gestes de l'éditeur de mail sur le DOM du texte : déplacer, envelopper, poser
+// le curseur. Aucune conversion ni aucun nettoyage ici (c'est `mailCorps.js`) :
+// tout ce qui est créé l'est élément par élément, jamais par une chaîne.
+// ============================================================================
+
+const BLOCS = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'DIV', 'UL', 'OL', 'LI']);
+const EN_LIGNE = new Set(['#text', 'B', 'STRONG', 'I', 'EM', 'A', 'SPAN', 'BR', 'U', 'FONT']);
+export const estElement = (n, attr) => n?.nodeType === 1 && n.hasAttribute(attr);
+export const estEtiquette = (n) => estElement(n, 'data-var');
+export const estVariableBloc = (n) => estElement(n, 'data-var-bloc');
+export const estBouton = (n) => n?.nodeName === 'P' && !!n.querySelector('a[data-bouton]');
+export const estFixe = (n) => estVariableBloc(n) || estBouton(n);
+const estVide = (n) => n?.nodeName === 'P' && !n.textContent.trim() && !n.querySelector('[data-var], a');
+const sansTexte = (n) => n.nodeType === 3 && !n.textContent.replace(/\u200b/g, '').length;
+export const elementDe = (n) => (n?.nodeType === 1 ? n : n?.parentElement ?? null);
+const br = () => document.createElement('br');
+
+export function nouveauParagraphe() {
+  const p = document.createElement('p');
+  p.appendChild(br());
+  return p;
+}
+
+/** Sélection courante, seulement si elle est dans le texte. */
+export function plageDans(ed) {
+  const sel = window.getSelection();
+  if (!sel?.rangeCount) return null;
+  const r = sel.getRangeAt(0);
+  return ed.contains(r.commonAncestorContainer) ? r : null;
+}
+
+export function placerCurseur(n, ou) {
+  if (!n) return;
+  const r = document.createRange();
+  r.selectNodeContents(n);
+  r.collapse(ou === 'debut');
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+/** Bloc du texte (enfant direct de l'éditeur) qui contient ce point. */
+export function blocRacine(ed, n, offset = 0) {
+  if (n === ed) return ed.childNodes[Math.min(offset, ed.childNodes.length - 1)] ?? null;
+  while (n && n.parentNode !== ed) n = n.parentNode;
+  return n ?? null;
+}
+
+/** Déplace des nœuds en gardant le curseur s'il était dans un texte déplacé (pas recréé). */
+function avecCurseur(ed, faire, repli) {
+  const r = plageDans(ed);
+  const point = r && r.startContainer.nodeType === 3 ? [r.startContainer, r.startOffset] : null;
+  faire();
+  if (point && ed.contains(point[0])) {
+    const n = document.createRange();
+    n.setStart(point[0], Math.min(point[1], point[0].length));
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(n);
+  } else placerCurseur(repli(), 'fin');
+}
+
+/** Nœud juste avant (sens -1) ou après (+1) le curseur ; au bord d'un bloc du texte, le bloc voisin. */
+export function voisin(ed, plage, sens) {
+  let c = plage.startContainer;
+  let o = plage.startOffset;
+  if (c.nodeType === 3) {
+    if (sens < 0 ? o > 0 : o < c.length) return c;
+    o = [...c.parentNode.childNodes].indexOf(c) + (sens < 0 ? 0 : 1);
+    c = c.parentNode;
+  }
+  for (;;) {
+    let k = sens < 0 ? o - 1 : o;
+    while (k >= 0 && k < c.childNodes.length && sansTexte(c.childNodes[k])) k += sens;
+    if (c.childNodes[k]) return c.childNodes[k];
+    if (c === ed || !c.parentNode) return null;
+    if (BLOCS.has(c.nodeName)) return c.parentNode === ed ? (sens < 0 ? c.previousSibling : c.nextSibling) : null;
+    o = [...c.parentNode.childNodes].indexOf(c) + (sens < 0 ? 0 : 1);
+    c = c.parentNode;
+  }
+}
+
+/** Le texte commence et finit par un paragraphe, et deux blocs posés (bouton, information sur sa ligne) ne se touchent pas : le curseur peut toujours aller avant, entre et après eux. */
+export function garantirParagraphes(ed) {
+  // Une étiquette insérée par le navigateur garde sa nature (il peut perdre l'attribut en route).
+  ed.querySelectorAll('[data-var]:not([contenteditable="false"]), [data-var-bloc]:not([contenteditable="false"])').forEach((n) => {
+    n.setAttribute('contenteditable', 'false');
+    n.className = n.hasAttribute('data-var') ? 'variable-mail' : 'variable-bloc';
+  });
+  if (!ed.firstChild) ed.appendChild(nouveauParagraphe());
+  if (estFixe(ed.firstChild)) ed.insertBefore(nouveauParagraphe(), ed.firstChild);
+  const dernier = ed.lastChild;
+  if (estFixe(dernier) || estElement(dernier, 'data-encadre')) ed.appendChild(nouveauParagraphe());
+  [...ed.childNodes].forEach((n) => { if (estFixe(n) && estFixe(n.nextSibling)) ed.insertBefore(nouveauParagraphe(), n.nextSibling); });
+}
+
+/** Texte tapé à la racine (après « tout effacer ») : remis dans un paragraphe, curseur gardé. */
+export function rangerTexteRacine(ed) {
+  if (![...ed.childNodes].some((n) => EN_LIGNE.has(n.nodeName) && !sansTexte(n))) return;
+  avecCurseur(ed, () => {
+    let p = null;
+    [...ed.childNodes].forEach((n) => {
+      if (!EN_LIGNE.has(n.nodeName)) { p = null; return; }
+      if (!p) { p = document.createElement('p'); ed.insertBefore(p, n); }
+      p.appendChild(n);
+    });
+  }, () => ed.lastChild);
+}
+
+/** Pose un bloc après celui du curseur, ou à sa place s'il est un paragraphe vide. */
+export function insererApres(ed, bloc, el, remplacerVide = true) {
+  if (bloc && remplacerVide && estVide(bloc)) ed.replaceChild(el, bloc);
+  else ed.insertBefore(el, bloc ? bloc.nextSibling : null);
+}
+
+/** Lignes d'un bloc pour l'encadré (nœuds déplacés, pas copiés). */
+function lignesDe(b) {
+  if (b.nodeType === 3) return [[b]];
+  if (b.nodeName === 'UL' || b.nodeName === 'OL') return [...b.children].map((li) => [...li.childNodes]);
+  return [[...b.childNodes]];
+}
+
+export function basculerEncadre(ed, plage) {
+  const debut = blocRacine(ed, plage.startContainer, plage.startOffset);
+  let fin = blocRacine(ed, plage.endContainer, plage.endOffset) ?? debut;
+  if (!debut) return;
+  // Triple clic : la sélection finit au tout début du paragraphe suivant, qui n'est pas sélectionné.
+  if (fin !== debut && plage.endOffset === 0 && fin.previousSibling) fin = fin.previousSibling;
+  if (debut === fin && estElement(debut, 'data-encadre')) {
+    // Retour en paragraphes : une ligne de l'encadré = un paragraphe.
+    const ps = [];
+    let p = document.createElement('p');
+    const pousser = () => { if (!p.firstChild) p.appendChild(br()); ps.push(p); p = document.createElement('p'); };
+    [...debut.childNodes].forEach((n) => {
+      if (n.nodeName === 'BR') pousser();
+      else if (BLOCS.has(n.nodeName)) { if (p.firstChild) pousser(); [...n.childNodes].forEach((c) => p.appendChild(c)); pousser(); } else p.appendChild(n);
+    });
+    if (p.firstChild || !ps.length) pousser();
+    avecCurseur(ed, () => debut.replaceWith(...ps), () => ps[ps.length - 1]);
+    return;
+  }
+  const blocs = [];
+  for (let n = debut; n; n = n.nextSibling) { blocs.push(n); if (n === fin) break; }
+  const utiles = blocs.filter((b) => !estFixe(b) && !(b.nodeType === 3 && !b.textContent.trim()));
+  if (!utiles.length) return;
+  const div = document.createElement('div');
+  div.setAttribute('data-encadre', '');
+  avecCurseur(ed, () => {
+    utiles.flatMap(lignesDe)
+      .map((l) => l.filter((n, k) => !(n.nodeName === 'BR' && k === l.length - 1))) // retour final d'un paragraphe
+      .filter((l, k, toutes) => l.length || toutes.length === 1)
+      .forEach((l, k) => { if (k) div.appendChild(br()); l.forEach((n) => div.appendChild(n)); });
+    if (!div.firstChild) div.appendChild(br());
+    ed.insertBefore(div, utiles[0]);
+    utiles.forEach((b) => b.remove());
+  }, () => div);
+}
+
+/** Entrée sur une ligne vide à la fin d'un encadré : on en sort (vrai si fait). */
+export function sortirEncadreParEntree(ed, plage) {
+  const div = elementDe(plage.startContainer)?.closest('[data-encadre]');
+  if (!div) return false;
+  const reste = document.createRange();
+  reste.setStart(plage.startContainer, plage.startOffset);
+  reste.setEnd(div, div.childNodes.length);
+  const frag = reste.cloneContents();
+  if (frag.textContent.trim() || frag.querySelector('[data-var]')) return false;
+  const avant = voisin(ed, plage, -1);
+  if (avant?.nodeName !== 'BR' || !div.contains(avant)) return false;
+  avant.remove();
+  reste.deleteContents();
+  if (!div.firstChild) div.appendChild(br());
+  const p = nouveauParagraphe();
+  div.after(p);
+  placerCurseur(p, 'debut');
+  return true;
+}
+
+/** Texte collé ou déposé : paragraphes (ligne vide entre deux) de lignes, sans caractère de contrôle. */
+export function texteDeCollage(texte) {
+  // eslint-disable-next-line no-control-regex
+  const propre = String(texte ?? '').replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').replace(/\n+$/, '');
+  return propre ? propre.split(/\n[ \t]*\n+/).map((p) => p.split('\n')) : [];
+}
