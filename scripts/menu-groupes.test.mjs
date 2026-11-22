@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   GROUPES_MENU, SEUIL_MENU_GROUPE, grouperMenu, pageDansEntree, etatDuGroupe, lirePreferencesMenu,
+  PRIORITE_BARRE, raccourcisBarre, libelleDeBarre,
 } from '../src/lib/menuGroupes.js';
 
 const entree = (href, groupe) => ({ href, groupe });
@@ -84,4 +85,33 @@ test('AppLayout : chaque entrée du menu porte un groupe connu', () => {
     const groupe = ligne.match(/groupe: '([a-z]+)'/)?.[1];
     assert.ok(connus.includes(groupe), `entrée sans groupe connu : ${ligne.trim()}`);
   }
+});
+
+test('raccourcisBarre : trois pages du quotidien à côté de « Créer », quatre sans lui', () => {
+  const hrefs = (liste) => liste.map((item) => item.href);
+  assert.deepEqual(hrefs(raccourcisBarre(MENU_COMPLET, { avecCreer: true })), ['/', '/planning', '/clients']);
+  assert.deepEqual(hrefs(raccourcisBarre(MENU_COMPLET)), ['/', '/planning', '/clients', '/entretiens']);
+});
+
+test('raccourcisBarre : une page fermée à la personne laisse sa place à la suivante', () => {
+  const hrefs = (liste) => liste.map((item) => item.href);
+  const sansClients = MENU_COMPLET.filter((item) => item.href !== '/clients');
+  assert.deepEqual(hrefs(raccourcisBarre(sansClients, { avecCreer: true })), ['/', '/planning', '/entretiens']);
+  // Entreprise sans CRM : ses propres pages, dans l'ordre du menu.
+  const horsPriorite = [entree('/maintenance', 'terrain'), entree('/solaire', 'etudes')];
+  assert.deepEqual(hrefs(raccourcisBarre(horsPriorite)), ['/maintenance', '/solaire']);
+  assert.deepEqual(raccourcisBarre([]), []);
+});
+
+test('raccourcisBarre : rend les entrées du menu elles-mêmes, et chaque page prioritaire existe au menu', () => {
+  assert.equal(raccourcisBarre(MENU_COMPLET)[0], MENU_COMPLET[0]);
+  const source = readFileSync(new URL('../src/layouts/AppLayout.jsx', import.meta.url), 'utf8');
+  for (const href of PRIORITE_BARRE) {
+    assert.ok(source.includes(`href: '${href}',`), `page prioritaire absente du menu : ${href}`);
+  }
+});
+
+test('libelleDeBarre : « Accueil » pour la première page, le nom de son entrée pour les autres', () => {
+  assert.equal(libelleDeBarre({ href: '/', name: 'Dashboard' }), 'Accueil');
+  assert.equal(libelleDeBarre({ href: '/planning', name: 'Planning' }), 'Planning');
 });

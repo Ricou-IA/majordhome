@@ -318,6 +318,16 @@ html[data-device-class="tablet"] .mdh-kanban-col {
   flex: 0 0 240px;
 }
 
+/* Barre du bas du téléphone (`BarreDuBas`, qui pose `data-barre-bas` sur <html>) : les
+   messages s'affichent en bas de l'écran sous 600 px ; ils remontent au-dessus de la barre
+   au lieu de la recouvrir. `!important` : la bibliothèque écrit ce repère dans le style
+   de son élément. */
+@media (max-width: 600px) {
+  html[data-barre-bas] [data-sonner-toaster] {
+    --mobile-offset-bottom: calc(4.75rem + env(safe-area-inset-bottom)) !important;
+  }
+}
+
 /* Les animations d'apparition sont décoratives : coupées si l'OS le demande. */
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,

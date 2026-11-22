@@ -73,6 +73,37 @@ export function etatDuGroupe(groupe, { preferences = {}, pathname = '' } = {}) {
 }
 
 /**
+ * Pages proposées en priorité dans la barre du bas du téléphone, dans cet ordre : celles
+ * qu'on ouvre plusieurs fois par jour. Les autres restent dans le menu complet (« Plus »).
+ */
+export const PRIORITE_BARRE = Object.freeze(['/', '/planning', '/clients', '/entretiens', '/pipeline', '/chantiers']);
+
+/**
+ * Raccourcis de la barre du bas (téléphone) : les pages prioritaires que la personne peut
+ * ouvrir, complétées par ses autres pages quand il en manque (compte sans accès aux
+ * clients, entreprise sans CRM). Trois raccourcis à côté du bouton « Créer », quatre sans lui.
+ * @param {Array<{ href: string }>} items  entrées visibles du menu, dans leur ordre
+ * @param {{ avecCreer?: boolean }} [options]  vrai si la personne peut créer quelque chose
+ * @returns {Array<object>}  les entrées retenues (mêmes objets), dans l'ordre d'affichage
+ */
+export function raccourcisBarre(items = [], { avecCreer = false } = {}) {
+  const prioritaires = PRIORITE_BARRE
+    .map((href) => items.find((item) => item.href === href))
+    .filter(Boolean);
+  const autres = items.filter((item) => !PRIORITE_BARRE.includes(item.href));
+  return [...prioritaires, ...autres].slice(0, avecCreer ? 3 : 4);
+}
+
+/**
+ * Libellé d'un raccourci de la barre du bas : court, une ligne sous l'icône.
+ * @param {{ href: string, name: string }} item
+ * @returns {string}  « Accueil » pour la page d'accueil, sinon le nom de l'entrée
+ */
+export function libelleDeBarre(item) {
+  return item.href === '/' ? 'Accueil' : item.name;
+}
+
+/**
  * Choix de repli enregistrés (texte du stockage du navigateur).
  * @param {string|null|undefined} texte
  * @returns {Record<string, boolean>}  objet vide si absent ou illisible

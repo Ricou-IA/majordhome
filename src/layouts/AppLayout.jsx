@@ -4,10 +4,11 @@ import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { moduleActif, peutOuvrirParametres } from '@/lib/modules';
-import { grouperMenu, etatDuGroupe, lirePreferencesMenu } from '@/lib/menuGroupes';
+import { grouperMenu, etatDuGroupe, lirePreferencesMenu, raccourcisBarre } from '@/lib/menuGroupes';
 import { actionsCreer } from '@/lib/rechercheGlobale';
 import { RechercheGlobale } from '@components/navigation/RechercheGlobale';
 import { MenuCreer } from '@components/navigation/MenuCreer';
+import { BarreDuBas } from '@components/navigation/BarreDuBas';
 import { vocabulaire } from '@/lib/maintenance/vocabulaire';
 import { AppUpdateWatcher } from '@components/AppUpdateWatcher';
 import {
@@ -20,7 +21,6 @@ import {
   Wrench,
   Settings,
   LogOut,
-  Menu,
   Building2,
   User,
   Factory,
@@ -107,9 +107,10 @@ export default function AppLayout() {
 
   // Menu : entrées visibles pour cette personne, rangées en groupes au-delà d'un menu court.
   const { pathname } = useLocation();
-  const groupesDuMenu = grouperMenu(navigation.filter((item) => (item.visible
+  const entreesVisibles = navigation.filter((item) => (item.visible
     ? item.visible(organization)
-    : itemVisiblePourOrg(item, orgSettings) && can(item.resource, 'view'))));
+    : itemVisiblePourOrg(item, orgSettings) && can(item.resource, 'view')));
+  const groupesDuMenu = grouperMenu(entreesVisibles);
   // Groupes repliés ou dépliés par la personne, gardés sur son appareil (clé par utilisateur :
   // cette coque n'est montée qu'une fois la personne connue, et démontée à la déconnexion).
   const cleReplisMenu = user?.id ? `menu-groupes:${user.id}` : null;
@@ -131,6 +132,10 @@ export default function AppLayout() {
     lead: crmActif && can('pipeline', 'create'),
     client: crmActif && can('clients', 'create'),
   });
+  // Téléphone : pages du quotidien en accès direct dans la barre du bas, selon les droits.
+  const raccourcis = raccourcisBarre(entreesVisibles, { avecCreer: creations.length > 0 }).map((item) => (
+    item.module === 'maintenance' ? { ...item, name: vocabulaire(orgSettings).module } : item
+  ));
   useEffect(() => {
     const surTouche = (e) => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') {
@@ -424,20 +429,14 @@ export default function AppLayout() {
 
       {/* Main Content */}
       <div className="lg:pl-64">
-        {/* Bandeau du haut : téléphone seulement, pour ouvrir le menu. Dès que le menu est
-            affiché en permanence (lg, tablettes comprises), il n'a plus rien à porter — le
-            profil est au pied du menu — et la page gagne sa hauteur. */}
+        {/* Bandeau du haut : téléphone seulement — le nom de l'entreprise et la recherche. Le
+            menu s'ouvre par « Plus » dans la barre du bas. Dès que le menu est affiché en
+            permanence (lg, tablettes comprises), bandeau et barre disparaissent. */}
         <header className="sticky top-0 z-30 bg-white border-b border-secondary-200 lg:hidden">
           <div className="flex items-center justify-between h-14 px-3 sm:px-6">
-            {/* Menu burger mobile */}
-            <button
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Ouvrir le menu"
-              aria-expanded={sidebarOpen}
-              className="h-11 w-11 -ml-1 flex items-center justify-center rounded-lg text-secondary-600 hover:bg-secondary-100"
-            >
-              <Menu className="w-6 h-6" />
-            </button>
+            <p className="min-w-0 truncate px-1 text-sm font-semibold text-secondary-900">
+              {organization?.name || 'Majord’home'}
+            </p>
             <button
               onClick={ouvrirRecherche}
               aria-label="Rechercher un client, un lead, une page"
@@ -448,11 +447,21 @@ export default function AppLayout() {
           </div>
         </header>
 
-        {/* Page Content — marge basse étendue à la zone de sécurité iOS (barre d'accueil) */}
-        <main className="p-4 sm:p-6 lg:p-8 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-6 lg:pb-8">
+        {/* Page Content — sur téléphone, marge basse = hauteur de la barre du bas plus la zone
+            de sécurité iOS (barre d'accueil) : le bas de la page ne passe jamais dessous. */}
+        <main className="p-4 sm:p-6 lg:p-8 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-8">
           <Outlet />
         </main>
       </div>
+
+      {/* Téléphone : pages du quotidien, « Créer » et menu complet sous le pouce */}
+      <BarreDuBas
+        raccourcis={raccourcis}
+        creations={creations}
+        pathname={pathname}
+        menuOuvert={sidebarOpen}
+        onOuvrirMenu={() => setSidebarOpen(true)}
+      />
 
       {rechercheOuverte && (
         <RechercheGlobale
