@@ -225,7 +225,7 @@
 
 ## Après le bilan
 
-- [ ] **C25. La recherche de clients passe les accents (A5).**
+- [x] **C25. La recherche de clients passe les accents (A5).** 2026-11-22 — retour : « Oui, elles sortent ».
   Où : `Ctrl K` (ou la loupe sur téléphone), puis menu → Clients, champ de recherche. Après « Mettre à jour ».
   Saisir : `helene`, puis `jerome`, dans la recherche globale ; `helene` dans la liste des clients.
   Attendu : des clients dont le prénom s'écrit « Hélène » ou « Jérôme » apparaissent, mêlés à ceux écrits sans accent ; la liste des clients annonce 23 résultats pour `helene` (19 avant). Taper `hélène` avec ses accents donne les mêmes fiches.
