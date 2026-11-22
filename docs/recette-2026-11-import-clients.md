@@ -86,13 +86,13 @@
   Attendu : l'aperçu directement (sans passer par la correspondance), le téléphone et le code postal remis en forme.
   Vérification : rien (ne pas importer, ou retirer l'import ensuite).
 
-- [ ] **C111. Un membre qui n'est pas administrateur.**
+- [-] **C111. Un membre qui n'est pas administrateur.** 2026-11-22 — non testé : recette arrêtée à la demande d'Eric, pas de compte Cimaj non administrateur essayé. La base refuse de toute façon un non-administrateur (éprouvé le 2026-11-22 dans l'essai annulé).
   Où : un compte Cimaj non administrateur, s'il y en a un sous la main.
   Saisir : ouvrir Clients, puis l'adresse `/clients/import`.
   Attendu : pas de bouton « Importer » ; l'adresse renvoie à la liste des clients.
   Vérification : rien (la base refuse de toute façon : éprouvé le 2026-11-22).
 
-- [ ] **C112. La carte.** _Partiel_ — 2026-11-22 : Eric a importé la ligne de C110 à 02:45 (fiche `CLI-04071`, import `termine`, 1 fiche). Vérifié en base après le passage de 03:00 (`geocode-sweep`, « succeeded ») : la fiche a bien été prise par la file (`geocode_attempts` passé de 0 à 1), donc la file servie à tour de rôle fonctionne en production et voit les fiches importées. Mais elle n'a pas reçu de coordonnées (`latitude` et `geocoded_at` vides) : la ligne d'essai porte le code postal 01100 avec la ville « toulouse » et aucune adresse, une combinaison qui n'existe pas. Eric a dit vouloir corriger le code postal en 31000 ; au passage de 03:30 (« succeeded ») la fiche portait toujours 01100 / « toulouse » : deuxième essai sans résultat (`geocode_attempts` = 2). Manque : une fiche importée à l'adresse cohérente qui reçoit ses coordonnées. Dès que l'adresse de la fiche est corrigée, le compteur d'essais repart de zéro et le passage suivant la reprend.
+- [-] **C112. La carte.** 2026-11-22 — écarté à l'arrêt de la recette, resté partiel : la file de géocodage prend bien les fiches importées, mais aucune fiche importée à l'adresse cohérente n'a été vue recevoir ses coordonnées. Détail — 2026-11-22 : Eric a importé la ligne de C110 à 02:45 (fiche `CLI-04071`, import `termine`, 1 fiche). Vérifié en base après le passage de 03:00 (`geocode-sweep`, « succeeded ») : la fiche a bien été prise par la file (`geocode_attempts` passé de 0 à 1), donc la file servie à tour de rôle fonctionne en production et voit les fiches importées. Mais elle n'a pas reçu de coordonnées (`latitude` et `geocoded_at` vides) : la ligne d'essai porte le code postal 01100 avec la ville « toulouse » et aucune adresse, une combinaison qui n'existe pas. Eric a dit vouloir corriger le code postal en 31000 ; au passage de 03:30 (« succeeded ») la fiche portait toujours 01100 / « toulouse » : deuxième essai sans résultat (`geocode_attempts` = 2). Manque : une fiche importée à l'adresse cohérente qui reçoit ses coordonnées. Dès que l'adresse de la fiche est corrigée, le compteur d'essais repart de zéro et le passage suivant la reprend.
   Où : aucune action.
   Saisir : attendre le passage suivant du géocodage (toutes les 30 minutes) après C106, si l'import n'a pas été retiré entre-temps.
   Attendu : les fiches importées ont des coordonnées.
@@ -100,18 +100,18 @@
 
 ## Anomalies
 
-- **R101 (2026-11-22, vu pendant C110) — corrigée (`c3c51be8`, `2cc124ae`), à retester en C113. Accents abîmés quand un CSV a été ouvert puis enregistré par Excel.** Cause établie en lisant le fichier d'Eric cellule par cellule (`docs/recette-fichiers/import-clients-essai.xlsx`, non versionné) : c'est le fichier lui-même qui contient « RÃ©f. client », « SociÃ©tÃ© », « nÃ©ant »… Excel a ouvert le CSV d'essai, écrit en UTF-8 sans marque d'ordre des octets, comme un fichier Windows-1252, puis a enregistré le résultat. L'import a lu fidèlement ce qu'on lui a donné. Deux défauts de notre côté : (1) le fichier d'essai que j'ai fourni n'a pas la marque qui dit à Excel qu'il est en UTF-8 ; (2) le cas est courant chez un vrai utilisateur (ouvrir l'export dans Excel, le retoucher, l'enregistrer), et l'import ne répare rien : en-têtes non reconnus, noms et adresses faux en base. Correctif proposé, en attente de l'accord d'Eric : réparer ces accents à la lecture (une cellule dont le texte, repassé en octets Windows-1252, se relit proprement en UTF-8 est remplacée par sa version réparée ; sinon elle n'est pas touchée), avec ses tests, et ajouter la marque au fichier d'essai.
+- **R101 (2026-11-22, vu pendant C110) — corrigée (`c3c51be8`, `2cc124ae`), retest C113 validé le 2026-11-22. Accents abîmés quand un CSV a été ouvert puis enregistré par Excel.** Cause établie en lisant le fichier d'Eric cellule par cellule (`docs/recette-fichiers/import-clients-essai.xlsx`, non versionné) : c'est le fichier lui-même qui contient « RÃ©f. client », « SociÃ©tÃ© », « nÃ©ant »… Excel a ouvert le CSV d'essai, écrit en UTF-8 sans marque d'ordre des octets, comme un fichier Windows-1252, puis a enregistré le résultat. L'import a lu fidèlement ce qu'on lui a donné. Deux défauts de notre côté : (1) le fichier d'essai que j'ai fourni n'a pas la marque qui dit à Excel qu'il est en UTF-8 ; (2) le cas est courant chez un vrai utilisateur (ouvrir l'export dans Excel, le retoucher, l'enregistrer), et l'import ne répare rien : en-têtes non reconnus, noms et adresses faux en base. Correctif proposé, en attente de l'accord d'Eric : réparer ces accents à la lecture (une cellule dont le texte, repassé en octets Windows-1252, se relit proprement en UTF-8 est remplacée par sa version réparée ; sinon elle n'est pas touchée), avec ses tests, et ajouter la marque au fichier d'essai.
 
 ## Remarques et améliorations
 
-- **A105 — fait (c3c51be8, 2cc124ae), à retester en C117 (2026-11-22, vu pendant C110).** Le type de client n'accepte que les mots exacts : « Particuliers » (au pluriel), « Privé », « Client », « SARL » sont illisibles. Par ailleurs le bloc de l'aperçu dit « le champ est laissé vide », alors que pour le type de client la fiche devient « particulier ». À proposer : accepter les pluriels et quelques mots courants, et dire la valeur prise par défaut.
+- **A105 — fait (c3c51be8, 2cc124ae), retest C117 non fait à l'écran (2026-11-22, vu pendant C110).** Le type de client n'accepte que les mots exacts : « Particuliers » (au pluriel), « Privé », « Client », « SARL » sont illisibles. Par ailleurs le bloc de l'aperçu dit « le champ est laissé vide », alors que pour le type de client la fiche devient « particulier ». À proposer : accepter les pluriels et quelques mots courants, et dire la valeur prise par défaut.
 
-- **A104 — fait (c3c51be8), à retester en C116 (2026-11-22, vu pendant C108).** Dans les raisons d'un doublon, « même nom et prénom » est suivi de « même nom », qui dit la même chose une seconde fois. À proposer : ne pas afficher « même nom » quand « même nom et prénom » y est déjà.
+- **A104 — fait (c3c51be8), retest C116 non fait à l'écran (2026-11-22, vu pendant C108).** Dans les raisons d'un doublon, « même nom et prénom » est suivi de « même nom », qui dit la même chose une seconde fois. À proposer : ne pas afficher « même nom » quand « même nom et prénom » y est déjà.
 
-- **A102 — fait (87842d63), à retester en C115 (2026-11-22, vu pendant C107).** Sur la fiche, le champ « Notes internes » ne fait que deux lignes de haut : les trois lignes venues de l'import ne se lisent qu'en faisant défiler le champ (la première est coupée). À proposer : un champ qui s'agrandit avec son contenu.
-- **A103 — en attente de la réponse d'Eric (2026-11-22, vu pendant C107).** Deux façons de nommer le même champ : la fiche dit « Notes visibles par toute l'équipe », le fichier type et l'écran de correspondance disent « Notes (visibles par le client) ». À trancher par Eric, puis aligner les deux.
+- **A102 — fait (87842d63), retest C115 validé (2026-11-22, vu pendant C107).** Sur la fiche, le champ « Notes internes » ne fait que deux lignes de haut : les trois lignes venues de l'import ne se lisent qu'en faisant défiler le champ (la première est coupée). À proposer : un champ qui s'agrandit avec son contenu.
+- **A103 — ouverte, en attente de la réponse d'Eric (2026-11-22, vu pendant C107).** Deux façons de nommer le même champ : la fiche dit « Notes visibles par toute l'équipe », le fichier type et l'écran de correspondance disent « Notes (visibles par le client) ». À trancher par Eric, puis aligner les deux.
 
-- **A101 — fait (c3c51be8, 87842d63, 2cc124ae), à retester en C114 (2026-11-22, vu pendant C104).** Devant une colonne « Adresse complète », le réflexe d'Eric a été de choisir « Adresse » : toute la ligne (« 12 rue de la République 69003 Lyon ») irait alors dans l'adresse, et le code postal et la ville resteraient vides, sans que rien ne le dise. Le bon choix, « Adresse complète (rue, code postal, ville) », est en bas de la liste, dans un second groupe. Correctif proposé, en attente de son accord : (1) présélectionner la cible composée quand l'en-tête le dit (« Adresse complète », « Nom complet », « Nom et prénom », « CP Ville »…) ; (2) quand une colonne pointée sur « Adresse » contient des codes postaux et qu'aucune colonne ne va vers « Code postal », le dire sous la liste avec un bouton pour basculer ; même chose pour « Nom » quand les valeurs portent nom et prénom ; (3) à l'aperçu, compter les fiches sans code postal.
+- **A101 — fait (c3c51be8, 87842d63, 2cc124ae), retest C114 validé (2026-11-22, vu pendant C104).** Devant une colonne « Adresse complète », le réflexe d'Eric a été de choisir « Adresse » : toute la ligne (« 12 rue de la République 69003 Lyon ») irait alors dans l'adresse, et le code postal et la ville resteraient vides, sans que rien ne le dise. Le bon choix, « Adresse complète (rue, code postal, ville) », est en bas de la liste, dans un second groupe. Correctif proposé, en attente de son accord : (1) présélectionner la cible composée quand l'en-tête le dit (« Adresse complète », « Nom complet », « Nom et prénom », « CP Ville »…) ; (2) quand une colonne pointée sur « Adresse » contient des codes postaux et qu'aucune colonne ne va vers « Code postal », le dire sous la liste avec un bouton pour basculer ; même chose pour « Nom » quand les valeurs portent nom et prénom ; (3) à l'aperçu, compter les fiches sans code postal.
 
 - Connu avant recette : pendant un envoi, le menu latéral reste cliquable (l'envoi continue, l'import reste dans la liste).
 - Connu avant recette : un import arrêté en cours de route garde le libellé « En cours » dans la liste.
@@ -119,32 +119,42 @@
 
 ## Retest des corrections
 
-- [ ] **C113. Retest de R101 : le fichier Excel aux accents abîmés.**
+- [x] **C113. Retest de R101 : le fichier Excel aux accents abîmés.** 2026-11-22 — retour d'Eric : « Oui, réparés » (sur le déploiement de `2cc124ae`). Vérifié hors navigateur : le même fichier passé par les règles donne 11 cellules réparées et les en-têtes attendus. Non détaillé par Eric : le nombre de cellules affiché.
   Où : compte Cimaj → Clients → « Importer ».
   Saisir : déposer de nouveau `import-clients-essai.xlsx` (celui enregistré depuis Excel).
   Attendu : à l'étape Correspondance, la ligne « Des accents abîmés ont été réparés dans 11 cellules (fichier passé par un tableur). » ; les en-têtes se lisent « Réf. client », « Société », « Adresse complète », « Marque chaudière » ; les valeurs aussi (« République », « Jaurès », « néant », « m² », « peut-être »).
   Vérification : hors navigateur, le même fichier passé par les règles donne 11 cellules réparées (fait le 2026-11-22).
 
-- [ ] **C114. Retest de A101 : « Adresse complète » et « Nom complet » présélectionnés.**
+- [x] **C114. Retest de A101 : « Adresse complète » et « Nom complet » présélectionnés.** 2026-11-22 — retour d'Eric : « Oui, c'est bon ». Affichage seul, rien à vérifier en base.
   Où : la même étape Correspondance (ou en déposant `import-clients-essai.csv`).
   Saisir : rien d'abord ; puis mettre « Adresse » à la main sur la colonne « Adresse complète ».
   Attendu : « Nom complet » arrive sur « Nom et prénom, dans cet ordre » et « Adresse complète » sur « Adresse complète (rue, code postal, ville) » ; seules « Marque chaudière » et « ID interne » restent à choisir. Une fois « Adresse » mis à la main, un encadré sous la liste dit « Ces adresses contiennent le code postal et la ville. » avec un bouton « Séparer », qui remet le bon choix.
   Vérification : rien (affichage seul).
 
-- [ ] **C115. Retest de A102 : les notes d'une fiche importée se lisent sans défiler.**
+- [x] **C115. Retest de A102 : les notes d'une fiche importée se lisent sans défiler.** 2026-11-22 — retour d'Eric : « Oui, c'est bon ». Fait sur la fiche TEST1 ERIC (CLI-04071) avec des lignes saisies à la main, la fiche LEROY JEAN ayant été retirée avec l'import d'essai. Affichage seul.
   Où : une fiche importée qui a plusieurs lignes de notes internes.
   Saisir : ouvrir la fiche, descendre aux notes.
   Attendu : le champ « Notes internes » montre toutes ses lignes (jusqu'à douze) sans barre de défilement.
   Vérification : rien (affichage seul).
 
-- [ ] **C116. Retest de A104 : les raisons d'un doublon.**
+- [-] **C116. Retest de A104 : les raisons d'un doublon.** 2026-11-22 — non testé à l'écran : recette arrêtée à la demande d'Eric. La règle est tenue par les tests du dépôt (`scripts/import-clients/libelles.test.mjs`).
   Où : l'aperçu d'un fichier dont les fiches existent déjà.
   Saisir : déplier « Doublons ».
   Attendu : « même nom et prénom » n'est plus suivi de « même nom ».
   Vérification : rien (affichage seul).
 
-- [ ] **C117. Retest de A105 : le type de client.**
+- [-] **C117. Retest de A105 : le type de client.** 2026-11-22 — non testé à l'écran : recette arrêtée à la demande d'Eric. La règle est tenue par les tests du dépôt (`scripts/import-clients/normaliser.test.mjs`).
   Où : le fichier type rempli, colonne « Type de client ».
   Saisir : « Particuliers », « SARL », « Mairie » sur trois lignes, puis déposer.
   Attendu : aucune de ces valeurs dans « Valeurs illisibles ». Avec une valeur vraiment illisible (« ? »), le bloc dit « Un accord illisible vaut « oui » ; un type de client illisible est déduit de la société, sinon « particulier ». »
   Vérification : rien (affichage seul).
+
+## Fin de recette — 2026-11-22
+
+Recette arrêtée à la demande d'Eric (« je l'utilise tous les jours, donc on relèvera les problèmes »). La suite se fait à l'usage.
+
+- **Validés (13)** : C101 à C110, C113, C114, C115.
+- **Non testés ou écartés (4)** : C111 (pas de compte non administrateur essayé), C112 (géocodage d'une fiche importée, resté partiel), C116 et C117 (retests d'affichage, règles tenues par les tests du dépôt).
+- **Anomalie** : R101 corrigée et retestée. Aucune anomalie ouverte.
+- **Remarque ouverte** : A103, le libellé du champ « Notes » (« visibles par toute l'équipe » sur la fiche, « visibles par le client » dans le fichier type et la correspondance).
+- **Reste en base chez Cimaj** : la fiche d'essai TEST1 ERIC (`CLI-04071`, code postal 01100 / « toulouse », jamais placée sur la carte) et son import `fichier-type-clients (1).xlsx`. À retirer par Eric depuis « Imports précédents » quand il voudra ; aucune écriture n'a été faite en base pour la recette.
