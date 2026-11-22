@@ -114,7 +114,7 @@ Table principale des clients CRM. 3393 rows. RLS activé (4 policies).
 **FK sortantes** : project_id → core.projects, org_id → core.organizations, created_by → core.profiles
 **FK entrantes** : client_activities.client_id → clients.id
 
-### majordhome.client_imports (2026-11-21, migration `20261121_13`)
+### majordhome.client_imports (2026-11-21, migrations `20261121_13` et `20261122_1`)
 Un import de fichier clients venu d'un autre logiciel. RLS : une seule policy, SELECT pour un org_admin ACTIF de `org_id` ;
 aucune policy d'écriture, `authenticated` n'a que SELECT, `anon` rien ; `service_role` SELECT. Vue
 `public.majordhome_client_imports` (`security_invoker`, `created_by_name` = `core.profiles.full_name`).
@@ -128,9 +128,9 @@ aucune policy d'écriture, `authenticated` n'a que SELECT, `anon` rien ; `servic
 | `file_name` | text NOT NULL | nom du fichier (255 car. max) |
 | `source_label` | text | logiciel d'origine ; recopié dans `clients.import_source` |
 | `mapping` | jsonb (tableau) | correspondance colonnes → champs validée à l'écran |
-| `counts` | jsonb (objet) | bilan, écrit au départ puis à la fin |
-| `status` | text | `en_cours` → `termine` → `retire` |
-| `removed_at` / `removed_by` | timestamptz / uuid | retrait complet |
+| `counts` | jsonb (objet) | bilan : au départ `lues`, `prevues`, `doublons_ecartes`, `ecartees` ; à la fin `importees` (créées + déjà écrites) ; après un retrait `retirees` (cumul des appels) et `conservees` (fiches présentes et non retirables) |
+| `status` | text | `en_cours` → `termine` ; `retire` seulement quand l'import n'a plus AUCUNE fiche (un import sans fiche y passe au premier retrait) |
+| `removed_at` / `removed_by` | timestamptz / uuid | posés avec `retire` (plus aucune fiche) |
 
 **Écriture = cinq RPC SECURITY DEFINER** (`authenticated` + `service_role`, jamais anon ni PUBLIC) :
 `clients_import_start(p_org_id, p_file_name, p_source_label, p_mapping, p_counts) → uuid` (org_admin actif de `p_org_id`) ;
@@ -138,11 +138,12 @@ aucune policy d'écriture, `authenticated` n'a que SELECT, `anon` rien ; `servic
 colonnes, une ligne déjà écrite est comptée `skipped`, un projet `core.projects` par fiche, `identity.created_from =
 'import_clients'`) ; `clients_import_finish(p_import_id, p_counts)` ; `clients_import_removal_preview(p_import_id) →
 { retirables, conservees }` ; `clients_import_remove(p_import_id, p_limit = 200) → { retirees, conservees, restantes }`
-(au plus `p_limit` fiches par appel, à rappeler tant que `restantes > 0` ; `restantes` est recompté APRÈS la
-suppression — une fiche libérée par celle qui vient de partir est comptée — et `retire` n'est posé qu'à 0 ; ne passe
-pas par `client_hard_delete`). Les quatre dernières dérivent l'organisation de l'import. Codes : `unauthenticated`,
+(au plus `p_limit` fiches par appel, à rappeler tant que `restantes > 0` ; `retirees` = cet appel ; `restantes` =
+retirables d'avant − fiches supprimées, recompté seulement quand il vaut 0 — une fiche libérée par celle qui vient de
+partir est alors comptée ; `counts` reçoit `retirees` cumulé et `conservees` ; `retire` n'est posé que si l'import n'a
+plus aucune fiche ; ne passe pas par `client_hard_delete`). Les quatre dernières dérivent l'organisation de l'import. Codes : `unauthenticated`,
 `org_admin_required` (42501), `import_not_found` (P0002), `import_closed`, `rows_invalid` (pas un tableau de 1 à 500
-objets, ou deux lignes du même `import_line`), `row_invalid` (contenu d'une ligne), `file_name_required`,
+objets, ou deux lignes du même `import_line`), `row_invalid` (contenu d'une ligne ; détail « ligne N : colonne »), `file_name_required`,
 `removal_incomplete` (moins de fiches ou de projets supprimés que visé : tout est annulé).
 **Retirable** = fiche de l'import que rien ne référence : toute clé étrangère vers `majordhome.clients` ou vers son
 projet `core.projects`, lue dans `pg_constraint` à l'exécution (`majordhome.clients_import_retirables`, interne), sauf

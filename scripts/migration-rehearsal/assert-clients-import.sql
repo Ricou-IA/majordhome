@@ -346,8 +346,12 @@ BEGIN
   IF r IS DISTINCT FROM '{"retirees": 2, "conservees": 1, "restantes": 0}'::jsonb THEN RAISE EXCEPTION 'remove : %', r; END IF;
   SET LOCAL ROLE postgres;
 
-  IF (SELECT status FROM majordhome.client_imports WHERE id = v_imp) <> 'retire' THEN RAISE EXCEPTION 'remove : statut non retire'; END IF;
-  IF (SELECT removed_at IS NOT NULL AND removed_by = v_admin FROM majordhome.client_imports WHERE id = v_imp) IS NOT TRUE THEN RAISE EXCEPTION 'removed_at / removed_by'; END IF;
+  -- 20261122_1 : une fiche reste (contrat) ⇒ l'import n'est PAS « retire » ; counts garde le bilan et reçoit le retrait.
+  IF (SELECT status FROM majordhome.client_imports WHERE id = v_imp) <> 'termine' THEN RAISE EXCEPTION 'remove : une fiche reste, statut termine attendu'; END IF;
+  IF (SELECT removed_at IS NULL AND removed_by IS NULL FROM majordhome.client_imports WHERE id = v_imp) IS NOT TRUE THEN RAISE EXCEPTION 'removed_at / removed_by posés alors qu''une fiche reste'; END IF;
+  IF (SELECT counts FROM majordhome.client_imports WHERE id = v_imp) IS DISTINCT FROM '{"crees": 3, "ignorees": 0, "retirees": 2, "conservees": 1}'::jsonb THEN
+    RAISE EXCEPTION 'remove : counts = %', (SELECT counts FROM majordhome.client_imports WHERE id = v_imp);
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM majordhome.clients WHERE id = v_c2) THEN RAISE EXCEPTION 'la fiche au contrat a été retirée'; END IF;
   IF EXISTS (SELECT 1 FROM majordhome.clients WHERE id IN (v_c3, v_c4)) THEN RAISE EXCEPTION 'fiches non retirées'; END IF;
   IF EXISTS (SELECT 1 FROM core.projects WHERE id IN (v_p3, v_p4)) THEN RAISE EXCEPTION 'projets non retirés'; END IF;
@@ -360,6 +364,19 @@ BEGIN
   r := public.clients_import_remove(v_imp);
   IF r IS DISTINCT FROM '{"retirees": 0, "conservees": 1, "restantes": 0}'::jsonb THEN RAISE EXCEPTION 'remove rejoué : %', r; END IF;
   SET LOCAL ROLE postgres;
+  IF (SELECT counts FROM majordhome.client_imports WHERE id = v_imp) IS DISTINCT FROM '{"crees": 3, "ignorees": 0, "retirees": 2, "conservees": 1}'::jsonb THEN
+    RAISE EXCEPTION 'remove rejoué : retirees doit rester cumulé à 2, counts = %', (SELECT counts FROM majordhome.client_imports WHERE id = v_imp);
+  END IF;
+  -- La fiche se libère (contrat supprimé) : un nouveau retrait la retire et l'import passe enfin à « retire ».
+  DELETE FROM majordhome.contracts WHERE client_id = v_c2;
+  SET LOCAL ROLE authenticated;
+  r := public.clients_import_remove(v_imp);
+  IF r IS DISTINCT FROM '{"retirees": 1, "conservees": 0, "restantes": 0}'::jsonb THEN RAISE EXCEPTION 'remove après libération : %', r; END IF;
+  SET LOCAL ROLE postgres;
+  IF (SELECT status = 'retire' AND removed_at IS NOT NULL AND removed_by = v_admin AND counts ->> 'retirees' = '3' AND counts ->> 'conservees' = '0'
+        FROM majordhome.client_imports WHERE id = v_imp) IS NOT TRUE THEN
+    RAISE EXCEPTION 'import vidé : retire / removed_* / counts attendus, trouvé %', (SELECT row_to_json(i) FROM majordhome.client_imports i WHERE id = v_imp);
+  END IF;
   RAISE NOTICE '§7 retrait : OK';
 END $$;
 
@@ -390,7 +407,11 @@ BEGIN
   IF (SELECT status FROM public.majordhome_client_imports WHERE id = v_imp) <> 'en_cours' THEN RAISE EXCEPTION 'retire posé avant la fin'; END IF;
   r := public.clients_import_remove(v_imp, 0); -- borné à 1
   IF r IS DISTINCT FROM '{"retirees": 1, "conservees": 2, "restantes": 0}'::jsonb THEN RAISE EXCEPTION 'remove(0→1) : %', r; END IF;
-  IF (SELECT status FROM public.majordhome_client_imports WHERE id = v_imp) <> 'retire' THEN RAISE EXCEPTION 'statut retire attendu'; END IF;
+  -- Deux fiches conservées : l'import reste dans la liste, retirable plus tard.
+  IF (SELECT status FROM public.majordhome_client_imports WHERE id = v_imp) <> 'en_cours' THEN RAISE EXCEPTION 'deux fiches restent : statut en_cours attendu'; END IF;
+  IF (SELECT counts FROM public.majordhome_client_imports WHERE id = v_imp) IS DISTINCT FROM '{"retirees": 2, "conservees": 2}'::jsonb THEN
+    RAISE EXCEPTION 'tranches : counts = %', (SELECT counts FROM public.majordhome_client_imports WHERE id = v_imp);
+  END IF;
   SET LOCAL ROLE postgres;
   RAISE NOTICE '§7 bis retrait par tranches : OK';
 END $$;
@@ -510,6 +531,73 @@ BEGIN
   RAISE NOTICE 'MESURE duree_ms lot de 200 = % ; retrait de 200 = % (trigger d''audit actif : %)', d_lot, d_ret,
     EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'majordhome.clients'::regclass AND tgname = 'trg_audit_clients' AND tgenabled <> 'D');
   IF d_lot > 2000 OR d_ret > 2000 THEN RAISE EXCEPTION 'mesure au-dessus de 2 000 ms : lot %, retrait %', d_lot, d_ret; END IF;
+END $$;
+
+-- ── Import sans aucune fiche (20261122_1) : un appel le passe à « retire » ──
+DO $$
+DECLARE
+  v_a     uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+  v_admin uuid := '8a4907a3-f382-4707-bc38-2ff4832f873a';
+  v_imp uuid; r jsonb;
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  SET LOCAL ROLE authenticated;
+  v_imp := public.clients_import_start(v_a, 'vide.csv', NULL, '[]', '{"lues": 3, "prevues": 3, "doublons_ecartes": 0, "ecartees": 0}');
+  r := public.clients_import_removal_preview(v_imp);
+  IF r IS DISTINCT FROM '{"retirables": 0, "conservees": 0}'::jsonb THEN RAISE EXCEPTION 'import vide, preview : %', r; END IF;
+  r := public.clients_import_remove(v_imp);
+  IF r IS DISTINCT FROM '{"retirees": 0, "conservees": 0, "restantes": 0}'::jsonb THEN RAISE EXCEPTION 'import vide, remove : %', r; END IF;
+  SET LOCAL ROLE postgres;
+  IF (SELECT status = 'retire' AND removed_by = v_admin
+            AND counts = '{"lues": 3, "prevues": 3, "doublons_ecartes": 0, "ecartees": 0, "retirees": 0, "conservees": 0}'::jsonb
+        FROM majordhome.client_imports WHERE id = v_imp) IS NOT TRUE THEN
+    RAISE EXCEPTION 'import vide : %', (SELECT row_to_json(i) FROM majordhome.client_imports i WHERE id = v_imp);
+  END IF;
+  RAISE NOTICE 'import vide retiré de la liste : OK';
+END $$;
+
+-- ── Mesure D1 (20261122_1) : un appel de retrait sur un import de 3 000 fiches, p_limit 100 puis 200 ──
+DO $$
+DECLARE
+  v_a     uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+  v_admin uuid := '8a4907a3-f382-4707-bc38-2ff4832f873a';
+  v_imp uuid; t0 timestamptz; d_ins numeric; d_100 numeric; d_200 numeric; d_calc numeric; r jsonb; r2 jsonb; i int;
+BEGIN
+  -- client_number = 'CLI-' || lpad(n, 5) : au-delà de 99 999 le numéro est tronqué. 3 000 numéros libres à partir de 50 001.
+  PERFORM setval('majordhome.client_number_seq', 50000);
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  SET LOCAL ROLE authenticated;
+  v_imp := public.clients_import_start(v_a, 'mesure-3000.csv', 'Mesure', '[]', '{}');
+  t0 := clock_timestamp();
+  FOR i IN 0..14 LOOP
+    PERFORM public.clients_import_batch(v_imp, (
+      SELECT jsonb_agg(jsonb_build_object('import_line', g, 'display_name', 'TROISMILLE Client ' || g, 'last_name', 'TROISMILLE',
+               'first_name', 'Client ' || g, 'email', 'troismille' || g || '@example.test', 'phone', '07' || lpad(g::text, 8, '0'),
+               'postal_code', '81600', 'city', 'Gaillac', 'external_ref', 'T-' || g))
+        FROM generate_series(i * 200 + 1, i * 200 + 200) g));
+  END LOOP;
+  d_ins := round(extract(epoch FROM clock_timestamp() - t0) * 1000, 1);
+  SET LOCAL ROLE postgres;
+  t0 := clock_timestamp();
+  PERFORM majordhome.clients_import_retirables(v_imp);
+  d_calc := round(extract(epoch FROM clock_timestamp() - t0) * 1000, 1);
+  SET LOCAL ROLE authenticated;
+  t0 := clock_timestamp();
+  r := public.clients_import_remove(v_imp, 100);
+  d_100 := round(extract(epoch FROM clock_timestamp() - t0) * 1000, 1);
+  t0 := clock_timestamp();
+  r2 := public.clients_import_remove(v_imp, 200);
+  d_200 := round(extract(epoch FROM clock_timestamp() - t0) * 1000, 1);
+  SET LOCAL ROLE postgres;
+  IF r IS DISTINCT FROM '{"retirees": 100, "conservees": 0, "restantes": 2900}'::jsonb THEN RAISE EXCEPTION 'mesure 3000, p_limit 100 : %', r; END IF;
+  IF r2 IS DISTINCT FROM '{"retirees": 200, "conservees": 0, "restantes": 2700}'::jsonb THEN RAISE EXCEPTION 'mesure 3000, p_limit 200 : %', r2; END IF;
+  RAISE NOTICE 'MESURE 3000 fiches : 15 lots écrits en % ms ; un calcul des retirables % ms ; retrait p_limit 100 = % ms ; p_limit 200 = % ms (trigger d''audit actif : %, clés étrangères vers clients / projects : %)',
+    d_ins, d_calc, d_100, d_200,
+    EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'majordhome.clients'::regclass AND tgname = 'trg_audit_clients' AND tgenabled <> 'D'),
+    (SELECT count(*) FROM pg_constraint WHERE contype = 'f' AND confrelid IN ('majordhome.clients'::regclass, 'core.projects'::regclass));
+  IF d_100 > 8000 OR d_200 > 8000 THEN RAISE EXCEPTION 'retrait au-dessus du plafond PostgREST de 8 s : % / % ms', d_100, d_200; END IF;
 END $$;
 
 DROP FUNCTION public.zz_assert_erreur(text, text, text);
