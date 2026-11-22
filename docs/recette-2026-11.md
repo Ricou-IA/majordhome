@@ -233,7 +233,7 @@
   Attendu : des clients dont le prénom s'écrit « Hélène » ou « Jérôme » apparaissent, mêlés à ceux écrits sans accent ; la liste des clients annonce 23 résultats pour `helene` (19 avant). Taper `hélène` avec ses accents donne les mêmes fiches.
   Vérification : `select count(*) from public.majordhome_clients where org_id = '<Mayer>' and is_archived = false and recherche ilike '%helene%'` — 23 lu le 2026-11-22.
 
-- [ ] **C26. La source d'un lead et le texte d'aide de la recherche se lisent en entier (A3, A4).** _Partiel_ 2026-11-22 — première capture d'Eric : sources encore coupées à la même largeur qu'avant (« Bouche-à-or… » sur une carte qui a la place). Le site en ligne sert pourtant la correction (vérifié dans le fichier `Pipeline-*.js` servi : `max-w-full` et `flex-wrap` présents) : la page affichée était l'ancienne version. À refaire après un rechargement forcé. Seconde capture, page rechargée : les sources se lisent en entier, mais les cartes n'ont plus la même hauteur (bouton des devis sur une seconde ligne dans « Gagné » et « Perdu »). Eric : « je veux aussi que les cartes soient de taille uniforme, c'est le plus important » (A7). Troisième capture : « Rechercher un lead... » en entier ; la source est tranchée par C27. Reste à lire le champ de recherche de la page Chantiers.
+- [x] **C26. La source d'un lead et le texte d'aide de la recherche se lisent en entier (A3, A4).** 2026-11-22 — retour final sur le champ de la page Chantiers : « Oui, en entier ». Déroulé : première capture d'Eric : sources encore coupées à la même largeur qu'avant (« Bouche-à-or… » sur une carte qui a la place). Le site en ligne sert pourtant la correction (vérifié dans le fichier `Pipeline-*.js` servi : `max-w-full` et `flex-wrap` présents) : la page affichée était l'ancienne version. À refaire après un rechargement forcé. Seconde capture, page rechargée : les sources se lisent en entier, mais les cartes n'ont plus la même hauteur (bouton des devis sur une seconde ligne dans « Gagné » et « Perdu »). Eric : « je veux aussi que les cartes soient de taille uniforme, c'est le plus important » (A7). Troisième capture : « Rechercher un lead... » en entier ; la source est tranchée par C27 (entière quand la ligne a la place, abrégée sinon : la hauteur uniforme prime). Champ de recherche de la page Chantiers : « Rechercher un chantier... » en entier, confirmé par Eric.
   Où : Pipeline → Kanban, puis Chantiers, sur ordinateur, après « Mettre à jour ».
   Saisir : lire les cartes des colonnes « Devis envoyé », « Gagné » et « Perdu » ; lire le champ de recherche en haut à droite des deux écrans.
   Attendu : « Bouche-à-oreille », « Client Existant », « Boutique en ligne » en toutes lettres ; sur une carte chargée, le délai ou le bouton des devis passe sur une seconde ligne, sans rien qui déborde. « Rechercher un chantier... » et « Rechercher un lead... » en entier.
@@ -244,3 +244,12 @@
   Saisir : parcourir les six colonnes.
   Attendu : toutes les cartes ont la même hauteur, sur deux lignes (nom et montant, puis repères) ; aucun bouton de devis sur une troisième ligne. Dans « Nouveau », « Contacté » et « RDV planifié », la source se lit en entier (« Bouche-à-oreille », « Boutique en ligne ») ; dans les trois autres colonnes elle peut être abrégée quand la ligne est pleine. Seule exception voulue : une carte « Devis envoyé » sans devis rattaché porte une ligne d'alerte « Devis à rapprocher ».
   Vérification : rien (affichage seul).
+
+## État au 2026-11-22, fin de journée
+
+- **Validés** : 24 tests sur 27 — C2 à C18, C20 à C22, C24 à C27.
+- **Ouverts** :
+  - C1, partiel : bouton « Aujourd'hui » et flèche de gauche du planning, à voir un week-end sur ordinateur.
+  - C23, partiel : les Kanbans sur la tablette.
+  - C19 est remplacé par C23.
+- **Remarques A1 à A7** : toutes traitées et retestées.
