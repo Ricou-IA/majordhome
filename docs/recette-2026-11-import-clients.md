@@ -1,7 +1,7 @@
 # Recette — import des clients d'un autre logiciel (novembre 2026)
 
 - **Adresse testée** : https://majordhome.vercel.app
-- **Commit déployé** : à compléter après le push (le site en ligne ne porte pas encore la page d'import).
+- **Commit déployé** : `cfaefda1` (poussé le 2026-11-22, 31 commits depuis `5b0a9f3e`).
 - **Comptes** : celui d'Eric sur **Cimaj** (administrateur) pour tous les tests d'import ; celui d'Eric sur **Mayer Énergie** pour C101.
 - **Légende** : `[x]` validé · `[!]` anomalie · `[-]` non testable ou écarté, avec la raison
 - **Règle** : un test à la fois. Un point est coché après le retour d'Eric et la vérification.
@@ -15,13 +15,14 @@
 - **Essai de bout en bout en production, annulé à la fin** (aucune fiche ne reste) : 200 fiches créées en 674 ms, lot rejoué = 0 créée et 200 déjà présentes, administrateur d'une autre entreprise refusé, retrait de 100 fiches en 150 à 200 ms. Après l'essai : 3 788 clients, 0 import, comme avant.
 - **Numéros de client** : migration `20261122_2_client_number_sans_troncature` appliquée et inscrite au registre le 2026-11-22 (le numéro ne se tronque plus au-delà de 99 999). Vérifié : le défaut de la colonne passe par `majordhome.client_number_suivant()`, exécutable par l'application et le serveur, pas par un visiteur ; les 3 788 numéros existants sont inchangés ; une fiche créée comme le fait l'application, dans un essai annulé, a reçu `CLI-04066`.
 - **Aucune variable d'environnement, aucune fonction serveur** dans ce lot.
+- **Mise en ligne** : déploiement de production prêt pour `cfaefda1` (statut Vercel « success ») ; `https://majordhome.vercel.app/clients/import` répond 200 ; le site servi contient la route `clients/import` et le fichier de la page d'import (fragments « fichier type », « Imports pr »).
 - **Dépôt** : 1 677 tests, lint, contrôle du code mort et compilation au vert après le rebase.
 - **Fichier d'essai passé par les règles réelles** (hors navigateur) : 6 lignes lues = 4 à importer + 1 doublon écarté + 1 écartée.
 - **Non vérifiable par un agent** : tout ce qui demande une session connectée, donc chaque écran de la page d'import. Personne ne l'a encore vue. Rien n'est présumé validé.
 
 ## Tests
 
-### Avant le push (la base est déjà à jour, le site non)
+### Non-régression (compte Mayer)
 
 - [ ] **C101. La recherche et la création de clients marchent toujours chez Mayer.**
   Où : compte Mayer → Clients.
