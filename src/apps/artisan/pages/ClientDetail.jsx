@@ -3,8 +3,8 @@
  * ============================================================================
  * Page fiche client détaillée accessible via /clients/:id
  * Onglets (src/lib/ficheClientOnglets.js) : Résumé | Contrat | Équipements |
- * Interventions | Devis et factures | Échanges. En édition (« Modifier »), l'onglet
- * Résumé affiche le formulaire complet (TabInfo) à la place de la lecture.
+ * Interventions | Devis et factures | Échanges. « Modifier » ouvre le formulaire complet
+ * (TabInfo) dans un panneau latéral ; la page reste montée dessous.
  *
  * Sous-composants extraits dans ./client-detail/
  * ============================================================================
@@ -30,7 +30,7 @@ import { EventModal } from '../components/planning/EventModal';
 import { ClientInvestigationPanel } from '../components/clients/ClientInvestigationPanel';
 import { EnTeteFicheClient } from './client-detail/EnTeteFicheClient';
 import { TabResume } from './client-detail/TabResume';
-import { TabInfo } from './client-detail/TabInfo';
+import { PanneauModifierClient } from './client-detail/PanneauModifierClient';
 import { TabEquipments } from './client-detail/TabEquipments';
 import { TabInterventions } from './client-detail/TabInterventions';
 import { TabContrat } from './client-detail/TabContrat';
@@ -39,6 +39,7 @@ import { TabEchanges } from './client-detail/TabEchanges';
 import { logger } from '@lib/logger';
 import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
 import { ONGLETS, LIBELLE_ONGLET, ongletDeDepart } from '@/lib/ficheClientOnglets';
+import { champsModifies, casseTitre } from '@/lib/clientsAffichage';
 
 export default function ClientDetail() {
   const { id } = useParams();
@@ -48,7 +49,7 @@ export default function ClientDetail() {
   const isAdmin = effectiveRole === 'org_admin';
 
   const [activeTab, setActiveTab] = useState(() => ongletDeDepart(location.state?.tab));
-  const [isLocked, setIsLocked] = useState(true);
+  const [modificationOuverte, setModificationOuverte] = useState(false);
   const [formData, setFormData] = useState({});
   const [initialData, setInitialData] = useState({});
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -117,29 +118,24 @@ export default function ClientDetail() {
     setInitialData((prev) => (prev && prev.dpeNumber !== savedDpeNumber ? { ...prev, dpeNumber: savedDpeNumber } : prev));
     setFormData((prev) => {
       if (!prev || prev.dpeNumber === savedDpeNumber) return prev;
-      const enCoursDeSaisie = !isLocked && prev.dpeNumber !== (initialData?.dpeNumber ?? '');
+      const enCoursDeSaisie = modificationOuverte && prev.dpeNumber !== (initialData?.dpeNumber ?? '');
       return enCoursDeSaisie ? prev : { ...prev, dpeNumber: savedDpeNumber };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ne réagit qu'au numéro enregistré
   }, [savedDpeNumber, hasInitialized]);
 
-  // « Modifier » mène au formulaire, qui s'affiche dans l'onglet Résumé tant que la fiche est en édition.
-  const handleToggleLock = useCallback(() => {
-    if (!isLocked) {
-      setFormData({ ...initialData });
-    } else {
-      setActiveTab('resume');
-    }
-    setIsLocked(!isLocked);
-  }, [isLocked, initialData]);
+  // Quitter le panneau sans enregistrer : la saisie revient à la fiche enregistrée.
+  const handleAbandonModification = useCallback(() => {
+    setFormData({ ...initialData });
+    setModificationOuverte(false);
+  }, [initialData]);
 
-  // Pré-remplissage depuis l'investigation bâtiment. On déverrouille au lieu
+  // Pré-remplissage depuis l'investigation bâtiment. On ouvre le panneau au lieu
   // d'enregistrer : la donnée DPE peut être fausse ou porter sur un autre
   // logement du même immeuble, elle passe donc par une relecture humaine.
   const handleApplyInvestigation = useCallback((patch) => {
     setFormData((prev) => ({ ...prev, ...patch }));
-    setIsLocked(false);
-    setActiveTab('resume');
+    setModificationOuverte(true);
     setShowInvestigation(false);
     toast.success('Champs pré-remplis depuis le DPE — vérifiez puis Enregistrer');
   }, []);
@@ -154,14 +150,15 @@ export default function ClientDetail() {
     setEquipmentDraft(draft);
   }, []);
 
+  // Rend true si la fiche est enregistrée (le panneau ne se ferme qu'alors).
   const handleSave = async () => {
     if (!formData.lastName?.trim()) {
       toast.error('Le nom est requis');
-      return;
+      return false;
     }
     if (emailRefuse(formData.email, initialData?.email)) {
       toast.error(EMAIL_INVALIDE_MESSAGE);
-      return;
+      return false;
     }
 
     try {
@@ -190,12 +187,12 @@ export default function ClientDetail() {
     } catch (err) {
       logger.error('[ClientDetail] Erreur sauvegarde:', err);
       toast.error('Erreur lors de la sauvegarde');
-      return;
+      return false;
     }
 
     setInitialData({ ...formData });
-    setIsLocked(true);
     toast.success('Client mis à jour');
+    return true;
   };
 
   const handleArchive = async () => {
@@ -355,18 +352,14 @@ export default function ClientDetail() {
         isTenant={isTenant}
         isArchived={isArchived}
         isAdmin={isAdmin}
-        isLocked={isLocked}
         canCreateAppointment={canCreateAppointment}
         canCreateSAV={canCreateSAV}
-        isUpdating={isUpdating}
         isHardDeleting={isHardDeleting}
         onNouveauRdv={() => setAppointmentModal({ open: true })}
         onNouveauSav={() => setSavOpen(true)}
         onArchiver={() => setShowArchiveConfirm(true)}
         onSupprimer={handleOpenHardDelete}
-        onModifier={handleToggleLock}
-        onAnnuler={handleToggleLock}
-        onEnregistrer={handleSave}
+        onModifier={() => setModificationOuverte(true)}
       />
 
       {/* Onglets */}
@@ -395,9 +388,9 @@ export default function ClientDetail() {
         </nav>
       </div>
 
-      {/* Contenu des onglets. Résumé, Devis et factures, Échanges posent leurs propres cartes ;
-          en édition, le Résumé cède la place au formulaire complet. */}
-      {activeTab === 'resume' && isLocked && (
+      {/* Contenu des onglets. Résumé, Devis et factures, Échanges posent leurs propres cartes.
+          Le Résumé reste monté pendant la modification (le bloc DPE ne rejoue pas son rattachement). */}
+      {activeTab === 'resume' && (
         <TabResume
           client={client}
           owner={owner}
@@ -413,9 +406,8 @@ export default function ClientDetail() {
       )}
       {activeTab === 'devis-factures' && <TabDevisFactures client={client} clientId={id} orgId={organization?.id} />}
       {activeTab === 'echanges' && <TabEchanges clientId={id} projectId={client.project_id} />}
-      {((activeTab === 'resume' && !isLocked) || ['contrat', 'equipements', 'interventions'].includes(activeTab)) && (
+      {['contrat', 'equipements', 'interventions'].includes(activeTab) && (
         <div className="bg-white rounded-lg border border-secondary-200 shadow-card p-6">
-          {activeTab === 'resume' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} savedLocation={{ lat: client?.latitude, lng: client?.longitude }} savedAddress={{ address: client?.address || '', postalCode: client?.postal_code || '', city: client?.city || '' }} />}
           {activeTab === 'contrat' && <TabContrat clientId={id} orgId={organization?.id} userId={user?.id} client={client} />}
           {activeTab === 'equipements' && (
             <TabEquipments
@@ -429,9 +421,16 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* Investigation bâtiment — panneau latéral, lecture seule.
-          « Renseigner la fiche » ne fait que PRÉ-REMPLIR le formulaire et le
-          déverrouiller : rien n'est écrit en base sans un Enregistrer explicite. */}
+      <PanneauModifierClient
+        ouvert={modificationOuverte} nom={casseTitre(displayName)} isUpdating={isUpdating}
+        modifie={champsModifies(initialData, formData).length > 0}
+        onEnregistrer={async () => { if (await handleSave()) setModificationOuverte(false); }}
+        onAbandonner={handleAbandonModification}
+        formData={formData} setFormData={setFormData} clientId={id} orgId={organization?.id} client={client}
+      />
+
+      {/* Investigation bâtiment — panneau latéral, lecture seule. « Renseigner la fiche » ne fait
+          que PRÉ-REMPLIR le formulaire : rien n'est écrit en base sans un Enregistrer explicite. */}
       <ClientInvestigationPanel
         client={client}
         isOpen={showInvestigation}

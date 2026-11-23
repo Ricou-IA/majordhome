@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { User, Phone, MapPin, Home, FileText, ExternalLink, Link2, X, Search, Loader2, UserCheck, Users, Plus, Navigation } from 'lucide-react';
 import { LienWaze } from '@/apps/artisan/components/shared/LienWaze';
 import { useNavigate } from 'react-router-dom';
@@ -198,14 +197,14 @@ function LinkClientSearch({ clientId, orgId, onLink, isLinking }) {
         </button>
       </div>
 
-      {/* Modale création client — Portal pour éviter les conflits z-index */}
-      {showCreateModal && createPortal(
+      {/* Modale création client — rendue sur place, DANS le panneau « Modifier la fiche » : portée
+          sur document.body, elle tombait hors du panneau (piège de focus, clics coupés par la modale). */}
+      {showCreateModal && (
         <ClientModal
           isOpen={true}
           onClose={() => setShowCreateModal(false)}
           onCreated={handleClientCreated}
-        />,
-        document.body
+        />
       )}
     </>
   );
@@ -312,7 +311,7 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
           <User className="w-4 h-4 text-secondary-500" />
           Identité
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Nom" required>
             <TextInput value={formData.lastName} onChange={(v) => u('lastName', v.toUpperCase())} placeholder="DUPONT" disabled={isLocked} />
           </FormField>
@@ -323,7 +322,7 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
             <SelectInput value={formData.clientCategory} onChange={(v) => u('clientCategory', v)} options={CLIENT_CATEGORIES} placeholder="Sélectionner..." disabled={isLocked} />
           </FormField>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           <FormField label="Société">
             <TextInput value={formData.companyName} onChange={(v) => u('companyName', v)} placeholder="Entreprise (optionnel)" disabled={isLocked} />
           </FormField>
@@ -339,7 +338,7 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
           <Phone className="w-4 h-4 text-secondary-500" />
           Contact
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Téléphone">
             <PhoneInput value={formData.phone} onChange={(v) => u('phone', v)} disabled={isLocked} />
           </FormField>
@@ -393,7 +392,7 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
             Y aller avec Waze
           </LienWaze>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
         <div className="space-y-4">
           <FormField label="Adresse">
             <TextInput value={formData.address} onChange={(v) => u('address', v)} placeholder="12 rue des Lilas" disabled={isLocked} />
@@ -432,7 +431,7 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
             Logement
           </h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Type">
             <SelectInput value={formData.housingType} onChange={(v) => u('housingType', v)} options={HOUSING_TYPES} placeholder="Sélectionner..." disabled={isLocked} />
           </FormField>

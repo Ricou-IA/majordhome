@@ -8,17 +8,17 @@
  * Présentationnel : tout l'état et tous les gestes restent dans ClientDetail,
  * qui les passe en props. Conditions inchangées : Nouveau RDV si `planning.create`
  * et client non archivé, Nouveau SAV si `sav.create` et non archivé, Archiver si
- * non archivé et hors édition, Supprimer définitivement si administrateur et
- * hors édition (les deux ouvrent la confirmation de ClientDetail).
+ * non archivé, Supprimer définitivement si administrateur (les deux ouvrent la
+ * confirmation de ClientDetail).
  *
- * Une seule action principale : « Nouveau RDV », sauf en édition où c'est
- * « Enregistrer » (la plus à droite).
+ * Une seule action principale : « Nouveau RDV » (la plus à droite). « Modifier »
+ * ouvre le panneau latéral de ClientDetail, qui porte son propre « Enregistrer ».
  * ============================================================================
  */
 
 import { Link } from 'react-router-dom';
 import {
-  Archive, CalendarPlus, ChevronRight, LifeBuoy, Loader2, Mail, Navigation, Pencil, Phone, Save, Trash2,
+  Archive, CalendarPlus, ChevronRight, LifeBuoy, Mail, Navigation, Pencil, Phone, Trash2,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -48,23 +48,19 @@ function anneeDe(date) {
  * @param {boolean} props.isTenant
  * @param {boolean} props.isArchived
  * @param {boolean} props.isAdmin
- * @param {boolean} props.isLocked          fiche en lecture (pas d'édition en cours)
  * @param {boolean} props.canCreateAppointment
  * @param {boolean} props.canCreateSAV
- * @param {boolean} props.isUpdating
  * @param {boolean} props.isHardDeleting
  * @param {Function} props.onNouveauRdv
  * @param {Function} props.onNouveauSav
  * @param {Function} props.onArchiver       ouvre la confirmation d'archivage
  * @param {Function} props.onSupprimer      ouvre la confirmation de suppression définitive
- * @param {Function} props.onModifier       passe la fiche en édition
- * @param {Function} props.onAnnuler        quitte l'édition sans enregistrer
- * @param {Function} props.onEnregistrer
+ * @param {Function} props.onModifier       ouvre le panneau « Modifier la fiche »
  */
 export function EnTeteFicheClient({
-  client, displayName, isOwner, isTenant, isArchived, isAdmin, isLocked,
-  canCreateAppointment, canCreateSAV, isUpdating, isHardDeleting,
-  onNouveauRdv, onNouveauSav, onArchiver, onSupprimer, onModifier, onAnnuler, onEnregistrer,
+  client, displayName, isOwner, isTenant, isArchived, isAdmin,
+  canCreateAppointment, canCreateSAV, isHardDeleting,
+  onNouveauRdv, onNouveauSav, onArchiver, onSupprimer, onModifier,
 }) {
   const { isPhone } = useDeviceClass();
   // Sur téléphone, toute zone tactile fait au moins 44 px.
@@ -76,13 +72,12 @@ export function EnTeteFicheClient({
   const depuis = anneeDe(client.created_at);
   const adresse = formaterAdresse({ address: client.address, postalCode: client.postal_code, city: client.city });
   const villeSeule = [client.city, client.postal_code].filter(Boolean).join(' ');
-  const enEdition = !isLocked;
   const rdvPossible = canCreateAppointment && !isArchived;
 
   const actionsMenu = [
     canCreateSAV && !isArchived && { label: 'Nouveau SAV', icon: LifeBuoy, onClick: onNouveauSav },
-    !isArchived && isLocked && { label: 'Archiver', icon: Archive, danger: true, onClick: onArchiver },
-    isAdmin && isLocked && {
+    !isArchived && { label: 'Archiver', icon: Archive, danger: true, onClick: onArchiver },
+    isAdmin && {
       label: 'Supprimer définitivement', icon: Trash2, danger: true, disabled: isHardDeleting, onClick: onSupprimer,
     },
   ];
@@ -173,35 +168,15 @@ export function EnTeteFicheClient({
 
           <MenuActions libelle="Autres actions sur le client" actions={actionsMenu} className={tactileIcone} />
 
-          {enEdition ? (
-            <>
-              {rdvPossible && (
-                <Button type="button" variant="secondary" className={tactile} onClick={onNouveauRdv} title="Créer un nouveau RDV pour ce client">
-                  <CalendarPlus aria-hidden="true" />
-                  Nouveau RDV
-                </Button>
-              )}
-              <Button type="button" variant="secondary" className={tactile} onClick={onAnnuler} title="Annuler les modifications">
-                Annuler
-              </Button>
-              <Button type="button" variant="primary" className={tactile} onClick={onEnregistrer} disabled={isUpdating}>
-                {isUpdating ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
-                Enregistrer
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button type="button" variant="secondary" className={tactile} onClick={onModifier} title="Modifier la fiche">
-                <Pencil aria-hidden="true" />
-                Modifier
-              </Button>
-              {rdvPossible && (
-                <Button type="button" variant="primary" className={tactile} onClick={onNouveauRdv} title="Créer un nouveau RDV pour ce client">
-                  <CalendarPlus aria-hidden="true" />
-                  Nouveau RDV
-                </Button>
-              )}
-            </>
+          <Button type="button" variant="secondary" className={tactile} onClick={onModifier} title="Modifier la fiche">
+            <Pencil aria-hidden="true" />
+            Modifier
+          </Button>
+          {rdvPossible && (
+            <Button type="button" variant="primary" className={tactile} onClick={onNouveauRdv} title="Créer un nouveau RDV pour ce client">
+              <CalendarPlus aria-hidden="true" />
+              Nouveau RDV
+            </Button>
           )}
         </div>
       </div>
