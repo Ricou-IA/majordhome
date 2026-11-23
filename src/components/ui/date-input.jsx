@@ -39,7 +39,10 @@ export function DateInput({ value, onChange, min, max, disabled = false, require
   const [erreur, setErreur] = useState(null);
   const [moisAffiche, setMoisAffiche] = useState(null);
 
-  useEffect(() => { setErreur(null); }, [value]);
+  // Texte refusé gardé à l'écran (en rouge) tant que l'utilisateur ne l'a pas corrigé.
+  const [texteRefuse, setTexteRefuse] = useState(null);
+  // Une nouvelle date (choisie ici ou posée par le parent) efface l'erreur ; la date vidée par un refus, non.
+  useEffect(() => { if (value) { setErreur(null); setTexteRefuse(null); } }, [value]);
 
   const choisie = depuisIso(value);
   // Jours fériés de l'année affichée (et des voisines), pas seulement de celle de la valeur.
@@ -55,10 +58,20 @@ export function DateInput({ value, onChange, min, max, disabled = false, require
 
   const horsLimites = (iso) => (min && iso < min) || (max && iso > max);
 
-  const valider = (iso) => {
-    if (iso === null) { setErreur('Date invalide (jj/mm/aaaa)'); return false; }
-    if (iso && horsLimites(iso)) { setErreur('Date hors des limites permises'); return false; }
+  // Une saisie refusée VIDE la valeur (onChange('')) au lieu de garder l'ancienne : sinon un clic
+  // sur « Confirmer » enregistrerait en silence la date d'avant, et la vérification de l'appelant
+  // (date obligatoire, jamais dans le futur) ne pourrait pas refuser. Le texte tapé reste affiché.
+  const refuser = (message, texte) => {
+    setErreur(message);
+    setTexteRefuse(texte ?? null);
+    if (value) onChange?.('');
+    return false;
+  };
+  const valider = (iso, texte) => {
+    if (iso === null) return refuser('Date invalide (jj/mm/aaaa)', texte);
+    if (iso && horsLimites(iso)) return refuser('Date hors des limites permises', texte);
     setErreur(null);
+    setTexteRefuse(null);
     if (iso !== (value || '')) onChange?.(iso);
     return true;
   };
@@ -100,13 +113,16 @@ export function DateInput({ value, onChange, min, max, disabled = false, require
           aria-label={libelle}
           aria-invalid={erreur ? true : undefined}
           aria-describedby={erreur ? `${idChamp}-erreur` : undefined}
-          value={saisie ?? formatDateLongueFR(value)}
-          onFocus={() => setSaisie(saisieDepuisIso(value))}
+          value={saisie ?? texteRefuse ?? formatDateLongueFR(value)}
+          onFocus={() => setSaisie(texteRefuse ?? saisieDepuisIso(value))}
           onChange={(e) => setSaisie(e.target.value)}
           // Quitter le champ sans rien changer n'écrit rien (une valeur stockée sous une autre forme reste telle quelle).
-          onBlur={() => { if (saisie !== null && saisie !== saisieDepuisIso(value)) valider(lireSaisieDate(saisie)); setSaisie(null); }}
+          onBlur={() => {
+            if (saisie !== null && (texteRefuse !== null || saisie !== saisieDepuisIso(value))) valider(lireSaisieDate(saisie), saisie);
+            setSaisie(null);
+          }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); if (valider(lireSaisieDate(saisie ?? ''))) e.currentTarget.blur(); }
+            if (e.key === 'Enter') { e.preventDefault(); if (valider(lireSaisieDate(saisie ?? ''), saisie)) e.currentTarget.blur(); }
             if (e.key === 'ArrowDown' && e.altKey) { e.preventDefault(); setOuvert(true); }
           }}
           className={cn(
