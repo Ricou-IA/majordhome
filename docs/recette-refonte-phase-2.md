@@ -1,7 +1,7 @@
 # Recette — refonte de l'interface, phase 2 (menu, composants, en-têtes de page)
 
 - **Adresse testée** : https://majordhome.vercel.app
-- **Commit déployé** : à compléter à la mise en ligne (depuis `125ab233`, menu déjà en ligne le 2026-11-23)
+- **Commit déployé** : `24cf1cfd` (2026-11-23) ; le menu était en ligne depuis `125ab233`
 - **Comptes** : celui d'Eric (Mayer Énergie, administrateur) ; pour M4, un second compte (autre personne ou autre navigateur)
 - **Légende** : `[x]` validé · `[!]` anomalie · `[-]` non testable ou écarté, avec la raison
 - **Règle** : un test à la fois. Un point est coché après le retour d'Eric et la vérification.
