@@ -15,7 +15,7 @@ import { JourneeEtatChips } from './JourneeEtatChips';
  * cuivre (« vous êtes ici »). Pastille sans marge verticale : la ligne garde sa
  * hauteur, la réserve de l'en-tête (hauteurEnTeteReservee) reste exacte.
  */
-function TexteDuJour({ texte, aujourdhui }) {
+export function TexteDuJour({ texte, aujourdhui }) {
   const morceaux = aujourdhui ? String(texte).match(/^(\D*)(\d+)(.*)$/) : null;
   if (!morceaux) return <span>{texte}</span>;
   const [, avant, numero, apres] = morceaux;

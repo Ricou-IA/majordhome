@@ -49,7 +49,7 @@ import { CalendarToolbar } from '@/apps/artisan/components/planning/CalendarTool
 import { CalendarFilters } from '@/apps/artisan/components/planning/CalendarFilters';
 import { PlanningClientSearchInput, PlanningClientAppointments } from '@/apps/artisan/components/planning/PlanningClientSearch';
 import { PlanningEventContent } from '@/apps/artisan/components/planning/PlanningEventContent';
-import { PlanningDayHeader } from '@/apps/artisan/components/planning/PlanningDayHeader';
+import { PlanningDayHeader, TexteDuJour } from '@/apps/artisan/components/planning/PlanningDayHeader';
 import { RemplirJourneePanel } from '@/apps/artisan/components/tournees/RemplirJourneePanel';
 import { PageHeader } from '@/components/ui/page-header';
 
@@ -187,7 +187,9 @@ export default function Planning() {
   // En-tête d'un jour : charge par technicien et chiffre, pour l'admin d'organisation
   // et le team leader seulement (jamais en vue Mois).
   const dayHeaderContent = useCallback((arg) => {
-    if (!voitCharge || arg.view.type === 'dayGridMonth') return <span>{arg.text}</span>;
+    if (arg.view.type === 'dayGridMonth') return <span>{arg.text}</span>;
+    // Pastille cuivre du jour même pour tous les rôles ; la charge reste réservée au pilotage.
+    if (!voitCharge) return <TexteDuJour texte={arg.text} aujourdhui={arg.isToday} />;
     return (
       <PlanningDayHeader
         texte={arg.text}
