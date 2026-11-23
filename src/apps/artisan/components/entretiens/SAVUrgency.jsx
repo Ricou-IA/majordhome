@@ -60,6 +60,7 @@ export function SAVUrgencyBadge({ item, taille = 'carte' }) {
   return (
     <StatusPill
       tone={TON_URGENCE[niveau]}
+      taille={taille === 'fiche' ? 'normale' : 'compacte'}
       icone={<Icon className={taille === 'fiche' ? 'h-3.5 w-3.5' : 'h-3 w-3'} aria-hidden="true" />}
     >
       {libelleUrgence(niveau)}

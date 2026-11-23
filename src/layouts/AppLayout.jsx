@@ -212,16 +212,6 @@ export default function AppLayout() {
     return 'Utilisateur';
   };
 
-  const getUserInitials = () => {
-    const name = getUserDisplayName();
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   // ===========================================================================
   // RENDER SIDEBAR
   // ===========================================================================
@@ -239,7 +229,7 @@ export default function AppLayout() {
       onOuvrirRecherche={ouvrirRecherche}
       onNaviguer={closeSidebar}
       peutOuvrirReglages={peutOuvrirReglages}
-      profil={{ nom: getUserDisplayName(), initiales: getUserInitials(), email: user?.email }}
+      profil={{ nom: getUserDisplayName(), email: user?.email }}
       menuProfilOuvert={userMenuOpen}
       onMenuProfil={setUserMenuOpen}
       onSeDeconnecter={handleSignOut}

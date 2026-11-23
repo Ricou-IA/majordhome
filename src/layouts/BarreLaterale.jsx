@@ -67,7 +67,7 @@ function Entree({ to, icon: Icone, libelle, replie, onClick, className = '' }) {
  * @param {() => void} props.onOuvrirRecherche
  * @param {() => void} props.onNaviguer             lien suivi (ferme le tiroir et le menu du profil)
  * @param {boolean} props.peutOuvrirReglages
- * @param {{ nom: string, initiales: string, email?: string }} props.profil
+ * @param {{ nom: string, email?: string }} props.profil
  * @param {boolean} props.menuProfilOuvert
  * @param {(ouvert: boolean) => void} props.onMenuProfil
  * @param {() => void} props.onSeDeconnecter
