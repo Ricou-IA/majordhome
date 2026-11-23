@@ -23,14 +23,18 @@ export default function HistoriqueTab({ orgId, v }) {
   const [export_, setExport] = useState(false);
   const maj = (cle) => (v) => setF((p) => ({ ...p, [cle]: v, ...(cle === 'unitId' ? { taskId: null } : {}) }));
 
+  // Une borne vidée (ou une date refusée, qui vide le champ) reprend la période par défaut :
+  // ajouterJours('') lèverait « Invalid time value » en plein rendu.
+  const du = f.du || ajouterJours(aujourdhui, -30);
+  const au = f.au || aujourdhui;
   const filtresRequete = useMemo(() => ({
-    depuis: `${ajouterJours(f.du, -1)}T00:00:00Z`,
-    jusqua: `${ajouterJours(f.au, 1)}T23:59:59Z`,
+    depuis: `${ajouterJours(du, -1)}T00:00:00Z`,
+    jusqua: `${ajouterJours(au, 1)}T23:59:59Z`,
     unitId: f.unitId || undefined,
     taskId: f.taskId || undefined,
     operatorId: f.operatorId || undefined,
     status: f.status || undefined,
-  }), [f]);
+  }), [f, du, au]);
 
   const referentiel = useMaintenanceReferentiel(orgId);
   const logs = useMaintenanceLogs(orgId, filtresRequete);
@@ -41,10 +45,10 @@ export default function HistoriqueTab({ orgId, v }) {
 
   const lignes = useMemo(() => (logs.data || []).filter((l) => {
     const j = jourParis(l.done_at);
-    return j >= f.du && j <= f.au;
-  }), [logs.data, f.du, f.au]);
+    return j >= du && j <= au;
+  }), [logs.data, du, au]);
 
-  const periodeInvalide = f.du > f.au;
+  const periodeInvalide = du > au;
 
   const exporter = async () => {
     setExport(true);
@@ -55,8 +59,8 @@ export default function HistoriqueTab({ orgId, v }) {
         tasks,
         operators,
         logs: lignes,
-        du: f.du,
-        au: f.au,
+        du,
+        au,
         libelleModule: v.module,
       });
     } catch (err) {
