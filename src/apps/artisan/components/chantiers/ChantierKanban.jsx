@@ -9,7 +9,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, HardHat } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -138,6 +138,7 @@ export function ChantierKanban() {
       columnAmount={columnAmount}
       headerExtra={headerExtra}
       emptyMessage="Aucun chantier"
+      vide={{ icon: HardHat, message: 'Aucun chantier en cours.', detail: 'Un chantier naît d’un devis signé dans le pipeline.' }}
       headerRight={
         <button
           onClick={refresh}

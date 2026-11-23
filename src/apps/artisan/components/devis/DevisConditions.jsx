@@ -10,6 +10,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { computeQuoteTotals } from '@services/devis.service';
 import { FormField, TextInput, TextArea } from '../../components/FormFields';
 import DevisTvaSummary from './DevisTvaSummary';
+import { InfoTip } from '@components/ui/info-tip';
 import { buildDevisConfig } from '@/lib/devisConfig.js';
 
 /** @param {{ devisConfig?: object }} p  devisConfig = buildDevisConfig(settings) : conditions et validité par défaut de l'org */
@@ -55,7 +56,7 @@ export default function DevisConditions({ form, setField, lines, devisConfig }) 
               <button type="button" onClick={() => setField('conditions', DEFAULT_CONDITIONS)} className="text-xs text-primary-600 hover:text-primary-700 mt-1">Utiliser les conditions par défaut</button>
             )}
           </FormField>
-          <FormField label="Notes internes (non visibles sur le devis)">
+          <FormField label={<span className="inline-flex items-center gap-1">Note interne <InfoTip>Non visible sur le devis envoyé au client.</InfoTip></span>}>
             <TextArea value={form.notesInternes} onChange={(v) => setField('notesInternes', v)} rows={2} placeholder="Notes pour usage interne..." />
           </FormField>
         </div>

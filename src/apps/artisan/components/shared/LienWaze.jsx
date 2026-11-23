@@ -28,7 +28,7 @@ export function LienWaze({ address, postalCode, city, lat, lng, className = '', 
   const href = lienWaze({ adresse, lat, lng });
   if (!href) return sinon;
 
-  const titre = adresse ? `Y aller avec Waze : ${adresse}` : 'Y aller avec Waze';
+  const titre = adresse ? `Itinéraire vers ${adresse} (Waze)` : 'Itinéraire (Waze)';
   return (
     <a
       href={href}

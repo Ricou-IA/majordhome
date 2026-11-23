@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import { formatDateFR, formatPhoneNumber, formatEuro } from '@/lib/utils';
+import { InfoTip } from '@components/ui/info-tip';
 import {
   APPOINTMENT_TYPES,
   COMMERCIAL_TYPES,
@@ -713,11 +714,11 @@ export const SectionNotes = ({ formData, updateField, isCancelled }) => (
           disabled={isCancelled}
         />
       </FormField>
-      <FormField label="Notes internes">
+      <FormField label={<span className="inline-flex items-center gap-1">Note interne <InfoTip>Non visible par le client.</InfoTip></span>}>
         <TextArea
           value={formData.internal_notes}
           onChange={(v) => updateField('internal_notes', v)}
-          placeholder="Notes internes (non visibles par le client)..."
+          placeholder="Pour l’équipe…"
           rows={2}
           disabled={isCancelled}
         />

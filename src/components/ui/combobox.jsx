@@ -67,7 +67,8 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
 
   const choisir = (option) => {
     if (!option || option.disabled) return;
-    onChange?.(String(option.value ?? ''));
+    // Comme un <select> : rechoisir l'option déjà choisie ne déclenche pas onChange.
+    if (String(option.value ?? '') !== cleCourante) onChange?.(String(option.value ?? ''));
     setOuvert(false);
   };
 

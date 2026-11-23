@@ -29,6 +29,7 @@ import { formatEuroCeil, cn } from '@/lib/utils';
 import { Tag } from '@/components/ui/tag';
 import { useColonnesRepliees } from '@/shared/hooks/useColonnesRepliees';
 import { KanbanColonneRepliee } from './KanbanColonneRepliee';
+import { EmptyState } from '@/components/ui/empty-state';
 
 // ============================================================================
 // COLUMN (INTERNAL)
@@ -167,6 +168,9 @@ function ColumnContent({
  * @param {React.ReactNode} [props.headerLeft] - Content on the left of the header bar
  * @param {React.ReactNode} [props.headerRight] - Extra buttons on the right of the header bar (before search)
  * @param {string[]} [props.colonnesRepliables] - Column ids collapsed by default (still drop zones)
+ * @param {{ icon?: React.ComponentType, message: string, detail?: string, action?: { label: string, onClick: Function } }} [props.vide]
+ *   - Tableau entièrement vide (aucun élément, recherche à part) : un état vide avec son action au lieu de colonnes vides.
+ *     L'appelant ne le passe qu'une fois le chargement fini.
  */
 export function KanbanBoard({
   items,
@@ -184,6 +188,7 @@ export function KanbanBoard({
   headerLeft,
   headerRight,
   colonnesRepliables,
+  vide,
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const dndEnabled = typeof onDragEnd === 'function';
@@ -328,7 +333,9 @@ export function KanbanBoard({
       )}
 
       {/* Board */}
-      {dndEnabled ? (
+      {vide && items.length === 0 ? (
+        <EmptyState icon={vide.icon} message={vide.message} detail={vide.detail} action={vide.action} />
+      ) : dndEnabled ? (
         <DragDropContext onDragEnd={onDragEnd}>
           {boardContent}
         </DragDropContext>

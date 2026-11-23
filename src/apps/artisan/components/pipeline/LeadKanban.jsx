@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, UserCircle, Tag, FileText } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, UserCircle, Tag, FileText, Kanban } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeadStatuses, useLeadCommercials, useLeadSources, useLeadMutations } from '@hooks/useLeads';
@@ -805,7 +805,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
       searchFilter={searchFilter}
       columnAmount={columnAmount}
       colonnesRepliables={[...TERMINAL_COLUMN_KEYS]}
-      emptyMessage="Aucun lead"
+      emptyMessage="Aucun lead" vide={{ icon: Kanban, message: 'Aucun lead dans le tableau.', action: onNewLead ? { label: 'Nouveau lead', icon: Plus, onClick: onNewLead } : undefined }}
       headerLeft={
         <p className="text-sm text-secondary-500">
           {allLeads.length} lead{allLeads.length !== 1 ? 's' : ''} actif{allLeads.length !== 1 ? 's' : ''}

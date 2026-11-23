@@ -241,7 +241,7 @@ function LinkedClientsSection({ clientId, orgId, isLocked, onModaleOuverte }) {
     <section>
       <h3 className="text-sm font-semibold text-secondary-900 mb-4 flex items-center gap-2">
         <Link2 className="w-4 h-4 text-secondary-500" />
-        Clients liés
+        Proches et sociétés liées
         {hasLinks && (
           <span className="px-1.5 py-0.5 text-[11px] font-medium bg-secondary-100 text-secondary-600 rounded-full">
             {(owner ? 1 : 0) + tenants.length}
@@ -366,7 +366,7 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
             disabled={isLocked}
             className="rounded border-secondary-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
           />
-          Accepte de recevoir des emails (optin mailing)
+          Accepte les e-mails
         </label>
         <label className="flex items-center gap-2 mt-2 text-sm text-secondary-700 cursor-pointer select-none">
           <input
@@ -398,7 +398,7 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
             className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary-50 px-3 py-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-100"
           >
             <Navigation className="w-4 h-4" aria-hidden="true" />
-            Y aller avec Waze
+            Itinéraire
           </LienWaze>
         </div>
         <div className="grid grid-cols-1 gap-6">

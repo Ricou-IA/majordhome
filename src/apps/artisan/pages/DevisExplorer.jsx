@@ -10,7 +10,7 @@
 import { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { AlertTriangle, EyeOff, Link2, Plus } from 'lucide-react';
+import { AlertTriangle, EyeOff, FileText, Link2, Plus } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { useQuotesExplorer, useQuoteDismissals } from '@hooks/usePennylane';
@@ -184,6 +184,7 @@ export default function DevisExplorer() {
           columns={COLUMNS}
           groupBy="status"
           emptyMessage="Aucun devis"
+          vide={{ icon: FileText, message: sansReponse ? 'Aucun devis sans réponse depuis 21 jours.' : 'Aucun devis dans cette vue.' }}
           searchPlaceholder="Rechercher un client, un n° de devis..."
           searchFilter={(row, query) => {
             const q = query.toLowerCase();
