@@ -1,7 +1,7 @@
 # Recette — refonte de l'interface, phase 4 (Leads, Planning, Chantiers, Entretiens, Devis)
 
 - **Adresse testée** : https://majordhome.vercel.app
-- **Commit déployé** : à compléter à la mise en ligne
+- **Commit déployé** : `77edd619` (2026-11-23)
 - **Comptes** : celui d'Eric (Mayer Énergie, administrateur) ; pour P6, un compte technicien
 - **Légende** : `[x]` validé · `[!]` anomalie · `[-]` non testable ou écarté, avec la raison
 - **Règle** : un test à la fois. Un point est coché après le retour d'Eric et la vérification.
