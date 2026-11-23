@@ -11,8 +11,17 @@ import {
   Check,
   X,
   Filter,
+  HardHat,
+  Store,
+  Ruler,
+  Home,
+  Factory,
+  ClipboardList,
 } from 'lucide-react';
 import { NAF_SECTIONS, searchNafCodes } from '../lib/nafGlossary';
+
+/** Icône de chaque section du glossaire (clé `icon` de `nafGlossary.js`). */
+const ICONES_SECTION = { chantier: HardHat, commerce: Store, etude: Ruler, immobilier: Home, industrie: Factory, services: ClipboardList };
 
 // ============================================================================
 // MAIN COMPONENT
@@ -195,7 +204,7 @@ export default function NafSelector({ selectedCodes = [], onChange, module, defa
                         ) : (
                           <ChevronRight className="w-4 h-4 text-secondary-400" />
                         )}
-                        <span>{section.icon}</span>
+                        {(() => { const Icone = ICONES_SECTION[section.icon]; return Icone ? <Icone className="w-4 h-4 shrink-0 text-secondary-500" aria-hidden="true" /> : null; })()}
                         <span className="flex-1 text-left">{section.label}</span>
                         {sectionSelectedCount > 0 && (
                           <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#2196F3] text-white font-bold">

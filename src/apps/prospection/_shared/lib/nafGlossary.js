@@ -12,7 +12,7 @@ export const NAF_SECTIONS = [
   {
     code: 'F',
     label: 'Construction / BTP',
-    icon: '🏗️',
+    icon: 'chantier',
     groups: [
       {
         label: 'Génie climatique & Plomberie',
@@ -84,7 +84,7 @@ export const NAF_SECTIONS = [
   {
     code: 'G',
     label: 'Commerce',
-    icon: '🏪',
+    icon: 'commerce',
     groups: [
       {
         label: 'Commerce de gros matériel CVC / sanitaire',
@@ -111,7 +111,7 @@ export const NAF_SECTIONS = [
   {
     code: 'M',
     label: 'Activités scientifiques & techniques',
-    icon: '📐',
+    icon: 'etude',
     groups: [
       {
         label: 'Architecture & ingénierie',
@@ -129,7 +129,7 @@ export const NAF_SECTIONS = [
   {
     code: 'L',
     label: 'Activités immobilières',
-    icon: '🏠',
+    icon: 'immobilier',
     groups: [
       {
         label: 'Immobilier',
@@ -148,7 +148,7 @@ export const NAF_SECTIONS = [
   {
     code: 'C',
     label: 'Industrie manufacturière',
-    icon: '🏭',
+    icon: 'industrie',
     groups: [
       {
         label: 'Fabrication équipements CVC',
@@ -165,7 +165,7 @@ export const NAF_SECTIONS = [
   {
     code: 'N',
     label: 'Services administratifs & soutien',
-    icon: '📋',
+    icon: 'services',
     groups: [
       {
         label: 'Location matériel / nettoyage',
