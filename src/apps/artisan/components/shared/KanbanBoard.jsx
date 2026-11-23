@@ -23,7 +23,8 @@
 import { useState, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Search, X } from 'lucide-react';
-import { formatEuroCeil } from '@/lib/utils';
+import { formatEuroCeil, cn } from '@/lib/utils';
+import { Tag } from '@/components/ui/tag';
 
 // ============================================================================
 // COLUMN (INTERNAL)
@@ -50,30 +51,29 @@ function ColumnContent({
 
   return (
     <div
-      className={`
-        mdh-kanban-col flex flex-col bg-secondary-50 rounded-xl min-w-0 flex-1 basis-0
-        border transition-colors
-        ${isDraggingOver ? 'border-blue-300 bg-blue-50/50' : 'border-secondary-200'}
-      `}
+      className={cn(
+        'mdh-kanban-col flex flex-col rounded-2xl min-w-0 flex-1 basis-0 border transition-colors',
+        // Zone de dépôt survolée : teinte cuivre claire (sélection), jamais un statut
+        isDraggingOver ? 'border-primary-300 bg-primary-50' : 'border-transparent bg-secondary-100',
+      )}
     >
       {/* Header */}
       <div className="px-3 py-3 border-b border-secondary-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Pastille : la couleur de l'étape, pas un statut */}
             <span
               className="w-3 h-3 rounded-full shrink-0"
               style={{ backgroundColor: column.color }}
             />
-            <h3 className="font-semibold text-sm text-secondary-800 truncate">
+            <h3 className="text-label font-semibold text-secondary-800 truncate">
               {column.label}
             </h3>
           </div>
-          <span className="text-xs font-medium bg-secondary-200 text-secondary-600 px-2 py-0.5 rounded-full">
-            {count}
-          </span>
+          <Tag className="shrink-0 bg-white tabular-nums">{count}</Tag>
         </div>
         {amount !== null && (
-          <p className={`text-xs mt-1 ${amount > 0 ? 'text-secondary-500' : 'text-secondary-300'}`}>
+          <p className={`text-xs mt-1 tabular-nums ${amount > 0 ? 'text-secondary-500' : 'text-secondary-300'}`}>
             {formatEuroCeil(amount)}
           </p>
         )}
@@ -100,7 +100,7 @@ function ColumnContent({
                     {...dragProvided.draggableProps}
                     {...dragProvided.dragHandleProps}
                     onClick={() => onCardClick?.(item)}
-                    className={snapshot.isDragging ? 'opacity-90 rotate-1 shadow-lg' : ''}
+                    className={snapshot.isDragging ? 'opacity-90 rotate-1 shadow-md' : ''}
                   >
                     {renderCard(item)}
                   </div>
@@ -263,7 +263,7 @@ export function KanbanBoard({
                   onChange={(e) => setSearchTerm(e.target.value)}
                   // Largeur d'après le texte d'aide : à 220 px fixes, « Rechercher un chantier... » était coupé.
                   size={Math.max(18, searchPlaceholder.length)}
-                  className="min-w-[220px] max-w-full pl-9 pr-8 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors min-h-[40px]"
+                  className="min-w-[220px] max-w-full pl-9 pr-8 py-2 border border-secondary-300 rounded-lg text-sm focus:shadow-ring focus:border-primary-600 focus:ring-0 outline-none transition-colors min-h-[40px]"
                   placeholder={searchPlaceholder}
                 />
                 {searchTerm && (

@@ -132,15 +132,15 @@ export default function Pipeline() {
         <TabsList className="w-full justify-start gap-1 bg-secondary-100/80 p-1">
           <TabsTrigger value="dashboard" className="gap-2 data-[state=active]:bg-white">
             <BarChart3 className="h-4 w-4" />
-            Dashboard
+            Statistiques
           </TabsTrigger>
           <TabsTrigger value="kanban" className="gap-2 data-[state=active]:bg-white">
             <Columns3 className="h-4 w-4" />
-            Kanban
+            Tableau
           </TabsTrigger>
           <TabsTrigger value="long-term" className="gap-2 data-[state=active]:bg-white">
             <Hourglass className="h-4 w-4" />
-            Suivi MT-LT
+            Suivi des objectifs
           </TabsTrigger>
         </TabsList>
 

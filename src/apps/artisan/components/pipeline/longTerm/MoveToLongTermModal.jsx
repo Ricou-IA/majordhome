@@ -36,7 +36,7 @@ export function MoveToLongTermModal({
   const handleSubmit = async () => {
     try {
       await onConfirm(notes.trim() || null);
-      toast.success('Lead basculé en Projet MT-LT');
+      toast.success('Lead passé en suivi des objectifs');
       onClose();
     } catch (err) {
       logger.error('[MoveToLongTermModal] error:', err);
@@ -53,7 +53,7 @@ export function MoveToLongTermModal({
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-2">
             <Hourglass className="h-5 w-5 text-purple-600" />
-            <h3 className="text-lg font-semibold text-secondary-900">Passer en Projet MT-LT</h3>
+            <h3 className="text-lg font-semibold text-secondary-900">Passer en suivi des objectifs</h3>
           </div>
           <button
             onClick={onClose}
@@ -77,7 +77,7 @@ export function MoveToLongTermModal({
         </div>
 
         <p className="text-sm text-secondary-600 mb-3">
-          Le lead sortira du pipeline et apparaîtra dans l&apos;onglet <strong>Suivi MT-LT</strong>.
+          Le lead sortira du pipeline et apparaîtra dans l&apos;onglet <strong>Suivi des objectifs</strong>.
           Vous pourrez ajouter des interactions et le réactiver à tout moment.
         </p>
 

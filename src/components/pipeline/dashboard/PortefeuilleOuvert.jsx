@@ -34,7 +34,7 @@ export function PortefeuilleOuvert({ portefeuille, onOuvrirKanban }) {
   return (
     <Panneau
       titre="À traiter maintenant"
-      precision="Le portefeuille ouvert aujourd’hui, hors projets en suivi MT-LT. Ne dépend pas de la période."
+      precision="Le portefeuille ouvert aujourd’hui, hors projets en suivi des objectifs. Ne dépend pas de la période."
     >
       <div className="overflow-x-auto">
         {lignes.length === 0 ? (
@@ -51,7 +51,7 @@ export function PortefeuilleOuvert({ portefeuille, onOuvrirKanban }) {
                 <Th title={`Devis en attente sans relance ni contact depuis plus de ${SEUIL_RELANCE_JOURS} jours`}>
                   Sans relance &gt; {SEUIL_RELANCE_JOURS} j
                 </Th>
-                {onOuvrirKanban && <Th><span className="sr-only">Ouvrir le Kanban</span></Th>}
+                {onOuvrirKanban && <Th><span className="sr-only">Ouvrir le tableau</span></Th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-secondary-100">
@@ -65,9 +65,9 @@ export function PortefeuilleOuvert({ portefeuille, onOuvrirKanban }) {
                         type="button"
                         onClick={() => onOuvrirKanban(l.id)}
                         className="inline-flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                        aria-label={`Ouvrir le Kanban de ${l.nom}`}
+                        aria-label={`Ouvrir le tableau de ${l.nom}`}
                       >
-                        Kanban
+                        Tableau
                         <ChevronRight className="h-3.5 w-3.5" />
                       </button>
                     </Td>

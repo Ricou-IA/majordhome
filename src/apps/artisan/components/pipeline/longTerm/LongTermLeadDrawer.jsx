@@ -185,7 +185,7 @@ export function LongTermLeadDrawer({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Hourglass className="h-4 w-4 text-purple-600 shrink-0" />
-                <span className="text-xs uppercase tracking-wide text-purple-700 font-semibold">Projet MT-LT</span>
+                <span className="text-xs uppercase tracking-wide text-purple-700 font-semibold">Suivi des objectifs</span>
                 <span
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${freshness.classes}`}
                   title={`Fraîcheur du suivi (basée sur la dernière interaction)`}
@@ -198,7 +198,7 @@ export function LongTermLeadDrawer({
                     type="button"
                     onClick={() => setShowQuoteCandidates(true)}
                     className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors"
-                    title="Rattacher un devis Pennylane à ce projet MT-LT (régularisation base)"
+                    title="Rattacher un devis Pennylane à ce projet en suivi des objectifs (régularisation base)"
                   >
                     <Link2 className="w-3 h-3" />
                     Rattacher devis PL
@@ -218,7 +218,7 @@ export function LongTermLeadDrawer({
                 )}
                 {lead.long_term_started_at && (
                   <span className="text-xs">
-                    En MT-LT depuis {formatShortDate(lead.long_term_started_at)}
+                    En suivi des objectifs depuis {formatShortDate(lead.long_term_started_at)}
                   </span>
                 )}
               </div>

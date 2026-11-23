@@ -17,6 +17,9 @@ import { useLinkedPennylaneQuotes, usePrefetchLinkedPennylaneQuotes } from '@hoo
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { dateDeCarte } from '@/lib/leadCardDate';
 import { estHorsZone } from '@/lib/territoire-config';
+import { Avatar } from '@/components/ui/avatar';
+import { Tag } from '@/components/ui/tag';
+import { StatusPill } from '@/components/ui/status-pill';
 import { QuoteSubCard } from './QuoteSubCard';
 
 // Statuts depuis lesquels un lead peut partir en suivi MT-LT : tout le funnel
@@ -81,8 +84,8 @@ const STATUS_LABEL_TO_COLUMN_KEY = {
  */
 function getDaysColor(days) {
   if (days == null) return 'text-secondary-400';
-  if (days > 7) return 'text-red-500';
-  if (days > 3) return 'text-amber-500';
+  if (days > 7) return 'text-st-alerte';
+  if (days > 3) return 'text-st-attente';
   return 'text-secondary-400';
 }
 
@@ -96,14 +99,10 @@ const SOURCE_SHORT_LABELS = {
 
 
 /**
- * Couleurs pour les badges initiales commerciaux
+ * Couleurs des pastilles d'initiales des commerciaux : une couleur de personne, dans le même ordre
+ * que l'ancienne table de classes (indigo, sarcelle, rose, ambre), assez soutenue pour des initiales blanches.
  */
-const COMMERCIAL_COLORS = [
-  'bg-indigo-100 text-indigo-700 ring-indigo-300',
-  'bg-teal-100 text-teal-700 ring-teal-300',
-  'bg-rose-100 text-rose-700 ring-rose-300',
-  'bg-amber-100 text-amber-700 ring-amber-300',
-];
+const COMMERCIAL_COLORS = ['#4F46E5', '#0F766E', '#BE123C', '#B45309'];
 
 function getCommercialColor(index) {
   return COMMERCIAL_COLORS[index % COMMERCIAL_COLORS.length];
@@ -114,7 +113,7 @@ function getCommercialColor(index) {
  * @param {Object} props.lead - Données lead avec statuses/sources jointures
  * @param {Function} props.onClick - Callback clic sur la carte
  * @param {Object} props.commercialsMap - Map { id: { initials, name, colorIndex } }
- * @param {Function} props.onMoveToLongTerm - (lead) => void — affiche un bouton MT-LT
+ * @param {Function} props.onMoveToLongTerm - (lead) => void — affiche le bouton « suivi des objectifs » (MT-LT)
  *   sur les cartes du funnel actif (Nouveau → Devis envoyé) si fourni
  * @param {Object} [props.card] - Carte Kanban courante (column_key, devis_count) passée par LeadKanban (Phase 1 pipeline multi-devis)
  * @param {string} [props.columnKey] - Colonne où la carte est AFFICHÉE (peut différer un instant de `card.column_key`
@@ -167,10 +166,8 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
   if (!lead) return null;
 
   const name = `${lead.last_name || ''} ${lead.first_name || ''}`.trim() || 'Sans nom';
-  const statusColor = lead.statuses?.color || '#6B7280';
   const sourceRaw = lead.sources?.name || null;
   const sourceLabel = sourceRaw ? (SOURCE_SHORT_LABELS[sourceRaw] || sourceRaw) : null;
-  const sourceColor = lead.sources?.color || '#6B7280';
   // Montant affiche :
   // - Colonne Gagne -> somme des devis valides (card.total_amount = accepted_sum
   //   de la vue majordhome_kanban_cards, decision produit 2026-05-27 : tous
@@ -204,22 +201,21 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
       onFocus={handleMouseEnter}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(lead); }}
       className="w-full text-left bg-white rounded-lg border hover:shadow-md transition-shadow
-                 focus:outline-none focus:ring-2 focus:ring-blue-500 flex cursor-pointer"
+                 focus:outline-none focus:shadow-ring flex cursor-pointer"
     >
-      {/* Bande date à gauche */}
+      {/* Bande date à gauche : neutre, la colonne dit déjà l'étape */}
       <div
-        className="flex flex-col items-center justify-center px-2 py-2 rounded-l-lg min-w-[44px] border-r"
-        style={{ backgroundColor: `${statusColor}10`, borderColor: `${statusColor}30` }}
+        className="flex flex-col items-center justify-center px-2 py-2 rounded-l-lg min-w-[44px] border-r bg-secondary-25 border-secondary-200 text-secondary-700"
         title={dateTitle}
       >
         {showAmber ? (
-          <CalendarClock className="h-4 w-4 text-amber-500" />
+          <CalendarClock className="h-4 w-4 text-st-attente" />
         ) : shortDate ? (
           <>
-            <span className="text-sm font-bold leading-none" style={{ color: statusColor }}>
+            <span className="font-display text-sm font-bold leading-none">
               {shortDate.day}
             </span>
-            <span className="text-[11px] uppercase leading-tight" style={{ color: statusColor }}>
+            <span className="text-caption uppercase leading-tight">
               {shortDate.month}
             </span>
           </>
@@ -231,19 +227,20 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
       {/* Contenu carte */}
       <div className="flex-1 min-w-0 p-2.5">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-medium text-sm text-secondary-900 truncate">{name}</p>
+          <p className="text-body-sm font-semibold text-secondary-900 truncate">{name}</p>
           <div className="flex items-center gap-1.5 shrink-0">
             {onMoveToLongTerm && LONG_TERM_ELIGIBLE_STATUSES.has(lead.statuses?.label) && (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onMoveToLongTerm(lead); }}
-                className="inline-flex items-center justify-center h-5 w-5 rounded-full text-purple-600 hover:bg-purple-100 transition-colors"
-                title="Passer en Projet MT-LT (sortir du pipeline)"
+                className="inline-flex items-center justify-center h-5 w-5 rounded-full text-secondary-500 hover:bg-secondary-100 transition-colors"
+                title="Passer en suivi des objectifs (sortir du pipeline)"
+                aria-label="Passer en suivi des objectifs (sortir du pipeline)"
               >
                 <Hourglass className="h-3.5 w-3.5" />
               </button>
             )}
-            <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-secondary-400'}`}>
+            <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-secondary-900' : 'text-secondary-400'}`}>
               {formatEuroCeil(amount)}
             </span>
           </div>
@@ -255,37 +252,36 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
             place). */}
         <div className="flex items-center gap-1.5 mt-1.5 min-w-0">
           {estHorsZone(lead) && (
-            <span
-              className="shrink-0 inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 font-medium whitespace-nowrap"
-              title="Adresse hors de la zone où l’entreprise intervient"
-            >
-              <MapPinOff className="h-3 w-3" />Hors zone
+            <span className="shrink-0 inline-flex" title="Adresse hors de la zone où l’entreprise intervient">
+              <StatusPill tone="attente" taille="compacte" icone={<MapPinOff className="h-3 w-3 shrink-0" />}>
+                Hors zone
+              </StatusPill>
             </span>
           )}
+          {/* Étiquette de source et pastille d'initiales ramenées à 20 px (h-5), la hauteur des
+              anciennes pastilles : la ligne, donc la carte, garde sa hauteur. */}
           {sourceLabel && (
-            <span
-              className="min-w-0 text-xs px-1.5 py-0.5 rounded-full text-white font-medium truncate"
-              style={{ backgroundColor: sourceColor }}
-              title={sourceLabel}
-            >
-              {sourceLabel}
-            </span>
+            <Tag className="min-w-0 h-5 px-1.5">
+              <span className="min-w-0 truncate" title={sourceLabel}>{sourceLabel}</span>
+            </Tag>
           )}
           {commercial && (
-            <span
-              className={`shrink-0 text-[11px] px-1.5 py-0.5 rounded-full font-bold ring-1 ${getCommercialColor(commercial.colorIndex)}`}
-              title={commercial.name}
-            >
-              {commercial.initials}
+            <span className="shrink-0 inline-flex" title={commercial.name} role="img" aria-label={commercial.name}>
+              <Avatar
+                nom={commercial.name}
+                couleur={getCommercialColor(commercial.colorIndex)}
+                taille={24}
+                className="h-5 w-5"
+              />
             </span>
           )}
           {lead.statuses?.label === 'Contacté' && lead.call_count > 0 && (
-            <span className="shrink-0 text-xs flex items-center gap-0.5 text-amber-600" title={`${lead.call_count} appel${lead.call_count > 1 ? 's' : ''}`}>
+            <span className="shrink-0 text-xs flex items-center gap-0.5 text-secondary-500" title={`${lead.call_count} appel${lead.call_count > 1 ? 's' : ''}`}>
               <Phone className="h-3 w-3" />{lead.call_count}
             </span>
           )}
           {lead.statuses?.label === 'Devis envoyé' && lead.followup_count > 0 && (
-            <span className="shrink-0 text-xs flex items-center gap-0.5 text-purple-600" title={`${lead.followup_count} relance${lead.followup_count > 1 ? 's' : ''}`}>
+            <span className="shrink-0 text-xs flex items-center gap-0.5 text-secondary-500" title={`${lead.followup_count} relance${lead.followup_count > 1 ? 's' : ''}`}>
               <Phone className="h-3 w-3" />{lead.followup_count}
             </span>
           )}
@@ -299,13 +295,9 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-              className="ml-auto shrink-0 inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors"
-              style={{
-                backgroundColor: card?.column_key === 'gagne' ? '#d97706'
-                  : card?.column_key === 'perdu' ? '#94a3b8'
-                  : '#1d4ed8',
-                color: 'white',
-              }}
+              className={`ml-auto shrink-0 inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors ${
+                card?.column_key === 'perdu' ? 'bg-st-neutre-bg text-st-neutre' : 'bg-st-info-bg text-st-info'
+              }`}
               title="Voir les devis Pennylane attachés"
             >
               <FileText className="w-3 h-3" />
@@ -317,7 +309,7 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
 
         {needsQuoteLink && (
           <p
-            className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-amber-700"
+            className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-st-attente"
             title="Devis envoyé sans devis Pennylane rattaché — à rapprocher manuellement"
           >
             <AlertTriangle className="h-3 w-3" />

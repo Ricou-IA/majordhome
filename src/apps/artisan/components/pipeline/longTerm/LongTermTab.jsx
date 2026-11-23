@@ -317,11 +317,11 @@ export function LongTermTab() {
         <div className="rounded-lg border border-secondary-200 bg-white px-6 py-12 text-center">
           <Hourglass className="mx-auto h-8 w-8 text-secondary-300" />
           <h3 className="mt-3 text-sm font-semibold text-secondary-900">
-            {enrichedLeads.length === 0 ? 'Aucun projet en suivi MT-LT' : 'Aucun projet ne correspond'}
+            {enrichedLeads.length === 0 ? 'Aucun projet en suivi des objectifs' : 'Aucun projet ne correspond'}
           </h3>
           <p className="mx-auto mt-1 max-w-md text-sm text-secondary-500">
             {enrichedLeads.length === 0
-              ? 'Le sablier d’une carte du Kanban (Nouveau, Contacté, RDV planifié ou Devis envoyé) fait passer un lead en suivi long terme.'
+              ? 'Le sablier d’une carte du tableau (Nouveau, Contacté, RDV planifié ou Devis envoyé) fait passer un lead en suivi des objectifs.'
               : 'Modifiez la recherche ou les filtres pour voir d’autres projets.'}
           </p>
         </div>
