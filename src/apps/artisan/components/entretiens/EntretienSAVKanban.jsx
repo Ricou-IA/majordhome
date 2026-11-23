@@ -15,7 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useEntretienSAV, useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { useInvitationsDuMois } from '@hooks/useTournees';
-import { KANBAN_COLUMNS, getTransitions, savService } from '@services/sav.service';
+import { KANBAN_COLUMNS, ENCAISSEES_DEPUIS_JOURS, getTransitions, savService } from '@services/sav.service';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { Button } from '@/components/ui/button';
 import { LancerAppelButton } from '../appels/LancerAppelButton';
@@ -70,7 +70,12 @@ export function EntretienSAVKanban() {
     const cols = effectiveRole === 'technicien'
       ? KANBAN_COLUMNS.filter(c => colonnesTechnicien().includes(c.value))
       : KANBAN_COLUMNS;
-    return cols.map(c => ({ id: c.value, label: c.label, color: c.color }));
+    return cols.map(c => ({
+      id: c.value,
+      // La colonne Encaissé ne montre que les cartes encaissées récemment : on le dit.
+      label: c.value === 'facture' ? `${c.label} · ${ENCAISSEES_DEPUIS_JOURS} j` : c.label,
+      color: c.color,
+    }));
   }, [effectiveRole]);
 
   // Filtrer par rôle avant de passer au KanbanBoard
@@ -179,7 +184,8 @@ export function EntretienSAVKanban() {
     }
 
     // Bloquer drag planifié → réalisé pour les entretiens (certificat obligatoire)
-    if (item.intervention_type === 'entretien' && newStatus === 'realise') {
+    // (sauf retour depuis « Encaissé » : le certificat est déjà fait)
+    if (item.intervention_type === 'entretien' && newStatus === 'realise' && oldStatus !== 'facture') {
       toast.error('Veuillez remplir le certificat d\'entretien pour passer en réalisé');
       return;
     }
@@ -302,6 +308,9 @@ export function EntretienSAVKanban() {
       searchPlaceholder="Rechercher..."
       searchFilter={searchFilter}
       emptyMessage="Aucun élément"
+      // « Encaissé » = filet (cartes encaissées depuis 30 jours) : repliée par défaut,
+      // une carte s'y ramène en « Réalisé » par glisser-déposer.
+      colonnesRepliables={['facture']}
       headerRight={
         <>
           {/* Campagne d'appels = bureau : le technicien voit des SAV « À planifier », pas la file d'appels */}

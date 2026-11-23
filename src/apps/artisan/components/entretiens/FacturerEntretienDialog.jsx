@@ -44,6 +44,7 @@ import { anomaliesDeCarte, noteClientDepuisAnomalies } from '@/lib/certificatAno
 import { FormField, TextArea } from '../FormFields';
 import { genererAttestationsIntervention } from '@/apps/artisan/components/certificat/attestationExport';
 import { certificatKeys } from '@/shared/hooks/cacheKeys';
+import { savService } from '@services/sav.service';
 
 /**
  * @param {object} p
@@ -486,6 +487,22 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
             Mode, échéance et mentions : Paramètres → Facturation.
           </p>
         )}
+
+        {/* Facture faite hors de l'outil (directement dans Pennylane) : on marque seulement la carte.
+            Ce geste était un bouton à part sur la carte ; il vit ici depuis que la carte porte des pastilles. */}
+        <button
+          type="button"
+          onClick={async () => {
+            const { error } = await savService.updateFields(item.id, { invoiced_at: new Date().toISOString() });
+            if (error) { toast.error('Erreur mise à jour facturation'); return; }
+            toast.success('Carte marquée facturée');
+            onOpenChange(false);
+            onCreated?.();
+          }}
+          className="text-xs text-secondary-600 underline underline-offset-2 hover:text-secondary-900"
+        >
+          Facture déjà faite ailleurs ? Marquer la carte facturée
+        </button>
       </div>
     </ConfirmDialog>
   );

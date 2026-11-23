@@ -18,6 +18,7 @@ import { withErrorHandling, getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { isMobileFR } from '@/lib/phoneUtils';
 import { entretiensService, releaseOrphanEntretienCard } from './entretiens.service';
 import { logger } from '@lib/logger';
+import { fetchAllPages } from '@/lib/postgrestUtils';
 import { statutVisiteAnnee } from '@/lib/entretienVisitStatus';
 import { minutesVersHeure as minutesVersHHMM, minutesDepuisMinuit } from '@/lib/tournee/arrets.js';
 
@@ -96,6 +97,9 @@ export const SAV_STATUSES = [
  * Les cartes entretien n'apparaissent que dans : a_planifier, planifie, realise
  * Les cartes SAV apparaissent dans toutes les colonnes
  */
+/** Colonne « Encaissé » du kanban : cartes encaissées touchées depuis ce nombre de jours. */
+export const ENCAISSEES_DEPUIS_JOURS = 30;
+
 export const KANBAN_COLUMNS = [
   { value: 'demande',           label: 'Demande SAV',       color: '#EF4444', types: ['sav'] },
   { value: 'devis_envoye',      label: 'Devis envoyé',      color: '#3B82F6', types: ['sav'] },
@@ -104,6 +108,9 @@ export const KANBAN_COLUMNS = [
   { value: 'a_planifier',       label: 'À planifier',       color: '#3B82F6', types: ['entretien', 'sav'] },
   { value: 'planifie',          label: 'Planifié',          color: '#8B5CF6', types: ['entretien', 'sav'] },
   { value: 'realise',           label: 'Réalisé',           color: '#10B981', types: ['entretien', 'sav'] },
+  // Filet (Eric 2026-11-23) : une carte encaissée ne disparaît plus, elle se range ici
+  // (repliée par défaut) et se ramène en Réalisé par glisser-déposer.
+  { value: 'facture',           label: 'Encaissé',          color: '#64748B', types: ['entretien', 'sav'] },
 ];
 
 const ENTRETIEN_TRANSITIONS = {
@@ -123,7 +130,8 @@ const SAV_TRANSITIONS = {
   pieces_commandees: ['a_planifier', 'devis_envoye'],
   a_planifier:       ['planifie'],
   planifie:          ['realise', 'a_planifier'],
-  realise:           [],
+  realise:           ['facture'],
+  facture:           ['realise'],
 };
 
 export const PARTS_ORDER_STATUSES = [
@@ -328,25 +336,26 @@ export const savService = {
   // ==========================================================================
 
   /**
-   * Récupère tous les items entretien + SAV d'une organisation
+   * Cartes du kanban Entretien & SAV : toutes les cartes en cours (lues en entier,
+   * page par page) + les cartes encaissées touchées depuis `encaisseesDepuisJours` jours
+   * (colonne « Encaissé », le filet pour revenir en arrière).
+   * Avant le 2026-11-23 : `limit(300)` sur 392 cartes — les plus anciennes, dont des
+   * cartes « Réalisé », manquaient sans rien dire.
    */
-  async getEntretiensSAV({ orgId, limit = 300 }) {
+  async getEntretiensSAV({ orgId, encaisseesDepuisJours = ENCAISSEES_DEPUIS_JOURS }) {
     if (!orgId) throw new Error('[sav] orgId requis');
 
     try {
-      const { data, error } = await supabase
-        .from('majordhome_entretien_sav')
-        .select('*')
-        .eq('org_id', orgId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      const depuis = new Date(Date.now() - encaisseesDepuisJours * 86_400_000).toISOString();
+      const lire = (filtrer) => fetchAllPages((from, to) => filtrer(
+        supabase.from('majordhome_entretien_sav').select('*').eq('org_id', orgId),
+      ).order('created_at', { ascending: false }).order('id').range(from, to));
 
-      if (error) {
-        logger.error('[sav] getEntretiensSAV error:', error);
-        return { data: null, error };
-      }
-
-      return { data: data || [], error: null };
+      const [enCours, encaissees] = await Promise.all([
+        lire((q) => q.or('workflow_status.is.null,workflow_status.neq.facture')),
+        lire((q) => q.eq('workflow_status', 'facture').gte('updated_at', depuis)),
+      ]);
+      return { data: [...enCours, ...encaissees], error: null };
     } catch (err) {
       logger.error('[sav] getEntretiensSAV error:', err);
       return { data: null, error: err };

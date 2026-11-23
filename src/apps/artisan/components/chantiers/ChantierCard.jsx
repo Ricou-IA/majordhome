@@ -16,7 +16,8 @@
  * ============================================================================
  */
 
-import { MapPin, Calendar, CalendarClock, CalendarPlus, Package, Check, Clock, AlertTriangle, MessageSquare, Loader2 } from 'lucide-react';
+import { MapPin, Calendar, CalendarClock, CalendarPlus, Package, MessageSquare } from 'lucide-react';
+import { RepereCarte as Repere, RepereBouton } from '../shared/RepereCarte';
 import { formatEuroCeil } from '@/lib/utils';
 import { getChantierAmount } from '@services/chantiers.service';
 import { poseProvisoire } from '@/lib/installOrder';
@@ -142,18 +143,13 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
           <div className="mt-auto flex items-center gap-0.5 min-w-0 overflow-hidden">
             {reperes.map((repere) => (
               repere.cle === 'avis' && onDemanderAvis && !avisBlocage ? (
-                <button
+                <RepereBouton
                   key={repere.cle}
-                  type="button"
-                  disabled={avisEnCours}
-                  onClick={(e) => { e.stopPropagation(); onDemanderAvis(chantier); }}
-                  title="Demander un avis au client par SMS"
-                  className="inline-flex items-center gap-0.5 text-caption leading-4 px-1.5 py-0.5 rounded-full font-bold shrink-0 border
-                             border-secondary-300 text-secondary-700 bg-white hover:bg-secondary-50 disabled:opacity-60"
-                >
-                  {avisEnCours ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <MessageSquare className="h-2.5 w-2.5" />}
-                  Avis
-                </button>
+                  repere={{ ...repere, etat: 'a_faire', libelle: 'Avis', titre: 'Demander un avis au client par SMS' }}
+                  icone={MessageSquare}
+                  enCours={avisEnCours}
+                  onClick={() => onDemanderAvis(chantier)}
+                />
               ) : <Repere key={repere.cle} repere={repere} />
             ))}
           </div>
@@ -177,25 +173,6 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
         )}
       </div>
     </div>
-  );
-}
-
-/** Pastille d'un repère d'après-vente : l'état se lit à l'icône et au remplissage, pas à la couleur seule. */
-const REPERE_STYLES = {
-  fait: { css: 'bg-st-ok text-white border-st-ok', Icone: Check },
-  en_cours: { css: 'bg-st-info-bg text-st-info border-st-info/20', Icone: Clock },
-  attention: { css: 'bg-st-attente-bg text-st-attente border-st-attente/30', Icone: AlertTriangle },
-  a_faire: { css: 'bg-white text-secondary-400 border-secondary-200', Icone: null },
-  inconnu: { css: 'bg-secondary-50 text-secondary-300 border-dashed border-secondary-200', Icone: null },
-};
-
-function Repere({ repere }) {
-  const { css, Icone } = REPERE_STYLES[repere.etat] || REPERE_STYLES.a_faire;
-  return (
-    <span className={`inline-flex min-w-0 items-center gap-0.5 text-caption leading-4 px-1 py-0.5 rounded-full font-bold border ${css}`} title={repere.titre}>
-      {Icone && <Icone className="h-2.5 w-2.5 shrink-0" />}
-      <span className="truncate">{repere.libelle}</span>
-    </span>
   );
 }
 

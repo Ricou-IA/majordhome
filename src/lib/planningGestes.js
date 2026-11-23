@@ -164,10 +164,11 @@ export function plagesVoisines({ vue, startDate, endDate } = {}) {
 }
 
 // Grille horaire affichée par défaut ; elle ne s'étend que pour montrer un RDV
-// posé plus tôt ou plus tard (Eric, 2026-11-21).
-const GRILLE_DEBUT_MINUTES = 7 * 60 + 30;
+// posé plus tôt ou plus tard (Eric, 2026-11-21). Bornes à l'heure ronde : les
+// libellés tombent sur 8 h 00, 9 h 00… (Eric 2026-11-23 : « 7 h 30, 8 h 30… » se lisait mal).
+const GRILLE_DEBUT_MINUTES = 8 * 60;
 const GRILLE_FIN_MINUTES = 18 * 60;
-const PAS_GRILLE_MINUTES = 30;
+const PAS_GRILLE_MINUTES = 60;
 
 const heureDeGrille = (minutes) => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}:00`;
 const minutesDuJour = (iso) => {
@@ -176,7 +177,7 @@ const minutesDuJour = (iso) => {
 };
 
 /**
- * Bornes de la grille horaire : 7 h 30 → 18 h, élargies à la demi-heure près pour
+ * Bornes de la grille horaire : 8 h → 18 h, élargies à l'heure ronde près pour
  * que tout RDV affiché soit visible en entier. Les bandes de tolérance (events de
  * fond) n'élargissent rien. Un RDV sans heure de fin compte pour une heure.
  * @param {Array<{ start?: string, end?: (string|null), display?: string }>} events

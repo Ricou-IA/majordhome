@@ -113,20 +113,20 @@ test('plagesVoisines : vue Jour = jour ouvré voisin ; vue Mois et plage inconnu
   const { bornesDeGrille } = await import('../src/lib/planningGestes.js');
   const rdv = (debut, fin, extra = {}) => ({ start: `2026-11-16T${debut}`, end: fin ? `2026-11-16T${fin}` : null, ...extra });
 
-  test('bornesDeGrille : 7 h 30 → 18 h sans RDV, ou avec des RDV dans la plage', () => {
-    assert.deepEqual(bornesDeGrille([]), { slotMinTime: '07:30:00', slotMaxTime: '18:00:00' });
-    assert.deepEqual(bornesDeGrille([rdv('08:00:00', '17:00:00'), rdv('07:30:00', '18:00:00')]),
-      { slotMinTime: '07:30:00', slotMaxTime: '18:00:00' });
+  test('bornesDeGrille : 8 h → 18 h sans RDV, ou avec des RDV dans la plage', () => {
+    assert.deepEqual(bornesDeGrille([]), { slotMinTime: '08:00:00', slotMaxTime: '18:00:00' });
+    assert.deepEqual(bornesDeGrille([rdv('08:00:00', '17:00:00'), rdv('09:30:00', '18:00:00')]),
+      { slotMinTime: '08:00:00', slotMaxTime: '18:00:00' });
   });
 
-  test('bornesDeGrille : s\'étend à la demi-heure près pour un RDV plus tôt ou plus tard', () => {
-    assert.deepEqual(bornesDeGrille([rdv('06:45:00', '08:00:00'), rdv('18:00:00', '19:10:00')]),
-      { slotMinTime: '06:30:00', slotMaxTime: '19:30:00' });
+  test('bornesDeGrille : s\'étend à l\'heure ronde pour un RDV plus tôt ou plus tard', () => {
+    assert.deepEqual(bornesDeGrille([rdv('07:30:00', '09:00:00'), rdv('18:00:00', '19:10:00')]),
+      { slotMinTime: '07:00:00', slotMaxTime: '20:00:00' });
   });
 
   test('bornesDeGrille : RDV sans fin = une heure ; bande de tolérance ignorée', () => {
-    assert.deepEqual(bornesDeGrille([rdv('17:30:00', null)]).slotMaxTime, '18:30:00');
+    assert.deepEqual(bornesDeGrille([rdv('17:30:00', null)]).slotMaxTime, '19:00:00');
     assert.deepEqual(bornesDeGrille([rdv('06:00:00', '20:00:00', { display: 'background' })]),
-      { slotMinTime: '07:30:00', slotMaxTime: '18:00:00' });
+      { slotMinTime: '08:00:00', slotMaxTime: '18:00:00' });
   });
 }

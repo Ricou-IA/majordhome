@@ -3,19 +3,22 @@
  * ============================================================================
  * Carte individuelle pour le kanban Entretien & SAV.
  * Bandeau gauche coloré par type (bleu entretien / orange SAV) ; pastilles en tons st-*.
- * Affiche : nom client, code postal, montant contrat/devis, date, tag type.
+ * Hauteur FIXE (comme la carte chantier) : nom + montant, ville, type et repères, puis une
+ * ligne du bas (suites d'un réalisé en pastilles partagées avec le chantier — RepereCarte —,
+ * certificat à faire, devis fléché ou invitation). Ni tag « Contrat » ni numéro de contrat,
+ * ni lien de prise de RDV (Eric 2026-11-23).
  *
  * @version 1.0.0 - Sprint 8 Entretien & SAV
  * ============================================================================
  */
 
 import { useState } from 'react';
-import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw, Undo2, Mail, Link2, AlertTriangle, Camera, FileText } from 'lucide-react';
+import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Archive, Phone, PhoneForwarded, Receipt, Undo2, Mail, AlertTriangle, Camera, FileText } from 'lucide-react';
+import { RepereCarte, RepereBouton } from '../shared/RepereCarte';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
 import { savService } from '@services/sav.service';
-import { autoRdvService } from '@services/autoRdv.service';
 import { invoicesService } from '@services/invoices.service';
 import { PARTS_ORDER_STATUSES } from '@services/sav.service';
 import { useQueryClient } from '@tanstack/react-query';
@@ -98,26 +101,6 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
   const [cancelOpen, setCancelOpen] = useState(false);
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
   const { isTeamLeaderOrAbove } = useAuth();
-  // Lien de prise de RDV (auto-RDV) : copié dans le presse-papiers pour tester
-  // la page client ou poser par téléphone en la lisant avec le client.
-  const [lienBusy, setLienBusy] = useState(false);
-  const contractIdPourLien = item.effective_contract_id || item.contract_id || null;
-  const handleCopierLien = async (e) => {
-    e.stopPropagation();
-    if (lienBusy || !contractIdPourLien) return;
-    setLienBusy(true);
-    try {
-      const { data, error } = await autoRdvService.signerLien({ orgId, contractId: contractIdPourLien });
-      if (error || !data?.url) throw error || new Error('lien indisponible');
-      await navigator.clipboard.writeText(data.url);
-      const fin = data.expires_at ? new Date(data.expires_at).toLocaleDateString('fr-FR') : null;
-      toast.success(fin ? `Lien de prise de rendez-vous copié — valable jusqu'au ${fin}` : 'Lien de prise de rendez-vous copié');
-    } catch (err) {
-      toast.error(`Lien non copié : ${err?.message || 'erreur'}`);
-    } finally {
-      setLienBusy(false);
-    }
-  };
   const pennylaneEnabled = usePennylaneEnabled();
   const { settings } = useOrgSettings();
   const isHubMode = pennylaneInvoiceSettings(settings).mode === 'hub';
@@ -192,13 +175,116 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
     });
   };
 
+  const invoiced = !!item.invoice_id || !!item.invoiced_at;
+
+  // Encaissé : la carte part dans la colonne « Encaissé » (repliée) ; « Annuler » la ramène.
+  const handleEncaisser = async () => {
+    const { error } = await savService.updateWorkflowStatus(item.id, 'facture');
+    if (error) {
+      toast.error('Erreur mise à jour encaissement — la carte reste ouverte');
+      return;
+    }
+    onRefresh?.();
+    toast.success('Carte encaissée', {
+      description: `${name} · rangée dans « Encaissé »`,
+      action: {
+        label: 'Annuler',
+        onClick: async () => {
+          const { error: rErr } = await savService.updateWorkflowStatus(item.id, 'realise');
+          if (rErr) toast.error('Retour en « Réalisé » impossible');
+          onRefresh?.();
+        },
+      },
+    });
+  };
+
+  const handleMarquageFacture = async () => {
+    const next = item.invoiced_at ? null : new Date().toISOString();
+    const { error } = await savService.updateFields(item.id, { invoiced_at: next });
+    if (error) {
+      toast.error('Erreur mise à jour facturation');
+      return;
+    }
+    toast.success(next ? 'Marqué facturé' : 'Marquage facturé retiré');
+    onRefresh?.();
+  };
+
+  const handleFacture = async () => {
+    if (item.invoice_id) {
+      // Mode hub : `invoice_id` pointe une facture Majord'home archivée ; mode Pennylane : id PL, rien à ouvrir.
+      if (!isHubMode) return;
+      const { data: url, error } = await invoicesService.getPdfUrl(orgId, item.invoice_id);
+      if (error) toast.error(error.message || 'PDF non archivé');
+      else window.open(url, '_blank', 'noopener');
+      return;
+    }
+    if (!item.invoiced_at && canPushInvoice) { setInvoiceOpen(true); return; }
+    await handleMarquageFacture();
+  };
+
+  const handleAvis = async () => {
+    if (smsSent) return;
+    setSmsLoading(true);
+    const { data, error } = await savService.sendAvisRequest({
+      interventionId: item.id,
+      clientId: item.client_id,
+      clientFirstName: item.client_first_name,
+      clientPhone: item.client_phone,
+      clientPhoneSecondary: item.client_phone_secondary,
+      orgId,
+    });
+    setSmsLoading(false);
+    if (error) {
+      toast.error(error.message || 'Erreur envoi demande d\'avis');
+    } else {
+      setSmsSent(true);
+      const count = data?.sentCount || 1;
+      toast.success(count > 1 ? `${count} demandes d'avis envoyées` : 'Demande d\'avis envoyée');
+    }
+  };
+
+  const handleRejeuImport = async () => {
+    try {
+      const r = await retryExport.mutateAsync({
+        invoiceId: item.invoice_id,
+        company: buildCompanyInfo(settings),
+        invoicing: invoicingSettings(settings),
+        renderPdf: generateInvoicePdfBlob,
+        pennylaneEnabled,
+      });
+      toast.success(
+        r.alreadyImported && !r.imported
+          ? `Facture ${r.number} déjà importée dans Pennylane`
+          : `Facture ${r.number}${r.pdfRegenerated ? ' — PDF régénéré,' : ''} importée dans Pennylane`,
+      );
+    } catch (err) {
+      toast.error(invoiceErrorMessage(err, 'Le rejeu de l’export a échoué'), { duration: 15000 });
+    }
+  };
+
+  const titreFacture = item.invoice_id
+    ? (isHubMode ? 'Facture émise — ouvrir le PDF' : 'Facture créée sur Pennylane')
+    : item.invoiced_at
+      ? 'Facturé — cliquer pour retirer le marquage'
+      : (canPushInvoice ? (isHubMode ? 'Émettre la facture' : 'Créer la facture sur Pennylane') : 'Marquer comme facturé');
+  const repereFacture = { etat: invoiced ? 'fait' : 'a_faire', libelle: 'Facturé', titre: titreFacture };
+
+  // Ligne du bas (hauteur fixe) : une seule information, par ordre d'utilité.
+  const certificatAFaire = (type === 'entretien' || (type === 'sav' && item.includes_entretien))
+    && item.workflow_status === 'planifie'
+    && !!(item.effective_contract_id || item.contract_id);
+  const invitationLibelle = item.workflow_status === 'a_planifier' ? libelleInvitation(invitation) : null;
+
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={() => onClick?.(item)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(item); }}
-      className="relative w-full text-left bg-white rounded-lg border border-secondary-200 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500"
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') onClick?.(item);
+      }}
+      className="relative w-full h-[112px] text-left bg-white rounded-lg border border-secondary-200 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500"
     >
       {item.workflow_status === 'a_planifier' && canRanger && (
         <button
@@ -210,31 +296,20 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
           <Archive className="w-3.5 h-3.5" />
         </button>
       )}
-      {item.workflow_status === 'a_planifier' && isTeamLeaderOrAbove && contractIdPourLien && (
-        <button
-          type="button"
-          onClick={handleCopierLien}
-          disabled={lienBusy}
-          title="Copier le lien de prise de rendez-vous (page client)"
-          className="absolute bottom-1 left-7 z-10 p-1 rounded-md text-white/70 hover:text-white hover:bg-white/25 transition-all disabled:opacity-50"
-        >
-          {lienBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
-        </button>
-      )}
-      <div className="flex">
-        {/* Bandeau gauche coloré avec date */}
+      <div className="flex h-full">
+        {/* Bandeau gauche coloré avec date (gris une fois encaissée) */}
         <div
-          className={`w-12 flex-shrink-0 flex flex-col items-center justify-center py-2 text-white ${config.stripeClass}`}
+          className={`w-12 flex-shrink-0 flex flex-col items-center justify-center py-2 text-white ${item.workflow_status === 'facture' ? 'bg-secondary-400' : config.stripeClass}`}
         >
           <span className="text-sm font-bold leading-none">{dayNum}</span>
           <span className="text-[11px] uppercase leading-tight mt-0.5">{monthShort}</span>
         </div>
 
-        {/* Contenu */}
-        <div className="flex-1 min-w-0 px-3 py-2 space-y-1">
+        {/* Contenu : quatre lignes, la dernière collée en bas */}
+        <div className="flex-1 min-w-0 px-3 py-2 flex flex-col">
           {/* Ligne 1 : Nom + montant */}
           <div className="flex items-center justify-between gap-2">
-            <span className="font-medium text-sm text-secondary-900 truncate">
+            <span className="font-medium text-sm leading-5 text-secondary-900 truncate">
               {name}
             </span>
             {(amount > 0 || Number(item.parts_total_ttc) > 0) && (
@@ -254,33 +329,26 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
           </div>
 
           {/* Ligne 2 : Code postal + ville */}
-          <div className="flex items-center gap-1.5 text-xs text-secondary-500">
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs leading-4 text-secondary-500">
             <MapPin className="w-3 h-3 text-secondary-400 flex-shrink-0" />
             <span className="truncate">
               {[item.client_postal_code, item.client_city].filter(Boolean).join(' ') || '—'}
             </span>
           </div>
 
-          {/* Ligne 3 : Tags type + badges */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${config.bgClass}`}>
+          {/* Ligne 3 : type + repères, sur une seule ligne */}
+          <div className="mt-1.5 flex items-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap">
+            <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${config.bgClass}`}>
               {config.label}
             </span>
             <SAVUrgencyBadge item={item} />
             {item.tags?.includes('Web') && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-secondary-100 text-secondary-600">
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-secondary-100 text-secondary-600 shrink-0">
                 Web
               </span>
             )}
-            {/* `tags` est un marqueur figé à la création — vide si le contrat a été saisi
-                après. On retombe sur le contrat effectif dérivé par la vue. */}
-            {(item.tags?.includes('Contrat') || item.effective_contract_id) && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-ok-bg text-st-ok">
-                Contrat
-              </span>
-            )}
             {type === 'sav' && item.includes_entretien && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-info-bg text-st-info">
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-info-bg text-st-info shrink-0">
                 Entretien à faire
               </span>
             )}
@@ -288,7 +356,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                 (recette Eric 2026-10-10 : « pas tout le commentaire, ça fait trop chargé ») */}
             {anomalies.length > 0 && (
               <span
-                className="inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-attente-bg text-st-attente"
+                className="inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-attente-bg text-st-attente shrink-0"
                 title={anomalies.map((a) => `${a.equipement ? `${a.equipement} : ` : ''}${a.detail || a.bilanLabel}${a.actionLabel ? ` · ${a.actionLabel}` : ''}${a.savId ? ' · SAV créé' : ''}${a.photoPlaquePath ? ' · photo de plaque' : (a.photoPlaqueAbsence ? ` · pas de photo de plaque (${a.photoPlaqueAbsence})` : '')}`).join('\n')}
               >
                 <AlertTriangle className="w-3 h-3" />
@@ -298,7 +366,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
               </span>
             )}
             {type === 'sav' && item.sav_origin === 'entretien' && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-attente-bg text-st-attente" title="Demande ouverte à la suite d'un entretien (certificat)">
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-attente-bg text-st-attente shrink-0" title="Demande ouverte à la suite d'un entretien (certificat)">
                 Suite d&apos;entretien
               </span>
             )}
@@ -306,252 +374,119 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
               <PartsOrderBadge status={item.parts_order_status} />
             )}
             {item.call_count > 0 && (
-              <span className="text-xs flex items-center gap-0.5 text-st-attente"
+              <span className="text-xs flex items-center gap-0.5 text-st-attente shrink-0"
                     title={`${item.call_count} appel${item.call_count > 1 ? 's' : ''}${item.last_call_result === 'voicemail' ? ' · répondeur' : ''}`}>
                 <Phone className="h-3 w-3" />{item.call_count}
               </span>
             )}
             {item.last_call_result === 'callback' && (
-              <span className="text-xs flex items-center gap-0.5 text-st-attente" title="À rappeler">
+              <span className="text-xs flex items-center gap-0.5 text-st-attente shrink-0" title="À rappeler">
                 <PhoneForwarded className="h-3 w-3" />
               </span>
             )}
           </div>
 
-          {/* Devis fléché vers la carte SAV : numéro + statut (le montant est sur la ligne 1) */}
-          {devisFleche && (
-            <div className="flex items-center gap-1 text-xs text-secondary-600">
-              <FileText className="w-3 h-3 text-secondary-400 flex-shrink-0" />
-              <span className="truncate">
-                {devisFleche.quote_number || 'Devis'}
-                {' · '}
-                {QUOTE_STATUSES.find((s) => s.value === devisFleche.status)?.label || devisFleche.status}
-              </span>
-            </div>
-          )}
-
-          {/* Ligne 4 : Numéro contrat */}
-          {item.contract_number && (
-            <div className="text-xs text-secondary-500">
-              {item.contract_number}
-            </div>
-          )}
-
-          {/* Suivi de l'invitation auto-RDV du mois (À planifier uniquement) */}
-          {item.workflow_status === 'a_planifier' && libelleInvitation(invitation) && (
-            <div className="text-xs text-st-info mt-0.5">
-              {libelleInvitation(invitation)}
-            </div>
-          )}
-
-          {/* Badge "Certificat à faire" — entretien + SAV avec entretien inclus uniquement.
-              Conditionné au contrat EFFECTIF (comme la section de la modale) : sans contrat
-              il n'y a pas d'équipements à certifier, et le badge promettait un écran vide. */}
-          {(type === 'entretien' || (type === 'sav' && item.includes_entretien))
-            && item.workflow_status === 'planifie'
-            && (item.effective_contract_id || item.contract_id) && (
-            <span className="inline-flex items-center gap-1 mt-1 px-2 py-1 bg-st-info text-white text-xs font-medium rounded-md">
-              <ClipboardCheck className="w-3 h-3" />
-              Certificat à faire
-            </span>
-          )}
-
-          {/* Boutons d'action (Facturé + Encaissé + SMS avis) — tout item réalisé, entretien ou SAV */}
-          {item.workflow_status === 'realise' && (
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              {/* Facturer (team_leader / org_admin, org Pennylane, entretien) : crée la
-                  facture sur Pennylane ET marque la carte (`invoice_id` + `invoiced_at`).
-                  Bouton ONE SHOT (Eric, 2026-09-21) : il disparaît dès que la carte est
-                  facturée, que ce soit par ce bouton (`invoice_id`) ou par le marquage
-                  manuel (`invoiced_at`) — un avoir ou une facture différente se gère dans
-                  Pennylane, jamais en re-générant depuis la carte. `invoice_id` posé ⇒
-                  « Facturée » inerte et marquage manuel masqué. */}
-              {isTeamLeaderOrAbove && canPushInvoice && (item.invoice_id || !item.invoiced_at) && (
-                <>
-                  <button
-                    type="button"
+          {/* Ligne 4 (bas de carte) : suites d'un réalisé — mêmes pastilles que le chantier
+              réceptionné —, certificat à faire, devis fléché ou invitation */}
+          <div className="mt-auto flex items-center gap-0.5 min-w-0 overflow-hidden">
+            {item.workflow_status === 'realise' ? (
+              <>
+                {isTeamLeaderOrAbove ? (
+                  <RepereBouton
+                    repere={repereFacture}
+                    icone={Receipt}
                     disabled={!!item.invoice_id && !isHubMode}
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (!item.invoice_id) { setInvoiceOpen(true); return; }
-                      // Mode hub : `invoice_id` pointe une facture Majord'home archivée (PDF
-                      // dans le bucket `invoices`) — mode Pennylane : c'est un id PL, aucun PDF
-                      // local à ouvrir, le bouton reste inerte (finding F4, revue 2026-09-22).
-                      if (!isHubMode) return;
-                      const { data: url, error } = await invoicesService.getPdfUrl(orgId, item.invoice_id);
-                      if (error) toast.error(error.message || 'PDF non archivé');
-                      else window.open(url, '_blank', 'noopener');
+                    onClick={handleFacture}
+                  />
+                ) : <RepereCarte repere={repereFacture} />}
+                <RepereBouton
+                  repere={{ etat: 'a_faire', libelle: 'Encaissé', titre: 'Marquer comme encaissé (la carte passe dans « Encaissé »)' }}
+                  icone={Euro}
+                  onClick={handleEncaisser}
+                />
+                {smsSent ? (
+                  <RepereCarte repere={{ etat: 'fait', libelle: 'Avis', titre: 'Demande d\'avis déjà envoyée' }} />
+                ) : (
+                  <RepereBouton
+                    repere={{ etat: 'a_faire', libelle: 'Avis', titre: 'Envoyer une demande d\'avis au client par SMS' }}
+                    icone={MessageSquare}
+                    enCours={smsLoading}
+                    onClick={handleAvis}
+                  />
+                )}
+                {isTeamLeaderOrAbove && needsExportRetry && pennylaneEnabled && (
+                  <RepereBouton
+                    repere={{
+                      etat: 'attention',
+                      libelle: 'Import PL',
+                      titre: item.invoice_import_status === 'error' ? 'L’import Pennylane a échoué : rejouer' : 'Import Pennylane non fait : rejouer',
                     }}
-                    title={item.invoice_id ? (isHubMode ? 'Ouvrir la facture (PDF)' : 'Facture créée sur Pennylane') : (isHubMode ? 'Émettre la facture' : 'Créer la facture sur Pennylane')}
-                    className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                      item.invoice_id
-                        ? `border-violet-300 text-violet-700 bg-violet-50 ${isHubMode ? 'hover:bg-violet-100 cursor-pointer' : 'cursor-default'}`
-                        : 'border-violet-400 text-white bg-violet-600 hover:bg-violet-700'
-                    }`}
-                  >
-                    {item.invoice_id ? <Check className="w-3 h-3" /> : <Receipt className="w-3 h-3" />}
-                    {item.invoice_id ? 'Facturée' : 'Facturer'}
-                  </button>
-                  {invoiceOpen && (
-                    // Le portail Radix remonte les clics React jusqu'à la carte : on les arrête ici.
-                    <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                      <FacturerEntretienDialog
-                        item={item}
-                        orgId={orgId}
-                        open={invoiceOpen}
-                        onOpenChange={setInvoiceOpen}
-                        onCreated={() => onRefresh?.()}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-              {isTeamLeaderOrAbove && isHubMode && item.invoice_id && item.invoice_import_status != null && type === 'entretien' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setCancelOpen(true); }}
-                    title="Annuler cette facture par un avoir"
-                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-st-alerte/30 text-st-alerte bg-white hover:bg-st-alerte-bg"
-                  >
-                    <Undo2 className="w-3 h-3" />
-                    Avoir
-                  </button>
-                  {cancelOpen && (
-                    <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                      <CancelInvoiceDialog item={item} orgId={orgId} open={cancelOpen} onOpenChange={setCancelOpen} onDone={() => onRefresh?.()} />
-                    </div>
-                  )}
-                </>
-              )}
-              {isTeamLeaderOrAbove && canSendInvoiceEmail && (
-                <>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setSendEmailOpen(true); }}
-                    title="Envoyer la facture par e-mail au client"
-                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 bg-white hover:bg-secondary-50 hover:border-secondary-400 hover:text-secondary-800"
-                  >
-                    <Mail className="w-3 h-3" />
-                    Envoyer par e-mail
-                  </button>
-                  {sendEmailOpen && (
-                    <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                      <SendInvoiceEmailDialog item={item} orgId={orgId} open={sendEmailOpen} onOpenChange={setSendEmailOpen} />
-                    </div>
-                  )}
-                </>
-              )}
-              {isTeamLeaderOrAbove && needsExportRetry && pennylaneEnabled && (
-                <button
-                  type="button"
-                  disabled={retryExport.isPending}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    try {
-                      const r = await retryExport.mutateAsync({
-                        invoiceId: item.invoice_id,
-                        company: buildCompanyInfo(settings),
-                        invoicing: invoicingSettings(settings),
-                        renderPdf: generateInvoicePdfBlob,
-                        pennylaneEnabled,
-                      });
-                      toast.success(
-                        r.alreadyImported && !r.imported
-                          ? `Facture ${r.number} déjà importée dans Pennylane`
-                          : `Facture ${r.number}${r.pdfRegenerated ? ' — PDF régénéré,' : ''} importée dans Pennylane`,
-                      );
-                    } catch (err) {
-                      toast.error(invoiceErrorMessage(err, 'Le rejeu de l’export a échoué'), { duration: 15000 });
-                    }
-                  }}
-                  title={item.invoice_import_status === 'error' ? 'L’import Pennylane a échoué : rejouer' : 'Import Pennylane non fait : rejouer'}
-                  className="inline-flex items-center gap-1 px-2 py-1.5 text-xs rounded border border-st-attente/30 text-st-attente bg-st-attente-bg hover:border-st-attente/60 disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3 h-3 ${retryExport.isPending ? 'animate-spin' : ''}`} />
-                  {retryExport.isPending ? 'Import…' : 'Import Pennylane à rejouer'}
-                </button>
-              )}
-              {/* Marquage manuel « Facturé » (toggle) : facture faite directement dans
-                  Pennylane, ou org sans intégration. La carte reste en Réalisé ; le RDV
-                  lié passe en violet sur le planning. Masqué dès qu'une facture PL existe. */}
-              {isTeamLeaderOrAbove && !item.invoice_id && (
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    const next = item.invoiced_at ? null : new Date().toISOString();
-                    const { error } = await savService.updateFields(item.id, { invoiced_at: next });
-                    if (error) {
-                      toast.error('Erreur mise à jour facturation');
-                      return;
-                    }
-                    toast.success(next ? 'Marqué facturé' : 'Marquage facturé retiré');
-                    onRefresh?.();
-                  }}
-                  title={item.invoiced_at ? 'Facturé — cliquer pour annuler' : 'Marquer comme facturé (la carte reste affichée)'}
-                  className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                    item.invoiced_at
-                      ? 'border-violet-300 text-violet-700 bg-violet-50'
-                      : 'border-secondary-300 text-secondary-600 bg-white hover:bg-violet-50 hover:border-violet-400 hover:text-violet-700'
-                  }`}
-                >
-                  {item.invoiced_at ? <Check className="w-3 h-3" /> : <Receipt className="w-3 h-3" />}
-                  Facturé
-                </button>
-              )}
-              {/* Encaissé : paiement reçu → workflow 'facture', la carte sort du kanban */}
-              <button
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  // Même contrat que les autres boutons de la carte : `{ error }` sans throw
-                  const { error } = await savService.updateWorkflowStatus(item.id, 'facture');
-                  if (error) {
-                    toast.error('Erreur mise à jour encaissement — la carte reste ouverte');
-                    return;
-                  }
-                  onRefresh?.();
-                }}
-                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 bg-white hover:bg-st-ok-bg hover:border-st-ok/40 hover:text-st-ok transition-colors"
-                title="Marquer comme encaissé (clôture la carte)"
-              >
-                <Euro className="w-3 h-3" />
-              </button>
-              <button
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  if (smsSent) return;
-                  setSmsLoading(true);
-                  const { data, error } = await savService.sendAvisRequest({
-                    interventionId: item.id,
-                    clientId: item.client_id,
-                    clientFirstName: item.client_first_name,
-                    clientPhone: item.client_phone,
-                    clientPhoneSecondary: item.client_phone_secondary,
-                    orgId,
-                  });
-                  setSmsLoading(false);
-                  if (error) {
-                    toast.error(error.message || 'Erreur envoi demande d\'avis');
-                  } else {
-                    setSmsSent(true);
-                    const count = data?.sentCount || 1;
-                    toast.success(count > 1 ? `${count} demandes d'avis envoyées` : 'Demande d\'avis envoyée');
-                  }
-                }}
-                disabled={smsLoading || smsSent}
-                title={smsSent ? 'Demande d\'avis déjà envoyée' : 'Envoyer une demande d\'avis au client'}
-                className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                  smsSent
-                    ? 'border-st-ok/30 text-st-ok bg-st-ok-bg'
-                    : 'border-secondary-300 text-secondary-600 bg-white hover:bg-secondary-50 hover:border-secondary-400 hover:text-secondary-800'
-                } disabled:opacity-60`}
-              >
-                {smsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : smsSent ? <Check className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
-              </button>
-            </div>
-          )}
+                    enCours={retryExport.isPending}
+                    onClick={handleRejeuImport}
+                  />
+                )}
+                {isTeamLeaderOrAbove && canSendInvoiceEmail && (
+                  <RepereBouton
+                    repere={{ etat: 'a_faire', libelle: 'E-mail', titre: 'Envoyer la facture par e-mail au client' }}
+                    icone={Mail}
+                    onClick={() => setSendEmailOpen(true)}
+                  />
+                )}
+                {isTeamLeaderOrAbove && isHubMode && item.invoice_id && item.invoice_import_status != null && type === 'entretien' && (
+                  <RepereBouton
+                    repere={{ etat: 'a_faire', libelle: 'Avoir', titre: 'Annuler cette facture par un avoir' }}
+                    icone={Undo2}
+                    onClick={() => setCancelOpen(true)}
+                  />
+                )}
+              </>
+            ) : item.workflow_status === 'facture' ? (
+              <span className="text-xs text-secondary-500 truncate" title="Glisser la carte dans « Réalisé » pour la rouvrir">
+                Encaissé{invoiced ? ' · facturé' : ''}
+              </span>
+            ) : certificatAFaire ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-st-info text-white text-xs font-medium rounded-md">
+                <ClipboardCheck className="w-3 h-3" />
+                Certificat à faire
+              </span>
+            ) : devisFleche ? (
+              <span className="flex items-center gap-1 text-xs text-secondary-600 min-w-0">
+                <FileText className="w-3 h-3 text-secondary-400 flex-shrink-0" />
+                <span className="truncate">
+                  {devisFleche.quote_number || 'Devis'}
+                  {' · '}
+                  {QUOTE_STATUSES.find((s) => s.value === devisFleche.status)?.label || devisFleche.status}
+                </span>
+              </span>
+            ) : invitationLibelle ? (
+              <span className="text-xs text-st-info truncate" title={invitationLibelle}>{invitationLibelle}</span>
+            ) : null}
+          </div>
         </div>
       </div>
+
+      {/* Fenêtres ouvertes depuis la carte : le portail Radix remonte les clics React jusqu'à la carte, on les arrête ici. */}
+      {invoiceOpen && (
+        <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          <FacturerEntretienDialog
+            item={item}
+            orgId={orgId}
+            open={invoiceOpen}
+            onOpenChange={setInvoiceOpen}
+            onCreated={() => onRefresh?.()}
+          />
+        </div>
+      )}
+      {cancelOpen && (
+        <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          <CancelInvoiceDialog item={item} orgId={orgId} open={cancelOpen} onOpenChange={setCancelOpen} onDone={() => onRefresh?.()} />
+        </div>
+      )}
+      {sendEmailOpen && (
+        <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          <SendInvoiceEmailDialog item={item} orgId={orgId} open={sendEmailOpen} onOpenChange={setSendEmailOpen} />
+        </div>
+      )}
     </div>
   );
 }
