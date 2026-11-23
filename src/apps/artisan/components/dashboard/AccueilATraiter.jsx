@@ -18,9 +18,10 @@ import { Card, CardHeader } from '@components/ui/card';
  * @param {boolean} props.peutCreerLead
  */
 export function AccueilATraiter({ lignes, isLoading, echecs = [], peutCreerLead }) {
+  const total = lignes.reduce((somme, l) => somme + l.nombre, 0);
   return (
     <Card as="section" className="overflow-hidden">
-      <CardHeader title="À traiter" subtitle="Ce qui attend aujourd’hui, quelle que soit sa date." />
+      <CardHeader title={total > 0 ? `À traiter · ${total.toLocaleString('fr-FR')} ${total > 1 ? 'actions' : 'action'}` : 'À traiter'} />
       {lignes.length > 0 && (
         <ul className="divide-y divide-secondary-100 border-t border-secondary-100">
           {lignes.map((ligne) => (
@@ -32,10 +33,10 @@ export function AccueilATraiter({ lignes, isLoading, echecs = [], peutCreerLead 
                 <span className="w-8 shrink-0 text-right text-base font-semibold tabular-nums text-secondary-900">
                   {ligne.nombre.toLocaleString('fr-FR')}
                 </span>
-                <span className={`flex-1 ${ligne.attention ? 'font-medium text-amber-800' : 'text-secondary-700'}`}>
+                <span className={`flex-1 ${ligne.attention ? 'font-medium text-st-attente' : 'text-secondary-700'}`}>
                   {ligne.texte}
                 </span>
-                {ligne.attention && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />}
+                {ligne.attention && <AlertTriangle className="h-4 w-4 shrink-0 text-st-attente" aria-hidden="true" />}
                 <ChevronRight className="h-4 w-4 shrink-0 text-secondary-400" aria-hidden="true" />
               </Link>
             </li>

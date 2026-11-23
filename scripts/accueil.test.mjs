@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { plageAccueil, journeeAffichee, compterRdv, personnesDuRdv, lieuDuRdv, lignesATraiter, rdvEnCours, sousTitreAccueil } from '../src/lib/accueil.js';
+import { plageAccueil, journeeAffichee, compterRdv, personnesDuRdv, lieuDuRdv, lignesATraiter, rdvEnCours, sousTitreAccueil, variation } from '../src/lib/accueil.js';
 
 const rdv = (date, heure, extra = {}) => ({ scheduled_date: date, scheduled_start: heure, status: 'scheduled', appointment_type: 'maintenance', ...extra });
 
@@ -95,7 +95,8 @@ test('AccueilJournee ne lit que des champs que la vue des RDV porte', () => {
   const source = readFileSync(new URL('../src/apps/artisan/components/dashboard/AccueilJournee.jsx', import.meta.url), 'utf8');
   const lus = [...source.matchAll(/\brdv\.([a-z_]+)/g)].map((m) => m[1]);
   // Colonnes de public.majordhome_appointments lues par ce bloc (relevées en base le 2026-11-22).
-  const colonnes = ['id', 'scheduled_start', 'scheduled_end', 'appointment_type', 'client_name', 'client_first_name', 'subject'];
+  // address, postal_code, city : lien Itinéraire (relevées en base le 2026-11-23).
+  const colonnes = ['id', 'scheduled_start', 'scheduled_end', 'appointment_type', 'client_name', 'client_first_name', 'subject', 'address', 'postal_code', 'city'];
   assert.deepEqual([...new Set(lus)].filter((champ) => !colonnes.includes(champ)), []);
 });
 
@@ -141,4 +142,13 @@ test('sousTitreAccueil : date, rendez-vous et leads à rappeler, parties inconnu
   assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 0, aRappeler: 1 }), 'Lundi 23 novembre · aucun rendez-vous et 1 lead à rappeler');
   assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: null, aRappeler: 0 }), 'Lundi 23 novembre · aucun lead à rappeler');
   assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 1200, aRappeler: 2 }), 'Lundi 23 novembre · 1 200 rendez-vous et 2 leads à rappeler');
+});
+
+test('variation : pourcentage arrondi et sens, rien sans base ou sans écart', () => {
+  assert.deepEqual(variation(11200, 10000), { pourcent: 12, sens: 'hausse' });
+  assert.deepEqual(variation(8000, 10000), { pourcent: 20, sens: 'baisse' });
+  assert.equal(variation(5000, 0), null);
+  assert.equal(variation(5000, null), null);
+  assert.equal(variation(null, 5000), null);
+  assert.equal(variation(10010, 10000), null);
 });

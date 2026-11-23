@@ -15,6 +15,7 @@
  */
 
 import { useMemo } from 'react';
+import { CalendarDays, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -27,13 +28,14 @@ import { chantierKeys } from '@hooks/cacheKeys';
 import { supabase } from '@lib/supabaseClient';
 import { SEUIL_RELANCE_JOURS } from '@lib/pipelineDashboard';
 import { cumulPeriode, formatCa } from '@/lib/planningCa';
-import { plageAccueil, journeeAffichee, compterRdv, lignesATraiter } from '@/lib/accueil';
+import { plageAccueil, journeeAffichee, compterRdv, lignesATraiter, sousTitreAccueil, variation } from '@/lib/accueil';
 import { PageHeader } from '@components/ui/page-header';
 import { KpiCard } from '@components/ui/kpi-card';
-import { entier, euros } from '@components/pipeline/dashboard/format';
+import { entier, euros, libelleMoisCourt } from '@components/pipeline/dashboard/format';
 import { AccueilJournee } from '@apps/artisan/components/dashboard/AccueilJournee';
 import { AccueilATraiter } from '@apps/artisan/components/dashboard/AccueilATraiter';
 import { AccueilACorriger } from '@apps/artisan/components/dashboard/AccueilACorriger';
+import { AccueilRelances } from '@apps/artisan/components/dashboard/AccueilRelances';
 
 // =============================================================================
 // HOOK — chantiers en attente d'un geste (commande à passer, pose à dater)
@@ -114,8 +116,8 @@ export default function Dashboard() {
 
   // --- Repères : seulement les chiffres connus ---
   const reperes = [];
+  const compte = rdvConnus ? compterRdv(appointments, plage) : null;
   if (rdvConnus) {
-    const compte = compterRdv(appointments, plage);
     reperes.push({
       key: 'rdv',
       label: 'RDV aujourd’hui',
@@ -133,14 +135,19 @@ export default function Dashboard() {
     });
   }
   if (dashboard) {
-    const { actuel } = dashboard.entreprise;
+    const { actuel, precedent } = dashboard.entreprise;
     const { total } = dashboard.portefeuille;
     const nomDuMois = new Date().toLocaleDateString('fr-FR', { month: 'long' });
+    const ecart = variation(actuel.ca, precedent?.ca);
+    const moisPrecedent = dashboard.periode?.precedente?.length === 1 ? libelleMoisCourt(dashboard.periode.precedente[0]) : null;
     reperes.push({
       key: 'ca-signe',
       label: `CA signé HT en ${nomDuMois}`,
       value: euros(actuel.ca),
       sub: `${entier(actuel.ventes)} ${actuel.ventes > 1 ? 'ventes signées' : 'vente signée'}`,
+      delta: ecart && moisPrecedent
+        ? { valeur: `${ecart.pourcent} % vs ${moisPrecedent}`, sens: ecart.sens }
+        : undefined,
     });
     reperes.push({
       key: 'devis',
@@ -171,13 +178,21 @@ export default function Dashboard() {
     <div className="space-y-6">
       <PageHeader
         title={`Bonjour${profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}`}
-        subtitle={dateDuJour.charAt(0).toUpperCase() + dateDuJour.slice(1)}
+        subtitle={sousTitreAccueil({
+          dateDuJour: dateDuJour.charAt(0).toUpperCase() + dateDuJour.slice(1),
+          rdvAujourdhui: compte ? compte.aujourdhui : null,
+          aRappeler: dashboard ? dashboard.portefeuille.total.aContacter : null,
+        })}
+        actions={[
+          peutPlanning && { label: 'Ouvrir le planning', icon: CalendarDays, variant: 'secondary', to: '/planning' },
+          can('pipeline', 'create') && { label: 'Nouveau lead', icon: Plus, variant: 'primary', to: '/pipeline?tab=kanban&new=1' },
+        ]}
       />
 
       {reperes.length >= 2 && (
         <div className={`grid gap-4 ${reperes.length >= 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2'}`}>
           {reperes.map((repere) => (
-            <KpiCard key={repere.key} label={repere.label} value={repere.value} context={repere.sub} info={repere.title} />
+            <KpiCard key={repere.key} label={repere.label} value={repere.value} context={repere.sub} info={repere.title} delta={repere.delta} />
           ))}
         </div>
       )}
@@ -195,12 +210,15 @@ export default function Dashboard() {
           </div>
         )}
         {aTraiterVisible && (
-          <AccueilATraiter
-            lignes={lignes}
-            isLoading={(peutPipeline && pipelineLoading) || (peutChantiers && chantiers.isLoading)}
-            echecs={echecs}
-            peutCreerLead={can('pipeline', 'create')}
-          />
+          <div className="space-y-6">
+            <AccueilATraiter
+              lignes={lignes}
+              isLoading={(peutPipeline && pipelineLoading) || (peutChantiers && chantiers.isLoading)}
+              echecs={echecs}
+              peutCreerLead={can('pipeline', 'create')}
+            />
+            {dashboard && <AccueilRelances relances={dashboard.portefeuille.relancesPrioritaires} />}
+          </div>
         )}
       </div>
 

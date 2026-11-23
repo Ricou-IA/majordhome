@@ -178,3 +178,17 @@ export function sousTitreAccueil({ dateDuJour, rdvAujourdhui = null, aRappeler =
   }
   return parties.length ? `${dateDuJour} · ${parties.join(' et ')}` : dateDuJour;
 }
+
+/**
+ * Variation d'un chiffre par rapport à la période précédente, pour la pastille d'un chiffre clé.
+ * @param {number|null|undefined} actuel
+ * @param {number|null|undefined} precedent
+ * @returns {{ pourcent: number, sens: 'hausse'|'baisse' }|null}  null sans base de comparaison
+ *   (précédent absent ou nul) ou sans écart : on n'affiche pas « +∞ % » ni « 0 % ».
+ */
+export function variation(actuel, precedent) {
+  if (typeof actuel !== 'number' || typeof precedent !== 'number' || !(precedent > 0)) return null;
+  const pourcent = Math.round(((actuel - precedent) / precedent) * 100);
+  if (pourcent === 0) return null;
+  return { pourcent: Math.abs(pourcent), sens: pourcent > 0 ? 'hausse' : 'baisse' };
+}
