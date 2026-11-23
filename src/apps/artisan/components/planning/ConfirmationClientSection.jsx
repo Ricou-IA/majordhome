@@ -59,6 +59,11 @@ export function ConfirmationClientSection({ appointment, orgId, teamMembers = []
       setLocal((l) => ({ ...l, client_notified_at: data.sentAt }));
       toast.success('Rappel envoyé au client');
     } catch (err) {
+      // Pas de texte de rappel saisi : une information, pas une panne (règle du module SMS).
+      if (err?.message === 'campaign_template_missing') {
+        toast.info('Aucun texte de rappel n’est saisi : Paramètres → E-mails & SMS → SMS & WhatsApp, « Rappel des rendez-vous ».');
+        return;
+      }
       toast.error(err?.message || 'Rappel non envoyé');
     }
   };
