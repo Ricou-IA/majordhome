@@ -13,10 +13,8 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   ArrowLeft, User, FileText, Wrench, History, Mail, MessageSquare,
-  Save, Loader2, AlertCircle, Lock, Unlock, Clock,
-  Archive, ArchiveRestore, Receipt, CalendarPlus, Trash2, LifeBuoy, Navigation,
+  Loader2, AlertCircle, Archive, ArchiveRestore, Receipt,
 } from 'lucide-react';
-import { LienWaze } from '../components/shared/LienWaze';
 import { CreateSAVModal } from '../components/entretiens/CreateSAVModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,9 +28,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EventModal } from '../components/planning/EventModal';
 
 // Sous-composants extraits
-import { InviteClientButton } from '../components/clients/InviteClientButton';
 import { ClientInvestigationPanel } from '../components/clients/ClientInvestigationPanel';
-import { ClientCategoryBadge } from './client-detail/ClientCategoryBadge';
+import { EnTeteFicheClient } from './client-detail/EnTeteFicheClient';
 import { TabInfo } from './client-detail/TabInfo';
 import { TabEquipments } from './client-detail/TabEquipments';
 import { TabInterventions } from './client-detail/TabInterventions';
@@ -361,132 +358,26 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link to="/clients" className="p-2 rounded-lg hover:bg-secondary-100 transition-colors">
-            <ArrowLeft className="w-5 h-5 text-secondary-600" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-secondary-900">{displayName}</h1>
-              <ClientCategoryBadge clientCategory={client.client_category} />
-              {isOwner && (
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 border border-blue-200">Propriétaire</span>
-              )}
-              {isTenant && (
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-700 border border-orange-200">Locataire</span>
-              )}
-              {client.has_active_contract && (
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 border border-green-200">Contrat actif</span>
-              )}
-            </div>
-            <p className="text-secondary-500 mt-0.5">
-              {client.pennylane_account_number && (
-                <span className="text-xs font-mono text-secondary-600 bg-secondary-100 px-1.5 py-0.5 rounded mr-2" title="Code comptable Pennylane">{client.pennylane_account_number}</span>
-              )}
-              {client.client_number && !client.pennylane_account_number && (
-                <span className="text-xs font-mono text-secondary-400 mr-2">{client.client_number}</span>
-              )}
-              {client.external_ref && (
-                <span className="text-xs text-secondary-400 mr-2" title="Numéro du client dans l'ancien logiciel">ancien n° {client.external_ref}</span>
-              )}
-              {/* Ville de l'en-tête : un appui lance Waze vers l'adresse de la fiche, depuis n'importe quel onglet */}
-              <LienWaze
-                address={client.address}
-                postalCode={client.postal_code}
-                city={client.city}
-                lat={client.latitude}
-                lng={client.longitude}
-                className="inline-flex items-center gap-1 text-primary-600 hover:underline"
-                sinon={[client.city, client.postal_code].filter(Boolean).join(' ')}
-              >
-                <Navigation className="w-3.5 h-3.5" aria-hidden="true" />
-                {[client.city, client.postal_code].filter(Boolean).join(' ') || 'Itinéraire'}
-              </LienWaze>
-              {client.email && ` • ${client.email}`}
-              {client.updated_at && (
-                <span className="ml-2 inline-flex items-center gap-1 text-xs text-secondary-400">
-                  <Clock className="w-3 h-3" />
-                  MàJ {formatDateFR(client.updated_at)}
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Nouveau RDV */}
-          {canCreateAppointment && !isArchived && (
-            <button
-              onClick={() => setAppointmentModal({ open: true })}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
-              title="Créer un nouveau RDV pour ce client"
-            >
-              <CalendarPlus className="w-4 h-4" />
-              Nouveau RDV
-            </button>
-          )}
-
-          {/* Nouvelle demande SAV pour ce client (la carte arrive dans le kanban Entretiens & SAV) */}
-          {canCreateSAV && !isArchived && (
-            <button
-              onClick={() => setSavOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
-              title="Ouvrir une demande SAV pour ce client"
-            >
-              <LifeBuoy className="w-4 h-4" />
-              Nouveau SAV
-            </button>
-          )}
-
-          {/* Portail client */}
-          <InviteClientButton client={client} />
-
-          {!isArchived && isLocked && (
-            <button
-              onClick={() => setShowArchiveConfirm(true)}
-              className="p-2 rounded-lg text-secondary-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-              title="Archiver ce client"
-            >
-              <Archive className="w-5 h-5" />
-            </button>
-          )}
-
-          {/* God mode — hard delete réservé aux org_admin (nettoyage de base), masqué en édition */}
-          {isAdmin && isLocked && (
-            <button
-              onClick={handleOpenHardDelete}
-              disabled={isHardDeleting}
-              className="p-2 rounded-lg text-secondary-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-              title="God mode — supprimer définitivement ce client (org_admin)"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
-          )}
-
-          <button
-            onClick={handleToggleLock}
-            className={`p-2 rounded-lg transition-colors ${
-              isLocked ? 'text-secondary-400 hover:text-secondary-600 hover:bg-secondary-100' : 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
-            }`}
-            title={isLocked ? 'Déverrouiller pour modifier' : 'Annuler les modifications'}
-          >
-            {isLocked ? <Lock className="w-5 h-5" /> : <Unlock className="w-5 h-5" />}
-          </button>
-
-          {!isLocked && (
-            <button
-              onClick={handleSave}
-              disabled={isUpdating}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
-            >
-              {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Enregistrer
-            </button>
-          )}
-        </div>
-      </div>
+      <EnTeteFicheClient
+        client={client}
+        displayName={displayName}
+        isOwner={isOwner}
+        isTenant={isTenant}
+        isArchived={isArchived}
+        isAdmin={isAdmin}
+        isLocked={isLocked}
+        canCreateAppointment={canCreateAppointment}
+        canCreateSAV={canCreateSAV}
+        isUpdating={isUpdating}
+        isHardDeleting={isHardDeleting}
+        onNouveauRdv={() => setAppointmentModal({ open: true })}
+        onNouveauSav={() => setSavOpen(true)}
+        onArchiver={() => setShowArchiveConfirm(true)}
+        onSupprimer={handleOpenHardDelete}
+        onModifier={handleToggleLock}
+        onAnnuler={handleToggleLock}
+        onEnregistrer={handleSave}
+      />
 
       {/* Onglets */}
       <div className="border-b border-secondary-200">

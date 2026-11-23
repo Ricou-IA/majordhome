@@ -110,7 +110,6 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/catalogue/modelKey.js',
   'src/lib/catalogue/mapping.js',
   'src/components/ui/side-panel.jsx', // refonte UI phase 3 : consommé par le panneau Modifier de la fiche client (tâche 7), à retirer d'ici à ce moment
-  'src/components/ui/menu-actions.jsx', // idem : consommé par l'en-tête de la fiche client (tâche 5)
 ]);
 
 const allFiles = walk(SRC);
