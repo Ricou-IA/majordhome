@@ -7,6 +7,8 @@
  */
 
 import { AlertTriangle } from 'lucide-react';
+import { Combobox } from '@components/ui/combobox';
+import { useDeviceClass } from '@hooks/useDeviceClass';
 import { formatPhoneNumber, formatPhoneDisplay } from '@/lib/utils';
 
 // Classes de base réutilisables
@@ -81,9 +83,26 @@ export function PhoneInput({ value, onChange, placeholder = '06 12 34 56 78', di
 }
 
 /**
- * SelectInput — select contrôlé avec options {value, label}[]
+ * SelectInput — liste contrôlée avec options {value, label}[].
+ * Sur tablette et ordinateur : Combobox (recherche dès 7 choix) ; sur téléphone, ou en forme
+ * `children` (balises <option> écrites à la main), le <select> natif. Même valeur dans les deux
+ * cas : `onChange(valeur || null)`, et le `placeholder` est l'option vide qui remet à zéro.
  */
 export function SelectInput({ value, onChange, options, placeholder, disabled = false, className = '', children }) {
+  const { isPhone } = useDeviceClass();
+  if (options && !isPhone) {
+    const liste = placeholder ? [{ value: '', label: placeholder }, ...options] : options;
+    return (
+      <Combobox
+        value={value || ''}
+        onChange={(v) => onChange(v || null)}
+        options={liste}
+        placeholder={placeholder || 'Choisir…'}
+        disabled={disabled}
+        className={className}
+      />
+    );
+  }
   return (
     <select
       value={value || ''}
