@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { User, Phone, MapPin, Home, FileText, ExternalLink, Link2, X, Search, Loader2, UserCheck, Users, Plus, Navigation } from 'lucide-react';
 import { LienWaze } from '@/apps/artisan/components/shared/LienWaze';
 import { useNavigate } from 'react-router-dom';
@@ -65,10 +65,18 @@ function LinkedClientCard({ client, role, onUnlink, isUnlinking }) {
 // SOUS-COMPOSANT — Recherche et liaison
 // ============================================================================
 
-function LinkClientSearch({ clientId, orgId, onLink, isLinking }) {
+function LinkClientSearch({ clientId, orgId, onLink, isLinking, onModaleOuverte }) {
   const [showSearch, setShowSearch] = useState(false);
   const [linkAs, setLinkAs] = useState(null); // 'proprietaire' | 'locataire'
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Le panneau qui contient le formulaire doit savoir qu'une fenêtre est ouverte dedans
+  // (Échap ne doit fermer ni lui ni elle) ; `false` aussi quand ce bloc disparaît.
+  useEffect(() => {
+    if (!showCreateModal) return undefined;
+    onModaleOuverte?.(true);
+    return () => onModaleOuverte?.(false);
+  }, [showCreateModal, onModaleOuverte]);
   const { query, results, searching, search, clear } = useClientSearch(orgId);
 
   const handleSelect = async (selectedClient) => {
@@ -214,7 +222,7 @@ function LinkClientSearch({ clientId, orgId, onLink, isLinking }) {
 // SOUS-COMPOSANT — Section clients liés
 // ============================================================================
 
-function LinkedClientsSection({ clientId, orgId, isLocked }) {
+function LinkedClientsSection({ clientId, orgId, isLocked, onModaleOuverte }) {
   const { owner, tenants, isLoading, linkClient, unlinkClient, isUnlinking } = useLinkedClients(clientId, orgId);
 
   const hasLinks = owner || tenants.length > 0;
@@ -281,6 +289,7 @@ function LinkedClientsSection({ clientId, orgId, isLocked }) {
               orgId={orgId}
               onLink={linkClient}
               isLinking={false}
+              onModaleOuverte={onModaleOuverte}
             />
           )}
           {/* Si déjà locataire (a un owner), pas de bouton "lier propriétaire" */}
@@ -298,7 +307,7 @@ function LinkedClientsSection({ clientId, orgId, isLocked }) {
 // COMPOSANT PRINCIPAL — TabInfo
 // ============================================================================
 
-export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, savedLocation, savedAddress }) => {
+export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, savedLocation, savedAddress, onModaleOuverte }) => {
   const u = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }));
   const { settings } = useOrgSettings();
   const siege = getOrgHeadquarters(settings);
@@ -463,7 +472,7 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
 
       {/* Clients liés (Propriétaire / Locataire) */}
       {clientId && orgId && (
-        <LinkedClientsSection clientId={clientId} orgId={orgId} isLocked={isLocked} />
+        <LinkedClientsSection clientId={clientId} orgId={orgId} isLocked={isLocked} onModaleOuverte={onModaleOuverte} />
       )}
 
       {/* Notes */}

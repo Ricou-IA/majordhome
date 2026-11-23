@@ -12,7 +12,9 @@ const LARGEURS = {
  * droite, plein écran sur téléphone. En-tête titre + fermer, corps qui défile, pied collé en
  * bas avec les actions alignées à droite (« Annuler » discret puis l'action principale).
  * Échap, le voile et la croix appellent `onFermer` : c'est l'appelant qui décide de fermer
- * (il peut d'abord demander une confirmation).
+ * (il peut d'abord demander une confirmation). `bloquerFermeture` neutralise Échap et le clic
+ * à l'extérieur, le temps qu'une fenêtre qui n'est pas une couche Radix (ex. `ClientModal`)
+ * est ouverte dans le panneau : sans lui, Échap dans cette fenêtre fermerait le panneau.
  *
  * @param {Object} props
  * @param {boolean} props.ouvert
@@ -21,13 +23,18 @@ const LARGEURS = {
  * @param {React.ReactNode} [props.description]
  * @param {React.ReactNode} [props.pied]
  * @param {'md'|'lg'} [props.largeur]   480 px ou 640 px
+ * @param {boolean} [props.bloquerFermeture]
  */
-export function SidePanel({ ouvert, onFermer, titre, description, pied, largeur = 'md', children }) {
+export function SidePanel({ ouvert, onFermer, titre, description, pied, largeur = 'md', bloquerFermeture = false, children }) {
+  const retenir = (e) => { if (bloquerFermeture) e.preventDefault(); };
   return (
     <Dialog.Root open={ouvert} onOpenChange={(o) => { if (!o) onFermer(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-secondary-900/30 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <Dialog.Content
+          onEscapeKeyDown={retenir}
+          onPointerDownOutside={retenir}
+          onInteractOutside={retenir}
           className={cn(
             'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-lg focus:outline-none',
             'data-[state=open]:animate-in data-[state=open]:slide-in-from-right',
@@ -52,7 +59,7 @@ export function SidePanel({ ouvert, onFermer, titre, description, pied, largeur 
           </div>
           <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
           {pied && (
-            <div className="flex items-center justify-end gap-2 border-t border-secondary-200 bg-secondary-25 px-6 py-3">
+            <div className="flex items-center justify-end gap-2 border-t border-secondary-200 bg-secondary-25 px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               {pied}
             </div>
           )}

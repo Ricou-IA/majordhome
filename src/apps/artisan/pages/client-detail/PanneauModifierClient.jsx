@@ -9,7 +9,8 @@
  * ClientDetail. Le panneau ne décide que de la confirmation : fermer (Annuler,
  * Échap, voile, croix) avec des modifications demande « Abandonner les
  * modifications ? » ; sans modification, on ferme directement. Rien ne se ferme
- * pendant un enregistrement.
+ * pendant un enregistrement, ni tant que la fenêtre « Créer un nouveau client » de
+ * `TabInfo` est ouverte (elle garde son propre bouton de fermeture).
  * ============================================================================
  */
 
@@ -39,9 +40,10 @@ export function PanneauModifierClient({
   formData, setFormData, clientId, orgId, client,
 }) {
   const [confirmation, setConfirmation] = useState(false);
+  const [modaleImbriquee, setModaleImbriquee] = useState(false);
 
   const demanderFermeture = () => {
-    if (isUpdating || confirmation) return;
+    if (isUpdating || confirmation || modaleImbriquee) return;
     if (modifie) setConfirmation(true);
     else onAbandonner();
   };
@@ -54,6 +56,7 @@ export function PanneauModifierClient({
         titre="Modifier la fiche"
         description={nom}
         largeur="lg"
+        bloquerFermeture={modaleImbriquee}
         pied={(
           <>
             <Button type="button" variant="ghost" onClick={demanderFermeture} disabled={isUpdating}>
@@ -74,6 +77,7 @@ export function PanneauModifierClient({
           orgId={orgId}
           savedLocation={{ lat: client?.latitude, lng: client?.longitude }}
           savedAddress={{ address: client?.address || '', postalCode: client?.postal_code || '', city: client?.city || '' }}
+          onModaleOuverte={setModaleImbriquee}
         />
       </SidePanel>
 
