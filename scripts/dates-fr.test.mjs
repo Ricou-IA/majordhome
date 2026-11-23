@@ -61,3 +61,19 @@ test('raccourcisDate : aujourd’hui, demain, lundi prochain', () => {
   ]);
   assert.equal(raccourcisDate(new Date(2026, 10, 30, 10))[2].iso, '2026-12-07'); // un lundi : le suivant
 });
+
+test('lireSaisieDate : chiffres seuls, année à deux chiffres au bon siècle', () => {
+  const maintenant = new Date(2026, 10, 23);
+  assert.equal(lireSaisieDate('23112026', maintenant), '2026-11-23');
+  assert.equal(lireSaisieDate('231126', maintenant), '2026-11-23');
+  assert.equal(lireSaisieDate('15/03/85', maintenant), '1985-03-15');
+  assert.equal(lireSaisieDate('15/03/36', maintenant), '2036-03-15');
+  assert.equal(lireSaisieDate('15/03/37', maintenant), '1937-03-15');
+  assert.equal(lireSaisieDate('2311202', maintenant), null);
+});
+
+test('depuisIso : un horodatage se lit par sa date', () => {
+  const d = depuisIso('2026-11-23T10:00:00+00:00');
+  assert.equal(d.getDate(), 23);
+  assert.equal(formatDateLongueFR('2026-11-23 08:00:00'), 'lun. 23 nov. 2026');
+});

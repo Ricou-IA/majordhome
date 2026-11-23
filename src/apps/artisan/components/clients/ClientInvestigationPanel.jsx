@@ -306,7 +306,7 @@ export function ClientInvestigationPanel({ client, isOpen, onClose }) {
   useEffect(() => {
     if (!isOpen) return undefined;
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !e.defaultPrevented) onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

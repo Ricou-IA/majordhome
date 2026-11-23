@@ -26,7 +26,7 @@ export default function UwHelperModal({ champLabel, onApply, onClose }) {
   const [voletIdx, setVoletIdx] = useState('');
 
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e) => e.key === 'Escape' && !e.defaultPrevented && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);

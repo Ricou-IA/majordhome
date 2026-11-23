@@ -22,7 +22,7 @@ export default function ComposeurParoiModal({ famille, label, couchesInitiales, 
   const [pickerOuvert, setPickerOuvert] = useState(false);
 
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e) => e.key === 'Escape' && !e.defaultPrevented && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);

@@ -20,8 +20,10 @@ import { avecRecherche, filtrerOptions, libelleDe } from '@/lib/listeOptions';
  * @param {string} [props.libelle]      nom lu par un lecteur d'écran (sinon le libellé de champ associé)
  * @param {string} [props.id]
  * @param {string} [props.className]    classes du déclencheur
+ * @param {boolean} [props.required]    annoncé (aria-required) ; la vérification reste à l'appelant
+ *   (un Combobox ne bloque pas l'envoi d'un formulaire comme un <select required>).
  */
-export function Combobox({ value, onChange, options = [], placeholder = 'Choisir…', disabled = false, libelle, id, className }) {
+export function Combobox({ value, onChange, options = [], placeholder = 'Choisir…', disabled = false, libelle, id, className, required = false }) {
   const [ouvert, setOuvert] = useState(false);
   const [saisie, setSaisie] = useState('');
   const [actif, setActif] = useState(0);
@@ -34,20 +36,34 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
   const cleCourante = value === null || value === undefined ? '' : String(value);
 
   // À l'ouverture : la saisie se vide, l'option choisie devient l'option active.
+  const ouvrir = (o) => {
+    if (disabled) return;
+    if (o) {
+      setSaisie('');
+      const rang = options.findIndex((opt) => String(opt.value ?? '') === cleCourante);
+      setActif(rang >= 0 ? rang : 0);
+    }
+    setOuvert(o);
+  };
+
+  // L'option active reste visible quand on la déplace au clavier — en réglant le défilement de
+  // la liste seule (scrollIntoView ferait aussi défiler la page ou la fenêtre derrière).
   useEffect(() => {
     if (!ouvert) return;
-    setSaisie('');
-    const rang = options.findIndex((o) => String(o.value ?? '') === cleCourante);
-    setActif(rang >= 0 ? rang : 0);
-  }, [ouvert]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { setActif(0); }, [saisie]);
-
-  // L'option active reste visible quand on la déplace au clavier.
-  useEffect(() => {
-    if (!ouvert) return;
-    listeRef.current?.querySelector(`[data-rang="${actif}"]`)?.scrollIntoView({ block: 'nearest' });
+    const liste = listeRef.current;
+    const ligne = liste?.querySelector(`[data-rang="${actif}"]`);
+    if (!liste || !ligne) return;
+    if (ligne.offsetTop < liste.scrollTop) liste.scrollTop = ligne.offsetTop;
+    else if (ligne.offsetTop + ligne.offsetHeight > liste.scrollTop + liste.clientHeight) {
+      liste.scrollTop = ligne.offsetTop + ligne.offsetHeight - liste.clientHeight;
+    }
   }, [actif, ouvert]);
+
+  /** Prochaine option non désactivée dans le sens `pas` (+1 / -1), sinon la position actuelle. */
+  const suivante = (depuis, pas) => {
+    for (let i = depuis + pas; i >= 0 && i < visibles.length; i += pas) if (!visibles[i].disabled) return i;
+    return depuis;
+  };
 
   const choisir = (option) => {
     if (!option || option.disabled) return;
@@ -56,15 +72,18 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
   };
 
   const auClavier = (e) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActif((i) => Math.min(i + 1, visibles.length - 1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setActif((i) => Math.max(i - 1, 0)); }
-    else if (e.key === 'Home') { e.preventDefault(); setActif(0); }
-    else if (e.key === 'End') { e.preventDefault(); setActif(visibles.length - 1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActif((i) => suivante(i, 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActif((i) => suivante(i, -1)); }
+    else if (e.key === 'Home') { e.preventDefault(); setActif(suivante(-1, 1)); }
+    else if (e.key === 'End') { e.preventDefault(); setActif(suivante(visibles.length, -1)); }
     else if (e.key === 'Enter') { e.preventDefault(); choisir(visibles[actif]); }
+    // Tab : on referme et le focus repart du champ, vers le champ suivant du formulaire.
+    else if (e.key === 'Tab') { setOuvert(false); }
   };
 
   return (
-    <Popover open={ouvert} onOpenChange={(o) => { if (!disabled) setOuvert(o); }}>
+    // modal : la liste bloque le défilement de la page mais défile elle-même, même dans un panneau latéral.
+    <Popover modal open={ouvert} onOpenChange={ouvrir}>
       <PopoverTrigger asChild>
         <button
           id={id}
@@ -74,9 +93,10 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
           aria-haspopup="listbox"
           aria-controls={listeId}
           aria-label={libelle}
+          aria-required={required || undefined}
           disabled={disabled}
           onKeyDown={(e) => {
-            if (!ouvert && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); setOuvert(true); }
+            if (!ouvert && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); ouvrir(true); }
           }}
           className={cn(
             'flex h-[38px] w-full items-center justify-between gap-2 rounded-lg border border-secondary-300 bg-white px-3 text-left text-sm text-secondary-900 shadow-xs outline-none transition-colors',
@@ -93,7 +113,8 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-[var(--radix-popover-trigger-width)] min-w-[12rem] p-1 shadow-lg"
+        // Au-dessus de toute fenêtre de l'application (les plus hautes sont à z-[80]).
+        className="z-[90] w-[var(--radix-popover-trigger-width)] min-w-[12rem] p-1 shadow-lg"
         onOpenAutoFocus={(e) => { if (!recherche) { e.preventDefault(); listeRef.current?.focus(); } }}
       >
         {recherche && (
@@ -102,7 +123,7 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
             <input
               type="text"
               value={saisie}
-              onChange={(e) => setSaisie(e.target.value)}
+              onChange={(e) => { setSaisie(e.target.value); setActif(0); }}
               onKeyDown={auClavier}
               placeholder="Rechercher…"
               aria-label="Rechercher dans la liste"

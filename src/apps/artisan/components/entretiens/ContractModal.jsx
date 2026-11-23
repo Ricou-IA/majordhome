@@ -221,7 +221,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
   // Gestion ESC pour fermer
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === 'Escape') onClose?.();
+      if (e.key === 'Escape' && !e.defaultPrevented) onClose?.();
     };
     if (isOpen) document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);

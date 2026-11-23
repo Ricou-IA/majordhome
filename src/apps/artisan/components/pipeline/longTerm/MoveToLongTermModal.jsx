@@ -48,7 +48,7 @@ export function MoveToLongTermModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div
         className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6"
-        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+        onKeyDown={(e) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose(); }}
       >
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-2">

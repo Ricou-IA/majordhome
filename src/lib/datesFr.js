@@ -16,11 +16,12 @@ export const versIso = (date) => `${date.getFullYear()}-${deux(date.getMonth() +
 
 /**
  * `YYYY-MM-DD` → Date locale à midi (à l'abri des changements d'heure), ou null si la date n'existe pas.
+ * Un horodatage (`2026-11-23T10:00:00…`) se lit par sa date : une valeur stockée telle quelle reste lisible.
  * @param {string|null|undefined} iso
  * @returns {Date|null}
  */
 export function depuisIso(iso) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso ?? ''));
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/.exec(String(iso ?? ''));
   if (!m) return null;
   const [a, mo, j] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const d = new Date(a, mo - 1, j, 12);
@@ -46,18 +47,28 @@ export function saisieDepuisIso(iso) {
 }
 
 /**
- * Saisie au clavier → `YYYY-MM-DD`. Accepte j/m/aaaa, jj/mm/aa (→ 20aa), séparateurs « / - . ».
+ * Saisie au clavier → `YYYY-MM-DD`. Accepte j/m/aaaa, jj/mm/aa, séparateurs « / - . », ou les chiffres
+ * seuls (jjmmaaaa, jjmmaa : le clavier numérique d'une tablette n'a pas toujours « / »). Une année
+ * sur deux chiffres va au siècle actuel, sauf si elle dépasse l'année en cours de plus de 10 ans
+ * (« 85 » = 1985 : une date de naissance).
  * @param {string} texte
+ * @param {Date} [maintenant]  pour l'année sur deux chiffres (tests)
  * @returns {string|null}  `''` pour un champ vidé, null pour une saisie impossible
  */
-export function lireSaisieDate(texte) {
+export function lireSaisieDate(texte, maintenant) {
   const brut = String(texte ?? '').trim();
   if (!brut) return '';
-  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/.exec(brut);
+  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/.exec(brut)
+    || /^(\d{2})(\d{2})(\d{4}|\d{2})$/.exec(brut);
   if (!m) return null;
   const jour = Number(m[1]);
   const mois = Number(m[2]);
-  const annee = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  let annee = Number(m[3]);
+  if (m[3].length === 2) {
+    const courante = (maintenant ?? new Date()).getFullYear();
+    annee += Math.floor(courante / 100) * 100;
+    if (annee > courante + 10) annee -= 100;
+  }
   if (annee < 1900 || annee > 2999) return null;
   const iso = `${annee}-${deux(mois)}-${deux(jour)}`;
   return depuisIso(iso) ? iso : null;

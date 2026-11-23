@@ -98,7 +98,7 @@ export default function TrouverPieceModal({ equipment, interventionId = null, on
 
   const lancement = useRef(false);
   useEffect(() => {
-    const surTouche = (e) => { if (e.key === 'Escape') onClose(); };
+    const surTouche = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose(); };
     window.addEventListener('keydown', surTouche);
     return () => window.removeEventListener('keydown', surTouche);
   }, [onClose]);

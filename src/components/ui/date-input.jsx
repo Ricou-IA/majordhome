@@ -3,7 +3,7 @@ import { CalendarDays } from 'lucide-react';
 import { DayPicker } from 'react-day-picker';
 import { fr } from 'react-day-picker/locale';
 import 'react-day-picker/style.css';
-import { Popover, PopoverTrigger, PopoverContent } from './popover';
+import { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } from './popover';
 import { cn } from '@lib/utils';
 import { useDeviceClass } from '@hooks/useDeviceClass';
 import {
@@ -28,19 +28,22 @@ import {
  * @param {string} [props.id]
  * @param {string} [props.libelle]  nom lu par un lecteur d'écran
  * @param {string} [props.className]
+ * @param {boolean} [props.autoFocus]
  */
-export function DateInput({ value, onChange, min, max, disabled = false, required = false, id, libelle, className }) {
+export function DateInput({ value, onChange, min, max, disabled = false, required = false, id, libelle, className, autoFocus = false }) {
   const { isPhone } = useDeviceClass();
   const idAuto = useId();
   const idChamp = id || idAuto;
   const [ouvert, setOuvert] = useState(false);
   const [saisie, setSaisie] = useState(null); // null = pas en cours de saisie
   const [erreur, setErreur] = useState(null);
+  const [moisAffiche, setMoisAffiche] = useState(null);
 
   useEffect(() => { setErreur(null); }, [value]);
 
   const choisie = depuisIso(value);
-  const annee = (choisie || new Date()).getFullYear();
+  // Jours fériés de l'année affichée (et des voisines), pas seulement de celle de la valeur.
+  const annee = (moisAffiche || choisie || new Date()).getFullYear();
   const feries = useMemo(
     () => [annee - 1, annee, annee + 1].flatMap(joursFeries).map(depuisIso),
     [annee],
@@ -70,6 +73,7 @@ export function DateInput({ value, onChange, min, max, disabled = false, require
         max={max}
         disabled={disabled}
         required={required}
+        autoFocus={autoFocus}
         aria-label={libelle}
         onChange={(e) => onChange?.(e.target.value)}
         className={cn(
@@ -81,7 +85,8 @@ export function DateInput({ value, onChange, min, max, disabled = false, require
   }
 
   return (
-    <Popover open={ouvert} onOpenChange={(o) => { if (!disabled) setOuvert(o); }}>
+    <Popover modal open={ouvert} onOpenChange={(o) => { if (!disabled) setOuvert(o); }}>
+      <PopoverAnchor asChild>
       <div className={cn('relative w-full', className)}>
         <input
           id={idChamp}
@@ -91,13 +96,15 @@ export function DateInput({ value, onChange, min, max, disabled = false, require
           placeholder="jj/mm/aaaa"
           disabled={disabled}
           required={required}
+          autoFocus={autoFocus}
           aria-label={libelle}
           aria-invalid={erreur ? true : undefined}
           aria-describedby={erreur ? `${idChamp}-erreur` : undefined}
           value={saisie ?? formatDateLongueFR(value)}
           onFocus={() => setSaisie(saisieDepuisIso(value))}
           onChange={(e) => setSaisie(e.target.value)}
-          onBlur={() => { if (saisie !== null) valider(lireSaisieDate(saisie)); setSaisie(null); }}
+          // Quitter le champ sans rien changer n'écrit rien (une valeur stockée sous une autre forme reste telle quelle).
+          onBlur={() => { if (saisie !== null && saisie !== saisieDepuisIso(value)) valider(lireSaisieDate(saisie)); setSaisie(null); }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') { e.preventDefault(); if (valider(lireSaisieDate(saisie ?? ''))) e.currentTarget.blur(); }
             if (e.key === 'ArrowDown' && e.altKey) { e.preventDefault(); setOuvert(true); }
@@ -122,7 +129,8 @@ export function DateInput({ value, onChange, min, max, disabled = false, require
           <p id={`${idChamp}-erreur`} className="mt-1 text-caption text-st-alerte">{erreur}</p>
         )}
       </div>
-      <PopoverContent align="start" className="mdh-calendrier w-auto p-3 shadow-lg">
+      </PopoverAnchor>
+      <PopoverContent align="start" className="mdh-calendrier z-[90] w-auto p-3 shadow-lg">
         <div className="mb-2 flex flex-wrap gap-1">
           {raccourcisDate().map((r) => (
             <button
@@ -142,6 +150,7 @@ export function DateInput({ value, onChange, min, max, disabled = false, require
           weekStartsOn={1}
           selected={choisie || undefined}
           defaultMonth={choisie || undefined}
+          onMonthChange={setMoisAffiche}
           disabled={desactives}
           modifiers={{ ferie: feries }}
           modifiersClassNames={{ ferie: 'mdh-jour-ferie' }}
