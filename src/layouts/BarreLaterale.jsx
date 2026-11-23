@@ -15,6 +15,8 @@ import {
   Building2, ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, Search, Settings, User,
 } from 'lucide-react';
 import { etatDuGroupe } from '@/lib/menuGroupes';
+import { Avatar } from '@components/ui/avatar';
+import { Tag } from '@components/ui/tag';
 import { MenuCreer } from '@components/navigation/MenuCreer';
 
 const FOCUS = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30';
@@ -104,9 +106,7 @@ export function BarreLaterale({
             <div className="min-w-0 flex-1">
               <p className="truncate text-cell font-semibold text-secondary-900">{organization.name}</p>
               {libelleRole && (
-                <span className="mt-1 inline-block rounded-md bg-secondary-100 px-2 py-0.5 text-caption text-secondary-600">
-                  {libelleRole}
-                </span>
+                <Tag className="mt-1">{libelleRole}</Tag>
               )}
             </div>
           </div>
@@ -206,9 +206,9 @@ export function BarreLaterale({
             aria-expanded={menuProfilOuvert}
             aria-haspopup="menu"
             title={profil.nom}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary-800 ring-2 ring-transparent transition-shadow hover:ring-secondary-300 focus:outline-none focus-visible:ring-primary-600/40 lg:h-10 lg:w-10"
+            className="flex h-11 w-11 items-center justify-center rounded-full ring-2 ring-transparent transition-shadow hover:ring-secondary-300 focus:outline-none focus-visible:ring-primary-600/40 lg:h-10 lg:w-10"
           >
-            <span className="text-label text-white">{profil.initiales}</span>
+            <Avatar nom={profil.nom} couleur="#2C2823" className="h-full w-full" />
           </button>
 
           {menuProfilOuvert && (

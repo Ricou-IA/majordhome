@@ -23,27 +23,15 @@ import {
   Mail,
   ChevronRight,
   Archive,
-  FileText,
 } from 'lucide-react';
 import { EquipmentKindIcons } from '../shared/EquipmentKindIcons';
 import { LienWaze } from '../shared/LienWaze';
+import { StatusPill } from '@components/ui/status-pill';
+import { toneFor } from '@/lib/tonsStatut';
 
 // ============================================================================
 // SOUS-COMPOSANTS
 // ============================================================================
-
-/**
- * Icône contrat (vert = actif, gris = sans contrat)
- */
-const ContractIcon = ({ hasContract }) => (
-  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-    hasContract ? 'bg-green-100' : 'bg-secondary-100'
-  }`}>
-    <FileText className={`w-3.5 h-3.5 ${
-      hasContract ? 'text-green-600' : 'text-secondary-400'
-    }`} />
-  </div>
-);
 
 /**
  * Ligne d'information avec icône
@@ -178,7 +166,7 @@ export function ClientCard({
               Archivé
             </span>
           )}
-          {hasContract && <ContractIcon hasContract />}
+          {hasContract && <StatusPill tone={toneFor('contrat', 'active')}>Contrat actif</StatusPill>}
         </div>
       </div>
 

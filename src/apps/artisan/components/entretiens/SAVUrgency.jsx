@@ -5,12 +5,16 @@
  */
 
 import { Zap, Hourglass, Minus } from 'lucide-react';
+import { StatusPill } from '@components/ui/status-pill';
 import { SAV_URGENCES, urgenceDe, urgenceVisible, libelleUrgence } from '@/lib/savUrgency';
 
+// Ton de la pastille de la carte : l'urgence est la seule à crier ; « peut attendre » reste informatif.
+const TON_URGENCE = { urgent: 'alerte', normal: 'neutre', peut_attendre: 'info' };
+
 const VISUELS = {
-  urgent: { Icon: Zap, actif: 'bg-red-600 text-white border-red-600', pastille: 'bg-red-600 text-white' },
-  normal: { Icon: Minus, actif: 'bg-secondary-700 text-white border-secondary-700', pastille: 'bg-secondary-100 text-secondary-600' },
-  peut_attendre: { Icon: Hourglass, actif: 'bg-secondary-500 text-white border-secondary-500', pastille: 'bg-secondary-100 text-secondary-600' },
+  urgent: { Icon: Zap, actif: 'bg-red-600 text-white border-red-600' },
+  normal: { Icon: Minus, actif: 'bg-secondary-700 text-white border-secondary-700' },
+  peut_attendre: { Icon: Hourglass, actif: 'bg-secondary-500 text-white border-secondary-500' },
 };
 
 /**
@@ -52,12 +56,13 @@ export function SAVUrgencySelect({ value, onChange, disabled = false }) {
 export function SAVUrgencyBadge({ item, taille = 'carte' }) {
   if (!urgenceVisible(item)) return null;
   const niveau = urgenceDe(item);
-  const { Icon, pastille } = VISUELS[niveau];
-  const classes = taille === 'fiche' ? 'text-xs px-2 py-0.5 gap-1' : 'text-[11px] px-1.5 py-0.5 gap-0.5';
+  const { Icon } = VISUELS[niveau];
   return (
-    <span className={`inline-flex items-center font-semibold rounded ${classes} ${pastille}`}>
-      <Icon className={taille === 'fiche' ? 'w-3.5 h-3.5' : 'w-3 h-3'} />
+    <StatusPill
+      tone={TON_URGENCE[niveau]}
+      icone={<Icon className={taille === 'fiche' ? 'h-3.5 w-3.5' : 'h-3 w-3'} aria-hidden="true" />}
+    >
       {libelleUrgence(niveau)}
-    </span>
+    </StatusPill>
   );
 }
