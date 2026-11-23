@@ -38,13 +38,13 @@ export function TexteDuJour({ texte, aujourdhui }) {
  * @param {boolean} props.filtreEquipe  vrai si le chiffre est la part des personnes affichées
  * @param {(item: object) => void} props.onOpen
  */
-export function PlanningDayHeader({ texte, date, lignes, ca, caError, filtreEquipe, onOpen }) {
+export function PlanningDayHeader({ texte, date, aujourdhui = false, lignes, ca, caError, filtreEquipe, onOpen }) {
   const total = ca?.parJour.get(date) || 0;
   const sansMontant = ca?.sansMontantParJour.get(date) || 0;
   return (
     <div className="mdh-day-head flex w-full flex-col items-start">
       <div className="flex w-full items-baseline justify-between gap-2">
-        <TexteDuJour texte={texte} aujourdhui={date === new Date().toLocaleDateString('fr-CA')} />
+        <TexteDuJour texte={texte} aujourdhui={aujourdhui} />
         {caError && (
           <span className="font-normal normal-case text-secondary-400" title={`CA HT programmé indisponible (${caError.message || 'échec du chargement'})`}>
             CA indisponible

@@ -193,6 +193,7 @@ export default function Planning() {
     return (
       <PlanningDayHeader
         texte={arg.text}
+        aujourdhui={arg.isToday}
         date={arg.date.toLocaleDateString('fr-CA')}
         lignes={lignesCharge}
         ca={caPlanning}

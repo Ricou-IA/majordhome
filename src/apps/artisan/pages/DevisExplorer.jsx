@@ -168,6 +168,7 @@ export default function DevisExplorer() {
           variant="secondary"
           size="sm"
           aria-pressed={sansReponse}
+          title="Devis en attente ou expirés depuis plus de 21 jours, parmi ceux des 90 derniers jours affichés ici"
           onClick={() => { setSansReponse((v) => !v); setSelectedIds(new Set()); }}
           className={sansReponse ? 'border-primary-200 bg-primary-50 text-primary-800 hover:bg-primary-50' : undefined}
         >
@@ -192,7 +193,7 @@ export default function DevisExplorer() {
           }}
           columnAmount={(items) => items.reduce((sum, r) => sum + (Number(r.amount_ht) || 0), 0)}
           headerLeft={
-            selectedIds.size > 0 ? (
+            selectedRows.length > 0 ? (
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
@@ -200,7 +201,7 @@ export default function DevisExplorer() {
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-sm font-medium text-white"
                 >
                   <Link2 className="w-4 h-4" />
-                  Rattacher {selectedIds.size} devis
+                  Rattacher {selectedRows.length} devis
                 </button>
                 <button
                   type="button"
@@ -210,16 +211,16 @@ export default function DevisExplorer() {
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary-100 hover:bg-secondary-200 text-sm font-medium text-secondary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4" />
-                  Créer le lead ({selectedIds.size} devis)
+                  Créer le lead ({selectedRows.length} devis)
                 </button>
                 <button
                   type="button"
                   disabled={isDismissing}
-                  onClick={() => handleDismiss([...selectedIds])}
+                  onClick={() => handleDismiss(selectedRows.map((r) => r.id))}
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary-100 hover:bg-secondary-200 text-sm font-medium text-secondary-700 disabled:opacity-50"
                 >
                   <EyeOff className="w-4 h-4" />
-                  Écarter {selectedIds.size} devis
+                  Écarter {selectedRows.length} devis
                 </button>
               </div>
             ) : (

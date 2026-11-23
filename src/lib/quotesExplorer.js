@@ -16,6 +16,8 @@
  * jamais envoyé au client n'est pas une anomalie de rapprochement.
  * La divergence est VOULUE — ne pas « corriger » en réintroduisant draft.
  */
+import { SEUIL_RELANCE_JOURS } from './pipelineDashboard.js';
+
 export const EXPLORER_QUOTE_STATUSES = ['pending', 'expired', 'accepted', 'invoiced'];
 
 export const EXPLORER_VIEWS = {
@@ -120,7 +122,7 @@ const EN_ATTENTE_DE_REPONSE = new Set(['pending', 'expired']);
  * @param {number} [jours]
  * @returns {boolean}
  */
-export function sansReponseDepuis(ligne, aujourdhui, jours = 21) {
+export function sansReponseDepuis(ligne, aujourdhui, jours = SEUIL_RELANCE_JOURS) {
   if (!EN_ATTENTE_DE_REPONSE.has(ligne?.status) || !ligne?.date) return false;
   const debut = Date.parse(String(ligne.date).slice(0, 10));
   const fin = Date.parse(aujourdhui);
