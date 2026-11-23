@@ -19,6 +19,7 @@ import { KanbanBoard } from '@apps/artisan/components/shared/KanbanBoard';
 import { supabase } from '@/lib/supabaseClient';
 import { formatEuroCeil } from '@/lib/utils';
 import { logger } from '@lib/logger';
+import { PageHeader } from '@/components/ui/page-header';
 
 // ============================================================================
 // STAT CARD (léger, inline)
@@ -358,14 +359,10 @@ export default function PipelineContrats() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Pipeline Contrats</h1>
-          <p className="text-secondary-500 mt-1">
-            {loading ? '...' : `${contracts.length} contrat${contracts.length !== 1 ? 's' : ''} en cours de traitement`}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Contrats"
+        subtitle={loading ? null : `${contracts.length} contrat${contracts.length !== 1 ? 's' : ''} en cours de traitement`}
+      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

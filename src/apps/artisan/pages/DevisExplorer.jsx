@@ -20,6 +20,7 @@ import { AttachQuoteToLeadModal } from '@apps/artisan/components/devis/AttachQuo
 import { CreateLeadFromQuoteModal } from '@apps/artisan/components/devis/CreateLeadFromQuoteModal';
 import { EXPLORER_VIEWS, filterExplorerRows } from '@/lib/quotesExplorer';
 import { formatEuro, formatRelativeFR } from '@/lib/utils';
+import { PageHeader } from '@/components/ui/page-header';
 
 const COLUMNS = [
   { id: 'pending', label: 'En attente', color: '#d97706' },
@@ -101,14 +102,7 @@ export default function DevisExplorer() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Devis Pennylane</h1>
-          <p className="text-secondary-600">
-            Tous les devis Pennylane et leur rattachement au pipeline.
-          </p>
-        </div>
-      </div>
+      <PageHeader title="Devis" />
 
       {error && (
         <div className="p-4 rounded-lg bg-amber-50 text-amber-800 flex items-start gap-3">

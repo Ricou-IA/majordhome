@@ -51,6 +51,7 @@ import { PlanningClientSearchInput, PlanningClientAppointments } from '@/apps/ar
 import { PlanningEventContent } from '@/apps/artisan/components/planning/PlanningEventContent';
 import { PlanningDayHeader } from '@/apps/artisan/components/planning/PlanningDayHeader';
 import { RemplirJourneePanel } from '@/apps/artisan/components/tournees/RemplirJourneePanel';
+import { PageHeader } from '@/components/ui/page-header';
 
 // Vue Mois : une colonne est un jour de la SEMAINE, pas une date. Avec le format des
 // autres vues (jour + mois), le calendrier y écrivait une date de référence sans
@@ -231,7 +232,7 @@ export default function Planning() {
   if (error) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-secondary-900">Planning</h1>
+        <PageHeader title="Planning" />
         <div className="bg-white rounded-lg border border-secondary-200 p-12 text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-secondary-900 mb-2">Erreur de chargement</h3>
@@ -247,7 +248,7 @@ export default function Planning() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-secondary-900">Planning</h1>
+      <PageHeader title="Planning" />
 
       {/* Toolbar */}
       <div className="bg-white rounded-lg border border-secondary-200 p-3 sm:p-4 space-y-3">

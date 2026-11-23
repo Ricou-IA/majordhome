@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Mail, Sparkles, Filter, BarChart3 } from 'lucide-react';
+import { Sparkles, Filter, BarChart3 } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import EditorTab from '@apps/artisan/components/mailing/EditorTab';
 import SegmentsTab from '@apps/artisan/components/mailing/SegmentsTab';
 import StatsTab from '@apps/artisan/components/mailing/StatsTab';
 import PageMail from '@apps/artisan/components/mailing/page/PageMail';
+import { PageHeader } from '@/components/ui/page-header';
 
 const ONGLETS = ['campagnes', 'stats', 'segments'];
 
@@ -39,12 +40,7 @@ export default function Mailing() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
-          <Mail className="w-7 h-7 text-secondary-400" />
-          Mailing
-        </h1>
-      </div>
+      <PageHeader title="Messages" />
 
       {isOrgAdmin && (
         <div className="flex gap-1 border-b">

@@ -5,6 +5,7 @@ import { modulesVisibles } from '@/lib/modules';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useCanAccess } from '@hooks/usePermissions';
 import DemarrageCard from './settings/DemarrageCard';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Building2,
   Users,
@@ -52,12 +53,7 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-secondary-900">Paramètres</h1>
-        <p className="text-secondary-600">
-          Gérez les paramètres de votre compte et de votre organisation
-        </p>
-      </div>
+      <PageHeader title="Paramètres" />
 
       {/* Organisation info */}
       {organization && (

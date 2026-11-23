@@ -21,6 +21,7 @@ import { LeadModal } from '@apps/artisan/components/pipeline/LeadModal';
 import { LeadKanban } from '@apps/artisan/components/pipeline/LeadKanban';
 import { LongTermTab } from '@apps/artisan/components/pipeline/longTerm/LongTermTab';
 import NouveauDevisRapideModal from '@apps/artisan/components/devis/NouveauDevisRapideModal';
+import { PageHeader } from '@/components/ui/page-header';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -124,9 +125,7 @@ export default function Pipeline() {
   return (
     <div className="p-4 md:p-8 space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-secondary-900">Pipeline</h1>
-      </div>
+      <PageHeader title="Leads" />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>

@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Map, Loader2, AlertTriangle, Zap, MapPin } from 'lucide-react';
+import { Loader2, AlertTriangle, Zap, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -15,6 +15,7 @@ import { useTerritoireData, useTerritoireStats } from '../components/territoire/
 import { territoireService } from '@services/territoire.service';
 import { geocodingService } from '@services/geocoding.service';
 import { logger } from '@lib/logger';
+import { PageHeader } from '@/components/ui/page-header';
 
 // ============================================================================
 // COMPOSANT PAGE
@@ -178,17 +179,7 @@ export default function Territoire() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-secondary-100 flex items-center justify-center">
-            <Map className="w-5 h-5 text-secondary-500" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-secondary-900">Territoire</h1>
-            <p className="text-sm text-secondary-500">
-              Carte interactive de l&apos;activité CRM
-            </p>
-          </div>
-        </div>
+        <PageHeader title="Carte" />
 
         {/* Boutons batch géocodage */}
         <div className="flex items-center gap-2">

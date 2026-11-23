@@ -52,6 +52,7 @@ import { SectorGroupView } from '@apps/artisan/components/entretiens/SectorGroup
 import { ContractModal } from '@apps/artisan/components/entretiens/ContractModal';
 import { CreateContractModal } from '@apps/artisan/components/entretiens/CreateContractModal';
 import { logger } from '@lib/logger';
+import { PageHeader } from '@/components/ui/page-header';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -379,26 +380,23 @@ export default function Entretiens() {
   return (
     <div className="p-4 md:p-8 space-y-6">
       {/* ===== HEADER ===== */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Entretiens & SAV</h1>
-          <p className="text-secondary-500 mt-1">
-            {contractStats
-              ? `${contractStats.openContracts} contrats actifs`
-              : '...'}{' '}
-            · Année {currentYear}
-          </p>
-        </div>
-        {canCreateContract && (
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-5 h-5" />
-            Nouveau contrat
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Entretiens"
+        subtitle={[
+          contractStats ? `${contractStats.openContracts.toLocaleString('fr-FR')} contrats actifs` : null,
+          !savStatsLoading && savStats?.entretien_a_faire != null
+            ? `${savStats.entretien_a_faire.toLocaleString('fr-FR')} entretiens à faire`
+            : null,
+        ].filter(Boolean).join(' · ') || null}
+        actions={[
+          canCreateContract && {
+            label: 'Nouveau contrat',
+            icon: Plus,
+            variant: 'primary',
+            onClick: () => setCreateModalOpen(true),
+          },
+        ]}
+      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
