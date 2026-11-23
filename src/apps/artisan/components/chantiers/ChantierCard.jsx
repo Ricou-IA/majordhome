@@ -18,7 +18,7 @@
 
 import { MapPin, Calendar, CalendarClock, CalendarPlus, Package, Check, Clock, AlertTriangle, MessageSquare, Loader2 } from 'lucide-react';
 import { formatEuroCeil } from '@/lib/utils';
-import { getChantierStatusConfig, getChantierAmount } from '@services/chantiers.service';
+import { getChantierAmount } from '@services/chantiers.service';
 import { poseProvisoire } from '@/lib/installOrder';
 import { bandeDeCarteChantier, adresseDeCarte, objetDeCarte } from '@/lib/chantierCardDate';
 import { reperePv } from '@/lib/chantierApresVente';
@@ -58,7 +58,6 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
 
   const name = `${chantier.last_name || ''} ${chantier.first_name || ''}`.trim() || 'Sans nom';
   const amount = getChantierAmount(chantier);
-  const statusConfig = getChantierStatusConfig(chantier.chantier_status);
   const bande = bandeDeCarteChantier(chantier);
   const date = bande.date ? jourEtMois(bande.date) : null;
   const { voie, commune } = adresseDeCarte(chantier);
@@ -69,8 +68,9 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
   const provisoire = chantier.chantier_status === 'planification' && bande.repere === 'date' && poseProvisoire(chantier);
   const aReplanifier = bande.repere === 'a_replanifier';
 
-  let bandeStyle = { backgroundColor: `${statusConfig.color}10`, borderColor: `${statusConfig.color}30` };
-  let bandeCouleur = statusConfig.color;
+  // Bande neutre comme la carte de lead ; seuls « à replanifier » et « pose provisoire » portent un ton.
+  let bandeStyle = null;
+  let bandeCouleur = null;
   let bandeTitre = bande.libelle;
   if (aReplanifier) {
     bandeStyle = AMBRE;
@@ -79,8 +79,6 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
     bandeStyle = HACHURE;
     bandeCouleur = '#B45309';
     bandeTitre = 'Pose provisoire : commandes non reçues';
-  } else if (bande.repere === 'inconnue') {
-    bandeCouleur = '#D1D5DB';
   }
   const Icone = ICONES[bande.repere] || Calendar;
 
@@ -103,17 +101,17 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
     >
       {/* Bande de gauche : date de la colonne, ou icône quand elle n'en a pas */}
       <div
-        className="flex flex-col items-center justify-center px-2 w-[44px] shrink-0 border-r"
-        style={bandeStyle}
+        className={`flex flex-col items-center justify-center px-2 w-[44px] shrink-0 border-r ${bandeStyle ? '' : 'bg-secondary-25 border-secondary-200 text-secondary-700'}`}
+        style={bandeStyle || undefined}
         title={bandeTitre}
       >
         {date ? (
           <>
-            <span className="text-sm font-bold leading-none" style={{ color: bandeCouleur }}>{date.jour}</span>
-            <span className="text-[11px] uppercase leading-tight" style={{ color: bandeCouleur }}>{date.mois}</span>
+            <span className="font-display text-sm font-bold leading-none" style={bandeCouleur ? { color: bandeCouleur } : undefined}>{date.jour}</span>
+            <span className="text-caption uppercase leading-tight" style={bandeCouleur ? { color: bandeCouleur } : undefined}>{date.mois}</span>
           </>
         ) : (
-          <Icone className="h-4 w-4" style={{ color: bandeCouleur }} aria-label={bandeTitre} />
+          <Icone className={`h-4 w-4 ${bandeCouleur ? '' : 'text-secondary-400'}`} style={bandeCouleur ? { color: bandeCouleur } : undefined} aria-label={bandeTitre} />
         )}
       </div>
 
@@ -121,7 +119,7 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
         {/* Ligne 1 : nom + montant */}
         <div className="flex items-start justify-between gap-2">
           <p className="font-medium text-sm leading-5 text-secondary-900 truncate">{name}</p>
-          <span className={`text-xs leading-5 font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-secondary-400'}`}>
+          <span className={`text-xs leading-5 font-semibold whitespace-nowrap ${amount > 0 ? 'text-secondary-900' : 'text-secondary-400'}`}>
             {formatEuroCeil(amount)}
           </span>
         </div>
@@ -149,8 +147,8 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
                   disabled={avisEnCours}
                   onClick={(e) => { e.stopPropagation(); onDemanderAvis(chantier); }}
                   title="Demander un avis au client par SMS"
-                  className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded-full font-bold shrink-0 border
-                             border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 disabled:opacity-60"
+                  className="inline-flex items-center gap-0.5 text-caption leading-4 px-1.5 py-0.5 rounded-full font-bold shrink-0 border
+                             border-secondary-300 text-secondary-700 bg-white hover:bg-secondary-50 disabled:opacity-60"
                 >
                   {avisEnCours ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <MessageSquare className="h-2.5 w-2.5" />}
                   Avis
@@ -165,12 +163,12 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
           <span className="flex-1" />
           {pvEnAttente && <Repere repere={reperePv(chantier)} />}
           {plusieursDevis && (
-            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold shrink-0" title="Devis groupés sur ce chantier">
+            <span className="text-caption leading-4 px-1.5 py-0.5 rounded-full bg-st-info-bg text-st-info font-semibold shrink-0" title="Devis groupés sur ce chantier">
               {chantier.quotes_count} devis
             </span>
           )}
           {sansDevisValide && (
-            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold truncate" title="Aucun devis validé sur ce chantier">
+            <span className="text-caption leading-4 px-1.5 py-0.5 rounded-full bg-st-attente-bg text-st-attente font-semibold truncate" title="Aucun devis validé sur ce chantier">
               sans devis validé
             </span>
           )}
@@ -183,9 +181,9 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
 
 /** Pastille d'un repère d'après-vente : l'état se lit à l'icône et au remplissage, pas à la couleur seule. */
 const REPERE_STYLES = {
-  fait: { css: 'bg-emerald-500 text-white border-emerald-500', Icone: Check },
-  en_cours: { css: 'bg-blue-50 text-blue-700 border-blue-200', Icone: Clock },
-  attention: { css: 'bg-amber-100 text-amber-800 border-amber-300', Icone: AlertTriangle },
+  fait: { css: 'bg-st-ok text-white border-st-ok', Icone: Check },
+  en_cours: { css: 'bg-st-info-bg text-st-info border-st-info/20', Icone: Clock },
+  attention: { css: 'bg-st-attente-bg text-st-attente border-st-attente/30', Icone: AlertTriangle },
   a_faire: { css: 'bg-white text-secondary-400 border-secondary-200', Icone: null },
   inconnu: { css: 'bg-secondary-50 text-secondary-300 border-dashed border-secondary-200', Icone: null },
 };
@@ -193,7 +191,7 @@ const REPERE_STYLES = {
 function Repere({ repere }) {
   const { css, Icone } = REPERE_STYLES[repere.etat] || REPERE_STYLES.a_faire;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded-full font-bold shrink-0 border ${css}`} title={repere.titre}>
+    <span className={`inline-flex items-center gap-0.5 text-caption leading-4 px-1.5 py-0.5 rounded-full font-bold shrink-0 border ${css}`} title={repere.titre}>
       {Icone && <Icone className="h-2.5 w-2.5" />}
       {repere.libelle}
     </span>
@@ -201,7 +199,7 @@ function Repere({ repere }) {
 }
 
 const ORDER_STYLES = {
-  recu: { css: 'bg-emerald-500 text-white', etat: 'reçu' },
+  recu: { css: 'bg-st-ok text-white', etat: 'reçu' },
   commande: { css: 'bg-st-info text-white', etat: 'commandé' },
   na: { css: 'bg-secondary-200 text-secondary-400', etat: 'rien à recevoir' },
 };
@@ -209,7 +207,7 @@ const ORDER_STYLES = {
 function OrderIndicator({ label, nom, status }) {
   const style = ORDER_STYLES[status] || { css: 'bg-secondary-50 text-secondary-300 border border-secondary-200', etat: 'non renseigné' };
   return (
-    <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${style.css}`} title={`${nom} : ${style.etat}`}>
+    <span className={`text-caption leading-4 px-1.5 py-0.5 rounded-full font-bold shrink-0 ${style.css}`} title={`${nom} : ${style.etat}`}>
       {label}
     </span>
   );
