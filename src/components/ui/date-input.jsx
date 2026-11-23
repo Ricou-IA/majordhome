@@ -122,7 +122,7 @@ export function DateInput({ value, onChange, min, max, disabled = false, require
             setSaisie(null);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); if (valider(lireSaisieDate(saisie ?? ''), saisie)) e.currentTarget.blur(); }
+            if (e.key === 'Enter') { e.preventDefault(); if (valider(lireSaisieDate(saisie ?? saisieDepuisIso(value)), saisie)) e.currentTarget.blur(); }
             if (e.key === 'ArrowDown' && e.altKey) { e.preventDefault(); setOuvert(true); }
           }}
           className={cn(
