@@ -21,7 +21,9 @@ import { fetchAllPages } from '@/lib/postgrestUtils';
 const toutLire = (requete) => fetchAllPages((from, to) => requete().range(from, to));
 
 const COLONNES_LEADS = 'id, created_date, assigned_user_id, source_id, won_date, status_is_won, status_is_final, '
-  + 'status_changed_at, is_long_term_project, last_followup_date, last_interaction_at, quote_sent_date, order_amount_ht';
+  + 'status_changed_at, is_long_term_project, last_followup_date, last_interaction_at, quote_sent_date, order_amount_ht, '
+  // Nom du lead : relances prioritaires de la page d'accueil (aucune autre lecture n'en a besoin).
+  + 'first_name, last_name, company_name';
 
 const COLONNES_CARTES = 'card_key, lead_id, column_key, total_amount, devis_count, has_active_rdv, first_quote_date, quotes_validated_at';
 

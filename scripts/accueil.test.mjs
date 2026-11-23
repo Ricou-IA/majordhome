@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { plageAccueil, journeeAffichee, compterRdv, personnesDuRdv, lieuDuRdv, lignesATraiter } from '../src/lib/accueil.js';
+import { plageAccueil, journeeAffichee, compterRdv, personnesDuRdv, lieuDuRdv, lignesATraiter, rdvEnCours, sousTitreAccueil } from '../src/lib/accueil.js';
 
 const rdv = (date, heure, extra = {}) => ({ scheduled_date: date, scheduled_start: heure, status: 'scheduled', appointment_type: 'maintenance', ...extra });
 
@@ -119,4 +119,26 @@ test('lignesATraiter : une source inconnue ne produit aucune ligne (jamais un z�
   const seulChantier = lignesATraiter({ portefeuille: null, chantiers: { commandeAFaire: 2, aPlanifier: 0 }, seuilRelance: 21 });
   assert.deepEqual(seulChantier.map((l) => l.texte), ['commandes à passer']);
   assert.deepEqual(lignesATraiter({ portefeuille: { aContacter: 0, rdvAReplanifier: 0, devisEnAttente: 0, devisSansRelance: 0 }, seuilRelance: 21 }), []);
+});
+
+test('rdvEnCours : vrai entre le début et la fin, le jour même', () => {
+  const r = { scheduled_date: '2026-11-23', scheduled_start: '09:00', scheduled_end: '10:30' };
+  assert.equal(rdvEnCours(r, new Date(2026, 10, 23, 9, 45)), true);
+  assert.equal(rdvEnCours(r, new Date(2026, 10, 23, 9, 0)), true);
+  assert.equal(rdvEnCours(r, new Date(2026, 10, 23, 10, 30)), false);
+  assert.equal(rdvEnCours({ ...r, scheduled_date: '2026-11-24' }, new Date(2026, 10, 23, 9, 45)), false);
+  assert.equal(rdvEnCours({ ...r, scheduled_start: '09:00:00', scheduled_end: '10:30:00' }, new Date(2026, 10, 23, 9, 45)), true);
+  assert.equal(rdvEnCours({ ...r, scheduled_end: null }, new Date(2026, 10, 23, 9, 45)), false);
+  assert.equal(rdvEnCours({ ...r, status: 'cancelled' }, new Date(2026, 10, 23, 9, 45)), false);
+  assert.equal(rdvEnCours(null, new Date()), false);
+});
+
+test('sousTitreAccueil : date, rendez-vous et leads à rappeler, parties inconnues omises', () => {
+  const d = 'Lundi 23 novembre';
+  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 4, aRappeler: 9 }), 'Lundi 23 novembre · 4 rendez-vous et 9 leads à rappeler');
+  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 1, aRappeler: null }), 'Lundi 23 novembre · 1 rendez-vous');
+  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: null, aRappeler: null }), 'Lundi 23 novembre');
+  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 0, aRappeler: 1 }), 'Lundi 23 novembre · aucun rendez-vous et 1 lead à rappeler');
+  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: null, aRappeler: 0 }), 'Lundi 23 novembre · aucun lead à rappeler');
+  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 1200, aRappeler: 2 }), 'Lundi 23 novembre · 1 200 rendez-vous et 2 leads à rappeler');
 });

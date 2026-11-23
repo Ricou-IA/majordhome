@@ -145,3 +145,36 @@ export function lignesATraiter({ portefeuille = null, chantiers = null, seuilRel
   }
   return lignes;
 }
+
+const hhmm = (v) => String(v ?? '').slice(0, 5);
+const isoLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/**
+ * Le RDV est-il en cours à cet instant ? Même jour local, début inclus, fin exclue.
+ * Un RDV annulé ou sans heure de fin n'est jamais « en cours ».
+ * @param {{ scheduled_date?: string, scheduled_start?: string, scheduled_end?: string|null, status?: string }|null} rdv
+ * @param {Date} maintenant
+ * @returns {boolean}
+ */
+export function rdvEnCours(rdv, maintenant) {
+  if (!rdv || rdv.status === 'cancelled' || !rdv.scheduled_start || !rdv.scheduled_end) return false;
+  if (rdv.scheduled_date !== isoLocal(maintenant)) return false;
+  const heure = `${String(maintenant.getHours()).padStart(2, '0')}:${String(maintenant.getMinutes()).padStart(2, '0')}`;
+  return hhmm(rdv.scheduled_start) <= heure && heure < hhmm(rdv.scheduled_end);
+}
+
+/**
+ * Sous-titre de l'accueil : « Lundi 23 novembre · 4 rendez-vous et 9 leads à rappeler ».
+ * Une partie inconnue (`null` : chargement, échec, pas le droit) est omise, jamais remplacée par 0.
+ * @param {{ dateDuJour: string, rdvAujourdhui: number|null, aRappeler: number|null }} p
+ * @returns {string}
+ */
+export function sousTitreAccueil({ dateDuJour, rdvAujourdhui = null, aRappeler = null }) {
+  const nombre = (n) => (n === 0 ? 'aucun' : n.toLocaleString('fr-FR'));
+  const parties = [];
+  if (rdvAujourdhui !== null && rdvAujourdhui !== undefined) parties.push(`${nombre(rdvAujourdhui)} rendez-vous`);
+  if (aRappeler !== null && aRappeler !== undefined) {
+    parties.push(`${nombre(aRappeler)} ${pluriel(aRappeler, 'lead')} à rappeler`);
+  }
+  return parties.length ? `${dateDuJour} · ${parties.join(' et ')}` : dateDuJour;
+}

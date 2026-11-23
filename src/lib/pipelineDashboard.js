@@ -253,6 +253,44 @@ const aDeLActivite = (m) => m.leads + m.rdv + m.devis + m.ventes > 0;
 
 const lignePortefeuilleVide = () => ({ aContacter: 0, rdvAReplanifier: 0, devisEnAttente: 0, montantEnAttente: 0, devisSansRelance: 0 });
 
+/** Jours depuis le dernier contact daté d'une carte « Devis envoyé » ; `null` si aucun contact n'est daté. */
+function joursSansRelance(l, c, aujourdhui) {
+  const dernierContact = plusRecente([
+    l.lead.last_followup_date, l.lead.last_interaction_at, l.lead.quote_sent_date, c.first_quote_date,
+  ]);
+  return joursEntre(dernierContact, aujourdhui);
+}
+
+/** Nom affiché d'un lead : société, sinon nom et prénom. */
+const nomDuLead = (lead) => (lead.company_name || '').trim()
+  || [lead.last_name, lead.first_name].map((v) => (v || '').trim()).filter(Boolean).join(' ')
+  || 'Sans nom';
+
+/** Nombre de relances prioritaires montrées sur la page d'accueil. */
+export const NB_RELANCES_PRIORITAIRES = 3;
+
+/**
+ * Les devis en attente sans relance depuis plus de SEUIL_RELANCE_JOURS (même critère que
+ * `devisSansRelance`), hors projets MT-LT : plus gros montant d'abord, puis plus ancien contact
+ * (un devis sans aucun contact daté passe après ceux qui en ont un, à montant égal).
+ * @returns {Array<{ leadId: string, nom: string, montant: number, jours: number|null }>}
+ */
+function relancesPrioritaires(leadsIndexes, aujourdhui, garder) {
+  const liste = [];
+  for (const l of leadsIndexes) {
+    if (!garder(l) || l.lead.is_long_term_project) continue;
+    for (const c of l.cartes) {
+      if (c.column_key !== 'devis_envoye') continue;
+      const jours = joursSansRelance(l, c, aujourdhui);
+      if (jours !== null && jours <= SEUIL_RELANCE_JOURS) continue;
+      liste.push({ leadId: l.lead.id, nom: nomDuLead(l.lead), montant: Number(c.total_amount) || 0, jours });
+    }
+  }
+  return liste
+    .sort((a, b) => b.montant - a.montant || (b.jours ?? -1) - (a.jours ?? -1))
+    .slice(0, NB_RELANCES_PRIORITAIRES);
+}
+
 /** Ajoute à `ligne` ce que le lead `l` laisse en attente aujourd'hui. Les projets MT-LT ont leur propre suivi. */
 function ajouterAuPortefeuille(ligne, l, aujourdhui) {
   if (l.lead.is_long_term_project) return;
@@ -262,10 +300,7 @@ function ajouterAuPortefeuille(ligne, l, aujourdhui) {
     else if (c.column_key === 'devis_envoye') {
       ligne.devisEnAttente += 1;
       ligne.montantEnAttente += Number(c.total_amount) || 0;
-      const dernierContact = plusRecente([
-        l.lead.last_followup_date, l.lead.last_interaction_at, l.lead.quote_sent_date, c.first_quote_date,
-      ]);
-      const age = joursEntre(dernierContact, aujourdhui);
+      const age = joursSansRelance(l, c, aujourdhui);
       // Aucun contact daté : on ne peut pas dire qu'il a été relancé.
       if (age === null || age > SEUIL_RELANCE_JOURS) ligne.devisSansRelance += 1;
     }
@@ -368,7 +403,11 @@ export function buildPipelineDashboard({
     commerciaux,
     parMois,
     sources: lignesSources,
-    portefeuille: { lignes: portefeuille, total: totalPortefeuille },
+    portefeuille: {
+      lignes: portefeuille,
+      total: totalPortefeuille,
+      relancesPrioritaires: relancesPrioritaires(index.values(), aujourdhui, dansLePerimetre),
+    },
     tendance,
   };
 }

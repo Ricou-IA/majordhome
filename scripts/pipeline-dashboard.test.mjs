@@ -308,3 +308,39 @@ test('mesurer : sans donnée, des zéros et aucun taux', () => {
   assert.equal(m.tauxGagnes30, null);
   assert.equal(m.delaiSignature, null);
 });
+
+test('portefeuille : relances prioritaires = les 3 devis sans relance au plus gros montant, hors MT-LT', () => {
+  const d = buildPipelineDashboard({
+    leads: [
+      lead('r1', { last_name: 'Martin', first_name: 'Paul' }),
+      lead('r2', { last_name: 'Durand', company_name: '' }),
+      lead('r3', { company_name: 'SCI Les Tilleuls' }),
+      lead('r4', { last_name: 'Petit' }),
+      lead('r5', { last_name: 'Relancé', last_followup_date: '2026-11-12T10:00:00Z' }),
+      lead('r6', { last_name: 'Projet', is_long_term_project: true }),
+    ],
+    cards: [
+      card('r1', 'devis_envoye', { total_amount: 500, first_quote_date: '2026-09-01' }),
+      card('r2', 'devis_envoye', { total_amount: 9000, first_quote_date: '2026-10-01' }),
+      card('r3', 'devis_envoye', { total_amount: 3000, first_quote_date: '2026-10-01' }),
+      card('r4', 'devis_envoye', { total_amount: 9000, first_quote_date: '2026-09-01' }),
+      card('r5', 'devis_envoye', { total_amount: 20000, first_quote_date: '2026-09-01' }),
+      card('r6', 'devis_envoye', { total_amount: 50000, first_quote_date: '2026-09-01' }),
+    ],
+    rdvs: [], devis: [], commercials: COMMERCIALS, sources: SOURCES, mois: ['2026-11'], aujourdhui: '2026-11-17',
+  });
+  assert.deepEqual(d.portefeuille.relancesPrioritaires, [
+    { leadId: 'r4', nom: 'Petit', montant: 9000, jours: 77 },
+    { leadId: 'r2', nom: 'Durand', montant: 9000, jours: 47 },
+    { leadId: 'r3', nom: 'SCI Les Tilleuls', montant: 3000, jours: 47 },
+  ]);
+});
+
+test('portefeuille : un devis sans aucune date de contact est en relance prioritaire, jours inconnus', () => {
+  const d = buildPipelineDashboard({
+    leads: [lead('z', { created_date: '2026-11-10', last_name: 'Sans' })],
+    cards: [card('z', 'devis_envoye', { total_amount: 100 })],
+    rdvs: [], devis: [], commercials: COMMERCIALS, sources: SOURCES, mois: ['2026-11'], aujourdhui: '2026-11-17',
+  });
+  assert.deepEqual(d.portefeuille.relancesPrioritaires, [{ leadId: 'z', nom: 'Sans', montant: 100, jours: null }]);
+});
