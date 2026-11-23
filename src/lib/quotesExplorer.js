@@ -100,6 +100,34 @@ export function filterExplorerRows(rows, view) {
   }
 }
 
+/** Nombre de devis de chaque vue, mêmes règles que filterExplorerRows (compteurs des onglets). */
+export function compterVues(rows = []) {
+  return {
+    [EXPLORER_VIEWS.ORPHANS]: filterExplorerRows(rows, EXPLORER_VIEWS.ORPHANS).length,
+    [EXPLORER_VIEWS.ALL]: filterExplorerRows(rows, EXPLORER_VIEWS.ALL).length,
+    [EXPLORER_VIEWS.DISMISSED]: filterExplorerRows(rows, EXPLORER_VIEWS.DISMISSED).length,
+  };
+}
+
+/** Statuts d'un devis qui attend encore la réponse du client. */
+const EN_ATTENTE_DE_REPONSE = new Set(['pending', 'expired']);
+
+/**
+ * Devis envoyé resté sans réponse depuis plus de `jours` jours : en attente (ou expiré, donc
+ * relançable) et daté. Un devis sans date n'est jamais compté : on ne sait pas depuis quand il attend.
+ * @param {{ status?: string, date?: string|null }} ligne  ligne de l'explorateur (`date` = date du devis)
+ * @param {string} aujourdhui  `YYYY-MM-DD`
+ * @param {number} [jours]
+ * @returns {boolean}
+ */
+export function sansReponseDepuis(ligne, aujourdhui, jours = 21) {
+  if (!EN_ATTENTE_DE_REPONSE.has(ligne?.status) || !ligne?.date) return false;
+  const debut = Date.parse(String(ligne.date).slice(0, 10));
+  const fin = Date.parse(aujourdhui);
+  if (Number.isNaN(debut) || Number.isNaN(fin)) return false;
+  return Math.round((fin - debut) / DAY_MS) > jours;
+}
+
 /**
  * Payload RPC `lead_attach_quotes_and_send` d'une ligne de l'explorateur.
  * Forme unique partagée par le rattachement (AttachQuoteToLeadModal) et la

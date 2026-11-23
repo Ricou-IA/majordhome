@@ -46,12 +46,12 @@ export function QuoteExplorerCard({
           </p>
 
           {row.lead_id ? (
-            <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-700">
+            <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-xs bg-st-info-bg text-st-info">
               <Link2 className="w-3 h-3" />
               {row.lead_name || 'Lead rattaché'}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700">
+            <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-xs bg-st-attente-bg text-st-attente">
               <FileText className="w-3 h-3" />
               Non rattaché
             </span>

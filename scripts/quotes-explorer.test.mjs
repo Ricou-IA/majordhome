@@ -5,6 +5,8 @@ import {
   EXPLORER_VIEWS,
   buildExplorerRows,
   filterExplorerRows,
+  sansReponseDepuis,
+  compterVues,
 } from '../src/lib/quotesExplorer.js';
 
 const NOW = Date.parse('2026-08-05T12:00:00Z');
@@ -123,4 +125,29 @@ test('les lignes sont triées par date décroissante', () => {
     ...base,
   });
   assert.deepEqual(rows.map(r => r.id), [2, 3, 1]);
+});
+
+test('sansReponseDepuis : devis en attente ou expiré daté de plus de 21 jours', () => {
+  const auj = '2026-11-23';
+  assert.equal(sansReponseDepuis({ status: 'pending', date: '2026-11-01' }, auj), true); // 22 j
+  assert.equal(sansReponseDepuis({ status: 'pending', date: '2026-11-02' }, auj), false); // 21 j
+  assert.equal(sansReponseDepuis({ status: 'expired', date: '2026-10-01' }, auj), true);
+  assert.equal(sansReponseDepuis({ status: 'accepted', date: '2026-10-01' }, auj), false);
+  assert.equal(sansReponseDepuis({ status: 'pending', date: null }, auj), false);
+  assert.equal(sansReponseDepuis({ status: 'pending', date: 'pas une date' }, auj), false);
+  assert.equal(sansReponseDepuis({ status: 'pending', date: '2026-11-10' }, auj, 7), true);
+});
+
+test('compterVues : un compteur par vue, cohérent avec filterExplorerRows', () => {
+  const rows = [
+    { is_dismissed: false, is_orphan: true },
+    { is_dismissed: false, is_orphan: false },
+    { is_dismissed: true, is_orphan: true },
+  ];
+  assert.deepEqual(compterVues(rows), {
+    [EXPLORER_VIEWS.ORPHANS]: filterExplorerRows(rows, EXPLORER_VIEWS.ORPHANS).length,
+    [EXPLORER_VIEWS.ALL]: filterExplorerRows(rows, EXPLORER_VIEWS.ALL).length,
+    [EXPLORER_VIEWS.DISMISSED]: filterExplorerRows(rows, EXPLORER_VIEWS.DISMISSED).length,
+  });
+  assert.deepEqual(compterVues([]), { orphans: 0, all: 0, dismissed: 0 });
 });

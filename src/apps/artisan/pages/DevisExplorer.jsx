@@ -18,7 +18,9 @@ import { KanbanBoard } from '@apps/artisan/components/shared/KanbanBoard';
 import { QuoteExplorerCard } from '@apps/artisan/components/devis/QuoteExplorerCard';
 import { AttachQuoteToLeadModal } from '@apps/artisan/components/devis/AttachQuoteToLeadModal';
 import { CreateLeadFromQuoteModal } from '@apps/artisan/components/devis/CreateLeadFromQuoteModal';
-import { EXPLORER_VIEWS, filterExplorerRows } from '@/lib/quotesExplorer';
+import { EXPLORER_VIEWS, filterExplorerRows, compterVues, sansReponseDepuis } from '@/lib/quotesExplorer';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { Button } from '@/components/ui/button';
 import { formatEuro, formatRelativeFR } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/page-header';
 
@@ -54,7 +56,15 @@ export default function DevisExplorer() {
   });
   const { dismissQuotes, isDismissing, restoreQuote } = useQuoteDismissals();
 
-  const visibleRows = useMemo(() => filterExplorerRows(rows, view), [rows, view]);
+  const [sansReponse, setSansReponse] = useState(false);
+  const compteurs = useMemo(() => compterVues(rows), [rows]);
+  const visibleRows = useMemo(() => {
+    const parVue = filterExplorerRows(rows, view);
+    if (!sansReponse) return parVue;
+    const d = new Date();
+    const aujourdhui = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return parVue.filter((r) => sansReponseDepuis(r, aujourdhui));
+  }, [rows, view, sansReponse]);
 
   // Sélection groupée (2026-09-16) : « Rattacher N devis » et « Créer le lead
   // avec N devis » agissent sur les cases cochées — avant, seule « Écarter »
@@ -105,7 +115,7 @@ export default function DevisExplorer() {
       <PageHeader title="Devis Pennylane" />
 
       {error && (
-        <div className="p-4 rounded-lg bg-amber-50 text-amber-800 flex items-start gap-3">
+        <div className="p-4 rounded-lg bg-st-attente-bg text-st-attente flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
           <div className="flex-1">
             {/* La page ne lit plus Pennylane en direct mais la table jumelle :
@@ -129,7 +139,7 @@ export default function DevisExplorer() {
             Dernière synchronisation {formatRelativeFR(syncedAt)}
           </p>
         ) : (
-          <div className="p-3 rounded-lg bg-amber-50 text-amber-800 text-sm flex items-start gap-2">
+          <div className="p-3 rounded-lg bg-st-attente-bg text-st-attente text-sm flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             Aucune synchronisation Pennylane connue — cette page ne reflète
             peut-être rien du tout.
@@ -138,7 +148,7 @@ export default function DevisExplorer() {
       )}
 
       {syncedAt && (Date.now() - new Date(syncedAt).getTime()) > STALE_AFTER_MS && (
-        <div className="p-3 rounded-lg bg-amber-50 text-amber-800 text-sm flex items-start gap-2">
+        <div className="p-3 rounded-lg bg-st-attente-bg text-st-attente text-sm flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           Les devis affichés datent de plus d&apos;une heure — la synchronisation
           Pennylane est peut-être arrêtée.
@@ -146,21 +156,23 @@ export default function DevisExplorer() {
       )}
 
       {/* Onglets de vue */}
-      <div className="flex items-center gap-1 border-b border-secondary-200">
-        {VIEW_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => { setView(tab.id); setSelectedIds(new Set()); }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              view === tab.id
-                ? 'border-primary-600 text-primary-700'
-                : 'border-transparent text-secondary-500 hover:text-secondary-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <SegmentedControl
+          label="Vue des devis"
+          value={view}
+          onChange={(v) => { setView(v); setSelectedIds(new Set()); }}
+          options={VIEW_TABS.map((tab) => ({ value: tab.id, label: tab.label, count: isLoading ? undefined : compteurs[tab.id] }))}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          aria-pressed={sansReponse}
+          onClick={() => { setSansReponse((v) => !v); setSelectedIds(new Set()); }}
+          className={sansReponse ? 'border-primary-200 bg-primary-50 text-primary-800 hover:bg-primary-50' : undefined}
+        >
+          Sans réponse depuis 21 j
+        </Button>
       </div>
 
       {isLoading ? (
