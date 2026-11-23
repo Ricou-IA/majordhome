@@ -16,11 +16,11 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { isMobileFR } from '@/lib/phoneUtils';
-import { entretiensService, releaseOrphanEntretienCard } from './entretiens.service';
+import { entretiensService, releaseOrphanEntretienCard, getPlannedContractIds } from './entretiens.service';
 import { logger } from '@lib/logger';
 import { fetchAllPages } from '@/lib/postgrestUtils';
 import { buildRappelRdvVars } from '@/lib/smsCampaigns';
-import { statutVisiteAnnee } from '@/lib/entretienVisitStatus';
+import { compterProgrammation } from '@/lib/entretienVisitStatus';
 import { minutesVersHeure as minutesVersHHMM, minutesDepuisMinuit } from '@/lib/tournee/arrets.js';
 
 const STATUTS_CLOS = ['cancelled', 'completed', 'no_show'];
@@ -370,73 +370,38 @@ export const savService = {
     if (!orgId) throw new Error('[sav] orgId requis');
 
     try {
-      // 1) Contrats actifs avec statut visite année en cours
-      const { data: contracts, error: contractsError } = await supabase
-        .from('majordhome_contracts')
-        .select('id, current_year_visit_status, amount')
-        .eq('org_id', orgId)
-        .eq('status', 'active');
-
-      if (contractsError) {
+      // 1) Contrats actifs avec statut visite année en cours (lus en entier : PostgREST
+      //    plafonne à 1 000 lignes sans le dire)
+      let contracts;
+      try {
+        contracts = await fetchAllPages((from, to) => supabase
+          .from('majordhome_contracts')
+          .select('id, current_year_visit_status, amount')
+          .eq('org_id', orgId)
+          .eq('status', 'active')
+          .order('id')
+          .range(from, to));
+      } catch (contractsError) {
         logger.error('[sav] getStats contracts error:', contractsError);
         return { data: null, error: contractsError };
       }
 
-      // 2) Interventions kanban (entretiens + SAV) pour l'année en cours
-      const { data: interventions, error: intError } = await supabase
-        .from('majordhome_entretien_sav')
-        .select('intervention_type, workflow_status, contract_id')
-        .eq('org_id', orgId);
-
-      if (intError) {
-        logger.error('[sav] getStats interventions error:', intError);
-        return { data: null, error: intError };
+      // 2) SAV du kanban + contrats qui ont une carte d'entretien ouverte (seule définition :
+      //    getPlannedContractIds, la même que l'outil de Programmation).
+      const [{ data: savs, error: intError }, { data: plannedIds, error: plannedError }] = await Promise.all([
+        supabase.from('majordhome_entretien_sav').select('workflow_status').eq('org_id', orgId).eq('intervention_type', 'sav'),
+        getPlannedContractIds({ orgId }),
+      ]);
+      if (intError || plannedError) {
+        logger.error('[sav] getStats interventions error:', intError || plannedError);
+        return { data: null, error: intError || plannedError };
       }
+      const savCount = (savs || []).length;
+      const savParStatut = (statut) => (savs || []).filter((x) => x.workflow_status === statut).length;
 
-      const items = interventions || [];
-      const allContracts = contracts || [];
-
-      // Set des contrats ayant un entretien planifié (non réalisé) dans le kanban
-      const plannedContractIds = new Set();
-      let savCount = 0;
-      let entretienPlanifie = 0;
-
-      for (const item of items) {
-        if (item.intervention_type === 'sav') {
-          // Tout SAV dans le kanban compte (géré cette année)
-          savCount++;
-        }
-        if (item.intervention_type === 'entretien' && item.workflow_status === 'planifie') {
-          entretienPlanifie++;
-          if (item.contract_id) plannedContractIds.add(item.contract_id);
-        }
-        if (item.intervention_type === 'entretien' && item.workflow_status === 'a_planifier') {
-          if (item.contract_id) plannedContractIds.add(item.contract_id);
-        }
-      }
-
-      // Compteurs basés sur les contrats
-      let entretienRealise = 0;
-      let entretienRefuse = 0;
-      let entretienAFaire = 0;
-      let caAFaire = 0;
-      let caRealise = 0;
-
-      for (const c of allContracts) {
-        const amt = Number(c.amount) || 0;
-        const statut = statutVisiteAnnee(c);
-        if (statut === 'realise') {
-          entretienRealise++;
-          caRealise += amt;
-        } else if (statut === 'refuse') {
-          // Refusé par le client cette année : ni à faire, ni dans le CA à faire.
-          entretienRefuse++;
-        } else if (!plannedContractIds.has(c.id)) {
-          // Pas de visite cette année et pas dans le kanban → "à faire" (non planifié)
-          entretienAFaire++;
-          caAFaire += amt;
-        }
-      }
+      // Partition unique (Eric 2026-11-23 : l'en-tête disait 161, la Programmation 193) :
+      // réalisé · refusé · planifié · à planifier — compterProgrammation.
+      const compte = compterProgrammation(contracts || [], plannedIds);
 
       // Contrats en attente (status = 'pending')
       const { count: contratsEnAttente } = await supabase
@@ -446,13 +411,17 @@ export const savService = {
         .eq('status', 'pending');
 
       const stats = {
-        entretien_a_faire: entretienAFaire,       // Contrats sans visite ET sans entretien planifié (refus exclus)
-        entretien_refuse: entretienRefuse,         // Contrats dont le client a refusé l'entretien de l'année
-        entretien_planifie: entretienPlanifie,     // Entretiens dans le kanban en statut planifié
-        entretien_realise: entretienRealise,       // Contrats avec visite complétée cette année
+        entretien_a_faire: compte.aPlanifier,      // Contrats à planifier : rien de fait, rien d'ouvert (refus exclus)
+        entretien_reste_a_faire: compte.resteAFaire, // À planifier + déjà planifiés
+        entretien_refuse: compte.refuses,          // Contrats dont le client a refusé l'entretien de l'année
+        entretien_planifie: compte.planifies,      // Contrats dont l'entretien a une carte ouverte (posée ou à poser)
+        entretien_realise: compte.realises,        // Contrats avec visite complétée cette année
         sav_en_cours: savCount,                    // Nombre total de SAV gérés cette année
-        ca_a_faire: caAFaire,                      // CA théorique des entretiens à faire
-        ca_realise: caRealise,                     // CA théorique des entretiens réalisés
+        sav_demande: savParStatut('demande'),      // Lus par le Dashboard des entretiens (absents
+        sav_devis_envoye: savParStatut('devis_envoye'), // du service jusqu'au 2026-11-23 : toujours 0)
+        sav_pieces_commandees: savParStatut('pieces_commandees'),
+        ca_a_faire: compte.caAPlanifier,           // CA théorique des entretiens à planifier
+        ca_realise: compte.caRealise,              // CA théorique des entretiens réalisés
         contrats_en_attente: contratsEnAttente || 0, // Contrats en statut pending
       };
 

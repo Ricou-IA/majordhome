@@ -3,7 +3,7 @@
 // Run : node --test scripts/entretien-visit-status.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveVisitBadgeStatus, statutVisiteAnnee, compterVisitesAnnee } from '../src/lib/entretienVisitStatus.js';
+import { deriveVisitBadgeStatus, statutVisiteAnnee, compterVisitesAnnee, statutProgrammation, compterProgrammation } from '../src/lib/entretienVisitStatus.js';
 
 const YEAR = 2026;
 
@@ -65,4 +65,28 @@ test('seulement une visite d\'une année passée → a_planifier (on ne regarde 
 test('valeurs par défaut robustes (args vides)', () => {
   const r = deriveVisitBadgeStatus({ currentYear: YEAR });
   assert.equal(r, 'a_planifier');
+});
+
+test('statutProgrammation : partition réalisé · refusé · planifié · à planifier', () => {
+  const planifies = new Set(['b']);
+  assert.equal(statutProgrammation({ id: 'a', current_year_visit_status: 'completed' }, planifies), 'realise');
+  assert.equal(statutProgrammation({ id: 'b', current_year_visit_status: 'cancelled' }, planifies), 'refuse');
+  assert.equal(statutProgrammation({ id: 'b', current_year_visit_status: null }, planifies), 'planifie');
+  assert.equal(statutProgrammation({ id: 'c', current_year_visit_status: null }, planifies), 'a_planifier');
+  assert.equal(statutProgrammation({ id: 'c', current_year_visit_status: null }, undefined), null);
+});
+
+test('compterProgrammation : reste à faire = planifiés + à planifier (161 + 32 = 193)', () => {
+  const contrats = [
+    { id: '1', current_year_visit_status: 'completed', amount: 190 },
+    { id: '2', current_year_visit_status: 'cancelled', amount: 90 },
+    { id: '3', current_year_visit_status: null, amount: 190 },
+    { id: '4', current_year_visit_status: null, amount: '90' },
+  ];
+  const r = compterProgrammation(contrats, new Set(['3']));
+  assert.deepEqual(r, { realises: 1, refuses: 1, planifies: 1, aPlanifier: 1, resteAFaire: 2, caAPlanifier: 90, caRealise: 190, connu: true });
+  const inconnu = compterProgrammation(contrats, null);
+  assert.equal(inconnu.connu, false);
+  assert.equal(inconnu.resteAFaire, 2);
+  assert.equal(inconnu.aPlanifier, 0);
 });

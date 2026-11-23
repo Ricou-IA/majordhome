@@ -30,7 +30,8 @@ import {
   Ban,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { statutVisiteAnnee, compterVisitesAnnee } from '@/lib/entretienVisitStatus';
+import { statutVisiteAnnee, compterVisitesAnnee, statutProgrammation, compterProgrammation } from '@/lib/entretienVisitStatus';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { VisitBadge } from './VisitBadge';
 import { SearchBar } from '../shared/SearchBar';
 import { EquipmentKindIcons } from '../shared/EquipmentKindIcons';
@@ -332,6 +333,9 @@ export function SectorGroupView({
 }) {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  // Filtre sur l'avancement de l'année civile (Eric 2026-11-23) : tous, reste à faire
+  // (planifiés + à planifier), à planifier seulement, faits.
+  const [avancement, setAvancement] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
 
   // Filtrer par mois de référence + recherche full-text
@@ -366,11 +370,24 @@ export function SectorGroupView({
           });
         }
 
+        // Décompte AVANT le filtre d'avancement : les chiffres du filtre restent lisibles.
+        const programmation = compterProgrammation(filtered, plannedContractIds);
+
+        if (avancement) {
+          filtered = filtered.filter((c) => {
+            const st = statutProgrammation(c, plannedContractIds);
+            if (avancement === 'reste') return st === 'planifie' || st === 'a_planifier' || (st === null && statutVisiteAnnee(c) === 'a_faire');
+            if (avancement === 'a_planifier') return st === 'a_planifier';
+            return st === 'realise';
+          });
+        }
+
         // Un refus n'est ni fait ni à faire : compté à part (compterVisitesAnnee).
         const compte = compterVisitesAnnee(filtered);
 
         return {
           ...sector,
+          programmation,
           contracts: filtered,
           totalContracts: filtered.length,
           visitsDone: compte.realises,
@@ -378,15 +395,17 @@ export function SectorGroupView({
           visitsPending: compte.aFaire,
         };
       })
-      .filter((s) => s.contracts.length > 0);
-  }, [sectors, selectedMonth, searchQuery]);
+      ;
+  }, [sectors, selectedMonth, searchQuery, avancement, plannedContractIds]);
+  // Résumé : tous les secteurs (même ceux que le filtre d'avancement vide) ; liste : ceux qui restent.
+  const secteursAffiches = useMemo(() => filteredSectors.filter((s) => s.contracts.length > 0), [filteredSectors]);
 
   // Regrouper les contrats filtrés sous leur grand secteur (2 niveaux : grand
   // secteur → clients). Le code postal n'est plus un niveau de l'arborescence ;
   // la commune réelle est portée par chaque ligne client.
   const grandSecteurs = useMemo(() => {
     const map = new Map();
-    for (const s of filteredSectors) {
+    for (const s of secteursAffiches) {
       const key = s.grandSecteurId || 'non-localise';
       if (!map.has(key)) {
         map.set(key, {
@@ -423,7 +442,7 @@ export function SectorGroupView({
         b.visitsPending - a.visitsPending ||
         a.name.localeCompare(b.name),
     );
-  }, [filteredSectors]);
+  }, [secteursAffiches]);
 
   const toggleGroup = (id) => {
     setCollapsedGroups((prev) => {
@@ -459,11 +478,15 @@ export function SectorGroupView({
     );
   }
 
-  // Stats globales (calculées sur les secteurs filtrés)
-  const totalContracts = filteredSectors.reduce((s, sec) => s + sec.totalContracts, 0);
-  const totalDone = filteredSectors.reduce((s, sec) => s + sec.visitsDone, 0);
-  const totalRefused = filteredSectors.reduce((s, sec) => s + sec.visitsRefused, 0);
-  const totalPending = filteredSectors.reduce((s, sec) => s + sec.visitsPending, 0);
+  // Stats globales : partition unique (compterProgrammation), mêmes chiffres que l'en-tête
+  // de la page — sur les contrats du mois et de la recherche, avant le filtre d'avancement.
+  const totalContracts = filteredSectors.reduce((s, sec) => s + sec.programmation.realises + sec.programmation.refuses + sec.programmation.resteAFaire, 0);
+  const totalDone = filteredSectors.reduce((s, sec) => s + sec.programmation.realises, 0);
+  const totalRefused = filteredSectors.reduce((s, sec) => s + sec.programmation.refuses, 0);
+  const totalReste = filteredSectors.reduce((s, sec) => s + sec.programmation.resteAFaire, 0);
+  const totalPlanifies = filteredSectors.reduce((s, sec) => s + sec.programmation.planifies, 0);
+  const totalAPlanifier = filteredSectors.reduce((s, sec) => s + sec.programmation.aPlanifier, 0);
+  const planifiesConnus = !!plannedContractIds;
 
   return (
     <div className="space-y-4">
@@ -491,8 +514,11 @@ export function SectorGroupView({
             <strong>{totalDone}</strong> fait{totalDone > 1 ? 's' : ''}
           </span>
           <span className="text-secondary-300">|</span>
-          <span className="text-amber-600">
-            <strong>{totalPending}</strong> à faire
+          <span className="text-amber-600" title="Reste à faire cette année : déjà planifiés + à planifier">
+            <strong>{totalReste}</strong> à faire
+            {planifiesConnus && (
+              <span className="text-secondary-500"> (dont <strong>{totalPlanifies}</strong> planifié{totalPlanifies > 1 ? 's' : ''}, <strong>{totalAPlanifier}</strong> à planifier)</span>
+            )}
           </span>
           {totalRefused > 0 && (
             <>
@@ -504,7 +530,19 @@ export function SectorGroupView({
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Filtre d'avancement de l'année civile */}
+          <SegmentedControl
+            value={avancement}
+            onChange={setAvancement}
+            label="Avancement de l'année"
+            options={[
+              { value: '', label: 'Tous' },
+              { value: 'reste', label: 'Reste à faire', count: totalReste },
+              ...(planifiesConnus ? [{ value: 'a_planifier', label: 'À planifier', count: totalAPlanifier }] : []),
+              { value: 'faits', label: 'Faits', count: totalDone },
+            ]}
+          />
           {/* Filtre mois de référence */}
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-secondary-400" />
@@ -538,7 +576,7 @@ export function SectorGroupView({
       </div>
 
       {/* Message si filtre actif et aucun résultat */}
-      {(selectedMonth || searchQuery.trim()) && filteredSectors.length === 0 && (
+      {(selectedMonth || searchQuery.trim() || avancement) && secteursAffiches.length === 0 && (
         <div className="bg-white rounded-xl border border-secondary-200 p-8 text-center">
           <Calendar className="h-8 w-8 text-secondary-300 mx-auto mb-2" />
           <p className="text-secondary-500 text-sm">

@@ -55,6 +55,48 @@ export function compterVisitesAnnee(contracts) {
 }
 
 /**
+ * Où en est l'entretien de l'année d'un contrat, pour la programmation (Eric 2026-11-23 :
+ * l'en-tête disait 161 « à faire », la Programmation 193). Partition unique :
+ *   realise · refuse · planifie (une carte d'entretien est ouverte : posée ou à poser) ·
+ *   a_planifier (rien d'ouvert). « Reste à faire » = planifie + a_planifier.
+ * `plannedIds` = contrats qui ont une carte d'entretien non réalisée
+ * (`getPlannedContractIds`, seule définition). Liste inconnue ⇒ null : on ne devine pas.
+ * @param {{ id?: string, current_year_visit_status?: string|null }} contract
+ * @param {Set<string>|null|undefined} plannedIds
+ * @returns {'realise'|'refuse'|'planifie'|'a_planifier'|null}
+ */
+export function statutProgrammation(contract, plannedIds) {
+  const s = statutVisiteAnnee(contract);
+  if (s !== 'a_faire') return s;
+  if (!plannedIds) return null;
+  return plannedIds.has(contract?.id) ? 'planifie' : 'a_planifier';
+}
+
+/**
+ * Décompte de la partition ci-dessus.
+ * @param {Array<{ id?: string, current_year_visit_status?: string|null, amount?: (number|string|null) }>|null|undefined} contracts
+ * @param {Set<string>|null|undefined} plannedIds
+ * @returns {{ realises: number, refuses: number, planifies: number, aPlanifier: number, resteAFaire: number,
+ *   caAPlanifier: number, caRealise: number, connu: boolean }}
+ *   `connu` faux quand la liste des contrats planifiés manque : planifies / aPlanifier valent alors 0.
+ */
+export function compterProgrammation(contracts, plannedIds) {
+  const r = { realises: 0, refuses: 0, planifies: 0, aPlanifier: 0, resteAFaire: 0, caAPlanifier: 0, caRealise: 0, connu: !!plannedIds };
+  for (const c of contracts || []) {
+    const montant = Number(c.amount) || 0;
+    const s = statutProgrammation(c, plannedIds);
+    if (s === 'realise') { r.realises += 1; r.caRealise += montant; }
+    else if (s === 'refuse') r.refuses += 1;
+    else {
+      r.resteAFaire += 1;
+      if (s === 'planifie') r.planifies += 1;
+      else if (s === 'a_planifier') { r.aPlanifier += 1; r.caAPlanifier += montant; }
+    }
+  }
+  return r;
+}
+
+/**
  * Dérive le statut d'affichage du bloc "Visite {année}" du modal entretien.
  * Source unique = visites enregistrées (contract_visits) + carte entretien active.
  *

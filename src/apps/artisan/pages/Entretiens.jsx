@@ -13,7 +13,7 @@
  * une journée se fait depuis le Planning (puce d'état de la journée), ses
  * alertes vivent dans le Dashboard.
  *
- * Header : bande de repères (Entretiens à faire, SAV gérés, Planifiés,
+ * Header : bande de repères (À planifier, SAV gérés, Planifiés,
  * Réalisés) basée sur useEntretienSAVStats.
  *
  * @version 4.0.0 - Sprint 8 Entretien & SAV (Kanban unifié, KPIs SAV)
@@ -336,8 +336,9 @@ export default function Entretiens() {
         title="Entretiens"
         subtitle={[
           contractStats ? `${contractStats.openContracts.toLocaleString('fr-FR')} contrats actifs` : null,
-          !savStatsLoading && savStats?.entretien_a_faire != null
-            ? `${savStats.entretien_a_faire.toLocaleString('fr-FR')} entretiens à faire`
+          // Reste à faire = planifiés + à planifier : le même « à faire » que la Programmation.
+          !savStatsLoading && savStats?.entretien_reste_a_faire != null
+            ? `${savStats.entretien_reste_a_faire.toLocaleString('fr-FR')} entretiens à faire`
             : null,
           `Année ${currentYear}`,
         ].filter(Boolean).join(' · ')}
@@ -356,7 +357,9 @@ export default function Entretiens() {
         items={[
           {
             key: 'a_faire',
-            label: 'Entretiens à faire',
+            // À planifier = rien de fait ni d'ouvert cette année ; + « Planifiés » = reste à faire.
+            // Même partition que la Programmation (compterProgrammation).
+            label: 'À planifier',
             value: savStatsLoading ? '...' : (savStats?.entretien_a_faire ?? 0),
             // Les refus du client ne sont pas « à faire » : on les nomme pour que le compteur s'explique.
             sub: !savStatsLoading && savStats?.ca_a_faire != null
