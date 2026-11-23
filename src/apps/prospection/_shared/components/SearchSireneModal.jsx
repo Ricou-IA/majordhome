@@ -3,6 +3,7 @@
  * Utilisé inline (pas en modal) dans les pages Pipeline (tab Screener).
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Search,
@@ -264,16 +265,17 @@ export default function SearchSireneModal({
           )}
         </div>
 
-        <select
-          value={departement}
-          onChange={(e) => setDepartement(e.target.value)}
-          className="px-3 py-2.5 border border-secondary-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-[#2196F3] outline-none"
-        >
-          <option value="">Tous départements</option>
-          {DEPARTEMENTS_COURANTS.map((d) => (
-            <option key={d.value} value={d.value}>{d.label}</option>
-          ))}
-        </select>
+        <div className="min-w-[12rem]">
+          <ListeChoix
+            libelle="Département"
+            value={departement}
+            onChange={setDepartement}
+            options={[
+              { value: '', label: 'Tous départements' },
+              ...DEPARTEMENTS_COURANTS.map((d) => ({ value: d.value, label: d.label })),
+            ]}
+          />
+        </div>
       </div>
 
       {/* NAF Selector */}

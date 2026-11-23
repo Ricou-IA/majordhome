@@ -5,7 +5,8 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeft, Loader2, RefreshCw, AlertTriangle, Zap, Car, Save, FileDown, PanelsTopLeft, FolderOpen, FileCheck } from 'lucide-react';
 import { formatEuro } from '@lib/utils';
-import { FormField, inputClass, selectClass } from '@apps/artisan/components/FormFields';
+import { ListeChoix } from '@/components/ui/liste-choix';
+import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { buildEtudeModel } from '../lib/etudeModel';
 import ScenarioCards from './ScenarioCards';
 import TransparencyPanel from './TransparencyPanel';
@@ -175,14 +176,15 @@ export default function Step3Resultats({
                 />
               </FormField>
               <FormField label="Aspect">
-                <select
-                  className={selectClass}
+                <ListeChoix
+                  libelle="Aspect"
                   value={material.module_aspect}
-                  onChange={(e) => onMaterial({ module_aspect: e.target.value })}
-                >
-                  <option value="full_black">Full black (noir uniforme)</option>
-                  <option value="standard">Standard (cadre alu)</option>
-                </select>
+                  onChange={(v) => onMaterial({ module_aspect: v })}
+                  options={[
+                    { value: 'full_black', label: 'Full black (noir uniforme)' },
+                    { value: 'standard', label: 'Standard (cadre alu)' },
+                  ]}
+                />
               </FormField>
             </div>
           </div>

@@ -5,6 +5,7 @@
 // (core.organizations.settings.thermique.parois_bibliotheque, via useOrgSettings). Pattern modale
 // du repo (overlay + panneau fixed, cf. UwHelperModal). Le moteur reste INTACT : on ne produit que
 // { u, couches } ; la bibliothèque ne stocke que des compositions nommées réutilisables.
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { X, Trash2, Save, Plus } from 'lucide-react';
@@ -86,16 +87,15 @@ export default function ComposeurParoiModal({ famille, label, couchesInitiales, 
         {bibliothequeFamille.length > 0 && (
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-secondary-700">Charger depuis la bibliothèque</label>
-            <select
+            <ListeChoix
+              libelle="Charger depuis la bibliothèque"
               value=""
-              onChange={(e) => chargerDepuisBiblio(e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-secondary-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">— Choisir une paroi enregistrée —</option>
-              {bibliothequeFamille.map((p) => (
-                <option key={p.id} value={p.id}>{p.nom} — U {p.u}</option>
-              ))}
-            </select>
+              onChange={chargerDepuisBiblio}
+              options={[
+                { value: '', label: '— Choisir une paroi enregistrée —' },
+                ...bibliothequeFamille.map((p) => ({ value: p.id, label: `${p.nom} — U ${p.u}` })),
+              ]}
+            />
           </div>
         )}
 

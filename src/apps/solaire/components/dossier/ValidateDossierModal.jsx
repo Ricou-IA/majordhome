@@ -4,7 +4,8 @@
 // (identité simulation, adresse terrain) est pré-rempli — éditable, jamais redemandé ailleurs.
 import { useState, useEffect, useRef } from 'react';
 import { X, FileCheck, Loader2 } from 'lucide-react';
-import { FormField, inputClass, selectClass } from '@apps/artisan/components/FormFields';
+import { ListeChoix } from '@/components/ui/liste-choix';
+import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 
 const EMPTY = {
   civilite: 'M.',
@@ -69,10 +70,12 @@ export default function ValidateDossierModal({ open, onClose, onSubmit, isSubmit
 
         <div className="grid grid-cols-3 gap-3">
           <FormField label="Civilité">
-            <select className={selectClass} value={form.civilite} onChange={(e) => set({ civilite: e.target.value })}>
-              <option value="M.">M.</option>
-              <option value="Mme">Mme</option>
-            </select>
+            <ListeChoix
+              libelle="Civilité"
+              value={form.civilite}
+              onChange={(v) => set({ civilite: v })}
+              options={[{ value: 'M.', label: 'M.' }, { value: 'Mme', label: 'Mme' }]}
+            />
           </FormField>
           <FormField label="Nom" required>
             <input className={inputClass} value={form.nom} onChange={(e) => set({ nom: e.target.value })} />

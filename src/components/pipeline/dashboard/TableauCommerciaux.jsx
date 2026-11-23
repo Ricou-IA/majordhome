@@ -6,6 +6,7 @@
  * et « Délai » suivent le cycle de vie des leads reçus.
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState } from 'react';
 import { cn } from '@lib/utils';
 import { Panneau, Th, Td, Vide } from './Tableau';
@@ -114,17 +115,18 @@ export function TableauCommerciaux({ dashboard, estCommercial }) {
       actions={
         <>
           {lecture === 'mois' && !estCommercial && (
-            <select
-              value={qui}
-              onChange={(e) => setQui(e.target.value)}
-              aria-label="Commercial"
-              className="h-7 rounded-md border border-secondary-200 bg-white px-2 text-xs text-secondary-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            >
-              <option value={TOUS}>Toute l’entreprise</option>
-              {commerciaux.map((c) => (
-                <option key={c.id || 'non-assigne'} value={c.id}>{c.nom}</option>
-              ))}
-            </select>
+            <div className="w-52">
+              <ListeChoix
+                value={qui}
+                onChange={setQui}
+                libelle="Commercial"
+                className="h-7 px-2 text-xs"
+                options={[
+                  { value: TOUS, label: 'Toute l’entreprise' },
+                  ...commerciaux.map((c) => ({ value: c.id, label: c.nom })),
+                ]}
+              />
+            </div>
           )}
           <Bascule
             valeur={lecture}

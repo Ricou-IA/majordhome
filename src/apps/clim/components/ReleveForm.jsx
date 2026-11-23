@@ -2,7 +2,8 @@
 // Relevé du dimensionnement : logement (isolation, gamme) puis une carte par pièce.
 // Aucune logique de calcul ici : le moteur src/lib/clim/dimensionnement.js fait tout.
 import { Plus, Trash2 } from 'lucide-react';
-import { FormField, inputClass, selectClass } from '@apps/artisan/components/FormFields';
+import { ListeChoix } from '@/components/ui/liste-choix';
+import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { CLASSES_ISOLATION, EXPOSITIONS, classeDepuisAnnee } from '@/lib/clim/dimensionnement.js';
 import { nouvellePiece, APPAREILS, appareilsWatts } from '../lib/releveState';
 
@@ -33,14 +34,20 @@ export default function ReleveForm({ releve, gammes, onChange }) {
             <input type="number" min={1800} max={2100} value={releve.logement.annee} onChange={(e) => onAnnee(e.target.value)} placeholder="ex. 1985" className={inputClass} />
           </FormField>
           <FormField label="Isolation" required>
-            <select value={releve.logement.classe_isolation} onChange={(e) => setLogement({ classe_isolation: e.target.value })} className={selectClass}>
-              {CLASSES_ISOLATION.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-            </select>
+            <ListeChoix
+              libelle="Isolation"
+              value={releve.logement.classe_isolation}
+              onChange={(v) => setLogement({ classe_isolation: v })}
+              options={CLASSES_ISOLATION.map((c) => ({ value: c.code, label: c.label }))}
+            />
           </FormField>
           <FormField label="Gamme proposée">
-            <select value={releve.logement.gamme || ''} onChange={(e) => setLogement({ gamme: e.target.value })} className={selectClass}>
-              {gammesListe.map((g) => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <ListeChoix
+              libelle="Gamme proposée"
+              value={releve.logement.gamme || ''}
+              onChange={(v) => setLogement({ gamme: v })}
+              options={gammesListe.map((g) => ({ value: g, label: g }))}
+            />
           </FormField>
         </div>
         <p className="text-xs text-secondary-500">L’année propose une classe d’isolation ; corrigez-la si le logement a été rénové ou n’est pas isolé.</p>
@@ -62,9 +69,12 @@ export default function ReleveForm({ releve, gammes, onChange }) {
               <input type="number" min={2} max={6} step="0.1" value={p.hauteur_m} onChange={(e) => setPiece(p.id, { hauteur_m: e.target.value })} className={inputClass} />
             </FormField>
             <FormField label="Exposition" required>
-              <select value={p.exposition} onChange={(e) => setPiece(p.id, { exposition: e.target.value })} className={selectClass}>
-                {EXPOSITIONS.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}
-              </select>
+              <ListeChoix
+                libelle="Exposition"
+                value={p.exposition}
+                onChange={(v) => setPiece(p.id, { exposition: v })}
+                options={EXPOSITIONS.map((x) => ({ value: x.code, label: x.label }))}
+              />
             </FormField>
             <FormField label="Vitrage (m²)">
               <input type="number" min={0} max={60} step="0.5" value={p.vitrage_m2} onChange={(e) => setPiece(p.id, { vitrage_m2: e.target.value })} placeholder="0" className={inputClass} />

@@ -1,4 +1,5 @@
 import { Search, X } from 'lucide-react';
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { formatDuree, formatDateCourte, HORS_PERIMETRE_KEY } from '../lib/chantierGaillacModel';
 
 const GROUPS = [
@@ -43,19 +44,20 @@ export default function GaillacFilters({ filters, onChange, techniciens, options
       />
       <label className="flex min-w-0 max-w-full items-center gap-2 text-sm text-secondary-700">
         <span className="shrink-0">Journée / code</span>
-        <select
+        <ListeChoix
           value={filters.planningCode}
-          onChange={(e) => set({ planningCode: e.target.value })}
-          className="min-h-[44px] min-w-0 max-w-full rounded-lg border border-secondary-300 bg-white px-2 text-sm"
-        >
-          <option value="">Toutes</option>
-          {options.map((o) => (
-            <option key={o.code} value={o.code}>
-              {o.date ? `${formatDateCourte(o.date)} · ` : ''}{o.label}
-              {o.code === HORS_PERIMETRE_KEY || readOnly ? '' : ` (${formatDuree(o.totalMin)})`}
-            </option>
-          ))}
-        </select>
+          onChange={(planningCode) => set({ planningCode })}
+          libelle="Journée / code"
+          className="min-h-[44px] min-w-0 max-w-full"
+          selectClassName="min-w-0 max-w-full px-2"
+          options={[
+            { value: '', label: 'Toutes' },
+            ...options.map((o) => ({
+              value: o.code,
+              label: `${o.date ? `${formatDateCourte(o.date)} · ` : ''}${o.label}${o.code === HORS_PERIMETRE_KEY || readOnly ? '' : ` (${formatDuree(o.totalMin)})`}`,
+            })),
+          ]}
+        />
       </label>
       <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-secondary-700">
         <input

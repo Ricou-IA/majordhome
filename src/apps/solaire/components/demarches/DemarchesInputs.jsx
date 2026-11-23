@@ -1,6 +1,7 @@
 // src/apps/solaire/components/demarches/DemarchesInputs.jsx
 // Saisies projet du module Démarches (le reste est dérivé de la simulation et du dossier).
-import { FormField, inputClass, selectClass } from '@apps/artisan/components/FormFields';
+import { ListeChoix } from '@/components/ui/liste-choix';
+import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 
 const PEC_OPTIONS = [
   { value: 'refacture', label: 'Avancés par nous, refacturés' },
@@ -13,23 +14,41 @@ export default function DemarchesInputs({ value, onChange, prisesEnChargeDefaut,
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       <FormField label="Valorisation de la production">
-        <select className={selectClass} value={value.mode_valorisation} disabled={disabled} onChange={(e) => onChange({ mode_valorisation: e.target.value })}>
-          <option value="autoconso_surplus">Autoconsommation avec vente du surplus</option>
-          <option value="autoconso_totale">Autoconsommation totale (sans injection)</option>
-        </select>
+        <ListeChoix
+          libelle="Valorisation de la production"
+          value={value.mode_valorisation}
+          disabled={disabled}
+          onChange={(v) => onChange({ mode_valorisation: v })}
+          options={[
+            { value: 'autoconso_surplus', label: 'Autoconsommation avec vente du surplus' },
+            { value: 'autoconso_totale', label: 'Autoconsommation totale (sans injection)' },
+          ]}
+        />
       </FormField>
       <FormField label="Situation du bien">
-        <select className={selectClass} value={value.copropriete_ou_lotissement} disabled={disabled} onChange={(e) => onChange({ copropriete_ou_lotissement: e.target.value })}>
-          <option value="aucun">Maison individuelle, hors lotissement</option>
-          <option value="lotissement">En lotissement</option>
-          <option value="copropriete">En copropriété</option>
-        </select>
+        <ListeChoix
+          libelle="Situation du bien"
+          value={value.copropriete_ou_lotissement}
+          disabled={disabled}
+          onChange={(v) => onChange({ copropriete_ou_lotissement: v })}
+          options={[
+            { value: 'aucun', label: 'Maison individuelle, hors lotissement' },
+            { value: 'lotissement', label: 'En lotissement' },
+            { value: 'copropriete', label: 'En copropriété' },
+          ]}
+        />
       </FormField>
       <FormField label="Compteur">
-        <select className={selectClass} value={value.compteur_linky ? 'oui' : 'non'} disabled={disabled} onChange={(e) => onChange({ compteur_linky: e.target.value === 'oui' })}>
-          <option value="oui">Linky (communicant)</option>
-          <option value="non">Ancien compteur</option>
-        </select>
+        <ListeChoix
+          libelle="Compteur"
+          value={value.compteur_linky ? 'oui' : 'non'}
+          disabled={disabled}
+          onChange={(v) => onChange({ compteur_linky: v === 'oui' })}
+          options={[
+            { value: 'oui', label: 'Linky (communicant)' },
+            { value: 'non', label: 'Ancien compteur' },
+          ]}
+        />
       </FormField>
       <FormField label="Point de départ du planning">
         <input type="date" className={inputClass} value={value.date_depart ?? ''} disabled={disabled} onChange={(e) => onChange({ date_depart: e.target.value })} />
@@ -41,14 +60,22 @@ export default function DemarchesInputs({ value, onChange, prisesEnChargeDefaut,
         <input type="date" className={inputClass} value={value.devis?.date ?? ''} disabled={disabled} onChange={(e) => onChange({ devis: { ...value.devis, date: e.target.value } })} />
       </FormField>
       <FormField label="Frais Enedis">
-        <select className={selectClass} value={pec.raccordement_enedis ?? prisesEnChargeDefaut.raccordement_enedis} disabled={disabled} onChange={(e) => setPec('raccordement_enedis', e.target.value)}>
-          {PEC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <ListeChoix
+          libelle="Frais Enedis"
+          value={pec.raccordement_enedis ?? prisesEnChargeDefaut.raccordement_enedis}
+          disabled={disabled}
+          onChange={(v) => setPec('raccordement_enedis', v)}
+          options={PEC_OPTIONS}
+        />
       </FormField>
       <FormField label="Frais Consuel">
-        <select className={selectClass} value={pec.consuel ?? prisesEnChargeDefaut.consuel} disabled={disabled} onChange={(e) => setPec('consuel', e.target.value)}>
-          {PEC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <ListeChoix
+          libelle="Frais Consuel"
+          value={pec.consuel ?? prisesEnChargeDefaut.consuel}
+          disabled={disabled}
+          onChange={(v) => setPec('consuel', v)}
+          options={PEC_OPTIONS}
+        />
       </FormField>
     </div>
   );

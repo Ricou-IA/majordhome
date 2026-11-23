@@ -4,6 +4,7 @@
 // Ouvertures MULTIPLES par pièce (2026-07-15) : la colonne « Ouvertures » ouvre une sous-ligne
 // dépliable listant les menuiseries { type, surface, U } — U éditable par ouverture (vide = défaut
 // global du type). Re-défaut θint/chauffée au changement de type (v1 : re-défaute θint si vide).
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { Fragment, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { TYPES_PIECE, TYPES_MENUISERIE, typePieceInfo, normaliseOuvertures, LNC_PRESETS } from '../../lib/thermiqueConfig';
@@ -17,7 +18,6 @@ const fmt1 = (v) => (Math.round(v * 10) / 10).toString().replace('.', ',');
 // Spinners des inputs number masqués ([appearance:textfield] + pseudo-éléments webkit) → gain de
 // largeur, saisie numérique conservée. Sans effet sur l'input texte (Nom) qui n'a pas de spinner.
 const champ = 'px-2 py-1 text-sm bg-white border border-secondary-300 rounded-lg text-secondary-900 outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:[-webkit-appearance:none] [&::-webkit-outer-spin-button]:[-webkit-appearance:none]';
-const champSelect = `${champ} appearance-none`;
 
 const NB_COLONNES = 12;   // colSpan des lignes pleine largeur (sous-ligne ouvertures, ligne vide)
 
@@ -106,12 +106,15 @@ export default function PiecesTable({ saisie, config, compositions, onChange, ni
                       />
                     </td>
                     <td className="py-1.5 pr-2">
-                      <select
-                        value={p.typePiece} onChange={(e) => majType(p.id, e.target.value)}
-                        className={`${champSelect} w-32`}
-                      >
-                        {TYPES_PIECE.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-                      </select>
+                      <div className="w-32">
+                        <ListeChoix
+                          libelle={`Type de pièce ${p.nom}`}
+                          value={p.typePiece}
+                          onChange={(v) => majType(p.id, v)}
+                          className="h-8 px-2"
+                          options={TYPES_PIECE.map((t) => ({ value: t.id, label: t.label }))}
+                        />
+                      </div>
                     </td>
                     <td className="py-1.5 pr-2 text-center">
                       <input
@@ -168,17 +171,21 @@ export default function PiecesTable({ saisie, config, compositions, onChange, ni
                     </td>
                     <td className="py-1.5 pr-2">
                       <div className="flex items-center gap-1">
-                        <select
-                          value={LNC_PRESETS.find((preset) => preset.b === p.bLocalNonChauffe)?.id ?? ''}
-                          onChange={(e) => {
-                            const preset = LNC_PRESETS.find((x) => x.id === e.target.value);
-                            if (preset) majPiece(p.id, { bLocalNonChauffe: preset.b });
-                          }}
-                          className={`${champSelect} w-24`}
-                        >
-                          <option value="">Perso</option>
-                          {LNC_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
-                        </select>
+                        <div className="w-24">
+                          <ListeChoix
+                            libelle={`Local non chauffé ${p.nom}`}
+                            value={LNC_PRESETS.find((preset) => preset.b === p.bLocalNonChauffe)?.id ?? ''}
+                            onChange={(v) => {
+                              const preset = LNC_PRESETS.find((x) => x.id === v);
+                              if (preset) majPiece(p.id, { bLocalNonChauffe: preset.b });
+                            }}
+                            className="h-8 px-2"
+                            options={[
+                              { value: '', label: 'Perso' },
+                              ...LNC_PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
+                            ]}
+                          />
+                        </div>
                         <input
                           type="number" value={p.bLocalNonChauffe ?? ''} min={0} max={1} step={0.05}
                           onChange={(e) => majPiece(p.id, { bLocalNonChauffe: num(e.target.value) })}
@@ -219,12 +226,15 @@ export default function PiecesTable({ saisie, config, compositions, onChange, ni
                           )}
                           {ouvertures.map((o) => (
                             <div key={o.id} className="flex items-center gap-2 flex-wrap">
-                              <select
-                                value={o.type} onChange={(e) => majOuverture(p, o.id, { type: e.target.value })}
-                                className={`${champSelect} w-36`}
-                              >
-                                {TYPES_MENUISERIE.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                              </select>
+                              <div className="w-36">
+                                <ListeChoix
+                                  libelle={`Type d’ouverture de ${p.nom}`}
+                                  value={o.type}
+                                  onChange={(v) => majOuverture(p, o.id, { type: v })}
+                                  className="h-8 px-2"
+                                  options={TYPES_MENUISERIE.map((m) => ({ value: m.id, label: m.label }))}
+                                />
+                              </div>
                               <label className="flex items-center gap-1 text-xs text-secondary-600">
                                 Surface
                                 <input

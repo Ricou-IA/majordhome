@@ -2,6 +2,7 @@
  * ProspectFilters.jsx — Barre de filtres pour la liste prospects
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { Search, X } from 'lucide-react';
 
 export default function ProspectFilters({ filters, onChange, module, statuses = [] }) {
@@ -33,16 +34,17 @@ export default function ProspectFilters({ filters, onChange, module, statuses = 
       </div>
 
       {/* Filtre statut */}
-      <select
-        value={filters.statut || ''}
-        onChange={(e) => handleChange('statut', e.target.value)}
-        className="px-3 py-2 border border-secondary-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-[#2196F3] outline-none"
-      >
-        <option value="">Tous les statuts</option>
-        {statuses.map((s) => (
-          <option key={s.key} value={s.key}>{s.label}</option>
-        ))}
-      </select>
+      <div className="min-w-[11rem]">
+        <ListeChoix
+          libelle="Statut"
+          value={filters.statut || ''}
+          onChange={(v) => handleChange('statut', v)}
+          options={[
+            { value: '', label: 'Tous les statuts' },
+            ...statuses.map((s) => ({ value: s.key, label: s.label })),
+          ]}
+        />
+      </div>
 
       {/* Filtre département */}
       <input
@@ -56,15 +58,18 @@ export default function ProspectFilters({ filters, onChange, module, statuses = 
 
       {/* Filtre priorité (Cédants uniquement) */}
       {module === 'cedants' && (
-        <select
-          value={filters.priorite || ''}
-          onChange={(e) => handleChange('priorite', e.target.value)}
-          className="px-3 py-2 border border-secondary-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-[#2196F3] outline-none"
-        >
-          <option value="">Priorité</option>
-          <option value="A">Priorité A</option>
-          <option value="B">Priorité B</option>
-        </select>
+        <div className="min-w-[9rem]">
+          <ListeChoix
+            libelle="Priorité"
+            value={filters.priorite || ''}
+            onChange={(v) => handleChange('priorite', v)}
+            options={[
+              { value: '', label: 'Priorité' },
+              { value: 'A', label: 'Priorité A' },
+              { value: 'B', label: 'Priorité B' },
+            ]}
+          />
+        </div>
       )}
 
       {/* Bouton reset */}
