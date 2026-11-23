@@ -64,7 +64,7 @@ export function PlanningEventContent({ eventInfo }) {
   const enListe = view.type.startsWith('list');
   // Interligne serré dans la grille (c'est lui qui fait tenir 3 lignes dans une heure) ;
   // en liste, le texte suit la taille de la cellule.
-  const racine = `h-full overflow-hidden text-xs ${enListe ? '' : 'leading-[13px]'} ${
+  const racine = `h-full overflow-hidden ${enListe ? 'text-xs' : 'text-[13px] leading-[15px]'} ${
     rdv.status === 'cancelled' ? 'opacity-50 line-through' : ''
   }`;
   // Icônes d'équipement : entretien et SAV seulement (règle dans le modèle).

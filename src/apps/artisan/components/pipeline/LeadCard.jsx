@@ -205,7 +205,7 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
     >
       {/* Bande date à gauche : neutre, la colonne dit déjà l'étape */}
       <div
-        className="flex flex-col items-center justify-center px-2 py-2 rounded-l-lg min-w-[44px] border-r bg-secondary-25 border-secondary-200 text-secondary-700"
+        className="flex w-12 shrink-0 flex-col items-center justify-center px-1 py-2 rounded-l-lg border-r bg-secondary-25 border-secondary-200 text-secondary-700"
         title={dateTitle}
       >
         {showAmber ? (

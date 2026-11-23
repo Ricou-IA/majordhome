@@ -77,7 +77,7 @@ export function MoveToLongTermModal({
         </div>
 
         <p className="text-sm text-secondary-600 mb-3">
-          Le lead sortira du pipeline et apparaîtra dans l&apos;onglet <strong>Suivi des objectifs</strong>.
+          Le lead sortira du pipeline et apparaîtra dans l&apos;onglet <strong>Moyen et long terme</strong>.
           Vous pourrez ajouter des interactions et le réactiver à tout moment.
         </p>
 

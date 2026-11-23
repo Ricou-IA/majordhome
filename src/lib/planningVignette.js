@@ -16,12 +16,14 @@
  */
 
 // Hauteurs de la grille horaire, en pixels. À tenir alignées avec le CSS :
-// `.fc .fc-timegrid-slot` (1,5 em = 24 px, 2,5 rem = 40 px sur téléphone),
-// `.fc .fc-timegrid-event` (marges du bloc) et `leading-[13px]` du composant.
-export const HAUTEUR_CRENEAU = 24;
+// `.fc .fc-timegrid-slot` (28 px, 2,5 rem = 40 px sur téléphone),
+// `.fc .fc-timegrid-event` (marges du bloc) et `leading-[15px]` du composant.
+// Texte à 13 px depuis le 2026-11-23 (Eric : « un peu petit ») : créneau et interligne
+// ont grandi ensemble, un RDV d'une heure garde ses trois lignes.
+export const HAUTEUR_CRENEAU = 28;
 export const HAUTEUR_CRENEAU_TELEPHONE = 40;
 const DUREE_CRENEAU_MINUTES = 30;
-const HAUTEUR_LIGNE = 13;
+const HAUTEUR_LIGNE = 15;
 // Écart entre deux blocs + marges intérieures + bordure pointillée d'un RDV adaptable.
 const MARGES_BLOC = 8;
 const DUREE_PAR_DEFAUT = 60;

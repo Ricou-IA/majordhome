@@ -136,11 +136,11 @@ export default function Pipeline() {
           </TabsTrigger>
           <TabsTrigger value="kanban" className="gap-2 data-[state=active]:bg-white">
             <Columns3 className="h-4 w-4" />
-            Tableau
+            Pipeline
           </TabsTrigger>
           <TabsTrigger value="long-term" className="gap-2 data-[state=active]:bg-white">
             <Hourglass className="h-4 w-4" />
-            Suivi des objectifs
+            Moyen et long terme
           </TabsTrigger>
         </TabsList>
 

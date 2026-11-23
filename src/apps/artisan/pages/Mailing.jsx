@@ -40,7 +40,7 @@ export default function Mailing() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Messages" />
+      <PageHeader title="Mailing" />
 
       {isOrgAdmin && (
         <div className="flex gap-1 border-b">

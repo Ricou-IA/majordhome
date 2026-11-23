@@ -8,6 +8,8 @@
 
 @layer base {
   :root {
+    /* Cases à cocher, boutons radio et curseurs natifs : la couleur d'action (cuivre), plus le bleu du navigateur. */
+    accent-color: #C2532B;
     --background: 40 27% 96%;            /* secondary-50  #F7F5F1 (papier) */
     --foreground: 34 14% 10%;            /* secondary-900 #1C1915 */
 
@@ -365,6 +367,12 @@ html[data-device-class="phone"] .mdh-kanban-col {
 html[data-device-class="tablet"] .mdh-kanban-col {
   flex: 0 0 240px;
 }
+/* Ordinateur à fenêtre étroite (portable, fenêtre réduite) : une colonne ne descend pas sous
+   180 px ; au-delà, le tableau défile au lieu d'écraser les cartes (sept colonnes à 120 px
+   étaient illisibles). La colonne repliée (`KanbanColonneRepliee`) n'a pas cette classe. */
+html[data-device-class="desktop"] .mdh-kanban-col {
+  min-width: 180px;
+}
 /* Colonne repliée (Gagné, Perdu des leads) : 72 px partout, téléphone compris ; elle
    garde un point d'accroche, sinon le défilement aimanté ne l'atteindrait pas. */
 html[data-device-class="phone"] .mdh-kanban-repliee {
@@ -485,6 +493,8 @@ html[data-device-class="phone"] .mdh-kanban-repliee {
 
 .fc .fc-timegrid-slot {
   @apply border-secondary-100;
+  /* HAUTEUR_CRENEAU de planningVignette.js : changer l'un sans l'autre coupe la dernière ligne. */
+  height: 28px;
 }
 
 .fc .fc-col-header-cell {

@@ -26,7 +26,7 @@ export const REGISTRY = {
     edit:   { sql: 'UPDATE', default: d([1, 1, 1]) },
     delete: { sql: 'DELETE', default: d([0, 0, 0]) },
   } },
-  pipeline: { label: 'Pipeline', tables: {
+  pipeline: { label: 'Leads', tables: {
     leads: 'org', lead_activities: 'org', lead_interactions: 'org',
   }, actions: {
     view:     { sql: 'SELECT', default: d([1, 1, 0]) },

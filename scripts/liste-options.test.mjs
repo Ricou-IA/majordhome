@@ -24,6 +24,9 @@ test('avecRecherche : à partir de 7 options', () => {
   assert.equal(avecRecherche(liste(6)), false);
   assert.equal(avecRecherche(liste(7)), true);
   assert.equal(avecRecherche(undefined), false);
+  // Une option vide (« Choisir… ») ne compte pas : 6 vrais choix + l'invite = pas de recherche.
+  assert.equal(avecRecherche([{ value: '', label: 'Choisir…' }, ...liste(6)]), false);
+  assert.equal(avecRecherche([{ value: null, label: 'Choisir…' }, ...liste(7)]), true);
 });
 
 test('libelleDe : valeur comparée en chaîne, comme un <select>', () => {

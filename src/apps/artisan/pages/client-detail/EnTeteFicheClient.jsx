@@ -76,7 +76,7 @@ export function EnTeteFicheClient({
 
   const actionsMenu = [
     canCreateSAV && !isArchived && { label: 'Nouveau SAV', icon: LifeBuoy, onClick: onNouveauSav },
-    !isArchived && { label: 'Archiver', icon: Archive, danger: true, onClick: onArchiver },
+    !isArchived && { label: 'Archiver', icon: Archive, onClick: onArchiver },
     isAdmin && {
       label: 'Supprimer définitivement', icon: Trash2, danger: true, disabled: isHardDeleting, onClick: onSupprimer,
     },
@@ -90,8 +90,9 @@ export function EnTeteFicheClient({
         <span className="truncate text-secondary-700">{nom}</span>
       </nav>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-4">
+      {/* Fenêtre étroite : les boutons passent sous le nom au lieu de l'écraser. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-[16rem] flex-1 items-start gap-4">
           <Avatar nom={displayName} id={client.id} taille={56} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -135,7 +136,7 @@ export function EnTeteFicheClient({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {client.phone && (
             <Button asChild variant="secondary" size="icon" className={tactileIcone}>
               <a href={`tel:${client.phone.replace(/[^\d+]/g, '')}`} aria-label={`Appeler le ${client.phone}`} title={`Appeler le ${client.phone}`}>

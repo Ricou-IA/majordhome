@@ -176,7 +176,8 @@ export function DayResourceGrid({
         map.get(m.id).push({
           startIdx,
           slotCount,
-          color: cfg.color,
+          // Couleur de la personne de la colonne, comme au planning (le violet est réservé à « facturé »).
+          color: m.calendar_color || '#94A3B8',
           label: apt.subject || cfg.label,
           apt,
         });
@@ -426,6 +427,8 @@ export function DayResourceGrid({
               type="date"
               value={date || ''}
               onChange={(e) => handlePickDate(e.target.value)}
+              // Le champ est invisible : sans showPicker, un clic sur l'icône n'ouvrait pas le calendrier dans Chrome.
+              onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch { /* navigateur sans showPicker */ } }}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               tabIndex={-1}
             />

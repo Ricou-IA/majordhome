@@ -29,7 +29,7 @@ test('pagesCorrespondantes : accents ignorés, tous les mots requis, rien pour u
 test('pagesCorrespondantes : une page renommée se trouve par son nouveau nom et par l’ancien', () => {
   const renommees = [
     { name: 'Accueil', alias: 'Dashboard', href: '/' }, { name: 'Leads', alias: 'Pipeline', href: '/pipeline' },
-    { name: 'Carte', alias: 'Territoire', href: '/territoire' }, { name: 'Messages', alias: 'Mailing', href: '/mailing' },
+    { name: 'Carte', alias: 'Territoire', href: '/territoire' }, { name: 'Mailing', alias: 'Messages', href: '/mailing' },
     { name: 'Boutique', alias: 'Webshop', href: '/webshop' }, { name: 'Visibilité locale', alias: 'GeoGrid', href: '/geogrid' },
     { name: 'Publicité', alias: 'Meta Ads', href: '/meta-ads' }, { name: 'Planning', href: '/planning' },
   ];
@@ -51,7 +51,7 @@ test('pagesCorrespondantes : une page renommée se trouve par son nouveau nom et
 test('AppLayout : chaque page renommée garde son ancien nom en alias', () => {
   const source = readFileSync(new URL('../src/layouts/AppLayout.jsx', import.meta.url), 'utf8');
   for (const [nom, alias] of [['Accueil', 'Dashboard'], ['Leads', 'Pipeline'], ['Carte', 'Territoire'],
-    ['Messages', 'Mailing'], ['Boutique', 'Webshop'], ['Visibilité locale', 'GeoGrid'], ['Publicité', 'Meta Ads']]) {
+    ['Mailing', 'Messages'], ['Boutique', 'Webshop'], ['Visibilité locale', 'GeoGrid'], ['Publicité', 'Meta Ads']]) {
     assert.match(source, new RegExp(`name: '${nom}',\\s+alias: '${alias}',`), `alias manquant : ${nom}`);
   }
   assert.match(source, /alias: item\.alias,/);

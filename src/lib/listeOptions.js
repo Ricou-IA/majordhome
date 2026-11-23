@@ -15,10 +15,13 @@ import { normaliser } from './catalogue/recherchePieces.js';
 export const SEUIL_RECHERCHE = 7;
 
 /**
+ * Les options à valeur vide (« Choisir… », « Tous ») ne comptent pas : ce ne sont pas des choix
+ * à chercher, et la liste ne doit pas changer d'allure selon qu'une valeur est déjà choisie.
  * @param {Array<{ value: unknown, label: string }>|null|undefined} options
  * @returns {boolean}
  */
-export const avecRecherche = (options) => (options?.length || 0) >= SEUIL_RECHERCHE;
+export const avecRecherche = (options) =>
+  (options || []).filter((o) => String(o?.value ?? '') !== '').length >= SEUIL_RECHERCHE;
 
 /**
  * Options dont le libellé contient la saisie, sans accent ni casse. Saisie vide : toutes.

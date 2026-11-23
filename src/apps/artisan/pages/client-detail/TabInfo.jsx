@@ -4,6 +4,7 @@ import { LienWaze } from '@/apps/artisan/components/shared/LienWaze';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
+import { InfoTip } from '@/components/ui/info-tip';
 import { CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@services/clients.service';
 import { useLinkedClients, useClientSearch } from '@hooks/useClients';
 import { ClientModal } from '@/apps/artisan/components/clients/ClientModal';
@@ -483,8 +484,8 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
         </h3>
         <TextArea value={formData.notes} onChange={(v) => u('notes', v)} placeholder="Notes visibles par toute l'équipe..." rows={lignesDeNote(formData.notes, 3)} disabled={isLocked} />
         <div className="mt-4">
-          <FormField label="Notes internes">
-            <TextArea value={formData.internalNotes} onChange={(v) => u('internalNotes', v)} placeholder="Notes internes (non visibles par le client)" rows={lignesDeNote(formData.internalNotes, 2)} disabled={isLocked} />
+          <FormField label={<span className="inline-flex items-center gap-1">Note interne <InfoTip>Non visible par le client</InfoTip></span>}>
+            <TextArea value={formData.internalNotes} onChange={(v) => u('internalNotes', v)} placeholder="Réservée à l’équipe, jamais montrée au client" rows={lignesDeNote(formData.internalNotes, 2)} disabled={isLocked} />
           </FormField>
         </div>
       </section>

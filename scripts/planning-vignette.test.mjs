@@ -11,7 +11,7 @@ test('lignesDisponibles : la place suit la durée du RDV', () => {
   assert.equal(lignesDisponibles(30), 1);
   assert.equal(lignesDisponibles(45), 2);
   assert.equal(lignesDisponibles(60), 3);
-  assert.equal(lignesDisponibles(90), 4);
+  assert.equal(lignesDisponibles(90), 5);
   assert.equal(lignesDisponibles(120), 6);
   // Jamais moins d'une ligne ; durée inconnue = une heure.
   assert.equal(lignesDisponibles(10), 1);
@@ -35,7 +35,7 @@ test('gabaritVignette : SAV de 30 min = une ligne, installation = cadre plein', 
   assert.deepEqual(gabaritVignette({ dureeMinutes: 30 }), { gabarit: 'ligne', lignesNom: 1 });
   assert.deepEqual(gabaritVignette({ dureeMinutes: 45 }), { gabarit: 'deux', lignesNom: 1 });
   assert.deepEqual(gabaritVignette({ dureeMinutes: 60 }), { gabarit: 'trois', lignesNom: 1 });
-  assert.deepEqual(gabaritVignette({ dureeMinutes: 90 }), { gabarit: 'trois', lignesNom: 2 });
+  assert.deepEqual(gabaritVignette({ dureeMinutes: 90 }), { gabarit: 'plein', lignesNom: 2 });
   assert.deepEqual(gabaritVignette({ dureeMinutes: 120 }), { gabarit: 'plein', lignesNom: 3 });
   assert.deepEqual(gabaritVignette({ dureeMinutes: 540 }), { gabarit: 'plein', lignesNom: 3 });
 });

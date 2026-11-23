@@ -56,7 +56,7 @@ const navigation = [
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants', module: 'cedants', groupe: 'developpement' },
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale', module: 'prospection', groupe: 'developpement' },
   { name: 'Visibilité locale', alias: 'GeoGrid', href: '/geogrid', icon: Grid3x3,     resource: 'settings', module: 'geogrid', groupe: 'outils' },
-  { name: 'Messages',    alias: 'Mailing', href: '/mailing',     icon: Mail,          resource: 'settings', module: 'communication', groupe: 'ventes' },
+  { name: 'Mailing',     alias: 'Messages', href: '/mailing',     icon: Mail,          resource: 'settings', module: 'communication', groupe: 'ventes' },
   { name: 'Publicité',   alias: 'Meta Ads', href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads', module: 'meta_ads', groupe: 'outils' },
   { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator', module: 'solaire', groupe: 'etudes' },
   { name: 'Thermique',   href: '/thermique',   icon: Thermometer,   resource: 'thermal_study', module: 'thermique', groupe: 'etudes' },

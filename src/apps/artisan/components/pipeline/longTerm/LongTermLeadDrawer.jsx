@@ -185,7 +185,7 @@ export function LongTermLeadDrawer({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Hourglass className="h-4 w-4 text-secondary-500 shrink-0" />
-                <span className="text-xs uppercase tracking-wide text-secondary-600 font-semibold">Suivi des objectifs</span>
+                <span className="text-xs uppercase tracking-wide text-secondary-600 font-semibold">Moyen et long terme</span>
                 <span
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${freshness.classes}`}
                   title={`Fraîcheur du suivi (basée sur la dernière interaction)`}

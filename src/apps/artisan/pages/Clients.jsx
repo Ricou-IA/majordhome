@@ -328,9 +328,9 @@ export function Clients() {
 
   return (
     <div className="min-h-screen bg-secondary-50">
-      {/* Header */}
-      <div className="bg-white border-b border-secondary-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* En-tête posé sur le fond de page, comme les autres écrans (plus de bandeau blanc) */}
+      <div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
           <PageHeader
             title="Clients"
             subtitle={sousTitreClients(stats) || undefined}

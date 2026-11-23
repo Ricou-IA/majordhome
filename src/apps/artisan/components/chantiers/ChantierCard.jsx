@@ -138,7 +138,8 @@ export function ChantierCard({ chantier, onClick, reperes = null, avisBlocage = 
 
         {/* Ligne 5 : après-vente d'un chantier réceptionné, sinon commandes + repères de devis */}
         {reperes ? (
-          <div className="mt-auto flex items-center gap-1 min-w-0 overflow-hidden">
+          // Colonne étroite : les pastilles rétrécissent avec « … » (libellé complet au survol) au lieu d’être coupées net.
+          <div className="mt-auto flex items-center gap-0.5 min-w-0 overflow-hidden">
             {reperes.map((repere) => (
               repere.cle === 'avis' && onDemanderAvis && !avisBlocage ? (
                 <button
@@ -191,9 +192,9 @@ const REPERE_STYLES = {
 function Repere({ repere }) {
   const { css, Icone } = REPERE_STYLES[repere.etat] || REPERE_STYLES.a_faire;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-caption leading-4 px-1.5 py-0.5 rounded-full font-bold shrink-0 border ${css}`} title={repere.titre}>
-      {Icone && <Icone className="h-2.5 w-2.5" />}
-      {repere.libelle}
+    <span className={`inline-flex min-w-0 items-center gap-0.5 text-caption leading-4 px-1 py-0.5 rounded-full font-bold border ${css}`} title={repere.titre}>
+      {Icone && <Icone className="h-2.5 w-2.5 shrink-0" />}
+      <span className="truncate">{repere.libelle}</span>
     </span>
   );
 }

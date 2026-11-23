@@ -34,7 +34,7 @@ export default function Webshop() {
           <ShoppingCart className="w-6 h-6 text-secondary-500" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-secondary-900">Webshop</h1>
+          <h1 className="text-xl font-bold text-secondary-900">Boutique</h1>
           <p className="text-sm text-secondary-500">Commandes et catalogue de la boutique en ligne</p>
         </div>
       </div>
