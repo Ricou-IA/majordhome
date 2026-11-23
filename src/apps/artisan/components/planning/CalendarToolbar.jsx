@@ -10,6 +10,7 @@
 import { Plus, ChevronLeft, ChevronRight, Loader2, RefreshCw, Printer } from 'lucide-react';
 import { formatCa } from '@/lib/planningCa';
 import { jourDOuverture } from '@/lib/planningGestes';
+import { SegmentedControl } from '@components/ui/segmented-control';
 
 const VUES_BUREAU = [
   { value: 'timeGridDay', label: 'Jour' },
@@ -117,21 +118,7 @@ export function CalendarToolbar({
       {/* Actions */}
       <div className="flex items-center gap-2 flex-wrap">
         {/* Sélecteur de vue */}
-        <div className="flex items-center bg-secondary-100 rounded-lg p-0.5">
-          {views.map(v => (
-            <button
-              key={v.value}
-              onClick={() => onViewChange(v.value)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                currentView === v.value
-                  ? 'bg-white text-secondary-900 shadow-sm'
-                  : 'text-secondary-600 hover:text-secondary-900'
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl value={currentView} onChange={onViewChange} options={views} label="Vue du planning" />
 
         <button
           onClick={onRefresh}

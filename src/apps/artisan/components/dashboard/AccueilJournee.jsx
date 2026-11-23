@@ -7,7 +7,8 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Loader2, MapPin } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@services/appointments.service';
-import { Panneau, Vide } from '@components/pipeline/dashboard/Tableau';
+import { Vide } from '@components/pipeline/dashboard/Tableau';
+import { Card, CardHeader } from '@components/ui/card';
 import { personnesDuRdv, lieuDuRdv } from '@/lib/accueil';
 
 const jourEnClair = (iso) => {
@@ -34,7 +35,7 @@ function LigneRdv({ rdv, equipe }) {
   const client = [rdv.client_name, rdv.client_first_name].filter(Boolean).join(' ');
   const lieu = lieuDuRdv(rdv);
   return (
-    <li className="flex gap-4 px-4 py-3">
+    <li className="flex gap-4 px-5 py-3">
       <p className="w-24 shrink-0 text-sm tabular-nums text-secondary-900">
         <span className="font-semibold">{rdv.scheduled_start?.slice(0, 5) || '—'}</span>
         {rdv.scheduled_end && <span className="text-secondary-500"> – {rdv.scheduled_end.slice(0, 5)}</span>}
@@ -80,17 +81,18 @@ export function AccueilJournee({ journee, equipe, isLoading, error, finDeLecture
   }
 
   return (
-    <Panneau
-      titre={titre}
-      precision={precision}
-      actions={(
-        <Link to="/planning" className="text-sm font-medium text-primary-700 hover:text-primary-800">
-          Ouvrir le planning
-        </Link>
-      )}
-    >
+    <Card as="section" className="overflow-hidden">
+      <CardHeader
+        title={titre}
+        subtitle={precision}
+        actions={(
+          <Link to="/planning" className="text-sm font-medium text-primary-700 hover:text-primary-800">
+            Ouvrir le planning
+          </Link>
+        )}
+      />
       {error ? (
-        <p className="flex items-start gap-2 px-4 py-4 text-sm text-amber-900">
+        <p className="flex items-start gap-2 border-t border-secondary-100 px-5 py-4 text-sm text-amber-900">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           Le planning n’a pas pu être chargé. Ouvrez le planning pour voir les RDV.
         </p>
@@ -102,17 +104,17 @@ export function AccueilJournee({ journee, equipe, isLoading, error, finDeLecture
         <Vide>Aucun RDV posé d’ici au {jourEnClair(finDeLecture)}.</Vide>
       ) : (
         <>
-          <ul className="divide-y divide-secondary-100">
+          <ul className="divide-y divide-secondary-100 border-t border-secondary-100">
             {journee.rdvs.map((rdv) => <LigneRdv key={rdv.id} rdv={rdv} equipe={equipe} />)}
           </ul>
           {enConges.length > 0 && (
-            <p className="border-t border-secondary-100 px-4 py-2.5 text-sm text-secondary-600">
+            <p className="border-t border-secondary-100 px-5 py-2.5 text-sm text-secondary-600">
               En congés : {enConges.map((p) => p.nom).join(', ')}
             </p>
           )}
         </>
       )}
-    </Panneau>
+    </Card>
   );
 }
 

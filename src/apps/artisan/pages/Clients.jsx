@@ -37,6 +37,8 @@ import { useClients, useClientStats } from '@hooks/useClients';
 import { CLIENT_CATEGORIES } from '@services/clients.service';
 import { ClientCard, ClientCardSkeleton } from '@/apps/artisan/components/clients/ClientCard';
 import { ClientModal } from '@/apps/artisan/components/clients/ClientModal';
+import { PageHeader } from '@components/ui/page-header';
+import { EmptyState } from '@components/ui/empty-state';
 
 // ============================================================================
 // CONSTANTES
@@ -193,47 +195,21 @@ const STAT_CARD_LABELS = {
   publics: 'Aucun client du secteur public',
 };
 
-const EmptyState = ({ hasFilters, onClearFilters, onAddClient, activeStatCard }) => {
+const EtatVideClients = ({ hasFilters, onClearFilters, onAddClient, activeStatCard }) => {
   // Message contextuel selon la carte stat active
   const statCardLabel = activeStatCard ? STAT_CARD_LABELS[activeStatCard] : null;
+  if (statCardLabel) return <EmptyState icon={Users} message={statCardLabel} />;
 
   return (
-    <div className="text-center py-12">
-      <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <Users className="w-8 h-8 text-secondary-400" />
-      </div>
-      <h3 className="text-lg font-medium text-secondary-900 mb-2">
-        {statCardLabel || (hasFilters ? 'Aucun client trouvé' : 'Aucun client')}
-      </h3>
-      {!statCardLabel && (
-        <>
-          <p className="text-secondary-500 mb-6 max-w-sm mx-auto">
-            {hasFilters
-              ? 'Essayez de modifier vos critères de recherche ou de supprimer les filtres.'
-              : 'Commencez par ajouter votre premier client.'
-            }
-          </p>
-          <div className="flex items-center justify-center gap-3">
-            {hasFilters && (
-              <button
-                onClick={onClearFilters}
-                className="inline-flex items-center gap-2 px-4 py-2 border border-secondary-300 text-secondary-700 rounded-lg hover:bg-secondary-50 transition-colors"
-              >
-                <X className="w-4 h-4" />
-                Effacer les filtres
-              </button>
-            )}
-            <button
-              onClick={onAddClient}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Ajouter un client
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+    <EmptyState
+      icon={Users}
+      message={hasFilters ? 'Aucun client trouvé' : 'Aucun client'}
+      detail={hasFilters
+        ? 'Essayez de modifier vos critères de recherche ou de supprimer les filtres.'
+        : 'Commencez par ajouter votre premier client.'}
+      secondaryAction={hasFilters ? { label: 'Effacer les filtres', icon: X, onClick: onClearFilters } : undefined}
+      action={{ label: 'Ajouter un client', icon: Plus, onClick: onAddClient }}
+    />
   );
 };
 
@@ -486,35 +462,14 @@ export function Clients() {
       {/* Header */}
       <div className="bg-white border-b border-secondary-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-secondary-900">Clients</h1>
-              <p className="text-secondary-500 mt-1">
-                {totalCount} client{totalCount !== 1 ? 's' : ''} au total
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-            {isOrgAdmin && (
-              <button
-                type="button"
-                onClick={() => navigate('/clients/import')}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-secondary-700 border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors shadow-sm"
-              >
-                <Upload className="w-5 h-5" />
-                Importer
-              </button>
-            )}
-            {canCreateClient && (
-              <button
-                onClick={handleAddClient}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-              >
-                <Plus className="w-5 h-5" />
-                Nouveau client
-              </button>
-            )}
-            </div>
-          </div>
+          <PageHeader
+            title="Clients"
+            subtitle={`${totalCount} client${totalCount !== 1 ? 's' : ''} au total`}
+            actions={[
+              isOrgAdmin && { label: 'Importer', icon: Upload, variant: 'secondary', onClick: () => navigate('/clients/import') },
+              canCreateClient && { label: 'Nouveau client', icon: Plus, variant: 'primary', onClick: handleAddClient },
+            ]}
+          />
 
           {/* Stats */}
           {stats && (
@@ -664,7 +619,7 @@ export function Clients() {
 
         {/* État vide */}
         {!error && !loading && clients.length === 0 && (
-          <EmptyState
+          <EtatVideClients
             hasFilters={hasActiveFilters}
             onClearFilters={handleClearFilters}
             onAddClient={handleAddClient}

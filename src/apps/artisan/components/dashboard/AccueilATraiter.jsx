@@ -7,7 +7,8 @@
 
 import { Link } from 'react-router-dom';
 import { AlertTriangle, ChevronRight, Loader2, Plus } from 'lucide-react';
-import { Panneau, Vide } from '@components/pipeline/dashboard/Tableau';
+import { Vide } from '@components/pipeline/dashboard/Tableau';
+import { Card, CardHeader } from '@components/ui/card';
 
 /**
  * @param {Object} props
@@ -18,14 +19,15 @@ import { Panneau, Vide } from '@components/pipeline/dashboard/Tableau';
  */
 export function AccueilATraiter({ lignes, isLoading, echecs = [], peutCreerLead }) {
   return (
-    <Panneau titre="À traiter" precision="Ce qui attend aujourd’hui, quelle que soit sa date.">
+    <Card as="section" className="overflow-hidden">
+      <CardHeader title="À traiter" subtitle="Ce qui attend aujourd’hui, quelle que soit sa date." />
       {lignes.length > 0 && (
-        <ul className="divide-y divide-secondary-100">
+        <ul className="divide-y divide-secondary-100 border-t border-secondary-100">
           {lignes.map((ligne) => (
             <li key={ligne.cle}>
               <Link
                 to={ligne.href}
-                className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-secondary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
               >
                 <span className="w-8 shrink-0 text-right text-base font-semibold tabular-nums text-secondary-900">
                   {ligne.nombre.toLocaleString('fr-FR')}
@@ -48,7 +50,7 @@ export function AccueilATraiter({ lignes, isLoading, echecs = [], peutCreerLead 
       )}
 
       {echecs.length > 0 && (
-        <p className="flex items-start gap-2 border-t border-secondary-100 px-4 py-3 text-sm text-amber-900">
+        <p className="flex items-start gap-2 border-t border-secondary-100 px-5 py-3 text-sm text-amber-900">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           Lecture impossible pour {echecs.join(' et ')} : ce qui en dépend n’est pas affiché.
         </p>
@@ -57,7 +59,7 @@ export function AccueilATraiter({ lignes, isLoading, echecs = [], peutCreerLead 
       {lignes.length === 0 && !isLoading && echecs.length === 0 && <Vide>Rien n’attend.</Vide>}
 
       {peutCreerLead && (
-        <div className="border-t border-secondary-200 px-4 py-3">
+        <div className="border-t border-secondary-200 px-5 py-3">
           <Link
             to="/pipeline?tab=kanban&new=1"
             className="inline-flex items-center gap-2 text-sm font-medium text-primary-700 hover:text-primary-800"
@@ -67,7 +69,7 @@ export function AccueilATraiter({ lignes, isLoading, echecs = [], peutCreerLead 
           </Link>
         </div>
       )}
-    </Panneau>
+    </Card>
   );
 }
 

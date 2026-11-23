@@ -28,7 +28,8 @@ import { supabase } from '@lib/supabaseClient';
 import { SEUIL_RELANCE_JOURS } from '@lib/pipelineDashboard';
 import { cumulPeriode, formatCa } from '@/lib/planningCa';
 import { plageAccueil, journeeAffichee, compterRdv, lignesATraiter } from '@/lib/accueil';
-import { StatStrip } from '@apps/artisan/components/shared/StatStrip';
+import { PageHeader } from '@components/ui/page-header';
+import { KpiCard } from '@components/ui/kpi-card';
 import { entier, euros } from '@components/pipeline/dashboard/format';
 import { AccueilJournee } from '@apps/artisan/components/dashboard/AccueilJournee';
 import { AccueilATraiter } from '@apps/artisan/components/dashboard/AccueilATraiter';
@@ -160,6 +161,7 @@ export default function Dashboard() {
     peutChantiers && chantiers.error ? 'les chantiers' : null,
   ].filter(Boolean);
   const aTraiterVisible = peutPipeline || peutChantiers;
+  const dateDuJour = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
   // ===========================================================================
   // RENDER
@@ -167,17 +169,17 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-secondary-900">
-          Bonjour{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
-        </h1>
-        <p className="text-secondary-600 first-letter:uppercase">
-          {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-        </p>
-      </div>
+      <PageHeader
+        title={`Bonjour${profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}`}
+        subtitle={dateDuJour.charAt(0).toUpperCase() + dateDuJour.slice(1)}
+      />
 
       {reperes.length >= 2 && (
-        <StatStrip items={reperes} columns={reperes.length >= 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2'} />
+        <div className={`grid gap-4 ${reperes.length >= 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2'}`}>
+          {reperes.map((repere) => (
+            <KpiCard key={repere.key} label={repere.label} value={repere.value} context={repere.sub} info={repere.title} />
+          ))}
+        </div>
       )}
 
       <div className={`grid gap-6 ${peutPlanning && aTraiterVisible ? 'lg:grid-cols-3' : ''}`}>
