@@ -1,3 +1,4 @@
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { X, Loader2, Users, Filter, History, Eye, ChevronDown, ChevronRight } from 'lucide-react';
@@ -679,29 +680,21 @@ function MailingHistoryFields({ filters, set, campaigns }) {
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1">A ouvert la campagne</label>
-          <select
+          <ListeChoix
+            libelle="A ouvert la campagne"
             value={h.include_opened_campaign || ''}
-            onChange={(e) => set(['mailing_history', 'include_opened_campaign'], e.target.value || null)}
-            className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm"
-          >
-            <option value="">—</option>
-            {campaignOptions.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
+            onChange={(v) => set(['mailing_history', 'include_opened_campaign'], v || null)}
+            options={[{ value: '', label: '—' }, ...campaignOptions.map((c) => ({ value: c.value, label: c.label }))]}
+          />
         </div>
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1">A cliqué sur la campagne</label>
-          <select
+          <ListeChoix
+            libelle="A cliqué sur la campagne"
             value={h.include_clicked_campaign || ''}
-            onChange={(e) => set(['mailing_history', 'include_clicked_campaign'], e.target.value || null)}
-            className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm"
-          >
-            <option value="">—</option>
-            {campaignOptions.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
+            onChange={(v) => set(['mailing_history', 'include_clicked_campaign'], v || null)}
+            options={[{ value: '', label: '—' }, ...campaignOptions.map((c) => ({ value: c.value, label: c.label }))]}
+          />
         </div>
       </div>
     </div>
@@ -718,15 +711,12 @@ function PreviewFields({ filters, set, count, countLoading, previewRows, preview
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1">Trier par</label>
-          <select
+          <ListeChoix
+            libelle="Trier par"
             value={limits.order_by || 'recency_desc'}
-            onChange={(e) => set(['limits', 'order_by'], e.target.value)}
-            className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm"
-          >
-            {ORDER_BY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+            onChange={(v) => set(['limits', 'order_by'], v)}
+            options={ORDER_BY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          />
         </div>
         <NumberInput
           label="Limite destinataires (vide = tous)"

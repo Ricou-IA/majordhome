@@ -16,6 +16,7 @@
  * ============================================================================
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { productCategoriesForSection } from '@services/devis.service';
@@ -287,9 +288,14 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
       {hasSections && (
         <div className="flex flex-wrap items-center gap-2 text-sm text-secondary-700">
           <label htmlFor="tva-devis" className="font-medium">TVA du devis</label>
-          <select id="tva-devis" value={tvaDevis} onChange={(e) => changerTvaDevis(e.target.value)} className="border border-secondary-300 rounded-lg px-2 py-1 text-sm">
-            {TAUX_TVA.map((t) => <option key={t} value={t}>{String(t).replace('.', ',')} %</option>)}
-          </select>
+          <div className="w-28">
+            <ListeChoix
+              id="tva-devis"
+              value={tvaDevis}
+              onChange={changerTvaDevis}
+              options={TAUX_TVA.map((t) => ({ value: t, label: `${String(t).replace('.', ',')} %` }))}
+            />
+          </div>
           <span className="text-xs text-secondary-400">Taux de la famille par défaut ; le changer l&apos;applique à toutes les lignes (chaque ligne reste modifiable).</span>
         </div>
       )}

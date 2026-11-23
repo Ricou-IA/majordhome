@@ -34,6 +34,7 @@
  * ============================================================================
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState, useEffect, useMemo } from 'react';
 import { X, Wrench, Pencil, Loader2, Camera } from 'lucide-react';
 import { PhotoCapture } from '@apps/artisan/components/interventions/PhotoCapture';
@@ -386,16 +387,15 @@ export function EquipmentFormModal({
             <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Année
             </label>
-            <select
+            <ListeChoix
+              libelle="Année"
               value={form.installationYear}
-              onChange={(e) => handleChange('installationYear', e.target.value)}
-              className="w-full px-3 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
-            >
-              <option value="">Sélectionner une année...</option>
-              {YEARS.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
+              onChange={(v) => handleChange('installationYear', v)}
+              options={[
+                { value: '', label: 'Sélectionner une année...' },
+                ...YEARS.map((year) => ({ value: year, label: String(year) })),
+              ]}
+            />
           </div>
 
           {/* Type de pose */}
@@ -403,15 +403,16 @@ export function EquipmentFormModal({
             <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Type de pose
             </label>
-            <select
+            <ListeChoix
+              libelle="Type de pose"
               value={form.installationType}
-              onChange={(e) => handleChange('installationType', e.target.value)}
-              className="w-full px-3 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
-            >
-              <option value="">Non renseigné</option>
-              <option value="ventouse">Pose ventouse</option>
-              <option value="verticale">Pose verticale</option>
-            </select>
+              onChange={(v) => handleChange('installationType', v)}
+              options={[
+                { value: '', label: 'Non renseigné' },
+                { value: 'ventouse', label: 'Pose ventouse' },
+                { value: 'verticale', label: 'Pose verticale' },
+              ]}
+            />
           </div>
 
           {/* Note */}

@@ -13,6 +13,7 @@
  * ============================================================================
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo, useState } from 'react';
 import { X, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -46,16 +47,28 @@ function NouvelArticle({ ligne, rap, nature, onNature, existant, onExistant }) {
           {' · '}{ligne.quantite ?? '?'} {uniteDepuisOffre(ligne.unite)} × {ligne.prix_unitaire_net != null ? formatEuro(ligne.prix_unitaire_net) : '?'} achat
         </p>
       </div>
-      <select value={nature} disabled={!!existant} onChange={(e) => onNature(e.target.value)}
-        className="border border-secondary-300 rounded-lg px-2 py-1 text-xs" title="Range la ligne dans le chapitre du devis du même type">
-        {NATURES.map((n) => <option key={n.value} value={n.value}>{n.label}</option>)}
-      </select>
+      <div title="Range la ligne dans le chapitre du devis du même type">
+        <ListeChoix
+          libelle="Nature de la ligne"
+          value={nature}
+          disabled={!!existant}
+          onChange={onNature}
+          className="h-8 text-xs"
+          selectClassName="text-xs"
+          options={NATURES.map((n) => ({ value: n.value, label: n.label }))}
+        />
+      </div>
       {suggestions.length ? (
-        <select value={existant} onChange={(e) => onExistant(e.target.value)} className="border border-secondary-300 rounded-lg px-2 py-1 text-xs w-full truncate"
-          title="Un article proche existe déjà : le choisir évite un doublon">
-          <option value="">Nouvel article</option>
-          {suggestions.map((s) => <option key={s.article.id} value={s.article.id}>C’est : {s.article.name}</option>)}
-        </select>
+        <div title="Un article proche existe déjà : le choisir évite un doublon" className="w-full min-w-0">
+          <ListeChoix
+            libelle="Article existant"
+            value={existant}
+            onChange={onExistant}
+            className="h-8 text-xs"
+            selectClassName="text-xs"
+            options={[{ value: '', label: 'Nouvel article' }, ...suggestions.map((s) => ({ value: s.article.id, label: `C’est : ${s.article.name}` }))]}
+          />
+        </div>
       ) : <span className="text-xs text-secondary-400">Nouvel article</span>}
       <span className="text-xs text-right text-amber-600" title="Prix de vente à saisir dans le devis">à chiffrer</span>
     </div>
@@ -176,10 +189,14 @@ export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose })
               <OffreEntete lecture={lecture} />
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <label htmlFor="offre-fournisseur" className="text-secondary-700">Fournisseur</label>
-                <select id="offre-fournisseur" value={fournisseurId} onChange={(e) => { setFournisseurId(e.target.value); setExistants({}); }} className="border border-secondary-300 rounded-lg px-2 py-1 text-sm">
-                  <option value="">— non choisi —</option>
-                  {suppliers.filter((s) => s.is_active !== false).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                <div className="w-64 max-w-full">
+                  <ListeChoix
+                    id="offre-fournisseur"
+                    value={fournisseurId}
+                    onChange={(v) => { setFournisseurId(v); setExistants({}); }}
+                    options={[{ value: '', label: '— non choisi —' }, ...suppliers.filter((s) => s.is_active !== false).map((s) => ({ value: s.id, label: s.name }))]}
+                  />
+                </div>
                 {!fournisseur && <span className="text-xs text-amber-600">Choisissez le fournisseur pour reconnaître ses références et enregistrer ses prix.</span>}
               </div>
               {error && <p className="text-sm text-red-600">Rapprochement impossible : {error.message}</p>}

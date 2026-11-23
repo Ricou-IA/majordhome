@@ -7,6 +7,7 @@
  * Spec : docs/superpowers/specs/2026-11-19-rapport-intervention-sav-design.md
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo, useState } from 'react';
 import { X, FileText, Loader2, Send, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
@@ -181,19 +182,19 @@ export function RapportSavDialog({ item, equipements = [], referentiel, membres 
 
               <div>
                 <label htmlFor="rs-appareil" className={etiquette}>Appareil</label>
-                <select
+                <ListeChoix
                   id="rs-appareil"
                   value={contenu.appareil?.id || ''}
-                  onChange={(e) => set('appareil')(appareils.find((a) => a.id === e.target.value) || null)}
-                  className={`${champ} bg-white`}
-                >
-                  <option value="">Aucun appareil précisé</option>
-                  {/* Appareil du rapport déjà édité, s'il n'est plus sur la fiche du client */}
-                  {contenu.appareil && !appareils.some((a) => a.id === contenu.appareil.id) && (
-                    <option value={contenu.appareil.id || ''}>{nomAppareil(contenu.appareil)}</option>
-                  )}
-                  {appareils.map((a) => <option key={a.id} value={a.id}>{nomAppareil(a)}</option>)}
-                </select>
+                  onChange={(v) => set('appareil')(appareils.find((a) => a.id === v) || null)}
+                  options={[
+                    { value: '', label: 'Aucun appareil précisé' },
+                    // Appareil du rapport déjà édité, s'il n'est plus sur la fiche du client
+                    ...(contenu.appareil && !appareils.some((a) => a.id === contenu.appareil.id)
+                      ? [{ value: contenu.appareil.id || '', label: nomAppareil(contenu.appareil) }]
+                      : []),
+                    ...appareils.map((a) => ({ value: a.id, label: nomAppareil(a) })),
+                  ]}
+                />
               </div>
 
               <div>

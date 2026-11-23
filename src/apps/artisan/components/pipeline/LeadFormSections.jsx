@@ -11,6 +11,7 @@
  * ============================================================================
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState } from 'react';
 import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
 import { BanAddressInput } from '@/apps/artisan/components/shared/BanAddressInput';
@@ -388,19 +389,12 @@ export const SectionPipeline = ({
     <SectionTitle>Pipeline</SectionTitle>
 
     <FormField label="Source">
-      <div className="relative">
-        <select
-          value={form.source_id}
-          onChange={(e) => setField('source_id', e.target.value)}
-          className={selectClass}
-        >
-          <option value="">— Source —</option>
-          {sources.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-      </div>
+      <ListeChoix
+        libelle="Source"
+        value={form.source_id}
+        onChange={(v) => setField('source_id', v)}
+        options={[{ value: '', label: '— Source —' }, ...sources.map((s) => ({ value: s.id, label: s.name }))]}
+      />
     </FormField>
 
     {/* Assistant de planification rendu en overlay dans LeadModal */}
@@ -408,22 +402,18 @@ export const SectionPipeline = ({
     {/* « Projet » = liste COMMERCIALE (familles de devis, Settings → Devis) : c'est elle qui présélectionne
         l'installation d'un devis. L'équipement ci-dessous reste le référentiel d'entretien (parc client). */}
     <FormField label="Projet" className="mt-3">
-      <div className="relative">
-        <select
-          value={form.project_family_key}
-          onChange={(e) => setField('project_family_key', e.target.value)}
-          className={selectClass}
-        >
-          <option value="">—</option>
-          {projectFamilies.map((f) => (
-            <option key={f.key} value={f.key}>{f.label}</option>
-          ))}
-          {form.project_family_key && !projectFamilies.some((f) => f.key === form.project_family_key) && (
-            <option value={form.project_family_key}>{projectFamilyOff?.label || form.project_family_key} (type désactivé)</option>
-          )}
-        </select>
-        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-      </div>
+      <ListeChoix
+        libelle="Projet"
+        value={form.project_family_key}
+        onChange={(v) => setField('project_family_key', v)}
+        options={[
+          { value: '', label: '—' },
+          ...projectFamilies.map((f) => ({ value: f.key, label: f.label })),
+          ...(form.project_family_key && !projectFamilies.some((f) => f.key === form.project_family_key)
+            ? [{ value: form.project_family_key, label: `${projectFamilyOff?.label || form.project_family_key} (type désactivé)` }]
+            : []),
+        ]}
+      />
     </FormField>
 
     {/* Sert au chantier (gabarit du PV, proposition de contrat), aux segments de mailing et à la fiche
@@ -452,19 +442,12 @@ export const SectionPipeline = ({
 
     {canAssign && (
       <FormField label="Commercial assigné" className="mt-3">
-        <div className="relative">
-          <select
-            value={form.assigned_user_id}
-            onChange={(e) => setField('assigned_user_id', e.target.value)}
-            className={selectClass}
-          >
-            <option value="">— Non assigné —</option>
-            {commercials.map((c) => (
-              <option key={c.id} value={c.id}>{c.full_name}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-        </div>
+        <ListeChoix
+          libelle="Commercial assigné"
+          value={form.assigned_user_id}
+          onChange={(v) => setField('assigned_user_id', v)}
+          options={[{ value: '', label: '— Non assigné —' }, ...commercials.map((c) => ({ value: c.id, label: c.full_name }))]}
+        />
       </FormField>
     )}
   </>

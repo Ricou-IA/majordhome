@@ -9,6 +9,7 @@
  * ============================================================================
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ShoppingCart, Wrench } from 'lucide-react';
@@ -94,12 +95,12 @@ export function SAVModelPartsSection({ item, equipements = [], referentiel, canE
 
   if (!liste.length) return null;
   const selecteur = liste.length > 1 && (
-    <select
-      value={choisi || ''} onChange={(e) => { setChoisi(e.target.value); changerAtelier(false); }} aria-label="Appareil concerné"
-      className="w-full border border-secondary-300 rounded-lg px-2 py-1.5 text-sm"
-    >
-      {liste.map((e) => <option key={e.id} value={e.id}>{nomEquipement(e, referentiel)}{e.id === item?.equipment_id ? ' (appareil du SAV)' : ''}</option>)}
-    </select>
+    <ListeChoix
+      value={choisi || ''}
+      onChange={(v) => { setChoisi(v); changerAtelier(false); }}
+      libelle="Appareil concerné"
+      options={liste.map((e) => ({ value: e.id, label: `${nomEquipement(e, referentiel)}${e.id === item?.equipment_id ? ' (appareil du SAV)' : ''}` }))}
+    />
   );
   const nomAppareil = liste.length > 1
     ? (id) => { const e = liste.find((x) => x.id === id); return e ? nomEquipement(e, referentiel) : null; }

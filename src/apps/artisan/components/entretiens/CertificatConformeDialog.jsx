@@ -12,10 +12,11 @@
  * ============================================================================
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useEffect, useState } from 'react';
 import { AlertTriangle, XCircle } from 'lucide-react';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
-import { inputClass, selectClass } from '@/apps/artisan/components/FormFields';
+import { inputClass } from '@/apps/artisan/components/FormFields';
 
 /**
  * @param {object} props
@@ -96,17 +97,16 @@ export function CertificatConformeDialog({
           </label>
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-secondary-700">Intervention réalisée par</span>
-            <select
+            <ListeChoix
+              libelle="Intervention réalisée par"
               value={technicienId}
-              onChange={(e) => setTechnicienId(e.target.value)}
-              className={selectClass}
+              onChange={setTechnicienId}
               disabled={!!blocage || loading || loadingTechnician}
-            >
-              <option value="">{loadingTechnician ? 'Lecture du RDV…' : 'Choisir…'}</option>
-              {technicians.map((t) => (
-                <option key={t.id} value={t.id}>{String(t.display_name || '').trim()}</option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: loadingTechnician ? 'Lecture du RDV…' : 'Choisir…' },
+                ...technicians.map((t) => ({ value: t.id, label: String(t.display_name || '').trim() })),
+              ]}
+            />
           </label>
         </div>
 

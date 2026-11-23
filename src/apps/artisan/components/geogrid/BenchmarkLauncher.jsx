@@ -1,3 +1,4 @@
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Play, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -280,18 +281,13 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
           {/* Sélection liste */}
           <div>
             <label className="block text-xs font-medium text-secondary-600 mb-1">Liste de keywords</label>
-            <select
+            <ListeChoix
+              libelle="Liste de keywords"
               value={selectedListId}
-              onChange={(e) => setSelectedListId(e.target.value)}
+              onChange={setSelectedListId}
               disabled={running}
-              className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500"
-            >
-              {lists.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name} ({l.keyword_count || l.keywords?.length || 0} keywords)
-                </option>
-              ))}
-            </select>
+              options={lists.map((l) => ({ value: l.id, label: `${l.name} (${l.keyword_count || l.keywords?.length || 0} keywords)` }))}
+            />
           </div>
 
           {/* Mode */}
@@ -322,29 +318,23 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="block text-xs font-medium text-secondary-600 mb-1">Ville</label>
-                <select
+                <ListeChoix
+                  libelle="Ville"
                   value={centerCityCode}
-                  onChange={(e) => setCenterCityCode(e.target.value)}
+                  onChange={setCenterCityCode}
                   disabled={running}
-                  className="w-full px-3 py-1.5 text-sm border rounded-md"
-                >
-                  {bigCities.map((c) => (
-                    <option key={c.code} value={c.code}>{c.name}</option>
-                  ))}
-                </select>
+                  options={bigCities.map((c) => ({ value: c.code, label: c.name }))}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-secondary-600 mb-1">Grille</label>
-                <select
+                <ListeChoix
+                  libelle="Grille"
                   value={gridSize}
-                  onChange={(e) => setGridSize(parseInt(e.target.value))}
+                  onChange={(v) => setGridSize(parseInt(v))}
                   disabled={running}
-                  className="w-full px-3 py-1.5 text-sm border rounded-md"
-                >
-                  {GRID_SIZES.map((g) => (
-                    <option key={g.value} value={g.value}>{g.label}</option>
-                  ))}
-                </select>
+                  options={GRID_SIZES.map((g) => ({ value: g.value, label: g.label }))}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-secondary-600 mb-1">Rayon (km)</label>
@@ -365,16 +355,13 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
           {scanMode === 'cities' && (
             <div>
               <label className="block text-xs font-medium text-secondary-600 mb-1">Seuil population communes</label>
-              <select
+              <ListeChoix
+                libelle="Seuil population communes"
                 value={minPopulation}
-                onChange={(e) => setMinPopulation(parseInt(e.target.value))}
+                onChange={(v) => setMinPopulation(parseInt(v))}
                 disabled={running}
-                className="w-full px-3 py-1.5 text-sm border rounded-md"
-              >
-                {POPULATION_THRESHOLDS.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
+                options={POPULATION_THRESHOLDS.map((t) => ({ value: t.value, label: t.label }))}
+              />
               {filteredCommunes.length > 0 && (
                 <div className="mt-1 text-xs text-secondary-500">
                   {filteredCommunes.length} communes sélectionnées

@@ -5,6 +5,7 @@
  * Remplace l'ancienne étape « Client » du wizard.
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { AlertTriangle, User, Phone, Mail, MapPin, FileUp } from 'lucide-react';
 import { QUOTE_TEMPLATE_FAMILIES } from '@services/devis.service';
 
@@ -52,10 +53,16 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
         </div>
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1.5">Devis type</label>
-          <select value={selectedTemplateId || ''} disabled={!selectedFamily} onChange={(e) => onSelectTemplate(e.target.value || null)} className={`${inputClass} disabled:bg-secondary-50 disabled:text-secondary-400`}>
-            <option value="">{selectedFamily ? '— Aucun (devis vierge) —' : '— Choisir une famille —'}</option>
-            {familyTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.description ? ` — ${t.description}` : ''}</option>)}
-          </select>
+          <ListeChoix
+            libelle="Devis type"
+            value={selectedTemplateId || ''}
+            disabled={!selectedFamily}
+            onChange={(v) => onSelectTemplate(v || null)}
+            options={[
+              { value: '', label: selectedFamily ? '— Aucun (devis vierge) —' : '— Choisir une famille —' },
+              ...familyTemplates.map((t) => ({ value: t.id, label: `${t.name}${t.description ? ` — ${t.description}` : ''}` })),
+            ]}
+          />
         </div>
         {onImportOffre && (
           <button type="button" onClick={onImportOffre} className="btn-secondary whitespace-nowrap" title="Reprendre les lignes d'une offre de prix fournisseur (PDF)">

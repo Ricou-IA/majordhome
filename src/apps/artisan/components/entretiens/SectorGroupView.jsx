@@ -14,6 +14,7 @@
  * ============================================================================
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState, useMemo } from 'react';
 import {
   MapPin,
@@ -507,18 +508,14 @@ export function SectorGroupView({
           {/* Filtre mois de référence */}
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-secondary-400" />
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="text-sm border border-secondary-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
-            >
-              <option value="">Tous les mois</option>
-              {MONTHS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
+            <div className="w-44">
+              <ListeChoix
+                libelle="Mois de référence"
+                value={selectedMonth}
+                onChange={setSelectedMonth}
+                options={[{ value: '', label: 'Tous les mois' }, ...MONTHS.map((m) => ({ value: m.value, label: m.label }))]}
+              />
+            </div>
           </div>
 
           {/* Expand/collapse */}

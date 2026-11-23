@@ -1,10 +1,10 @@
 /** OrdersTab — kanban des commandes boutique (5 colonnes glissables + 2 repliées). */
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { KanbanBoard } from '@apps/artisan/components/shared/KanbanBoard';
 import { useWebshopOrders, useWebshopOrderActions } from '@hooks/useWebshop';
-import { selectClass } from '@apps/artisan/components/FormFields';
 import {
   ORDER_BOARD_COLUMNS, ORDER_SIDE_STATUSES, canMoveTo, matchesOrderSearch, orderTotalCents,
   resumeTransition,
@@ -67,16 +67,30 @@ export default function OrdersTab() {
         emptyMessage="Aucune commande"
         headerLeft={(
           <div className="flex items-center gap-2">
-            <select value={channel} onChange={(e) => setChannel(e.target.value)} className={`${selectClass} w-44 py-1.5`}>
-              <option value="">Tous les canaux</option>
-              <option value="particulier">Particulier</option>
-              <option value="pro">Pro / concessionnaire</option>
-            </select>
-            <select value={orderType} onChange={(e) => setOrderType(e.target.value)} className={`${selectClass} w-48 py-1.5`}>
-              <option value="">Tous les types</option>
-              <option value="vente_directe">Vente directe</option>
-              <option value="vente_installation">Vente + installation</option>
-            </select>
+            <div className="w-44">
+              <ListeChoix
+                libelle="Canal"
+                value={channel}
+                onChange={setChannel}
+                options={[
+                  { value: '', label: 'Tous les canaux' },
+                  { value: 'particulier', label: 'Particulier' },
+                  { value: 'pro', label: 'Pro / concessionnaire' },
+                ]}
+              />
+            </div>
+            <div className="w-48">
+              <ListeChoix
+                libelle="Type de commande"
+                value={orderType}
+                onChange={setOrderType}
+                options={[
+                  { value: '', label: 'Tous les types' },
+                  { value: 'vente_directe', label: 'Vente directe' },
+                  { value: 'vente_installation', label: 'Vente + installation' },
+                ]}
+              />
+            </div>
           </div>
         )}
         headerRight={(

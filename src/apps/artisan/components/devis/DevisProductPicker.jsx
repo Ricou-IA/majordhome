@@ -12,6 +12,7 @@
  * ============================================================================
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Package, X, Loader2, Search, Minus, Plus, ShoppingCart } from 'lucide-react';
@@ -155,14 +156,22 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
               className="w-full pl-10 pr-4 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
           </div>
           <div className="flex flex-wrap gap-2">
-            <select value={brand} onChange={(e) => setBrand(e.target.value)} className="border border-secondary-300 rounded-lg px-2 py-1.5 text-sm">
-              <option value="">Toutes les marques ({brands.length})</option>
-              {brands.map((b) => <option key={b} value={b}>{b}</option>)}
-            </select>
-            <select value={gamme} onChange={(e) => setGamme(e.target.value)} className="border border-secondary-300 rounded-lg px-2 py-1.5 text-sm">
-              <option value="">Toutes les gammes ({gammes.length})</option>
-              {gammes.map((g) => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <div className="min-w-[10rem]">
+              <ListeChoix
+                libelle="Marque"
+                value={brand}
+                onChange={setBrand}
+                options={[{ value: '', label: `Toutes les marques (${brands.length})` }, ...brands.map((b) => ({ value: b, label: b }))]}
+              />
+            </div>
+            <div className="min-w-[10rem]">
+              <ListeChoix
+                libelle="Gamme"
+                value={gamme}
+                onChange={setGamme}
+                options={[{ value: '', label: `Toutes les gammes (${gammes.length})` }, ...gammes.map((g) => ({ value: g, label: g }))]}
+              />
+            </div>
             <span className="ml-auto self-center text-xs text-secondary-400">
               {count} article{count > 1 ? 's' : ''}{count > LIMITE ? ` · les ${LIMITE} premiers, affinez` : ''}
             </span>

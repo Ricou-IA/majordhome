@@ -3,6 +3,7 @@
  * Une ligne par colonne du fichier : son en-tête, trois valeurs, et le champ de la fiche qu'elle remplit.
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, Info, Lightbulb } from 'lucide-react';
 import {
@@ -68,16 +69,14 @@ export default function EtapeCorrespondance({
           </div>
           <div>
             <label htmlFor="import-entete" className="block text-sm font-medium text-secondary-700 mb-1">Ligne d&apos;en-tête</label>
-            <select
+            <ListeChoix
               id="import-entete"
               value={fichier.indexEntete}
-              onChange={(e) => onEntete(Number(e.target.value))}
-              className="w-full sm:w-80 px-3 py-2 border border-secondary-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {fichier.matrice.slice(0, 10).map((ligne, i) => (
-                <option key={i} value={i}>Ligne {i + 1} : {resumeLigne(ligne)}</option>
-              ))}
-            </select>
+              onChange={(v) => onEntete(Number(v))}
+              className="sm:w-80"
+              selectClassName="sm:w-80"
+              options={fichier.matrice.slice(0, 10).map((ligne, i) => ({ value: i, label: `Ligne ${i + 1} : ${resumeLigne(ligne)}` }))}
+            />
           </div>
         </div>
 

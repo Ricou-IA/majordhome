@@ -10,6 +10,7 @@
  * ============================================================================
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo, useState } from 'react';
 import { Loader2, RefreshCw, Truck, AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
@@ -84,11 +85,16 @@ export default function TourneesTab() {
           Avec commandes seulement
         </label>
         <div className="ml-auto flex items-center gap-2">
-          <select value={sectorId} onChange={(e) => setSectorId(e.target.value)}
-            className="text-xs border border-secondary-200 rounded-lg px-2.5 py-1.5 bg-white">
-            <option value="all">Tous les secteurs</option>
-            {sectors.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-          </select>
+          <div className="w-48">
+            <ListeChoix
+              libelle="Secteur"
+              value={sectorId}
+              onChange={setSectorId}
+              className="text-xs"
+              selectClassName="text-xs"
+              options={[{ value: 'all', label: 'Tous les secteurs' }, ...sectors.map((s) => ({ value: s.id, label: s.label }))]}
+            />
+          </div>
           <button type="button" onClick={() => refetch()} title="Rafraîchir"
             className="p-2 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg">
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />

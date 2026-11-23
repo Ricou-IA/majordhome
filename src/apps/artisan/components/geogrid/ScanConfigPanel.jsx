@@ -1,3 +1,4 @@
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, AlertTriangle, Info, Grid3x3, MapPin, ExternalLink } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
@@ -295,22 +296,14 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
             <label className="block text-xs font-medium text-secondary-600 mb-1">
               Ville à analyser
             </label>
-            <select
+            <ListeChoix
+              libelle="Ville à analyser"
               value={selectedCityCode}
-              onChange={(e) => setSelectedCityCode(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              onChange={setSelectedCityCode}
               disabled={loadingCommunes || !bigCities.length}
-            >
-              {loadingCommunes && <option>Chargement...</option>}
-              {!loadingCommunes && !bigCities.length && (
-                <option>{orgDepartmentCode ? 'Aucune commune ≥ 10 000 hab' : 'Aucun département configuré'}</option>
-              )}
-              {bigCities.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.name} ({c.population.toLocaleString('fr-FR')} hab)
-                </option>
-              ))}
-            </select>
+              placeholder={loadingCommunes ? 'Chargement...' : (!bigCities.length ? (orgDepartmentCode ? 'Aucune commune ≥ 10 000 hab' : 'Aucun département configuré') : undefined)}
+              options={bigCities.map((c) => ({ value: c.code, label: `${c.name} (${c.population.toLocaleString('fr-FR')} hab)` }))}
+            />
             {selectedCity && (
               <div className="text-[11px] text-secondary-500 mt-1">
                 Centre : {selectedCity.lat.toFixed(4)}, {selectedCity.lng.toFixed(4)}
@@ -337,15 +330,16 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-secondary-600 mb-1">Grille (NxN)</label>
-              <select
+              <ListeChoix
+                libelle="Grille (NxN)"
                 value={config.gridSize}
-                onChange={(e) => handleChange('gridSize', e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value={5}>5x5 (25 pts)</option>
-                <option value={7}>7x7 (49 pts)</option>
-                <option value={9}>9x9 (81 pts)</option>
-              </select>
+                onChange={(v) => handleChange('gridSize', v)}
+                options={[
+                  { value: 5, label: '5x5 (25 pts)' },
+                  { value: 7, label: '7x7 (49 pts)' },
+                  { value: 9, label: '9x9 (81 pts)' },
+                ]}
+              />
             </div>
           </div>
 
@@ -371,15 +365,12 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
             <label className="block text-xs font-medium text-secondary-600 mb-1">
               Seuil de population <span className="text-secondary-400">(filtre les communes scannées)</span>
             </label>
-            <select
+            <ListeChoix
+              libelle="Seuil de population"
               value={minPopulation}
-              onChange={(e) => setMinPopulation(parseInt(e.target.value))}
-              className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              {POPULATION_THRESHOLDS.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
+              onChange={(v) => setMinPopulation(parseInt(v))}
+              options={POPULATION_THRESHOLDS.map((t) => ({ value: t.value, label: t.label }))}
+            />
           </div>
 
           <div>
@@ -389,15 +380,12 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
                 <Info className="w-3 h-3 text-secondary-400" />
               </span>
             </label>
-            <select
+            <ListeChoix
+              libelle="Profil de recherche simulé"
               value={citiesSearchRadius}
-              onChange={(e) => setCitiesSearchRadius(parseInt(e.target.value))}
-              className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              {SEARCH_PROFILES.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
+              onChange={(v) => setCitiesSearchRadius(parseInt(v))}
+              options={SEARCH_PROFILES.map((p) => ({ value: p.value, label: p.label }))}
+            />
             <div className="text-[11px] text-secondary-500 mt-1 italic">
               {SEARCH_PROFILES.find((p) => p.value === citiesSearchRadius)?.hint}
             </div>

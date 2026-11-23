@@ -1,3 +1,4 @@
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -567,16 +568,12 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
             <TextInput value={contractForm.endDate} onChange={(v) => setContractForm((p) => ({ ...p, endDate: v }))} type="date" />
           </FormField>
           <FormField label="Mois d'entretien">
-            <select
+            <ListeChoix
+              libelle="Mois d'entretien"
               value={contractForm.maintenanceMonth || ''}
-              onChange={(e) => setContractForm((p) => ({ ...p, maintenanceMonth: e.target.value ? parseInt(e.target.value) : '' }))}
-              className="w-full rounded-lg border border-secondary-300 bg-white px-3 py-2 text-sm text-secondary-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            >
-              <option value="">Non défini</option>
-              {MAINTENANCE_MONTHS.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
+              onChange={(v) => setContractForm((p) => ({ ...p, maintenanceMonth: v ? parseInt(v) : '' }))}
+              options={[{ value: '', label: 'Non défini' }, ...MAINTENANCE_MONTHS.map((m) => ({ value: m.value, label: m.label }))]}
+            />
           </FormField>
           <FormField label="Tps estimé (heures)">
             <TextInput value={contractForm.estimatedTime} onChange={(v) => setContractForm((p) => ({ ...p, estimatedTime: v }))} placeholder="Ex: 1.5" type="number" />

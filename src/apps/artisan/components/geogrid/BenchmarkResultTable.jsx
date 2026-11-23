@@ -1,3 +1,4 @@
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo, useState } from 'react';
 import { Loader2, Eye } from 'lucide-react';
 import { useBenchmarkScans } from '@hooks/useGeoGrid';
@@ -148,24 +149,34 @@ export default function BenchmarkResultTable({ benchmark }) {
           <p className="text-xs text-secondary-500 mt-0.5">{benchmark.list_name} · {enrichedScans.length} keywords scannés</p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="text-xs px-2 py-1 border rounded"
-          >
-            <option value="found">Trier par trouvé</option>
-            <option value="top10">Trier par top 10</option>
-            <option value="top3">Trier par top 3</option>
-            <option value="keyword">Trier par mot-clé</option>
-          </select>
-          <select
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value)}
-            className="text-xs px-2 py-1 border rounded"
-          >
-            <option value="family">Grouper par famille</option>
-            <option value="none">Tout afficher</option>
-          </select>
+          <div className="w-44">
+            <ListeChoix
+              libelle="Tri"
+              value={sortBy}
+              onChange={setSortBy}
+              className="h-8 text-xs"
+              selectClassName="text-xs"
+              options={[
+                { value: 'found', label: 'Trier par trouvé' },
+                { value: 'top10', label: 'Trier par top 10' },
+                { value: 'top3', label: 'Trier par top 3' },
+                { value: 'keyword', label: 'Trier par mot-clé' },
+              ]}
+            />
+          </div>
+          <div className="w-44">
+            <ListeChoix
+              libelle="Groupement"
+              value={groupBy}
+              onChange={setGroupBy}
+              className="h-8 text-xs"
+              selectClassName="text-xs"
+              options={[
+                { value: 'family', label: 'Grouper par famille' },
+                { value: 'none', label: 'Tout afficher' },
+              ]}
+            />
+          </div>
         </div>
       </div>
 

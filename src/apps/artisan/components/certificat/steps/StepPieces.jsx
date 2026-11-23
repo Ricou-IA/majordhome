@@ -5,6 +5,7 @@
  * ============================================================================
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FormField, TextInput, TextArea } from '@apps/artisan/components/FormFields';
@@ -109,33 +110,37 @@ export function StepPieces({ formData, onChange }) {
 
       <FormField label="Prochaine intervention préconisée">
         <div className="flex gap-2">
-          <select
-            value={formData.prochaine_intervention ? formData.prochaine_intervention.slice(5, 7) : ''}
-            onChange={(e) => {
-              const year = formData.prochaine_intervention ? formData.prochaine_intervention.slice(0, 4) : String(new Date().getFullYear() + 1);
-              onChange('prochaine_intervention', e.target.value ? `${year}-${e.target.value}` : '');
-            }}
-            className="flex-1 px-3 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors text-sm"
-          >
-            <option value="">Mois...</option>
-            {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => (
-              <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>
-            ))}
-          </select>
-          <select
-            value={formData.prochaine_intervention ? formData.prochaine_intervention.slice(0, 4) : ''}
-            onChange={(e) => {
-              const month = formData.prochaine_intervention ? formData.prochaine_intervention.slice(5, 7) : '01';
-              onChange('prochaine_intervention', e.target.value ? `${e.target.value}-${month}` : '');
-            }}
-            className="w-24 px-3 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors text-sm"
-          >
-            <option value="">Année...</option>
-            {[0, 1, 2, 3].map((offset) => {
-              const y = new Date().getFullYear() + offset;
-              return <option key={y} value={y}>{y}</option>;
-            })}
-          </select>
+          <div className="min-w-0 flex-1">
+            <ListeChoix
+              libelle="Mois de la prochaine intervention"
+              value={formData.prochaine_intervention ? formData.prochaine_intervention.slice(5, 7) : ''}
+              onChange={(v) => {
+                const year = formData.prochaine_intervention ? formData.prochaine_intervention.slice(0, 4) : String(new Date().getFullYear() + 1);
+                onChange('prochaine_intervention', v ? `${year}-${v}` : '');
+              }}
+              options={[
+                { value: '', label: 'Mois...' },
+                ...['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => ({ value: String(i + 1).padStart(2, '0'), label: m })),
+              ]}
+            />
+          </div>
+          <div className="w-28 shrink-0">
+            <ListeChoix
+              libelle="Année de la prochaine intervention"
+              value={formData.prochaine_intervention ? formData.prochaine_intervention.slice(0, 4) : ''}
+              onChange={(v) => {
+                const month = formData.prochaine_intervention ? formData.prochaine_intervention.slice(5, 7) : '01';
+                onChange('prochaine_intervention', v ? `${v}-${month}` : '');
+              }}
+              options={[
+                { value: '', label: 'Année...' },
+                ...[0, 1, 2, 3].map((offset) => {
+                  const y = new Date().getFullYear() + offset;
+                  return { value: y, label: String(y) };
+                }),
+              ]}
+            />
+          </div>
         </div>
       </FormField>
     </div>

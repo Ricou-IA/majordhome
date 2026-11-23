@@ -9,9 +9,10 @@
 //   2. la fenêtre de devis habituelle (CreateDevisModal) s'ouvre sur ce lead.
 // Rien n'est créé tant que l'utilisateur n'a pas validé la fiche ; le lead créé reste si le devis est abandonné
 // (il est dans le pipeline, en « Nouveau »).
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { X, ChevronDown, Loader2, ArrowRight } from 'lucide-react';
+import { X, Loader2, ArrowRight } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useLeadCommercials, useLeadSources, useLeadStatuses } from '@hooks/useLeads';
 import { useOrgSettings, usePennylaneEnabled } from '@hooks/useOrgSettings';
@@ -26,7 +27,6 @@ import { SectionClientLinking } from '../pipeline/LeadFormSections';
 import CreateDevisModal from './CreateDevisModal';
 
 const inputClass = 'w-full px-3 py-2 border border-secondary-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-secondary-50 disabled:text-secondary-500';
-const selectClass = `${inputClass} pr-9 appearance-none bg-white`;
 
 function Champ({ id, label, requis = false, children }) {
   return (
@@ -37,13 +37,8 @@ function Champ({ id, label, requis = false, children }) {
   );
 }
 
-function Liste({ id, value, onChange, children }) {
-  return (
-    <div className="relative">
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={selectClass}>{children}</select>
-      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-    </div>
-  );
+function Liste({ id, value, onChange, options }) {
+  return <ListeChoix id={id} value={value} onChange={onChange} options={options} />;
 }
 
 /**
@@ -191,22 +186,22 @@ export default function NouveauDevisRapideModal({ onClose, onDone }) {
 
           <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-secondary-100">
             <Champ id="ndr-commercial" label="Commercial">
-              <Liste id="ndr-commercial" value={commercialId} onChange={set('commercial_id')}>
-                <option value="">Non assigné</option>
-                {(commercials || []).map((c) => <option key={c.id} value={c.id}>{c.full_name || c.email || c.id}</option>)}
-              </Liste>
+              <Liste
+                id="ndr-commercial" value={commercialId} onChange={set('commercial_id')}
+                options={[{ value: '', label: 'Non assigné' }, ...(commercials || []).map((c) => ({ value: c.id, label: c.full_name || c.email || c.id }))]}
+              />
             </Champ>
             <Champ id="ndr-source" label="Source">
-              <Liste id="ndr-source" value={form.source_id} onChange={set('source_id')}>
-                <option value="">— Source —</option>
-                {(sources || []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </Liste>
+              <Liste
+                id="ndr-source" value={form.source_id} onChange={set('source_id')}
+                options={[{ value: '', label: '— Source —' }, ...(sources || []).map((s) => ({ value: s.id, label: s.name }))]}
+              />
             </Champ>
             <Champ id="ndr-projet" label="Projet">
-              <Liste id="ndr-projet" value={form.project_family_key} onChange={set('project_family_key')}>
-                <option value="">—</option>
-                {projets.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-              </Liste>
+              <Liste
+                id="ndr-projet" value={form.project_family_key} onChange={set('project_family_key')}
+                options={[{ value: '', label: '—' }, ...projets.map((f) => ({ value: f.key, label: f.label }))]}
+              />
             </Champ>
           </section>
         </div>

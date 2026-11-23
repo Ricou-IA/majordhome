@@ -4,6 +4,7 @@
  * Fusionner avec une fiche existante. Règles et droits : RPC equipment_model_review / equipment_model_merge.
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -124,10 +125,12 @@ export default function AppareilAControlerFiche({ fiche, onDone }) {
           <label className="text-xs text-secondary-600">Modèle<input className={INPUT} value={form.model_name} onChange={(e) => setForm({ ...form, model_name: e.target.value })} /></label>
           <label className="text-xs text-secondary-600">Référence fabricant<input className={INPUT} value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} /></label>
           <label className="text-xs text-secondary-600">Type d&apos;équipement
-            <select className={INPUT} value={form.equipment_type_id} onChange={(e) => setForm({ ...form, equipment_type_id: e.target.value })}>
-              <option value="">Non précisé</option>
-              {equipmentTypes.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
+            <ListeChoix
+              libelle="Type d'équipement"
+              value={form.equipment_type_id}
+              onChange={(v) => setForm({ ...form, equipment_type_id: v })}
+              options={[{ value: '', label: 'Non précisé' }, ...equipmentTypes.map((t) => ({ value: t.id, label: t.label }))]}
+            />
           </label>
           {fiche.photo_path && (
             <label className="col-span-2 inline-flex items-center gap-1.5 text-xs text-secondary-600">

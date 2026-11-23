@@ -6,6 +6,7 @@
  * Règles : src/lib/savCloture.js · écriture : savClotureService (via useEntretienSAVMutations).
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo, useState } from 'react';
 import { X, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -98,9 +99,12 @@ export function SAVInterventionFaiteModal({ item, onClose, onDone }) {
             </div>
             <div className="col-span-2 sm:col-span-1">
               <label htmlFor="sif-duree" className="block text-sm font-medium text-secondary-700 mb-1.5">Durée</label>
-              <select id="sif-duree" value={saisie.durationMinutes} onChange={(e) => set('durationMinutes')(Number(e.target.value))} className={`${champ} bg-white`}>
-                {DUREES_CLOTURE.map((m) => <option key={m} value={m}>{libelleDuree(m)}</option>)}
-              </select>
+              <ListeChoix
+                id="sif-duree"
+                value={saisie.durationMinutes}
+                onChange={(v) => set('durationMinutes')(Number(v))}
+                options={DUREES_CLOTURE.map((m) => ({ value: m, label: libelleDuree(m) }))}
+              />
             </div>
           </div>
 

@@ -18,6 +18,7 @@
  * écran serait plus pauvre que celle d'un lead créé normalement.
  */
 
+import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { X, Plus, ChevronDown } from 'lucide-react';
@@ -254,31 +255,27 @@ export function CreateLeadFromQuoteModal({ quote = null, quotes = null, onClose,
               )}
 
               <Field id="commercial" label="Commercial">
-                <select
+                <ListeChoix
                   id="commercial"
                   value={commercialId}
-                  onChange={(e) => setCommercialId(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">Non assigné</option>
-                  {(commercials || []).map((c) => (
-                    <option key={c.id} value={c.id}>{c.full_name || c.email || c.id}</option>
-                  ))}
-                </select>
+                  onChange={setCommercialId}
+                  options={[
+                    { value: '', label: 'Non assigné' },
+                    ...(commercials || []).map((c) => ({ value: c.id, label: c.full_name || c.email || c.id })),
+                  ]}
+                />
               </Field>
 
               <Field id="source" label="Source">
-                <select
+                <ListeChoix
                   id="source"
                   value={sourceId}
-                  onChange={(e) => setSourceId(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">— Source —</option>
-                  {(sources || []).map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
+                  onChange={setSourceId}
+                  options={[
+                    { value: '', label: '— Source —' },
+                    ...(sources || []).map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+                />
               </Field>
 
               <Field id="equipment" label="Équipement concerné">
