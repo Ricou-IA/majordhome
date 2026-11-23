@@ -1,7 +1,7 @@
 # Recette — refonte de l'interface, phase 3 (Accueil, liste Clients, fiche client)
 
 - **Adresse testée** : https://majordhome.vercel.app
-- **Commit déployé** : à compléter à la mise en ligne
+- **Commit déployé** : `5c075c6d` (2026-11-23)
 - **Comptes** : celui d'Eric (Mayer Énergie, administrateur) ; pour A5 et F9, un compte technicien ou commercial s'il est sous la main
 - **Légende** : `[x]` validé · `[!]` anomalie · `[-]` non testable ou écarté, avec la raison
 - **Règle** : un test à la fois. Un point est coché après le retour d'Eric et la vérification.
