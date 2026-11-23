@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { plageAccueil, journeeAffichee, compterRdv, personnesDuRdv, lieuDuRdv, lignesATraiter, rdvEnCours, sousTitreAccueil, variation } from '../src/lib/accueil.js';
+import { plageAccueil, journeeAffichee, compterRdv, personnesDuRdv, lieuDuRdv, lignesATraiter, rdvEnCours, sousTitreAccueil } from '../src/lib/accueil.js';
 
 const rdv = (date, heure, extra = {}) => ({ scheduled_date: date, scheduled_start: heure, status: 'scheduled', appointment_type: 'maintenance', ...extra });
 
@@ -134,21 +134,12 @@ test('rdvEnCours : vrai entre le début et la fin, le jour même', () => {
   assert.equal(rdvEnCours(null, new Date()), false);
 });
 
-test('sousTitreAccueil : date, rendez-vous et leads à rappeler, parties inconnues omises', () => {
+test('sousTitreAccueil : date, rendez-vous et leads à contacter, parties inconnues omises', () => {
   const d = 'Lundi 23 novembre';
-  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 4, aRappeler: 9 }), 'Lundi 23 novembre · 4 rendez-vous et 9 leads à rappeler');
+  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 4, aRappeler: 9 }), 'Lundi 23 novembre · 4 rendez-vous et 9 leads à contacter');
   assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 1, aRappeler: null }), 'Lundi 23 novembre · 1 rendez-vous');
   assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: null, aRappeler: null }), 'Lundi 23 novembre');
-  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 0, aRappeler: 1 }), 'Lundi 23 novembre · aucun rendez-vous et 1 lead à rappeler');
-  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: null, aRappeler: 0 }), 'Lundi 23 novembre · aucun lead à rappeler');
-  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 1200, aRappeler: 2 }), 'Lundi 23 novembre · 1 200 rendez-vous et 2 leads à rappeler');
-});
-
-test('variation : pourcentage arrondi et sens, rien sans base ou sans écart', () => {
-  assert.deepEqual(variation(11200, 10000), { pourcent: 12, sens: 'hausse' });
-  assert.deepEqual(variation(8000, 10000), { pourcent: 20, sens: 'baisse' });
-  assert.equal(variation(5000, 0), null);
-  assert.equal(variation(5000, null), null);
-  assert.equal(variation(null, 5000), null);
-  assert.equal(variation(10010, 10000), null);
+  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 0, aRappeler: 1 }), 'Lundi 23 novembre · aucun rendez-vous et 1 lead à contacter');
+  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: null, aRappeler: 0 }), 'Lundi 23 novembre · aucun lead à contacter');
+  assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 1200, aRappeler: 2 }), 'Lundi 23 novembre · 1 200 rendez-vous et 2 leads à contacter');
 });

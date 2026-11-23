@@ -164,7 +164,8 @@ export function rdvEnCours(rdv, maintenant) {
 }
 
 /**
- * Sous-titre de l'accueil : « Lundi 23 novembre · 4 rendez-vous et 9 leads à rappeler ».
+ * Sous-titre de l'accueil : « Lundi 23 novembre · 4 rendez-vous et 9 leads à contacter » (leads
+ * « Nouveau », même chiffre et même mot que la ligne « à contacter » d'À traiter).
  * Une partie inconnue (`null` : chargement, échec, pas le droit) est omise, jamais remplacée par 0.
  * @param {{ dateDuJour: string, rdvAujourdhui: number|null, aRappeler: number|null }} p
  * @returns {string}
@@ -174,21 +175,7 @@ export function sousTitreAccueil({ dateDuJour, rdvAujourdhui = null, aRappeler =
   const parties = [];
   if (rdvAujourdhui !== null && rdvAujourdhui !== undefined) parties.push(`${nombre(rdvAujourdhui)} rendez-vous`);
   if (aRappeler !== null && aRappeler !== undefined) {
-    parties.push(`${nombre(aRappeler)} ${pluriel(aRappeler, 'lead')} à rappeler`);
+    parties.push(`${nombre(aRappeler)} ${pluriel(aRappeler, 'lead')} à contacter`);
   }
   return parties.length ? `${dateDuJour} · ${parties.join(' et ')}` : dateDuJour;
-}
-
-/**
- * Variation d'un chiffre par rapport à la période précédente, pour la pastille d'un chiffre clé.
- * @param {number|null|undefined} actuel
- * @param {number|null|undefined} precedent
- * @returns {{ pourcent: number, sens: 'hausse'|'baisse' }|null}  null sans base de comparaison
- *   (précédent absent ou nul) ou sans écart : on n'affiche pas « +∞ % » ni « 0 % ».
- */
-export function variation(actuel, precedent) {
-  if (typeof actuel !== 'number' || typeof precedent !== 'number' || !(precedent > 0)) return null;
-  const pourcent = Math.round(((actuel - precedent) / precedent) * 100);
-  if (pourcent === 0) return null;
-  return { pourcent: Math.abs(pourcent), sens: pourcent > 0 ? 'hausse' : 'baisse' };
 }

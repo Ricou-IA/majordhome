@@ -24,9 +24,9 @@
 
 ### Accueil
 
-- [ ] **A1. L'en-tête.** Ce que vous devez voir : « Bonjour, Eric », puis « Lundi 23 novembre · N rendez-vous et N leads à rappeler » (vos chiffres) ; à droite « Ouvrir le planning » (blanc) et « Nouveau lead » (cuivre). « Nouveau lead » ouvre la fenêtre de création du lead.
+- [ ] **A1. L'en-tête.** Ce que vous devez voir : « Bonjour, Eric », puis « Lundi 23 novembre · N rendez-vous et N leads à contacter » (vos chiffres) ; à droite « Ouvrir le planning » (blanc) et « Nouveau lead » (cuivre). « Nouveau lead » ouvre la fenêtre de création du lead.
 - [ ] **A2. Ma journée.** Chaque RDV montre l'heure, le client, le type, la ville, les personnes avec un rond à leurs initiales dans leur couleur du planning, et un bouton d'itinéraire à droite (ouvre Waze). Pendant un RDV en cours : la ligne est sur fond cuivre très clair, avec « En cours ».
-- [ ] **A3. Chiffres clés.** Les mêmes chiffres qu'avant. Sous « CA signé », une pastille verte ou rouge « 12 % vs oct. » (absente si le mois précédent était à 0).
+- [ ] **A3. Chiffres clés.** Les mêmes chiffres qu’avant, dans des cartes à grand chiffre (pas de comparaison au mois précédent : le mois en cours n’est jamais complet).
 - [ ] **A4. À traiter et relances.** Le titre « À traiter · N actions », sans phrase dessous. En dessous, « Relances prioritaires » : trois devis au plus, avec le nom, le montant HT et « Sans relance depuis N j ». Un clic ouvre la fiche du lead.
 - [ ] **A5. Un rôle sans pipeline.** Avec un compte technicien : pas de « Nouveau lead », pas de relances, l'accueil reste lisible.
 

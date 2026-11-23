@@ -102,7 +102,7 @@ export function ClientsTableau({
         {clients.length.toLocaleString('fr-FR')} sur {Math.max(totalCount, clients.length).toLocaleString('fr-FR')}
       </span>
       {(hasMore || chargementSuite) && (
-        <Button type="button" variant="secondary" size="sm" onClick={onChargerPlus} disabled={chargementSuite} className="h-11 md:h-8">
+        <Button type="button" variant="secondary" size="sm" onClick={onChargerPlus} disabled={chargementSuite} className="h-11">
           {chargementSuite ? 'Chargement…' : 'Charger plus'}
           {!chargementSuite && <ChevronDown aria-hidden="true" />}
         </Button>

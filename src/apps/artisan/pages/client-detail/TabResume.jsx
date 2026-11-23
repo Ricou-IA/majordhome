@@ -60,7 +60,7 @@ const Chargement = () => (
 );
 
 const Erreur = ({ children }) => (
-  <p className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-body-sm text-red-800">
+  <p className="flex items-start gap-2 rounded-lg border border-st-alerte/20 bg-st-alerte-bg p-3 text-body-sm text-st-alerte">
     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
     {children}
   </p>

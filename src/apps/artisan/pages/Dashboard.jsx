@@ -28,10 +28,10 @@ import { chantierKeys } from '@hooks/cacheKeys';
 import { supabase } from '@lib/supabaseClient';
 import { SEUIL_RELANCE_JOURS } from '@lib/pipelineDashboard';
 import { cumulPeriode, formatCa } from '@/lib/planningCa';
-import { plageAccueil, journeeAffichee, compterRdv, lignesATraiter, sousTitreAccueil, variation } from '@/lib/accueil';
+import { plageAccueil, journeeAffichee, compterRdv, lignesATraiter, sousTitreAccueil } from '@/lib/accueil';
 import { PageHeader } from '@components/ui/page-header';
 import { KpiCard } from '@components/ui/kpi-card';
-import { entier, euros, libelleMoisCourt } from '@components/pipeline/dashboard/format';
+import { entier, euros } from '@components/pipeline/dashboard/format';
 import { AccueilJournee } from '@apps/artisan/components/dashboard/AccueilJournee';
 import { AccueilATraiter } from '@apps/artisan/components/dashboard/AccueilATraiter';
 import { AccueilACorriger } from '@apps/artisan/components/dashboard/AccueilACorriger';
@@ -135,19 +135,16 @@ export default function Dashboard() {
     });
   }
   if (dashboard) {
-    const { actuel, precedent } = dashboard.entreprise;
+    // Pas de variation sur le mois précédent : le mois en cours n'est jamais complet à l'accueil,
+    // la comparer à un mois entier montrerait une baisse tous les débuts de mois.
+    const { actuel } = dashboard.entreprise;
     const { total } = dashboard.portefeuille;
     const nomDuMois = new Date().toLocaleDateString('fr-FR', { month: 'long' });
-    const ecart = variation(actuel.ca, precedent?.ca);
-    const moisPrecedent = dashboard.periode?.precedente?.length === 1 ? libelleMoisCourt(dashboard.periode.precedente[0]) : null;
     reperes.push({
       key: 'ca-signe',
       label: `CA signé HT en ${nomDuMois}`,
       value: euros(actuel.ca),
       sub: `${entier(actuel.ventes)} ${actuel.ventes > 1 ? 'ventes signées' : 'vente signée'}`,
-      delta: ecart && moisPrecedent
-        ? { valeur: `${ecart.pourcent} % vs ${moisPrecedent}`, sens: ecart.sens }
-        : undefined,
     });
     reperes.push({
       key: 'devis',

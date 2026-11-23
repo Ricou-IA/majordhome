@@ -4,6 +4,7 @@
  * Affichage seul. Une lecture en échec se dit, elle ne s'affiche jamais « aucun RDV ».
  */
 
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Loader2, MapPin, Navigation } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@services/appointments.service';
 import { Vide } from '@components/pipeline/dashboard/Tableau';
@@ -12,6 +13,16 @@ import { Avatar } from '@components/ui/avatar';
 import { Tag } from '@components/ui/tag';
 import { LienWaze } from '@apps/artisan/components/shared/LienWaze';
 import { personnesDuRdv, lieuDuRdv, rdvEnCours } from '@/lib/accueil';
+
+/** L'heure, rafraîchie chaque minute : la ligne « En cours » suit l'horloge, page ouverte. */
+function useMaintenant() {
+  const [maintenant, setMaintenant] = useState(() => new Date());
+  useEffect(() => {
+    const minuterie = setInterval(() => setMaintenant(new Date()), 60_000);
+    return () => clearInterval(minuterie);
+  }, []);
+  return maintenant;
+}
 
 const jourEnClair = (iso) => {
   const [a, m, j] = iso.split('-').map(Number);
@@ -65,7 +76,7 @@ function LigneRdv({ rdv, equipe, maintenant }) {
             address={rdv.address}
             postalCode={rdv.postal_code}
             city={rdv.city}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-500 hover:bg-secondary-100 hover:text-secondary-900 lg:h-9 lg:w-9"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-500 hover:bg-secondary-100 hover:text-secondary-900"
           >
             <Navigation className="h-4 w-4" aria-hidden="true" />
             <span className="sr-only">Itinéraire</span>
@@ -87,7 +98,7 @@ function LigneRdv({ rdv, equipe, maintenant }) {
 export function AccueilJournee({ journee, equipe, isLoading, error, finDeLecture }) {
   const enConges = [...new Map(journee.conges.flatMap((c) => personnesDuRdv(c, equipe)).map((p) => [p.cle, p])).values()];
   const nombre = journee.rdvs.length;
-  const maintenant = new Date();
+  const maintenant = useMaintenant();
 
   let titre = 'Aujourd’hui';
   let precision = null;
