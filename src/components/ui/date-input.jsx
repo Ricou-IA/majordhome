@@ -29,8 +29,10 @@ import {
  * @param {string} [props.libelle]  nom lu par un lecteur d'écran
  * @param {string} [props.className]
  * @param {boolean} [props.autoFocus]
+ * @param {boolean} [props.viderSurRefus]  vrai par défaut : une saisie refusée vide la valeur. Faux pour un
+ *   champ qui enregistre à chaque changement (sans formulaire ni confirmation) : la valeur reste, le champ est en rouge.
  */
-export function DateInput({ value, onChange, min, max, disabled = false, required = false, id, libelle, className, autoFocus = false }) {
+export function DateInput({ value, onChange, min, max, disabled = false, required = false, id, libelle, className, autoFocus = false, viderSurRefus = true }) {
   const { isPhone } = useDeviceClass();
   const idAuto = useId();
   const idChamp = id || idAuto;
@@ -64,7 +66,7 @@ export function DateInput({ value, onChange, min, max, disabled = false, require
   const refuser = (message, texte) => {
     setErreur(message);
     setTexteRefuse(texte ?? null);
-    if (value) onChange?.('');
+    if (value && viderSurRefus) onChange?.('');
     return false;
   };
   const valider = (iso, texte) => {

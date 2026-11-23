@@ -3,6 +3,7 @@ import { Check, ChevronDown, Search } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from './popover';
 import { cn } from '@lib/utils';
 import { avecRecherche, filtrerOptions, libelleDe } from '@/lib/listeOptions';
+import { useDeviceClass } from '@hooks/useDeviceClass';
 
 /**
  * Liste déroulante stylée (DA § 7 « Plus de `<select>` natif ») : champ de recherche dès
@@ -29,6 +30,9 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
   const [actif, setActif] = useState(0);
   const listeId = useId();
   const listeRef = useRef(null);
+  // Sur un appareil tenu en main, le curseur dans la recherche sortirait le clavier, qui cache la liste :
+  // le focus va à la liste, la recherche s'ouvre d'un toucher.
+  const { isMobileDevice } = useDeviceClass();
 
   const recherche = avecRecherche(options);
   const visibles = useMemo(() => filtrerOptions(options, saisie), [options, saisie]);
@@ -106,7 +110,7 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
             className,
           )}
         >
-          <span className={cn('min-w-0 truncate', libelle_ === null && 'text-secondary-400')}>
+          <span title={libelle_ ?? undefined} className={cn('min-w-0 truncate', libelle_ === null && 'text-secondary-400')}>
             {libelle_ ?? placeholder}
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 text-secondary-400" aria-hidden="true" />
@@ -116,7 +120,7 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
         align="start"
         // Au-dessus de toute fenêtre de l'application (les plus hautes sont à z-[80]).
         className="z-[90] w-[var(--radix-popover-trigger-width)] min-w-[12rem] p-1 shadow-lg"
-        onOpenAutoFocus={(e) => { if (!recherche) { e.preventDefault(); listeRef.current?.focus(); } }}
+        onOpenAutoFocus={(e) => { if (!recherche || isMobileDevice) { e.preventDefault(); listeRef.current?.focus(); } }}
       >
         {recherche && (
           <div className="relative mb-1">
@@ -139,7 +143,7 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
           role="listbox"
           tabIndex={-1}
           aria-label={libelle}
-          onKeyDown={recherche ? undefined : auClavier}
+          onKeyDown={auClavier}
           className="max-h-[320px] overflow-y-auto outline-none"
         >
           {visibles.length === 0 && (
@@ -164,7 +168,7 @@ export function Combobox({ value, onChange, options = [], placeholder = 'Choisir
                   option.disabled && 'cursor-not-allowed opacity-50',
                 )}
               >
-                <span className="min-w-0 truncate">{option.label}</span>
+                <span className="min-w-0 break-words">{option.label}</span>
                 {choisie && <Check className="h-4 w-4 shrink-0 text-primary-600" aria-hidden="true" />}
               </li>
             );

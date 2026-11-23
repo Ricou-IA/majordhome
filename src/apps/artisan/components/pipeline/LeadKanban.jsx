@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, UserCircle, Tag, FileText, Kanban } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, UserCircle, Tag, FileText, Kanban, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeadStatuses, useLeadCommercials, useLeadSources, useLeadMutations } from '@hooks/useLeads';
@@ -292,7 +292,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
   const { moveToLongTerm, isMoving: isMovingToLongTerm } = useLongTermMutations();
 
   // Phase 1 — cartes Kanban multi-devis (1 lead peut produire 1-2 cartes)
-  const { cards, isLoading: cardsLoading } = useKanbanCards();
+  const { cards, isLoading: cardsLoading, error: cardsError, refetch: refetchCards } = useKanbanCards();
 
   // Map { userId -> { initials, name, colorIndex } } pour les badges
   const commercialsMap = useMemo(() => {
@@ -315,6 +315,8 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
 
   const [allLeads, setAllLeads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Lecture des leads en échec : le tableau ne dit jamais « aucun lead » sur une liste qu'il n'a pas pu lire.
+  const [leadsError, setLeadsError] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedCommercialId, setSelectedCommercialId] = useState(initialCommercialId);
   const [selectedSourceId, setSelectedSourceId] = useState('');
@@ -349,7 +351,9 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
       const { data, error } = await leadsService.getAllLeads({ orgId, filters: dateFilters });
       if (error) throw error;
       setAllLeads(data || []);
+      setLeadsError(false);
     } catch (err) {
+      setLeadsError(true);
       logger.error('[LeadKanban] fetchLeads error:', err);
       toast.error('Erreur chargement des leads');
     } finally {
@@ -380,7 +384,9 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
         const { data, error } = await leadsService.getAllLeads({ orgId, filters: dateFilters });
         if (error) throw error;
         setAllLeads(data || []);
+        setLeadsError(false);
       } catch (err) {
+        setLeadsError(true);
         logger.error('[LeadKanban] refresh error:', err);
       }
     };
@@ -805,7 +811,14 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
       searchFilter={searchFilter}
       columnAmount={columnAmount}
       colonnesRepliables={[...TERMINAL_COLUMN_KEYS]}
-      emptyMessage="Aucun lead" vide={{ icon: Kanban, message: 'Aucun lead dans le tableau.', action: onNewLead ? { label: 'Nouveau lead', icon: Plus, onClick: onNewLead } : undefined }}
+      emptyMessage="Aucun lead"
+      vide={
+        leadsError || cardsError
+          ? { icon: AlertTriangle, message: 'Les leads n’ont pas pu être chargés.', action: { label: 'Réessayer', icon: RefreshCw, onClick: () => { fetchLeads(); refetchCards(); } } }
+          : selectedMonth || selectedCommercialId || selectedSourceId
+            ? { icon: Kanban, message: 'Aucun lead pour ces filtres.', detail: 'Changez le mois, le commercial ou la source.' }
+            : { icon: Kanban, message: 'Aucun lead dans le tableau.', action: onNewLead ? { label: 'Nouveau lead', icon: Plus, onClick: onNewLead } : undefined }
+      }
       headerLeft={
         <p className="text-sm text-secondary-500">
           {allLeads.length} lead{allLeads.length !== 1 ? 's' : ''} actif{allLeads.length !== 1 ? 's' : ''}

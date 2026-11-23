@@ -20,6 +20,8 @@ function DatePrevueInput({ planning, onSave }) {
           onSave(planning.code, v || null);
         }}
         className="w-48"
+        // Enregistré à chaque changement : une date mal tapée ne doit jamais effacer la date prévue en base.
+        viderSurRefus={false}
       />
     </label>
   );

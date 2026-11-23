@@ -9,7 +9,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import { Loader2, RefreshCw, HardHat } from 'lucide-react';
+import { Loader2, RefreshCw, HardHat, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -34,7 +34,7 @@ export function ChantierKanban() {
   const orgId = organization?.id;
   const { can, effectiveRole } = useCanAccess();
 
-  const { chantiers, isLoading, refresh } = useChantiers(orgId);
+  const { chantiers, isLoading, error: chantiersError, refresh } = useChantiers(orgId);
   // Après-vente des chantiers réceptionnés : contrats et avis déjà demandés (undefined = pas encore connus).
   const listesApresVente = useChantiersApresVente(orgId);
   const { demanderAvis, envoiEnCoursPour } = useDemanderAvisPose();
@@ -138,7 +138,13 @@ export function ChantierKanban() {
       columnAmount={columnAmount}
       headerExtra={headerExtra}
       emptyMessage="Aucun chantier"
-      vide={{ icon: HardHat, message: 'Aucun chantier en cours.', detail: 'Un chantier naît d’un devis signé dans le pipeline.' }}
+      vide={
+        chantiersError
+          ? { icon: AlertTriangle, message: 'Les chantiers n’ont pas pu être chargés.', action: { label: 'Réessayer', icon: RefreshCw, onClick: refresh } }
+          : (chantiers?.length || 0) > 0
+            ? { icon: HardHat, message: 'Aucun chantier à afficher pour votre rôle.' }
+            : { icon: HardHat, message: 'Aucun chantier en cours.', detail: 'Un chantier naît d’un devis signé dans le pipeline.' }
+      }
       headerRight={
         <button
           onClick={refresh}
