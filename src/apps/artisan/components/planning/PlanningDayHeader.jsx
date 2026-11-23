@@ -11,6 +11,24 @@ import { formatCa } from '@/lib/planningCa';
 import { JourneeEtatChips } from './JourneeEtatChips';
 
 /**
+ * Libellé du jour (« lun. 23 nov. ») ; aujourd'hui, le numéro est dans une pastille
+ * cuivre (« vous êtes ici »). Pastille sans marge verticale : la ligne garde sa
+ * hauteur, la réserve de l'en-tête (hauteurEnTeteReservee) reste exacte.
+ */
+function TexteDuJour({ texte, aujourdhui }) {
+  const morceaux = aujourdhui ? String(texte).match(/^(\D*)(\d+)(.*)$/) : null;
+  if (!morceaux) return <span>{texte}</span>;
+  const [, avant, numero, apres] = morceaux;
+  return (
+    <span>
+      {avant}
+      <span className="rounded-full bg-primary-600 px-1.5 text-white">{numero}</span>
+      {apres}
+    </span>
+  );
+}
+
+/**
  * @param {object} props
  * @param {string} props.texte  libellé du jour (FullCalendar)
  * @param {string} props.date   ISO `YYYY-MM-DD`
@@ -26,7 +44,7 @@ export function PlanningDayHeader({ texte, date, lignes, ca, caError, filtreEqui
   return (
     <div className="mdh-day-head flex w-full flex-col items-start">
       <div className="flex w-full items-baseline justify-between gap-2">
-        <span>{texte}</span>
+        <TexteDuJour texte={texte} aujourdhui={date === new Date().toLocaleDateString('fr-CA')} />
         {caError && (
           <span className="font-normal normal-case text-secondary-400" title={`CA HT programmé indisponible (${caError.message || 'échec du chargement'})`}>
             CA indisponible

@@ -2,8 +2,8 @@
  * CalendarToolbar.jsx - Majord'home Artisan
  * ============================================================================
  * Barre du haut du Planning : navigation dans les dates, semaine, titre, CA HT
- * programmé de la période, recherche d'un client, choix de la vue, impression
- * et « Nouveau RDV ». Affichage seul : tout vient de Planning.jsx.
+ * programmé de la période, recherche d'un client, choix de la vue, menu « … »
+ * (Rafraîchir, Imprimer) et « Nouveau RDV ». Affichage seul : tout vient de Planning.jsx.
  * ============================================================================
  */
 
@@ -11,6 +11,15 @@ import { Plus, ChevronLeft, ChevronRight, Loader2, RefreshCw, Printer } from 'lu
 import { formatCa } from '@/lib/planningCa';
 import { jourDOuverture } from '@/lib/planningGestes';
 import { SegmentedControl } from '@components/ui/segmented-control';
+import { Button } from '@components/ui/button';
+import { Tag } from '@components/ui/tag';
+import { MenuActions } from '@components/ui/menu-actions';
+import { useDeviceClass } from '@hooks/useDeviceClass';
+import { cn } from '@lib/utils';
+
+// Icônes animées des entrées du menu « … » pendant un chargement ou une impression.
+const RafraichirEnCours = ({ className }) => <RefreshCw className={cn(className, 'animate-spin')} />;
+const ImpressionEnCours = ({ className }) => <Loader2 className={cn(className, 'animate-spin')} />;
 
 const VUES_BUREAU = [
   { value: 'timeGridDay', label: 'Jour' },
@@ -62,19 +71,30 @@ export function CalendarToolbar({
   const goNext = () => calendarRef.current?.getApi().next();
 
   const views = isMobileDevice ? VUES_MOBILE : VUES_BUREAU;
+  const { isPhone } = useDeviceClass();
 
-  // Sous `sm` (téléphone) : titre sur sa ligne, puis navigation et actions ;
-  // Imprimer disparaît (PDF d'une personne, geste de bureau).
+  // Rafraîchir et Imprimer vont dans le menu « … ». Imprimer n'y est pas sur
+  // téléphone (PDF d'une personne, geste de bureau) ; grisé, il dit pourquoi dans
+  // son libellé (une entrée désactivée ne montre pas d'infobulle au survol).
+  const actionsMenu = [
+    { label: 'Rafraîchir', icon: isLoading ? RafraichirEnCours : RefreshCw, onClick: onRefresh, disabled: isLoading },
+    !isPhone && {
+      label: printHint ? `Imprimer — ${printHint}` : isPrinting ? 'Impression…' : printLabel || 'Imprimer',
+      icon: isPrinting ? ImpressionEnCours : Printer,
+      onClick: onPrint,
+      disabled: !!printHint || isPrinting,
+    },
+  ];
+
+  // Sous `sm` (téléphone) : titre sur sa ligne, puis navigation et actions. Dès `xl`
+  // (1 440 px, menu ouvert), tout tient sur une ligne : la recherche se resserre.
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
       {/* Navigation dates */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={goToday}
-          className="h-10 sm:h-auto px-3 py-1.5 text-sm font-medium bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors"
-        >
+        <Button variant="secondary" size="sm" onClick={goToday} className="max-sm:h-10">
           Aujourd&apos;hui
-        </button>
+        </Button>
         <div className="flex items-center">
           <button
             onClick={goPrev}
@@ -92,63 +112,40 @@ export function CalendarToolbar({
           </button>
         </div>
         {weekNumber != null && (
-          <span
-            className="px-2 py-1 text-sm font-semibold bg-blue-50 text-blue-700 rounded-md shrink-0"
-            title={`Semaine ${weekNumber}`}
-          >
-            S{weekNumber}
+          <span title={`Semaine ${weekNumber}`} className="shrink-0">
+            <Tag className="font-semibold tabular-nums">S{weekNumber}</Tag>
           </span>
         )}
-        <h2 className="text-base sm:text-lg font-semibold text-secondary-900 sm:min-w-[200px] first-letter:uppercase">
+        <h2 className="font-display text-count text-secondary-900 whitespace-nowrap sm:min-w-[200px] xl:min-w-0 first-letter:uppercase">
           {title}
         </h2>
         {caCumul > 0 && (
           <span
-            className="px-2 py-1 text-sm font-semibold tabular-nums bg-secondary-100 text-secondary-900 rounded-md shrink-0"
-            title={`CA HT programmé sur la période affichée, ${caCumulPartiel ? 'part des personnes affichées (filtre équipe actif)' : 'tous techniciens confondus'}.\nDevis validés des installations (au prorata des journées posées) + contrats d’entretien. SAV non compté.`}
+            className="shrink-0"
+            title={`CA HT programmé sur la période affichée, ${caCumulPartiel ? 'part des personnes affichées (filtre équipe actif)' : 'tous techniciens confondus'}.
+Devis validés des installations (au prorata des journées posées) + contrats d’entretien. SAV non compté.`}
           >
-            {formatCa(caCumul)} HT
+            <Tag className="font-semibold tabular-nums text-secondary-900">{formatCa(caCumul)} HT</Tag>
           </span>
         )}
       </div>
 
       {/* Recherche d'un client — sur la ligne de la navigation, entre les dates et les actions */}
-      {search && <div className="sm:flex-1 sm:min-w-[14rem] sm:max-w-md">{search}</div>}
+      {search && <div className="sm:flex-1 sm:min-w-[14rem] xl:min-w-[8rem] sm:max-w-md">{search}</div>}
 
       {/* Actions */}
       <div className="flex items-center gap-2 flex-wrap">
         {/* Sélecteur de vue */}
         <SegmentedControl value={currentView} onChange={onViewChange} options={views} label="Vue du planning" />
 
-        <button
-          onClick={onRefresh}
-          disabled={isLoading}
-          className="h-10 w-10 flex items-center justify-center text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
-          title="Rafraîchir"
-          aria-label="Rafraîchir le planning"
-        >
-          <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
-        </button>
-
-        <button
-          onClick={onPrint}
-          disabled={!!printHint || isPrinting}
-          className="hidden sm:inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={printHint || printLabel}
-        >
-          {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-          Imprimer
-        </button>
+        <MenuActions libelle="Autres actions du planning" actions={actionsMenu} className="max-sm:h-10 max-sm:w-10" />
 
         {onAddEvent && (
-          <button
-            onClick={onAddEvent}
-            className="inline-flex items-center gap-2 h-10 px-3 sm:px-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
+          <Button variant="primary" onClick={onAddEvent} className="max-sm:h-10 max-sm:px-3">
+            <Plus aria-hidden="true" />
             <span className="hidden sm:inline">Nouveau RDV</span>
             <span className="sm:hidden">RDV</span>
-          </button>
+          </Button>
         )}
       </div>
     </div>

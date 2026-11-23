@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  chargeDuJour, joursDeLaPlage, lignesDeCharge, lignesMaxParJour, hauteurEnTeteReservee, panneauDeLigne, sortJourneeDemandee,
+  chargeDuJour, joursDeLaPlage, lignesDeCharge, lignesMaxParJour, hauteurEnTeteReservee, panneauDeLigne, sortJourneeDemandee, tonEtatJournee,
 } from '../src/lib/planningCharge.js';
 
 const SEMAINE = { monday: { active: true, start: '08:00', end: '17:00' }, tuesday: { active: true, start: '08:00', end: '17:00' },
@@ -195,4 +195,19 @@ test('lignesMaxParJour : hauteur d’en-tête à réserver', () => {
   lignes.set('2026-11-09|luc', { date: '2026-11-09' });
   assert.equal(hauteurEnTeteReservee(lignes), 105);
   assert.equal(hauteurEnTeteReservee(new Map()), null);
+});
+
+test('tonEtatJournee : un ton de statut par état, neutre pour tout le reste', () => {
+  assert.equal(tonEtatJournee('vide'), 'neutre');
+  assert.equal(tonEtatJournee('ouverte'), 'ok');
+  assert.equal(tonEtatJournee('pleine'), 'attente');
+  // Figée = info (bleu) : le violet est réservé à « facturé » sur le planning.
+  assert.equal(tonEtatJournee('figee'), 'info');
+  assert.equal(tonEtatJournee('a_arbitrer'), 'alerte');
+  assert.equal(tonEtatJournee('manuelle'), 'neutre');
+  assert.equal(tonEtatJournee('sans_etat'), 'neutre');
+  assert.equal(tonEtatJournee('attente'), 'neutre');
+  assert.equal(tonEtatJournee('etat_futur'), 'neutre');
+  assert.equal(tonEtatJournee(undefined), 'neutre');
+  assert.equal(tonEtatJournee(null), 'neutre');
 });

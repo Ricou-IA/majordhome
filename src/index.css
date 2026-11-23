@@ -486,6 +486,20 @@ html[data-device-class="tablet"] .mdh-kanban-col {
   @apply bg-secondary-50 text-secondary-600 font-semibold text-xs uppercase;
 }
 
+/* Aujourd'hui (« vous êtes ici », le cuivre) : en-tête du jour en cuivre, couleur
+   seulement — aucune taille ne change, la hauteur réservée (--mdh-head-h) reste exacte.
+   Avec la charge par technicien, le numéro du jour est en plus dans une pastille
+   (PlanningDayHeader). */
+.fc .fc-col-header-cell.fc-day-today {
+  @apply text-primary-700;
+}
+
+/* Trait « maintenant » de la grille horaire en cuivre (ligne et flèche : FullCalendar
+   lit cette variable pour l'une et l'autre, la flèche garde ses bords transparents). */
+.fc {
+  --fc-now-indicator-color: theme('colors.primary.600');
+}
+
 /* En-tête de jour avec charge par technicien (Planning.jsx, .mdh-day-head) : le
    contenu occupe toute la largeur de la colonne — une ligne par technicien, le
    chiffre du jour calé à droite. Sans cette règle le coussin FullCalendar est

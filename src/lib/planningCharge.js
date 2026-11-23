@@ -209,6 +209,24 @@ export function hauteurEnTeteReservee(lignes) {
 }
 
 /**
+ * Ton de statut d'une ligne de charge (puces de JourneeEtatChips). Le cuivre n'est
+ * jamais un statut ; « Figée » est en bleu (info) parce que le violet est réservé
+ * à « facturé » sur le planning. Tout état sans verdict (hors tournées, jour passé,
+ * chargement) ou inconnu est neutre.
+ * @param {string|null|undefined} etat
+ * @returns {'neutre'|'info'|'ok'|'attente'|'alerte'}
+ */
+export function tonEtatJournee(etat) {
+  switch (etat) {
+    case 'ouverte': return 'ok';
+    case 'pleine': return 'attente';
+    case 'figee': return 'info';
+    case 'a_arbitrer': return 'alerte';
+    default: return 'neutre';
+  }
+}
+
+/**
  * Panneau qu'ouvre le clic sur une ligne de charge : la feuille de route seule pour
  * une journée d'interventions que le moteur ne juge pas (technicien hors tournées,
  * jour passé), le panneau de remplissage sinon.

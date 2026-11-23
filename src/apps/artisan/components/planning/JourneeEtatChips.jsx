@@ -18,21 +18,27 @@
 import { Lock, AlertTriangle } from 'lucide-react';
 import { LIBELLES_ETAT } from '@/lib/tournee/etat.js';
 import { formatCa } from '@/lib/planningCa';
+import { tonEtatJournee } from '@/lib/planningCharge';
 
-const STYLES = {
-  vide: 'bg-secondary-50 text-secondary-500 border-secondary-200',
-  ouverte: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  pleine: 'bg-amber-50 text-amber-700 border-amber-200',
-  figee: 'bg-violet-50 text-violet-700 border-violet-200',
-  a_arbitrer: 'bg-red-50 text-red-700 border-red-200',
-  // Journée que la machine ne juge pas — technicien hors tournées (`manuelle`),
-  // jour passé ou non travaillé (`sans_etat`) : la personne, sa zone et son chiffre,
-  // sans libellé (« À la main » n'apprenait rien, Eric 2026-11-15).
-  manuelle: 'bg-white text-secondary-600 border-secondary-200',
-  sans_etat: 'bg-white text-secondary-600 border-secondary-200',
-  // Réponse en cours (RDV, techniciens ou verdict du moteur) : le nom seul, la place est tenue.
-  attente: 'bg-white text-secondary-400 border-secondary-100',
+// Couleurs seulement : tailles et interligne des puces sont tenus par
+// hauteurEnTeteReservee (planningCharge.js). Ton d'un état = tonEtatJournee.
+// Classes écrites en entier (Tailwind ne lit pas une classe interpolée).
+// Journée que la machine ne juge pas — technicien hors tournées (`manuelle`), jour
+// passé ou non travaillé (`sans_etat`) : neutre et sans libellé (« À la main »
+// n'apprenait rien, Eric 2026-11-15).
+const STYLES_TON = {
+  neutre: 'bg-st-neutre-bg text-st-neutre border-st-neutre/20',
+  info: 'bg-st-info-bg text-st-info border-st-info/20',
+  ok: 'bg-st-ok-bg text-st-ok border-st-ok/20',
+  attente: 'bg-st-attente-bg text-st-attente border-st-attente/20',
+  alerte: 'bg-st-alerte-bg text-st-alerte border-st-alerte/20',
 };
+// Réponse en cours (RDV, techniciens ou verdict du moteur) : le nom seul, la place
+// est tenue, en neutre clair pour ne pas se lire comme un état.
+const STYLE_ATTENTE = 'bg-white text-secondary-400 border-secondary-100';
+
+/** Classes de couleur d'une puce selon l'état de la journée. */
+const styleEtat = (etat) => (etat === 'attente' ? STYLE_ATTENTE : STYLES_TON[tonEtatJournee(etat)]);
 
 /** Journée sans verdict du moteur : pas de libellé d'état, la feuille de route au clic. */
 const sansVerdict = (item) => item.etat === 'manuelle' || item.etat === 'sans_etat';
@@ -108,7 +114,7 @@ export function JourneeEtatChips({ date, etats, onOpen, caParTechnicien = null }
             onClick={() => onOpen?.(item)}
             disabled={item.etat === 'attente'}
             title={ca > 0 ? `${titre(item)}\nCA HT programmé : ${formatCa(ca)}` : titre(item)}
-            className={`flex w-full items-center gap-1 rounded border px-1.5 py-0.5 text-left text-[10px] font-normal leading-tight ${STYLES[item.etat]}`}
+            className={`flex w-full items-center gap-1 rounded border px-1.5 py-0.5 text-left text-[10px] font-normal leading-tight ${styleEtat(item.etat)}`}
           >
             <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.couleur || '#94A3B8' }} />
             <span className="max-w-[6rem] shrink-0 truncate font-medium">{String(item.technicienNom || '').split(' ')[0]}</span>
