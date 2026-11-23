@@ -15,6 +15,8 @@
  * - Column header with count, optional amount sum, color dot
  * - Optional headerExtra render prop per column
  * - Scrollable columns with consistent sizing
+ * - Optional collapsible columns (colonnesRepliables) : a collapsed column is a
+ *   72 px strip that stays a drop zone (same droppableId), cards not rendered
  *
  * @version 1.0.0
  * ============================================================================
@@ -22,9 +24,11 @@
 
 import { useState, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Search, X } from 'lucide-react';
+import { Search, X, ChevronsRightLeft } from 'lucide-react';
 import { formatEuroCeil, cn } from '@/lib/utils';
 import { Tag } from '@/components/ui/tag';
+import { useColonnesRepliees } from '@/shared/hooks/useColonnesRepliees';
+import { KanbanColonneRepliee } from './KanbanColonneRepliee';
 
 // ============================================================================
 // COLUMN (INTERNAL)
@@ -42,6 +46,7 @@ function ColumnContent({
   emptyMessage,
   columnAmount,
   headerExtra,
+  onReplier, // présent si la colonne est repliable
   // DnD props — only present when DnD is enabled
   droppableProvided,
   isDraggingOver,
@@ -70,7 +75,21 @@ function ColumnContent({
               {column.label}
             </h3>
           </div>
-          <Tag className="shrink-0 bg-white tabular-nums">{count}</Tag>
+          <div className="flex items-center gap-1 shrink-0">
+            <Tag className="bg-white tabular-nums">{count}</Tag>
+            {onReplier && (
+              <button
+                type="button"
+                onClick={onReplier}
+                aria-expanded
+                aria-label={`Replier ${column.label}`}
+                title={`Replier ${column.label}`}
+                className="p-1 rounded-lg text-secondary-500 hover:bg-white hover:text-secondary-800 focus-visible:shadow-ring outline-none transition-colors"
+              >
+                <ChevronsRightLeft className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
         {amount !== null && (
           <p className={`text-xs mt-1 tabular-nums ${amount > 0 ? 'text-secondary-500' : 'text-secondary-300'}`}>
@@ -147,6 +166,7 @@ function ColumnContent({
  * @param {React.ReactNode} [props.children] - Extra content rendered after the board (modals, etc.)
  * @param {React.ReactNode} [props.headerLeft] - Content on the left of the header bar
  * @param {React.ReactNode} [props.headerRight] - Extra buttons on the right of the header bar (before search)
+ * @param {string[]} [props.colonnesRepliables] - Column ids collapsed by default (still drop zones)
  */
 export function KanbanBoard({
   items,
@@ -163,9 +183,12 @@ export function KanbanBoard({
   children,
   headerLeft,
   headerRight,
+  colonnesRepliables,
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const dndEnabled = typeof onDragEnd === 'function';
+  const repliage = useColonnesRepliees(colonnesRepliables);
+  const recherche = Boolean(searchFilter && searchTerm.trim());
 
   // --- Client-side search filtering ---
   const filteredItems = useMemo(() => {
@@ -192,6 +215,28 @@ export function KanbanBoard({
   // --- Render a single column ---
   const renderColumn = (column) => {
     const colItems = columnData[column.id] || [];
+    const replier = repliage.estRepliable(column.id) ? () => repliage.basculer(column.id) : undefined;
+
+    // Colonne repliée : bande de dépôt, mêmes droppableId et onDragEnd que dépliée.
+    if (repliage.estRepliee(column.id)) {
+      const repliee = (provided, snapshot) => (
+        <KanbanColonneRepliee
+          key={column.id}
+          column={column}
+          count={colItems.length}
+          amount={columnAmount ? columnAmount(colItems) : null}
+          recherche={recherche}
+          onDeplier={() => repliage.basculer(column.id)}
+          droppableProvided={provided}
+          isDraggingOver={snapshot?.isDraggingOver ?? false}
+        />
+      );
+      return dndEnabled ? (
+        <Droppable key={column.id} droppableId={column.id}>
+          {repliee}
+        </Droppable>
+      ) : repliee();
+    }
 
     if (dndEnabled) {
       return (
@@ -205,6 +250,7 @@ export function KanbanBoard({
               emptyMessage={emptyMessage}
               columnAmount={columnAmount}
               headerExtra={headerExtra}
+              onReplier={replier}
               droppableProvided={provided}
               isDraggingOver={snapshot.isDraggingOver}
             />
@@ -223,6 +269,7 @@ export function KanbanBoard({
         emptyMessage={emptyMessage}
         columnAmount={columnAmount}
         headerExtra={headerExtra}
+        onReplier={replier}
         isDraggingOver={false}
       />
     );

@@ -285,7 +285,6 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
   const orgId = organization?.id;
   const userId = user?.id;
 
-
   const { statuses } = useLeadStatuses();
   const { commercials } = useLeadCommercials(orgId);
   const { sources } = useLeadSources();
@@ -805,6 +804,7 @@ export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger,
       searchPlaceholder="Rechercher un lead..."
       searchFilter={searchFilter}
       columnAmount={columnAmount}
+      colonnesRepliables={[...TERMINAL_COLUMN_KEYS]}
       emptyMessage="Aucun lead"
       headerLeft={
         <p className="text-sm text-secondary-500">

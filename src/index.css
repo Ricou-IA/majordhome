@@ -365,6 +365,11 @@ html[data-device-class="phone"] .mdh-kanban-col {
 html[data-device-class="tablet"] .mdh-kanban-col {
   flex: 0 0 240px;
 }
+/* Colonne repliée (Gagné, Perdu des leads) : 72 px partout, téléphone compris ; elle
+   garde un point d'accroche, sinon le défilement aimanté ne l'atteindrait pas. */
+html[data-device-class="phone"] .mdh-kanban-repliee {
+  scroll-snap-align: start;
+}
 
 /* Barre du bas du téléphone (`BarreDuBas`, qui pose `data-barre-bas` sur <html>) : les
    messages s'affichent en bas de l'écran sous 600 px ; ils remontent au-dessus de la barre
