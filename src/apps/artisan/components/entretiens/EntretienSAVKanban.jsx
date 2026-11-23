@@ -31,6 +31,7 @@ import { construireReglages } from '@/lib/tournee/reglages.js';
 import { trierCartes } from '@/lib/savUrgency';
 import { peutCloturerSansPlanifier, colonnesTechnicien, carteVisibleParTechnicien, limiteALaCloture } from '@/lib/savCloture';
 import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
+import { colonneDeCarte, statutViseParDepot, COLONNES_SANS_COLONNE } from '@/lib/kanbanEntretienSav';
 // CertificatsEntretienModal retiré — section certificats intégrée dans EntretienSAVModal
 
 // ============================================================================
@@ -67,9 +68,12 @@ export function EntretienSAVKanban() {
 
   // Colonnes visibles selon le rôle
   const visibleColumns = useMemo(() => {
+    // « Demande de contrat » et « Pièces commandées » n'ont plus de colonne (Eric 2026-11-23) :
+    // règles dans src/lib/kanbanEntretienSav.js.
+    const affichees = KANBAN_COLUMNS.filter(c => !COLONNES_SANS_COLONNE.includes(c.value));
     const cols = effectiveRole === 'technicien'
-      ? KANBAN_COLUMNS.filter(c => colonnesTechnicien().includes(c.value))
-      : KANBAN_COLUMNS;
+      ? affichees.filter(c => colonnesTechnicien().includes(c.value))
+      : affichees;
     return cols.map(c => ({
       id: c.value,
       // La colonne Encaissé ne montre que les cartes encaissées récemment : on le dit.
@@ -91,7 +95,10 @@ export function EntretienSAVKanban() {
     }
     // SAV urgents à traiter en tête de colonne, puis date ascendante — même date que celle
     // affichée sur la carte : next_rdv_date > scheduled_date > created_at (src/lib/savUrgency.js).
-    return trierCartes(result);
+    // `colonne` = colonne affichée (une demande de contrat n'en a pas : hors kanban).
+    return trierCartes(result)
+      .map(i => ({ ...i, colonne: colonneDeCarte(i) }))
+      .filter(i => i.colonne);
   }, [items, effectiveRole, user?.id]);
 
   // =========================================================================
@@ -157,10 +164,11 @@ export function EntretienSAVKanban() {
     const { draggableId, source, destination } = result;
     if (!destination || source.droppableId === destination.droppableId) return;
 
-    const oldStatus = source.droppableId;
-    const newStatus = destination.droppableId;
     const item = roleFilteredItems.find(i => i.id === draggableId);
     if (!item) return;
+    // Statut réel de la carte (une carte « Pièces commandées » est rangée dans « À planifier »).
+    const oldStatus = item.workflow_status;
+    const newStatus = statutViseParDepot(item, destination.droppableId);
 
     // SAV déposé directement en Réalisé : le technicien est déjà intervenu → fenêtre
     // « Intervention faite » (clôture + inscription au planning après coup).
@@ -301,7 +309,7 @@ export function EntretienSAVKanban() {
     <KanbanBoard
       items={roleFilteredItems}
       columns={visibleColumns}
-      groupBy="workflow_status"
+      groupBy="colonne"
       renderCard={renderCard}
       onCardClick={setSelectedItem}
       onDragEnd={handleDragEnd}

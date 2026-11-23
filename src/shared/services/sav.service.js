@@ -128,7 +128,7 @@ const ENTRETIEN_TRANSITIONS = {
 const SAV_TRANSITIONS = {
   demande:           ['devis_envoye', 'pieces_commandees', 'a_planifier'],
   devis_envoye:      ['pieces_commandees', 'demande'],
-  pieces_commandees: ['a_planifier', 'devis_envoye'],
+  pieces_commandees: ['a_planifier', 'planifie', 'devis_envoye'],
   a_planifier:       ['planifie'],
   planifie:          ['realise', 'a_planifier'],
   realise:           ['facture'],

@@ -15,6 +15,7 @@
 import { useState } from 'react';
 import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Archive, Phone, PhoneForwarded, Receipt, Undo2, Mail, AlertTriangle, Camera, FileText } from 'lucide-react';
 import { RepereCarte, RepereBouton } from '../shared/RepereCarte';
+import { piecesEnAttente } from '@/lib/kanbanEntretienSav';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
@@ -40,6 +41,11 @@ import { QUOTE_STATUSES } from '@services/devis.service';
 // ============================================================================
 // CONSTANTES VISUELLES
 // ============================================================================
+
+/** Hachures posées sur la bande de couleur : même motif à 45° que la pose provisoire du planning. */
+const HACHURE_PIECES = {
+  backgroundImage: 'repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.35) 0 4px, transparent 4px 8px)',
+};
 
 const TYPE_CONFIG = {
   entretien: {
@@ -274,6 +280,8 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
     && item.workflow_status === 'planifie'
     && !!(item.effective_contract_id || item.contract_id);
   const invitationLibelle = item.workflow_status === 'a_planifier' ? libelleInvitation(invitation) : null;
+  // SAV dont les pièces ne sont pas reçues : bande hachurée, comme la pose provisoire d'un chantier.
+  const attentePieces = piecesEnAttente(item);
 
   return (
     <div
@@ -300,6 +308,8 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
         {/* Bandeau gauche coloré avec date (gris une fois encaissée) */}
         <div
           className={`w-12 flex-shrink-0 flex flex-col items-center justify-center py-2 text-white ${item.workflow_status === 'facture' ? 'bg-secondary-400' : config.stripeClass}`}
+          style={attentePieces ? HACHURE_PIECES : undefined}
+          title={attentePieces ? 'Pièces commandées, pas encore reçues' : undefined}
         >
           <span className="text-sm font-bold leading-none">{dayNum}</span>
           <span className="text-[11px] uppercase leading-tight mt-0.5">{monthShort}</span>
@@ -445,9 +455,9 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                 Encaissé{invoiced ? ' · facturé' : ''}
               </span>
             ) : certificatAFaire ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-st-info text-white text-xs font-medium rounded-md">
-                <ClipboardCheck className="w-3 h-3" />
-                Certificat à faire
+              <span className="inline-flex min-w-0 items-center gap-1 px-2 py-0.5 bg-st-info text-white text-xs font-medium rounded-md whitespace-nowrap">
+                <ClipboardCheck className="w-3 h-3 shrink-0" />
+                <span className="truncate">Certificat à faire</span>
               </span>
             ) : devisFleche ? (
               <span className="flex items-center gap-1 text-xs text-secondary-600 min-w-0">
