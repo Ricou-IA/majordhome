@@ -11,48 +11,77 @@
  * ============================================================================
  */
 
-import { ArrowLeftRight, Hourglass, Lock } from 'lucide-react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { ArrowLeftRight, Hourglass, Lock, CheckCircle2, PhoneCall } from 'lucide-react';
 import { estTypeAdaptable } from '@/lib/souplesse';
+import { etatConfirmation } from '@/lib/confirmationRdv';
 import { modeleVignette, HAUTEUR_CRENEAU, HAUTEUR_CRENEAU_TELEPHONE, MARGE_LISERE } from '@/lib/planningVignette';
 import { useDeviceClass } from '@hooks/useDeviceClass';
 import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKindIcons';
 
 // Classes écrites en toutes lettres : Tailwind ne génère pas une classe composée à la volée.
-const LIGNES_NOM = { 1: 'line-clamp-1', 2: 'line-clamp-2', 3: 'line-clamp-3' };
+const LIGNES_NOM = { 1: 'line-clamp-1', 2: 'line-clamp-2', 3: 'line-clamp-3', 4: 'line-clamp-4' };
 
 // Icône de 12 px dans un texte de 12 px à interligne 13 px : jamais une ligne plus haute.
 const ICONE_REPERE = 'inline-block h-3 w-3 align-[-1px] shrink-0';
 
-/** Repères d'état en tête de vignette : souplesse, heure communiquée, pose provisoire. */
+/**
+ * Repères d'état en tête de vignette (Eric 2026-11-23 : le cadenas seul « me semble flou ») :
+ *   coche       = confirmé au client (client_confirmed_at) ;
+ *   téléphone   = à confirmer (posé depuis plus d'un mois, jamais confirmé) ;
+ *   cadenas     = heure figée pour la tournée SANS confirmation au client (une journée
+ *                 pleine se fige seule la nuit) ;
+ *   flèches     = adaptable ; sablier = pose provisoire (appros du chantier non reçues).
+ */
 function Reperes({ rdv }) {
   const { adaptable, hour_confirmed_at, appointment_type, provisoire } = rdv;
+  const { etat, joursDepuisPose } = etatConfirmation(rdv);
+  const repere = (Icone, titre) => (
+    <span className="inline-flex shrink-0 opacity-90" title={titre} role="img" aria-label={titre}>
+      <Icone className={ICONE_REPERE} aria-hidden="true" />
+    </span>
+  );
   return (
     <>
-      {adaptable ? (
-        <span className="inline-flex shrink-0 opacity-90" title="Adaptable : l’heure peut glisser dans sa tolérance" role="img" aria-label="Adaptable : l’heure peut glisser dans sa tolérance">
-          <ArrowLeftRight className={ICONE_REPERE} aria-hidden="true" />
-        </span>
-      ) : (estTypeAdaptable(appointment_type) && hour_confirmed_at) ? (
-        <span className="inline-flex shrink-0 opacity-90" title="Heure communiquée au client" role="img" aria-label="Heure communiquée au client">
-          <Lock className={ICONE_REPERE} aria-hidden="true" />
-        </span>
-      ) : null}
-      {provisoire && (
-        <span className="inline-flex shrink-0 opacity-90" title="Pose provisoire : appros du chantier non reçues" role="img" aria-label="Pose provisoire : appros du chantier non reçues">
-          <Hourglass className={ICONE_REPERE} aria-hidden="true" />
-        </span>
-      )}
+      {etat === 'confirme'
+        ? repere(CheckCircle2, 'Confirmé au client')
+        : etat === 'a_confirmer'
+          ? repere(PhoneCall, `À confirmer : posé il y a ${joursDepuisPose} jours, client pas encore prévenu`)
+          : null}
+      {adaptable
+        ? repere(ArrowLeftRight, 'Adaptable : l’heure peut glisser dans sa tolérance')
+        : (etat !== 'confirme' && estTypeAdaptable(appointment_type) && hour_confirmed_at)
+          ? repere(Lock, 'Heure figée pour la tournée — le client ne l’a pas confirmée')
+          : null}
+      {provisoire && repere(Hourglass, 'Pose provisoire : appros du chantier non reçues')}
     </>
   );
 }
 
+/** Largeur du bloc, suivie quand la colonne change (filtre, fenêtre redimensionnée). */
+function useLargeur() {
+  const ref = useRef(null);
+  const [largeur, setLargeur] = useState(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    setLargeur(el.getBoundingClientRect().width);
+    const obs = new ResizeObserver(([entree]) => setLargeur(Math.round(entree.contentRect.width)));
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, largeur];
+}
+
 export function PlanningEventContent({ eventInfo }) {
   const { isPhone } = useDeviceClass();
+  const [refLargeur, largeur] = useLargeur();
   const { event, view } = eventInfo;
   const rdv = event.extendedProps;
   // Bande de tolérance (événement de fond) : une plage colorée, sans texte.
   if (rdv.band) return null;
   const m = modeleVignette({
+    largeur,
     rdv,
     debut: event.start,
     fin: event.end,
@@ -77,7 +106,7 @@ export function PlanningEventContent({ eventInfo }) {
   // Une ligne : tout sur la même, le nom prend la place qui reste.
   if (m.gabarit === 'ligne') {
     return (
-      <div className={`${racine} flex items-center gap-1 whitespace-nowrap`} title={m.infobulle}>
+      <div ref={refLargeur} className={`${racine} flex items-center gap-1 whitespace-nowrap`} title={m.infobulle}>
         <Reperes rdv={rdv} />
         {heure}
         <span className="shrink-0">{m.type}</span>
@@ -87,10 +116,23 @@ export function PlanningEventContent({ eventInfo }) {
     );
   }
 
+  // Resserré (plusieurs personnes ce jour-là) : repères + heure, puis le nom de famille.
+  if (m.gabarit === 'etroit') {
+    return (
+      <div ref={refLargeur} className={racine} title={m.infobulle}>
+        <div className="flex items-center gap-0.5 whitespace-nowrap overflow-hidden">
+          <Reperes rdv={rdv} />
+          {heure}
+        </div>
+        {m.nom && <div className={`font-bold break-all ${LIGNES_NOM[m.lignesNom] || 'line-clamp-4'}`}>{m.nom}</div>}
+      </div>
+    );
+  }
+
   // Cadre plein : créneau, puis type en toutes lettres (à la ligne si la colonne est étroite).
   if (m.gabarit === 'plein') {
     return (
-      <div className={racine} title={m.infobulle}>
+      <div ref={refLargeur} className={racine} title={m.infobulle}>
         <div className="flex flex-wrap items-center gap-x-1">
           <Reperes rdv={rdv} />
           {heure}
@@ -117,14 +159,14 @@ export function PlanningEventContent({ eventInfo }) {
   );
   if (m.gabarit === 'deux') {
     return (
-      <div className={racine} title={m.infobulle}>
+      <div ref={refLargeur} className={racine} title={m.infobulle}>
         {entete}
         <div className="truncate"><span className="font-bold">{m.nom}</span>{zoneALaSuite}</div>
       </div>
     );
   }
   return (
-    <div className={racine} title={m.infobulle}>
+    <div ref={refLargeur} className={racine} title={m.infobulle}>
       {entete}
       {m.nom && <div className={`font-bold break-words ${LIGNES_NOM[m.lignesNom]}`}>{m.nom}</div>}
       {m.zone && <div className="truncate font-normal opacity-90">{m.zone}</div>}

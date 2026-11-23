@@ -14,6 +14,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appointmentsService } from '@services/appointments.service';
 import { auditService } from '@services/audit.service';
+import { savService } from '@services/sav.service';
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId, unwrapResult } from '@/lib/serviceHelpers';
 import { appointmentKeys, leadKeys, tourneeKeys, chantierKeys, entretienSavKeys } from '@hooks/cacheKeys';
@@ -556,3 +557,36 @@ export function useChantierAppointments(orgId, chantierId) {
 // ============================================================================
 
 export default useAppointments;
+
+// ============================================================================
+// HOOK - useConfirmationRdv (confirmé au client · rappel SMS — Eric 2026-11-23)
+// ============================================================================
+
+/**
+ * Deux gestes de la fenêtre d'un RDV : le confirmer au client (ou retirer la
+ * confirmation) et lui envoyer le SMS de rappel. Contrat des mutations : rejette
+ * sur refus (unwrapResult). Toute réussite recharge le planning (appointmentKeys.all).
+ * @param {string} orgId org CORE (clés du planning)
+ */
+export function useConfirmationRdv(orgId) {
+  const queryClient = useQueryClient();
+  const recharger = () => queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+
+  const confirmer = useMutation({
+    mutationFn: ({ appointment, confirme }) =>
+      unwrapResult(appointmentsService.setClientConfirmation(appointment, confirme)),
+    onSuccess: recharger,
+  });
+  const rappel = useMutation({
+    mutationFn: ({ appointment, technicianName }) =>
+      unwrapResult(savService.sendRappelRdv({ appointment, technicianName, orgId })),
+    onSuccess: recharger,
+  });
+
+  return {
+    confirmer: confirmer.mutateAsync,
+    isConfirming: confirmer.isPending,
+    envoyerRappel: rappel.mutateAsync,
+    isSendingRappel: rappel.isPending,
+  };
+}

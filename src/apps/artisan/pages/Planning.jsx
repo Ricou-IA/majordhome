@@ -55,6 +55,7 @@ import { PlanningEventContent } from '@/apps/artisan/components/planning/Plannin
 import { PlanningDayHeader, TexteDuJour } from '@/apps/artisan/components/planning/PlanningDayHeader';
 import { RemplirJourneePanel } from '@/apps/artisan/components/tournees/RemplirJourneePanel';
 import { PageHeader } from '@/components/ui/page-header';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 // Vue Mois : une colonne est un jour de la SEMAINE, pas une date. Avec le format des
 // autres vues (jour + mois), le calendrier y écrivait une date de référence sans
@@ -129,7 +130,9 @@ export default function Planning() {
   const {
     fenetre, ouvrirCreation, ouvrirEdition, fermer: fermerFenetre, enregistrer, supprimer, annuler,
   } = usePlanningFenetreRdv({ createAppointment, updateAppointment, deleteAppointment, cancelAppointment });
-  const { surSelection, surClic, surDeplacement, surEtirement } = usePlanningGestes({
+  const {
+    surSelection, surClic, surDeplacement, surEtirement, deplacementEnAttente, confirmerDeplacement, annulerDeplacement,
+  } = usePlanningGestes({
     calendarRef, moveAppointment, ouvrirCreation, ouvrirEdition,
   });
   const nouveauRdv = useCallback(() => ouvrirCreation(creneauParDefaut()), [ouvrirCreation]);
@@ -407,6 +410,17 @@ export default function Planning() {
       {feuilleOuverte && (
         <FeuilleDeRoutePanel journee={feuilleOuverte} onClose={fermerFeuille} />
       )}
+
+      {/* RDV confirmé au client glissé ou étiré : accord demandé avant d'enregistrer. */}
+      <ConfirmDialog
+        open={!!deplacementEnAttente}
+        onOpenChange={(ouvert) => { if (!ouvert) annulerDeplacement(); }}
+        title="Ce RDV est confirmé au client"
+        description={`${[deplacementEnAttente?.rdv?.client_name, deplacementEnAttente?.rdv?.client_first_name].filter(Boolean).join(' ') || 'Le client'} a eu cette heure. Le déplacer retire la confirmation : il faudra le prévenir puis reconfirmer le RDV.`}
+        confirmLabel="Déplacer quand même"
+        variant="default"
+        onConfirm={confirmerDeplacement}
+      />
     </div>
   );
 }

@@ -12,6 +12,10 @@
  *   - deux   (2 lignes)  : créneau · type court · icônes / NOM · zone
  *   - trois  (3-4 lignes): créneau · type court · icônes / NOM (1-2 lignes) / zone
  *   - plein  (5 lignes+) : créneau / type complet · icônes / NOM (1-3 lignes) / zone
+ *   - etroit (colonne de moins de LARGEUR_ETROITE px, quand plusieurs personnes se
+ *     partagent le jour) : heure de début / NOM DE FAMILLE seul ; le reste au survol.
+ *     Moins il y a de personnes affichées, plus la colonne est large et plus on lit
+ *     (Eric 2026-11-23 : « illisible à plus de 4 personnes par jour »).
  * ============================================================================
  */
 
@@ -37,6 +41,8 @@ const TYPES_AVEC_ICONES = ['maintenance', 'service'];
 // Congés : la personne est déjà dite par la couleur et la colonne, l'objet (« Congés —
 // Antoine ») ne ferait que répéter le type.
 const TYPES_SANS_OBJET = ['leave'];
+/** En dessous de cette largeur (px), le bloc passe en vignette resserrée. */
+export const LARGEUR_ETROITE = 72;
 
 /**
  * Nombre de lignes de texte qui tiennent dans le bloc d'un RDV de la grille horaire.
@@ -101,18 +107,27 @@ export function gabaritVignette({ vue = 'timeGridWeek', dureeMinutes, hauteurCre
  * @param {string} [p.vue]              type de vue FullCalendar
  * @param {number} [p.hauteurCreneau]
  * @param {number} [p.margeSupplementaire]  cf. lignesDisponibles (MARGE_LISERE pour un devis fait)
+ * @param {number|null} [p.largeur]     largeur mesurée du bloc en pixels (grille horaire) ; null = inconnue
  * @returns {{ gabarit: string, lignesNom: number, heure: string, type: string, nom: string, zone: string, icones: boolean, infobulle: string }}
  */
-export function modeleVignette({ rdv, debut = null, fin = null, vue = 'timeGridWeek', hauteurCreneau, margeSupplementaire = 0 } = {}) {
+export function modeleVignette({ rdv, debut = null, fin = null, vue = 'timeGridWeek', hauteurCreneau, margeSupplementaire = 0, largeur = null } = {}) {
   const dureeMinutes = debut && fin ? Math.round((fin.getTime() - debut.getTime()) / 60000) : null;
-  const { gabarit, lignesNom } = gabaritVignette({ vue, dureeMinutes, hauteurCreneau, margeSupplementaire });
+  const selonHauteur = gabaritVignette({ vue, dureeMinutes, hauteurCreneau, margeSupplementaire });
+  const etroit = vue.startsWith('timeGrid') && largeur != null && largeur > 0 && largeur < LARGEUR_ETROITE;
+  const gabarit = etroit ? 'etroit' : selonHauteur.gabarit;
+  // Resserré : l'heure prend une ligne, le nom toutes les autres.
+  const lignesNom = etroit
+    ? Math.max(1, Math.min(4, lignesDisponibles(dureeMinutes, hauteurCreneau, margeSupplementaire) - 1))
+    : selonHauteur.lignesNom;
 
   const typeComplet = rdv?.typeConfig?.label || '';
   const typeCourt = rdv?.typeConfig?.shortLabel || typeComplet;
   const client = [rdv?.client_name, rdv?.client_first_name].filter(Boolean).join(' ').trim();
   // RDV sans client (réunion) : son objet, s'il dit autre chose que le type.
   const objet = TYPES_SANS_OBJET.includes(rdv?.appointment_type) ? '' : String(rdv?.subject || '').trim();
-  const nom = client || (objet && objet !== typeComplet ? objet : '');
+  const nomComplet = client || (objet && objet !== typeComplet ? objet : '');
+  // Resserré : le nom de famille seul (« MARTINEZ » plutôt que « MARTINEZ CORINNE »).
+  const nom = etroit ? (String(rdv?.client_name || '').trim() || nomComplet) : nomComplet;
   const zone = String(rdv?.grand_secteur || rdv?.city || '').trim();
   const creneau = creneauCourt(debut, fin);
 
@@ -120,11 +135,11 @@ export function modeleVignette({ rdv, debut = null, fin = null, vue = 'timeGridW
     gabarit,
     lignesNom,
     // Une ligne : le début suffit, la hauteur du bloc dit la fin. Liste : l'heure a sa colonne.
-    heure: vue.startsWith('list') ? '' : (gabarit === 'ligne' ? heureCourte(debut) : creneau),
+    heure: vue.startsWith('list') ? '' : ((gabarit === 'ligne' || etroit) ? heureCourte(debut) : creneau),
     type: gabarit === 'plein' ? typeComplet : typeCourt,
     nom,
-    zone,
-    icones: TYPES_AVEC_ICONES.includes(rdv?.appointment_type),
-    infobulle: [creneau, typeComplet, nom, zone].filter(Boolean).join(' · '),
+    zone: etroit ? '' : zone,
+    icones: !etroit && TYPES_AVEC_ICONES.includes(rdv?.appointment_type),
+    infobulle: [creneau, typeComplet, nomComplet, zone].filter(Boolean).join(' · '),
   };
 }

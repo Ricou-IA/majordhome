@@ -18,6 +18,7 @@
  */
 
 import { estTypeAdaptable } from '@/lib/souplesse';
+import { ConfirmationClientSection } from './ConfirmationClientSection';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CertificatsSection } from '@/apps/artisan/components/entretiens/CertificatsSection';
@@ -618,6 +619,20 @@ export function EventModal({
                       }
                       : null
                   }
+                />
+              )}
+
+              {/* Confirmé au client / rappel SMS (édition) : enregistrés tout de suite. */}
+              {!usesAssistant && isEdit && !isCancelled && appointment?.id && (
+                <ConfirmationClientSection
+                  appointment={appointment}
+                  orgId={orgId}
+                  teamMembers={allTeamMembers}
+                  onEcrit={(ligne) => setFormData((f) => ({
+                    ...f,
+                    time_flex_minutes: ligne.time_flex_minutes ?? f.time_flex_minutes,
+                    hour_confirmed_at: ligne.hour_confirmed_at ?? f.hour_confirmed_at,
+                  }))}
                 />
               )}
 

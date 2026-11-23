@@ -19,6 +19,7 @@ import { isMobileFR } from '@/lib/phoneUtils';
 import { entretiensService, releaseOrphanEntretienCard } from './entretiens.service';
 import { logger } from '@lib/logger';
 import { fetchAllPages } from '@/lib/postgrestUtils';
+import { buildRappelRdvVars } from '@/lib/smsCampaigns';
 import { statutVisiteAnnee } from '@/lib/entretienVisitStatus';
 import { minutesVersHeure as minutesVersHHMM, minutesDepuisMinuit } from '@/lib/tournee/arrets.js';
 
@@ -1284,6 +1285,39 @@ export const savService = {
    * Déclenché depuis l'onglet Programmation (SectorGroupView).
    * N8N envoie le SMS ET log dans sms_logs (campaign_name='rappel_entretien').
    */
+  async sendRappelRdv({ appointment, technicianName, orgId }) {
+    const phone = [appointment?.client_phone].find((p) => isMobileFR(p));
+    if (!phone) {
+      return { data: null, error: new Error(appointment?.client_phone ? 'Aucun numéro mobile (06/07) pour ce client' : 'Le client n\'a pas de numéro de téléphone') };
+    }
+    const { error } = await invokeSmsSend({
+      campaign: 'rappel_rdv',
+      phone,
+      org_id: orgId,
+      client_id: appointment.client_id || undefined,
+      intervention_id: appointment.intervention_id || undefined,
+      vars: buildRappelRdvVars({
+        clientFirstName: appointment.client_first_name,
+        date: appointment.scheduled_date,
+        startTime: appointment.scheduled_start,
+        technicianName,
+      }),
+    });
+    if (error) {
+      logger.error('[sav] sendRappelRdv error:', error);
+      return { data: null, error };
+    }
+    // Même marque que le cron sms-rappel-rdv : il ne renverra pas ce rappel.
+    const sentAt = new Date().toISOString();
+    const { error: markErr } = await supabase
+      .from('majordhome_appointments')
+      .update({ client_notified_at: sentAt })
+      .eq('id', appointment.id)
+      .eq('org_id', appointment.org_id);
+    if (markErr) logger.error('[sav] sendRappelRdv : marque client_notified_at non posée', markErr);
+    return { data: { sentAt, marque: !markErr }, error: null };
+  },
+
   async sendEntretienReminder({ contractId: _contractId, clientId, clientFirstName, clientName, clientPhone, orgId }) {
     if (!isMobileFR(clientPhone)) {
       const reason = clientPhone

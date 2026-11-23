@@ -19,7 +19,10 @@ import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { normaliserSecteur } from '@/lib/tournee/secteurs';
 import { googleCalendarService } from '@services/googleCalendar.service';
 import { leadsService } from '@services/leads.service';
-import { releaseOrphanEntretienCard } from '@services/entretiens.service';import { logger } from '@lib/logger';
+import { releaseOrphanEntretienCard } from '@services/entretiens.service';
+import { logger } from '@lib/logger';
+import { champsDeConfirmation } from '@/lib/confirmationRdv';
+import { estTypeAdaptable } from '@/lib/souplesse';
 
 // Buckets de type — source unique dans le module pur (re-export pour les callers
 // existants : EventModal, EventFormSections).
@@ -527,6 +530,29 @@ export const appointmentsService = {
   /**
    * Mettre à jour un RDV
    */
+  /**
+   * Confirmer un RDV au client (ou retirer la confirmation). Règles : `champsDeConfirmation`
+   * (src/lib/confirmationRdv.js) — confirmer fige aussi l'heure d'un RDV adaptable.
+   * L'auteur (`client_confirmed_by`) est posé par la base, jamais par l'écran.
+   */
+  async setClientConfirmation(appointment, confirme) {
+    if (!appointment?.id || !appointment?.org_id) throw new Error('[appointments] RDV requis');
+    const champs = champsDeConfirmation(appointment, confirme, { adaptable: estTypeAdaptable(appointment.appointment_type) });
+    const { data, error } = await supabase
+      .from('majordhome_appointments')
+      .update({ ...champs, updated_at: new Date().toISOString() })
+      .eq('id', appointment.id)
+      .eq('org_id', appointment.org_id)
+      .select('id, client_confirmed_at, client_confirmed_by, hour_confirmed_at, time_flex_minutes')
+      .maybeSingle();
+    if (error) {
+      logger.error('[appointments] setClientConfirmation error:', error);
+      return { data: null, error };
+    }
+    if (!data) return { data: null, error: new Error('RDV introuvable ou non modifiable') };
+    return { data, error: null };
+  },
+
   async updateAppointment(appointmentId, { technicianIds, ...updates }) {
     if (!appointmentId) throw new Error('[appointments] appointmentId requis');
 

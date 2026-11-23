@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   lignesDisponibles, heureCourte, creneauCourt, gabaritVignette, modeleVignette,
-  HAUTEUR_CRENEAU_TELEPHONE, MARGE_LISERE,
+  HAUTEUR_CRENEAU_TELEPHONE, MARGE_LISERE, LARGEUR_ETROITE,
 } from '../src/lib/planningVignette.js';
 
 const le = (h, m = 0) => new Date(2026, 10, 16, h, m);
@@ -117,4 +117,22 @@ test('modeleVignette : liste sans heure, RDV sans client = son objet', () => {
   assert.equal(absence.nom, '');
   // Fin inconnue : une heure par défaut, pas de plantage.
   assert.equal(modeleVignette({ rdv: sav, debut: le(10), fin: null }).gabarit, 'trois');
+});
+
+test('modeleVignette : colonne étroite = heure de début et nom de famille, le reste au survol', () => {
+  const m = modeleVignette({ rdv: sav, debut: le(8), fin: le(12), largeur: LARGEUR_ETROITE - 1 });
+  assert.equal(m.gabarit, 'etroit');
+  assert.equal(m.heure, '8h');
+  assert.equal(m.nom, 'ARCAMBAL');
+  assert.equal(m.zone, '');
+  assert.equal(m.icones, false);
+  assert.ok(m.lignesNom >= 1 && m.lignesNom <= 4);
+  assert.match(m.infobulle, /ARCAMBAL Guy/);
+  assert.match(m.infobulle, /Gaillac/);
+});
+
+test('modeleVignette : largeur suffisante, inconnue ou hors grille horaire = gabarit habituel', () => {
+  assert.equal(modeleVignette({ rdv: sav, debut: le(8), fin: le(12), largeur: LARGEUR_ETROITE }).gabarit, 'plein');
+  assert.equal(modeleVignette({ rdv: sav, debut: le(8), fin: le(12), largeur: null }).gabarit, 'plein');
+  assert.equal(modeleVignette({ rdv: sav, debut: le(8), fin: le(12), largeur: 40, vue: 'dayGridMonth' }).gabarit, 'ligne');
 });
