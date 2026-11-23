@@ -2,7 +2,9 @@
  * ClientDetail.jsx - Majord'home Artisan
  * ============================================================================
  * Page fiche client détaillée accessible via /clients/:id
- * Onglets : Informations | Contrat | Équipements | Interventions | Timeline
+ * Onglets (src/lib/ficheClientOnglets.js) : Résumé | Contrat | Équipements |
+ * Interventions | Devis et factures | Échanges. En édition (« Modifier »), l'onglet
+ * Résumé affiche le formulaire complet (TabInfo) à la place de la lecture.
  *
  * Sous-composants extraits dans ./client-detail/
  * ============================================================================
@@ -11,10 +13,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
-import {
-  ArrowLeft, User, FileText, Wrench, History, Mail, MessageSquare,
-  Loader2, AlertCircle, Archive, ArchiveRestore, Receipt,
-} from 'lucide-react';
+import { ArrowLeft, Loader2, AlertCircle, Archive, ArchiveRestore } from 'lucide-react';
 import { CreateSAVModal } from '../components/entretiens/CreateSAVModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,29 +29,16 @@ import { EventModal } from '../components/planning/EventModal';
 // Sous-composants extraits
 import { ClientInvestigationPanel } from '../components/clients/ClientInvestigationPanel';
 import { EnTeteFicheClient } from './client-detail/EnTeteFicheClient';
+import { TabResume } from './client-detail/TabResume';
 import { TabInfo } from './client-detail/TabInfo';
 import { TabEquipments } from './client-detail/TabEquipments';
 import { TabInterventions } from './client-detail/TabInterventions';
-import { TabTimeline } from './client-detail/TabTimeline';
 import { TabContrat } from './client-detail/TabContrat';
-import { TabMailings } from './client-detail/TabMailings';
-import { TabSms } from './client-detail/TabSms';
-import { TabDevisPL } from './client-detail/TabDevisPL';
-import { TabFacturesPL } from './client-detail/TabFacturesPL';
+import { TabDevisFactures } from './client-detail/TabDevisFactures';
+import { TabEchanges } from './client-detail/TabEchanges';
 import { logger } from '@lib/logger';
 import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
-
-const TABS = [
-  { id: 'info', label: 'Informations', icon: User },
-  { id: 'contract', label: 'Contrat', icon: FileText },
-  { id: 'equipments', label: 'Équipements', icon: Wrench },
-  { id: 'interventions', label: 'Interventions', icon: Wrench },
-  { id: 'devis-pl', label: 'Devis', icon: Receipt },
-  { id: 'factures-pl', label: 'Factures', icon: Receipt },
-  { id: 'timeline', label: 'Timeline', icon: History },
-  { id: 'mailings', label: 'Mailings', icon: Mail },
-  { id: 'sms', label: 'SMS', icon: MessageSquare },
-];
+import { ONGLETS, LIBELLE_ONGLET, ongletDeDepart } from '@/lib/ficheClientOnglets';
 
 export default function ClientDetail() {
   const { id } = useParams();
@@ -61,7 +47,7 @@ export default function ClientDetail() {
   const location = useLocation();
   const isAdmin = effectiveRole === 'org_admin';
 
-  const [activeTab, setActiveTab] = useState(location.state?.tab || 'info');
+  const [activeTab, setActiveTab] = useState(() => ongletDeDepart(location.state?.tab));
   const [isLocked, setIsLocked] = useState(true);
   const [formData, setFormData] = useState({});
   const [initialData, setInitialData] = useState({});
@@ -137,9 +123,12 @@ export default function ClientDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ne réagit qu'au numéro enregistré
   }, [savedDpeNumber, hasInitialized]);
 
+  // « Modifier » mène au formulaire, qui s'affiche dans l'onglet Résumé tant que la fiche est en édition.
   const handleToggleLock = useCallback(() => {
     if (!isLocked) {
       setFormData({ ...initialData });
+    } else {
+      setActiveTab('resume');
     }
     setIsLocked(!isLocked);
   }, [isLocked, initialData]);
@@ -150,6 +139,7 @@ export default function ClientDetail() {
   const handleApplyInvestigation = useCallback((patch) => {
     setFormData((prev) => ({ ...prev, ...patch }));
     setIsLocked(false);
+    setActiveTab('resume');
     setShowInvestigation(false);
     toast.success('Champs pré-remplis depuis le DPE — vérifiez puis Enregistrer');
   }, []);
@@ -160,7 +150,7 @@ export default function ClientDetail() {
   // de dupliquer ici la création d'équipement.
   const handleCreateEquipmentFromDpe = useCallback((draft) => {
     setShowInvestigation(false);
-    setActiveTab('equipments');
+    setActiveTab('equipements');
     setEquipmentDraft(draft);
   }, []);
 
@@ -380,69 +370,64 @@ export default function ClientDetail() {
       />
 
       {/* Onglets */}
-      <div className="border-b border-secondary-200">
-        <nav className="flex gap-0">
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            let badge = null;
-
-            if (tab.id === 'equipments' && client.equipments_count > 0) {
-              badge = client.equipments_count;
-            } else if (tab.id === 'interventions' && client.interventions_count > 0) {
-              badge = client.interventions_count;
-            }
-
+      <div className="overflow-x-auto border-b border-secondary-200">
+        <nav className="flex gap-1" aria-label="Onglets de la fiche client">
+          {ONGLETS.map((onglet) => {
+            const isActive = activeTab === onglet;
+            const badge = onglet === 'equipements' ? client.equipments_count
+              : onglet === 'interventions' ? client.interventions_count
+                : 0;
             return (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  isActive ? 'text-primary-600 border-primary-600' : 'text-secondary-500 border-transparent hover:text-secondary-700 hover:border-secondary-300'
+                key={onglet}
+                type="button"
+                onClick={() => setActiveTab(onglet)}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-body-sm transition-colors focus-visible:outline-none focus-visible:shadow-ring ${
+                  isActive ? 'border-primary-600 font-semibold text-secondary-900' : 'border-transparent font-medium text-secondary-500 hover:text-secondary-700'
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-                {badge > 0 && <span className="ml-1 px-1.5 py-0.5 text-xs bg-secondary-100 text-secondary-600 rounded-full">{badge}</span>}
+                {LIBELLE_ONGLET[onglet]}
+                {badge > 0 && <span className="rounded-full bg-secondary-100 px-1.5 py-0.5 text-caption text-secondary-600">{badge}</span>}
               </button>
             );
           })}
         </nav>
       </div>
 
-      {/* Contenu des onglets */}
-      <div className="bg-white rounded-lg border border-secondary-200 shadow-card p-6">
-        {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} onInvestigate={() => setShowInvestigation(true)} savedLocation={{ lat: client?.latitude, lng: client?.longitude }} savedAddress={{ address: client?.address || '', postalCode: client?.postal_code || '', city: client?.city || '' }} client={client} onApplyDpe={handleApplyInvestigation} onCreateEquipment={handleCreateEquipmentFromDpe} />}
-        {activeTab === 'contract' && <TabContrat clientId={id} orgId={organization?.id} userId={user?.id} client={client} />}
-        {activeTab === 'devis-pl' && client.pennylane_account_number && <TabDevisPL clientId={id} orgId={organization?.id} />}
-        {activeTab === 'devis-pl' && !client.pennylane_account_number && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Receipt className="w-10 h-10 text-secondary-300 mb-3" />
-            <p className="text-sm font-medium text-secondary-600">Client non synchronise avec Pennylane</p>
-            <p className="text-xs text-secondary-400 mt-1">Ce client n&apos;a pas encore de code comptable Pennylane</p>
-          </div>
-        )}
-        {activeTab === 'factures-pl' && client.pennylane_account_number && <TabFacturesPL clientId={id} orgId={organization?.id} />}
-        {activeTab === 'factures-pl' && !client.pennylane_account_number && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Receipt className="w-10 h-10 text-secondary-300 mb-3" />
-            <p className="text-sm font-medium text-secondary-600">Client non synchronisé avec Pennylane</p>
-            <p className="text-xs text-secondary-400 mt-1">Ce client n&apos;a pas encore de code comptable Pennylane</p>
-          </div>
-        )}
-        {activeTab === 'equipments' && (
-          <TabEquipments
-            clientId={id}
-            client={isArchived ? null : client}
-            prefillDraft={equipmentDraft}
-            onPrefillConsumed={() => setEquipmentDraft(null)}
-          />
-        )}
-        {activeTab === 'interventions' && <TabInterventions projectId={client.project_id} clientId={id} />}
-        {activeTab === 'timeline' && <TabTimeline clientId={id} projectId={client.project_id} />}
-        {activeTab === 'mailings' && <TabMailings clientId={id} />}
-        {activeTab === 'sms' && <TabSms clientId={id} />}
-      </div>
+      {/* Contenu des onglets. Résumé, Devis et factures, Échanges posent leurs propres cartes ;
+          en édition, le Résumé cède la place au formulaire complet. */}
+      {activeTab === 'resume' && isLocked && (
+        <TabResume
+          client={client}
+          owner={owner}
+          tenants={tenants}
+          members={members}
+          formHousingType={formData.housingType}
+          formSurface={formData.surface}
+          onApplyDpe={handleApplyInvestigation}
+          onCreateEquipment={handleCreateEquipmentFromDpe}
+          onInvestigate={() => setShowInvestigation(true)}
+          onOuvrirOnglet={setActiveTab}
+        />
+      )}
+      {activeTab === 'devis-factures' && <TabDevisFactures client={client} clientId={id} orgId={organization?.id} />}
+      {activeTab === 'echanges' && <TabEchanges clientId={id} projectId={client.project_id} />}
+      {((activeTab === 'resume' && !isLocked) || ['contrat', 'equipements', 'interventions'].includes(activeTab)) && (
+        <div className="bg-white rounded-lg border border-secondary-200 shadow-card p-6">
+          {activeTab === 'resume' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} savedLocation={{ lat: client?.latitude, lng: client?.longitude }} savedAddress={{ address: client?.address || '', postalCode: client?.postal_code || '', city: client?.city || '' }} />}
+          {activeTab === 'contrat' && <TabContrat clientId={id} orgId={organization?.id} userId={user?.id} client={client} />}
+          {activeTab === 'equipements' && (
+            <TabEquipments
+              clientId={id}
+              client={isArchived ? null : client}
+              prefillDraft={equipmentDraft}
+              onPrefillConsumed={() => setEquipmentDraft(null)}
+            />
+          )}
+          {activeTab === 'interventions' && <TabInterventions projectId={client.project_id} clientId={id} />}
+        </div>
+      )}
 
       {/* Investigation bâtiment — panneau latéral, lecture seule.
           « Renseigner la fiche » ne fait que PRÉ-REMPLIR le formulaire et le

@@ -146,3 +146,37 @@ export function ordonnerInterventions(interventions = [], aujourdhui) {
   }
   return ordre;
 }
+
+/**
+ * Interventions À VENIR, pour le Résumé de la fiche client : d'abord celles qui ont
+ * une date (RDV actif posé, sinon date prévue, à partir d'aujourd'hui), de la plus
+ * proche à la plus lointaine ; puis les cartes ouvertes que rien ne date encore
+ * (demande SAV, entretien à planifier), de la plus ancienne demande à la plus récente.
+ *
+ * N'y entrent ni les lignes enfants (un certificat par équipement), ni ce qui est fait
+ * (réalisé, facturé, terminé), ni ce qui est annulé, ni une date ou un RDV PASSÉ d'une
+ * intervention non close (elle n'est pas « à venir », elle est en retard de clôture),
+ * ni une ligne d'historique importé sans carte (`workflow_status` vide) et sans date.
+ * Ne modifie pas le tableau reçu.
+ * @param {Array<object>} [interventions] - lignes de `majordhome_interventions` enrichies de `rdvs`
+ * @param {string} aujourdhui - 'YYYY-MM-DD' (date LOCALE)
+ * @returns {Array<object>} les interventions retenues, dans l'ordre d'affichage
+ */
+export function interventionsAVenir(interventions = [], aujourdhui) {
+  const datees = [];
+  const ouvertes = [];
+  for (const i of interventions || []) {
+    if (i.parent_id || estFaite(i) || i.status === 'cancelled') continue;
+    const ref = rdvsActifs(i.rdvs).find((r) => jourDe(r.scheduled_date) >= aujourdhui);
+    if (ref) {
+      datees.push({ i, cle: `${jourDe(ref.scheduled_date)} ${heureDe(ref.scheduled_start) || ''}` });
+    } else if (rdvsActifs(i.rdvs).length === 0 && jourDe(i.scheduled_date) >= aujourdhui) {
+      datees.push({ i, cle: `${jourDe(i.scheduled_date)} ` });
+    } else if (rdvsActifs(i.rdvs).length === 0 && !i.scheduled_date && i.workflow_status) {
+      ouvertes.push(i);
+    }
+  }
+  datees.sort((a, b) => a.cle.localeCompare(b.cle));
+  ouvertes.sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+  return [...datees.map((d) => d.i), ...ouvertes];
+}

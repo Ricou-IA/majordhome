@@ -2,7 +2,7 @@
 // node --test scripts/intervention-ligne.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decrireIntervention, rdvDeReference, rdvsActifs, ordonnerInterventions } from '../src/lib/interventionLigne.js';
+import { decrireIntervention, rdvDeReference, rdvsActifs, ordonnerInterventions, interventionsAVenir } from '../src/lib/interventionLigne.js';
 
 const AUJOURDHUI = '2026-11-16';
 const NOMS = new Map([['t1', 'Michel'], ['t2', 'Philippe']]);
@@ -95,4 +95,29 @@ test('ordre : la plus récente en tête, les enfants sous leur parent, les orphe
   assert.equal(ordre[1]._hasChildren, true);
   assert.equal(ordre[0]._hasChildren, false);
   assert.deepEqual(liste, copie, 'le tableau reçu n’est pas modifié');
+});
+
+test('à venir : RDV posé ou date prévue à partir d’aujourd’hui, puis cartes ouvertes sans date', () => {
+  const liste = [
+    { id: 'faite', workflow_status: 'realise', scheduled_date: '2026-12-01', rdvs: [] },
+    { id: 'facturee', workflow_status: 'facture', rdvs: [{ scheduled_date: '2026-12-02', status: 'scheduled' }] },
+    { id: 'refus', workflow_status: 'a_planifier', status: 'cancelled', created_at: '2026-01-01T00:00:00Z', rdvs: [] },
+    { id: 'rdv-passe', workflow_status: 'planifie', rdvs: [{ scheduled_date: '2026-11-10', status: 'scheduled' }] },
+    { id: 'prevu-passe', workflow_status: 'planifie', scheduled_date: '2026-11-01', rdvs: [] },
+    { id: 'historique', intervention_type: 'maintenance', status: 'scheduled', created_at: '2020-01-01T00:00:00Z' },
+    { id: 'enfant', parent_id: 'rdv-loin', rdvs: [{ scheduled_date: '2026-11-17', status: 'scheduled' }] },
+    { id: 'demande-recente', workflow_status: 'demande', created_at: '2026-11-12T00:00:00Z', rdvs: [] },
+    { id: 'rdv-loin', workflow_status: 'planifie', rdvs: [{ scheduled_date: '2026-12-20', scheduled_start: '08:00', status: 'scheduled' }] },
+    { id: 'prevu', workflow_status: 'planifie', scheduled_date: '2026-11-30', rdvs: [] },
+    { id: 'demande-ancienne', workflow_status: 'a_planifier', created_at: '2026-09-01T00:00:00Z', rdvs: [] },
+    { id: 'rdv-jour', workflow_status: 'planifie', rdvs: [{ scheduled_date: '2026-11-16', scheduled_start: '14:00', status: 'scheduled' }] },
+    { id: 'rdv-jour-tot', workflow_status: 'planifie', rdvs: [{ scheduled_date: '2026-11-16', scheduled_start: '08:00', status: 'scheduled' }] },
+  ];
+  const copie = structuredClone(liste);
+  assert.deepEqual(interventionsAVenir(liste, AUJOURDHUI).map((i) => i.id), [
+    'rdv-jour-tot', 'rdv-jour', 'prevu', 'rdv-loin', 'demande-ancienne', 'demande-recente',
+  ]);
+  assert.deepEqual(liste, copie, 'le tableau reçu n’est pas modifié');
+  assert.deepEqual(interventionsAVenir([], AUJOURDHUI), []);
+  assert.deepEqual(interventionsAVenir(undefined, AUJOURDHUI), []);
 });
