@@ -5,6 +5,7 @@
 import { Combobox } from '@/components/ui/combobox';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
+import { AlertTriangle } from 'lucide-react';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildFumisterieConfig } from '@/lib/fumisterie/config.js';
 
@@ -104,7 +105,7 @@ const BORNES = [
 ];
 
 function Champ({ label, hint, error, children }) {
-  return (<div><label className={LABEL_CLASS}>{label}</label>{children}{error ? <p className="mt-1 text-xs text-st-alerte">⚠ {error}</p> : hint ? <p className={HINT_CLASS}>{hint}</p> : null}</div>);
+  return (<div><label className={LABEL_CLASS}>{label}</label>{children}{error ? <p className="mt-1 text-xs text-st-alerte"><AlertTriangle className="inline h-3.5 w-3.5 align-[-2px] mr-1" aria-hidden="true" />{error}</p> : hint ? <p className={HINT_CLASS}>{hint}</p> : null}</div>);
 }
 
 export default function FumisterieTab() {

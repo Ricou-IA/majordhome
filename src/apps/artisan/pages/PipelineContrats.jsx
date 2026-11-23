@@ -11,7 +11,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, AlertCircle, CheckCircle2, Archive, Clock, MapPin, Phone, ChevronRight } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2, Archive, Clock, MapPin, Phone, ChevronRight, Wrench, Target, Globe, Hand } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { contractKeys } from '@hooks/cacheKeys';
@@ -73,10 +73,10 @@ const PIPELINE_COLUMNS = [
 ];
 
 const SOURCE_CONFIG = {
-  chantier: { label: 'Chantier', emoji: '🔧', color: '#10B981', bg: 'bg-emerald-50',  text: 'text-emerald-700',  ring: 'ring-emerald-200' },
-  pipeline: { label: 'Pipeline', emoji: '🎯', color: '#6366F1', bg: 'bg-indigo-50',   text: 'text-indigo-700',   ring: 'ring-indigo-200' },
-  web:      { label: 'Site web', emoji: '🌐', color: '#3B82F6', bg: 'bg-blue-50',     text: 'text-blue-700',     ring: 'ring-blue-200' },
-  manual:   { label: 'Manuel',   emoji: '✋', color: '#6B7280', bg: 'bg-secondary-50',     text: 'text-secondary-700',     ring: 'ring-secondary-200' },
+  chantier: { label: 'Chantier', Icone: Wrench, color: '#10B981', bg: 'bg-emerald-50',  text: 'text-emerald-700',  ring: 'ring-emerald-200' },
+  pipeline: { label: 'Pipeline', Icone: Target, color: '#6366F1', bg: 'bg-indigo-50',   text: 'text-indigo-700',   ring: 'ring-indigo-200' },
+  web:      { label: 'Site web', Icone: Globe, color: '#3B82F6', bg: 'bg-blue-50',     text: 'text-blue-700',     ring: 'ring-blue-200' },
+  manual:   { label: 'Manuel',   Icone: Hand, color: '#6B7280', bg: 'bg-secondary-50',     text: 'text-secondary-700',     ring: 'ring-secondary-200' },
 };
 
 const SOURCE_ORDER = ['chantier', 'pipeline', 'web', 'manual'];
@@ -211,7 +211,7 @@ function ContractPipelineCard({ contract }) {
             title={`Source : ${sourceConfig.label}`}
             className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ring-1 ${sourceConfig.bg} ${sourceConfig.text} ${sourceConfig.ring}`}
           >
-            <span aria-hidden>{sourceConfig.emoji}</span>
+            <sourceConfig.Icone className="h-3 w-3 shrink-0" aria-hidden="true" />
             <span className="font-medium">{sourceConfig.label}</span>
           </span>
           <span className={`px-1.5 py-0.5 rounded-full ${createdDays > 7 ? 'bg-red-50 text-red-600' : createdDays > 3 ? 'bg-amber-50 text-amber-600' : 'bg-secondary-50 text-secondary-500'}`}>
@@ -276,7 +276,7 @@ function SourceFilter({ contracts, activeSource, onChange }) {
                 : 'bg-white text-secondary-700 ring-secondary-200 hover:bg-secondary-50'
               }`}
           >
-            <span aria-hidden>{cfg.emoji}</span>
+            <cfg.Icone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {cfg.label}
             <span className={`${active ? 'bg-white/60' : 'bg-secondary-100 text-secondary-600'} px-1.5 py-0.5 rounded-full tabular-nums`}>
               {count}

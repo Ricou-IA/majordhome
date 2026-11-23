@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   Mic, Square, Loader2, CheckCircle2, AlertCircle, RotateCcw,
-  ExternalLink, ChevronLeft, MapPin,
+  ExternalLink, ChevronLeft, MapPin, FileText, ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useAudioRecording } from '../hooks/useAudioRecording';
@@ -265,20 +265,21 @@ export default function VoiceRecorder() {
         {context.type === 'note' && (
           <div className="grid grid-cols-2 gap-2 mt-3">
             {[
-              { value: 'note_libre', label: '📝 Note libre' },
-              { value: 'reunion', label: '📋 Réunion' },
+              { value: 'note_libre', label: 'Note libre', Icone: FileText },
+              { value: 'reunion', label: 'Réunion', Icone: ClipboardList },
             ].map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => setNoteSubType(opt.value)}
                 disabled={isRecording || isBusy || !!audioBlob}
-                className={`py-2 rounded-lg border text-sm transition disabled:opacity-50 ${
+                className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm transition disabled:opacity-50 ${
                   noteSubType === opt.value
                     ? 'bg-orange-500 border-orange-500 text-white'
                     : 'bg-white/5 border-white/10 text-secondary-200 hover:bg-white/10'
                 }`}
               >
+                <opt.Icone className="h-4 w-4 shrink-0" aria-hidden="true" />
                 {opt.label}
               </button>
             ))}

@@ -2,7 +2,7 @@
  * ProspectTable.jsx — Table de prospects réutilisable
  */
 
-import { ArrowUpDown, TrendingUp, AlertTriangle, Loader2 } from 'lucide-react';
+import { ArrowUpDown, TrendingUp, AlertTriangle, Loader2, Star } from 'lucide-react';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
 
 // Score badge colors (deutan-friendly: icône + label toujours)
@@ -51,10 +51,11 @@ function PrioriteBadge({ priorite }) {
   if (!priorite) return null;
   const isA = priorite === 'A';
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold ${
+    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-bold ${
       isA ? 'bg-[#F5C542]/20 text-[#B8860B]' : 'bg-secondary-200 text-secondary-600'
     }`}>
-      {isA ? '★ A' : 'B'}
+      {isA && <Star className="h-3 w-3 shrink-0 fill-current" aria-hidden="true" />}
+      {isA ? 'A' : 'B'}
     </span>
   );
 }

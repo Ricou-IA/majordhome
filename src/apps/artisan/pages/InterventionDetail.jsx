@@ -559,7 +559,7 @@ export default function InterventionDetail() {
         <TabsContent value="photos" className="mt-4 space-y-6">
           {/* Photo avant */}
           <PhotoCapture
-            label="📸 Photo avant intervention"
+            label="Photo avant intervention"
             currentUrl={fileUrls.photoBeforeUrl}
             currentPath={intervention.photo_before_url}
             onUpload={(file) => handlePhotoUpload(file, FILE_TYPES.PHOTO_BEFORE, 'photo_before_url')}
@@ -570,7 +570,7 @@ export default function InterventionDetail() {
 
           {/* Photo après */}
           <PhotoCapture
-            label="📸 Photo après intervention"
+            label="Photo après intervention"
             currentUrl={fileUrls.photoAfterUrl}
             currentPath={intervention.photo_after_url}
             onUpload={(file) => handlePhotoUpload(file, FILE_TYPES.PHOTO_AFTER, 'photo_after_url')}
@@ -581,7 +581,7 @@ export default function InterventionDetail() {
 
           {/* Photos supplémentaires */}
           <div className="space-y-3">
-            <Label className="text-base font-medium">📸 Photos supplémentaires</Label>
+            <Label className="text-base font-medium">Photos supplémentaires</Label>
             <div className="grid grid-cols-2 gap-3">
               {(fileUrls.photosExtraUrls || []).map((url, index) => {
                 const path = intervention.photos_extra?.[index];

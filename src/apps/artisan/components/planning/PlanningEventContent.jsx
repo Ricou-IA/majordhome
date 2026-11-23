@@ -11,6 +11,7 @@
  * ============================================================================
  */
 
+import { ArrowLeftRight, Hourglass, Lock } from 'lucide-react';
 import { estTypeAdaptable } from '@/lib/souplesse';
 import { modeleVignette, HAUTEUR_CRENEAU, HAUTEUR_CRENEAU_TELEPHONE, MARGE_LISERE } from '@/lib/planningVignette';
 import { useDeviceClass } from '@hooks/useDeviceClass';
@@ -19,18 +20,27 @@ import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKi
 // Classes écrites en toutes lettres : Tailwind ne génère pas une classe composée à la volée.
 const LIGNES_NOM = { 1: 'line-clamp-1', 2: 'line-clamp-2', 3: 'line-clamp-3' };
 
+// Icône de 12 px dans un texte de 12 px à interligne 13 px : jamais une ligne plus haute.
+const ICONE_REPERE = 'inline-block h-3 w-3 align-[-1px] shrink-0';
+
 /** Repères d'état en tête de vignette : souplesse, heure communiquée, pose provisoire. */
 function Reperes({ rdv }) {
   const { adaptable, hour_confirmed_at, appointment_type, provisoire } = rdv;
   return (
     <>
       {adaptable ? (
-        <span className="shrink-0 opacity-90" title="Adaptable : l’heure peut glisser dans sa tolérance">↔</span>
+        <span className="inline-flex shrink-0 opacity-90" title="Adaptable : l’heure peut glisser dans sa tolérance" role="img" aria-label="Adaptable : l’heure peut glisser dans sa tolérance">
+          <ArrowLeftRight className={ICONE_REPERE} aria-hidden="true" />
+        </span>
       ) : (estTypeAdaptable(appointment_type) && hour_confirmed_at) ? (
-        <span className="shrink-0 opacity-90" title="Heure communiquée au client">🔒</span>
+        <span className="inline-flex shrink-0 opacity-90" title="Heure communiquée au client" role="img" aria-label="Heure communiquée au client">
+          <Lock className={ICONE_REPERE} aria-hidden="true" />
+        </span>
       ) : null}
       {provisoire && (
-        <span className="shrink-0 opacity-90" title="Pose provisoire : appros du chantier non reçues">⏳</span>
+        <span className="inline-flex shrink-0 opacity-90" title="Pose provisoire : appros du chantier non reçues" role="img" aria-label="Pose provisoire : appros du chantier non reçues">
+          <Hourglass className={ICONE_REPERE} aria-hidden="true" />
+        </span>
       )}
     </>
   );

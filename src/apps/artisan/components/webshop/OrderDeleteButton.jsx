@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { AlertTriangle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
@@ -56,9 +56,17 @@ export default function OrderDeleteButton({ order, onDelete, onDeleted }) {
         open={open}
         onOpenChange={setOpen}
         title={`Supprimer la commande ${order.order_number} ?`}
-        description={`La commande et ses lignes sont effacées définitivement ; sa place dans la tournée est libérée.${
-          paid ? ' ⚠️ Commande payée : la suppression ne rembourse pas le client (remboursement à faire dans Stripe).' : ''
-        } Pour garder une trace, préférez le statut « Annulée ».`}
+        description={
+          <>
+            La commande et ses lignes sont effacées définitivement ; sa place dans la tournée est libérée.
+            {paid && (
+              <>
+                {' '}<AlertTriangle className="inline h-4 w-4 align-[-2px] mr-1" aria-hidden="true" />Commande payée : la suppression ne rembourse pas le client (remboursement à faire dans Stripe).
+              </>
+            )}
+            {' '}Pour garder une trace, préférez le statut « Annulée ».
+          </>
+        }
         confirmLabel="Supprimer définitivement"
         variant="destructive"
         loading={deleting}

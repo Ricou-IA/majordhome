@@ -311,7 +311,8 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
             )}
             {!orgDepartmentCode && !loadingCommunes && (
               <div className="text-[11px] text-amber-600 mt-1">
-                ⚠️ Configure ton <strong>département principal</strong> dans Paramètres → Organisation → Territoire pour activer ce module.
+                <AlertTriangle className="inline h-3 w-3 align-[-2px] mr-1" aria-hidden="true" />
+                Configure ton <strong>département principal</strong> dans Paramètres → Organisation → Territoire pour activer ce module.
               </div>
             )}
           </div>

@@ -2,13 +2,13 @@
  * EquipmentKindIcons.jsx - Majord'home Artisan
  * ============================================================================
  * Icônes d'identité visuelle des équipements d'un client :
- *   🪵 bûche (bois) / 🔥 flamme (granulés) / ❄️ flocon (clim & PAC).
+ *   sapin (bois) / flamme (granulés) / flocon (clim & PAC).
  * 1 icône par équipement identifiable — rien si le type n'est pas saisi
  * (règle produit : jamais de devinette bois vs granulés).
  *
- * Emoji natifs (pas de Lucide) : rendus colorés par la police système,
- * lisibles aussi sur les blocs planning colorés. ⚠️ 🪵 (U+1FAB5, Unicode 13)
- * n'existe pas sous Windows 10 (carré vide) — assumé, parc Mayer = Win11/tablettes.
+ * Icônes Lucide à la couleur du texte (currentColor) : lisibles sur les blocs
+ * planning colorés comme sur une carte blanche. Le libellé de l'équipement est
+ * porté par `title` et `aria-label`, jamais par la couleur.
  *
  * Autonome : lit le cache partagé useClientEquipmentKinds (1 requête par org,
  * dédoublonnée par React Query) — se pose dans n'importe quelle carte/ligne
@@ -18,19 +18,20 @@
  * ============================================================================
  */
 
+import { Flame, Snowflake, TreePine } from 'lucide-react';
 import { useClientEquipmentKinds } from '@hooks/useClients';
 
-const KIND_EMOJI = {
-  buche: '\u{1FAB5}', // 🪵
-  flamme: '\u{1F525}', // 🔥
-  flocon: '❄️', // ❄️ (VS16 : force le rendu emoji coloré)
+const KIND_ICON = {
+  buche: TreePine,
+  flamme: Flame,
+  flocon: Snowflake,
 };
 
-// Tailles compensées : leading-none + marge verticale négative sur le conteneur
-// pour que l'emoji grossi ne modifie ni la hauteur de ligne ni celle des cartes.
+// 12 px en `xs` (planning, tableaux : texte de 11-12 px, interligne 13 px) :
+// l'icône ne rend jamais une ligne plus haute. 16 px en `sm` (cartes).
 const SIZE_CLASSES = {
-  xs: 'text-sm',
-  sm: 'text-lg',
+  xs: 'h-3 w-3',
+  sm: 'h-4 w-4',
 };
 
 /**
@@ -48,13 +49,13 @@ export function EquipmentKindIcons({ clientId, size = 'sm', className = '' }) {
   const sizeClass = SIZE_CLASSES[size] || SIZE_CLASSES.sm;
 
   return (
-    <span className={`inline-flex items-center gap-px flex-shrink-0 leading-none -my-0.5 ${sizeClass} ${className}`}>
+    <span className={`inline-flex items-center gap-px flex-shrink-0 leading-none ${className}`}>
       {kinds.map(({ kind, label }, i) => {
-        const emoji = KIND_EMOJI[kind];
-        if (!emoji) return null;
+        const Icone = KIND_ICON[kind];
+        if (!Icone) return null;
         return (
-          <span key={`${kind}-${i}`} title={label} role="img" aria-label={label}>
-            {emoji}
+          <span key={`${kind}-${i}`} title={label} role="img" aria-label={label} className="inline-flex">
+            <Icone className={`inline-block ${sizeClass} align-[-1px] shrink-0`} aria-hidden="true" />
           </span>
         );
       })}

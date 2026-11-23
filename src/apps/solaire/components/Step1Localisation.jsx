@@ -272,7 +272,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
               className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-60"
             >
               {gpsLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LocateFixed className="w-5 h-5" />}
-              {gpsLoading ? 'Localisation en cours…' : '📍 Me localiser'}
+              {gpsLoading ? 'Localisation en cours…' : 'Me localiser'}
             </button>
 
             <div className="relative">
@@ -346,7 +346,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
                 className="btn-primary w-full flex items-center justify-center gap-2 py-2.5 disabled:opacity-60"
               >
                 {panLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                {panLoading ? 'Analyse du pan…' : '➕ Ajouter ce pan'}
+                {panLoading ? 'Analyse du pan…' : 'Ajouter ce pan'}
               </button>
             )}
 
@@ -387,7 +387,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
                         <div className="flex items-center gap-1.5 font-medium text-secondary-900">
                           {isBest && <Star className="w-3.5 h-3.5 text-[#B45309] fill-[#F5C542] flex-shrink-0" />}
                           Pan {i + 1}
-                          {isBest && <span className="text-xs font-normal text-[#B45309]">★ meilleur</span>}
+                          {isBest && <span className="text-xs font-normal text-[#B45309]">meilleur</span>}
                         </div>
                         <div className="text-xs text-secondary-500">
                           pente {Math.round(pan.pitchDeg)}° · {azimuthToCompassLabel(pan.azimuthCompass)} · {Math.round(pan.slopeAreaM2)} m² ·{' '}

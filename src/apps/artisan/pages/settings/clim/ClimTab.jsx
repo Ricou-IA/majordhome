@@ -3,6 +3,7 @@
 // src/lib/clim/config.js (DEFAULTS_CLIM). ⚠ merge JSONB niveau 1 → on renvoie l'objet `clim` COMPLET.
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
+import { AlertTriangle } from 'lucide-react';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildClimConfig } from '@/lib/clim/config.js';
 import { CLASSES_ISOLATION, EXPOSITIONS } from '@/lib/clim/dimensionnement.js';
@@ -83,7 +84,7 @@ function validate(form) {
 }
 
 function Champ({ label, hint, error, children }) {
-  return (<div><label className={LABEL_CLASS}>{label}</label>{children}{error ? <p className="mt-1 text-xs text-st-alerte">⚠ {error}</p> : hint ? <p className={HINT_CLASS}>{hint}</p> : null}</div>);
+  return (<div><label className={LABEL_CLASS}>{label}</label>{children}{error ? <p className="mt-1 text-xs text-st-alerte"><AlertTriangle className="inline h-3.5 w-3.5 align-[-2px] mr-1" aria-hidden="true" />{error}</p> : hint ? <p className={HINT_CLASS}>{hint}</p> : null}</div>);
 }
 
 export default function ClimTab() {
@@ -163,7 +164,7 @@ export default function ClimTab() {
               <button type="button" onClick={() => setForm((f) => ({ ...f, paliers: f.paliers.filter((_, j) => j !== i) }))} className="text-xs text-secondary-500 hover:text-red-600 pb-2">retirer</button>
             </div>
           ))}
-          {errors.paliers && <p className="text-xs text-st-alerte">⚠ {errors.paliers}</p>}
+          {errors.paliers && <p className="text-xs text-st-alerte"><AlertTriangle className="inline h-3.5 w-3.5 align-[-2px] mr-1" aria-hidden="true" />{errors.paliers}</p>}
           <div className="flex items-center gap-4">
             <button type="button" onClick={() => setForm((f) => ({ ...f, paliers: [...f.paliers, { max_kw: '', liquide: '', gaz: '' }] }))} className="text-sm text-primary-700 hover:underline">+ Ajouter un palier</button>
             <div className="max-w-xs flex-1"><Champ label="Longueur de liaison par défaut (m)" error={errors.longueur_liaison_defaut_m}>{num('longueur_liaison_defaut_m', { step: 0.5, min: 1, max: 50 })}</Champ></div>

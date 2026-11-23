@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Play, Trash2, Clock, CheckCircle2, XCircle, BarChart3 } from 'lucide-react';
+import { Play, Trash2, Clock, CheckCircle2, XCircle, BarChart3, MapPin, Map as MapIcon } from 'lucide-react';
 import { formatDateTimeFR } from '@/lib/utils';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useKeywordLists, useBenchmarks, useDeleteBenchmark, useGeoGridQuota } from '@hooks/useGeoGrid';
 import BenchmarkLauncher from './BenchmarkLauncher';
 import BenchmarkResultTable from './BenchmarkResultTable';
+
+const ICONE_MODE = 'inline-block h-4 w-4 align-[-3px] mr-1 shrink-0';
 
 function StatusBadge({ status, completed, total }) {
   if (status === 'running') {
@@ -116,9 +118,15 @@ export default function BenchmarksPanel({ orgId }) {
                 >
                   <td className="px-4 py-2 font-medium text-secondary-900">{b.list_name}</td>
                   <td className="px-3 py-2 text-secondary-600">
-                    {b.scan_mode === 'grid' && '📍 Gaillac (grille)'}
-                    {b.scan_mode === 'cities' && `🗺️ ${orgDepartmentLabel || 'Département'} (communes)`}
-                    {b.scan_mode === 'both' && '📍🗺️ Les deux'}
+                    {b.scan_mode === 'grid' && (
+                      <><MapPin className={ICONE_MODE} aria-hidden="true" />Gaillac (grille)</>
+                    )}
+                    {b.scan_mode === 'cities' && (
+                      <><MapIcon className={ICONE_MODE} aria-hidden="true" />{orgDepartmentLabel || 'Département'} (communes)</>
+                    )}
+                    {b.scan_mode === 'both' && (
+                      <><MapPin className={ICONE_MODE} aria-hidden="true" /><MapIcon className={ICONE_MODE} aria-hidden="true" />Les deux</>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-secondary-600">{formatDateTimeFR(b.started_at)}</td>
                   <td className="px-3 py-2">

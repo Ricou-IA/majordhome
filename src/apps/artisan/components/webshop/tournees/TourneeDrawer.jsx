@@ -10,7 +10,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { X, Send, Download, Lock, LockOpen, Ban, Loader2, Package, Truck, PackageCheck, RotateCcw } from 'lucide-react';
+import { AlertTriangle, X, Send, Download, Lock, LockOpen, Ban, Loader2, Package, Truck, PackageCheck, RotateCcw } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
@@ -224,7 +224,17 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
         open={confirm === 'close'}
         onOpenChange={(v) => !v && closeConfirm()}
         title="Fermer la tournée à la réservation ?"
-        description={`Plus aucun client ne pourra la choisir. ${cfg.palette.envoi_auto ? `⚠️ L'envoi automatique de ${cfg.palette.heure_envoi} h envoie la feuille de route de toute tournée fermée : elle partira au transporteur ce soir.` : 'L\'envoi automatique est désactivé : pensez à l\'envoyer au transporteur.'}`}
+        description={
+          <>
+            Plus aucun client ne pourra la choisir.{' '}
+            {cfg.palette.envoi_auto ? (
+              <>
+                <AlertTriangle className="inline h-4 w-4 align-[-2px] mr-1" aria-hidden="true" />
+                {`L'envoi automatique de ${cfg.palette.heure_envoi} h envoie la feuille de route de toute tournée fermée : elle partira au transporteur ce soir.`}
+              </>
+            ) : 'L\'envoi automatique est désactivé : pensez à l\'envoyer au transporteur.'}
+          </>
+        }
         confirmLabel="Fermer"
         variant="default"
         loading={setStatus.isPending}

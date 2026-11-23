@@ -8,14 +8,14 @@
  * en-tête de la barre ; elle n'a rien à faire sur chaque bloc.
  *
  * Reprend la lecture d'une carte de kanban : qui, où, quoi, quand, combien de
- * temps. Les icônes d'équipement (🪵 bûche / 🔥 flamme / ❄️ flocon) sont celles
+ * temps. Les icônes d'équipement (sapin / flamme / flocon) sont celles
  * du reste de l'app — même composant, même cache — et ne s'affichent que sur un
  * entretien : c'est là qu'elles disent quelque chose du travail à faire.
  * ============================================================================
  */
 
 import { estTypeAdaptable } from '@/lib/souplesse';
-import { Car } from 'lucide-react';
+import { ArrowLeftRight, Car, Lock } from 'lucide-react';
 import { EquipmentKindIcons } from '@apps/artisan/components/shared/EquipmentKindIcons';
 import { minutesEnHHMM, formatDuree } from './tourneesPanelUtils';
 
@@ -63,8 +63,8 @@ export function BlocRdvCard({
       <div className="flex items-center justify-between gap-1.5">
         <p className="font-semibold text-secondary-900 text-xs truncate">
           {estTypeAdaptable(type) && (rdv.hour_confirmed_at || rdv.time_flex_minutes === 0
-            ? <span className="mr-1" title="Heure communiquée au client (figé)">🔒</span>
-            : <span className="mr-1" title="Adaptable : le CTA « Trouver le créneau » et « Figer la journée » peuvent le glisser dans sa tolérance. Le remplissage de journée, lui, ne déplace jamais un RDV posé.">↔</span>)}
+            ? <span className="mr-1" title="Heure communiquée au client (figé)"><Lock className="inline-block h-3 w-3 align-[-1px] shrink-0" aria-hidden="true" /></span>
+            : <span className="mr-1" title="Adaptable : le CTA « Trouver le créneau » et « Figer la journée » peuvent le glisser dans sa tolérance. Le remplissage de journée, lui, ne déplace jamais un RDV posé."><ArrowLeftRight className="inline-block h-3 w-3 align-[-1px] shrink-0" aria-hidden="true" /></span>)}
           {rdv.client_name || rdv.subject || 'Sans client'}
         </p>
         {type === 'maintenance' && rdv.client_id && (

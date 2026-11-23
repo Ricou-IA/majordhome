@@ -17,7 +17,7 @@ import { MAPBOX_CONFIG } from '@lib/mapbox';
 export default function AddressSearch({
   initialValue = '',
   onSelect,
-  placeholder = '🔍 Rechercher une adresse...',
+  placeholder = 'Rechercher une adresse...',
   disabled = false,
   types = null,
   autoFocus = false,

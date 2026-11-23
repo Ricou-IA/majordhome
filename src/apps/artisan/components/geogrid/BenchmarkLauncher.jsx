@@ -1,6 +1,6 @@
 import { ListeChoix } from '@/components/ui/liste-choix';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Play, Loader2, AlertTriangle, Info } from 'lucide-react';
+import { X, Play, Loader2, AlertTriangle, Info, MapPin, Map as MapIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@contexts/AuthContext';
@@ -295,8 +295,8 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
             <label className="block text-xs font-medium text-secondary-600 mb-1">Mode de scan</label>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { value: 'grid', label: `📍 Présence locale${selectedCity?.name ? ` (${selectedCity.name})` : ''}`, desc: 'Maillage fin sur 1 ville' },
-                { value: 'cities', label: `🗺️ Visibilité ${orgDepartmentLabel || 'département'} (communes)`, desc: '1 point par ville' },
+                { value: 'grid', Icone: MapPin, label: `Présence locale${selectedCity?.name ? ` (${selectedCity.name})` : ''}`, desc: 'Maillage fin sur 1 ville' },
+                { value: 'cities', Icone: MapIcon, label: `Visibilité ${orgDepartmentLabel || 'département'} (communes)`, desc: '1 point par ville' },
               ].map((m) => (
                 <button
                   key={m.value}
@@ -306,7 +306,10 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
                     scanMode === m.value ? 'border-primary-500 bg-primary-50' : 'border-secondary-200 hover:border-secondary-300'
                   }`}
                 >
-                  <div className="font-medium">{m.label}</div>
+                  <div className="font-medium">
+                    <m.Icone className="inline-block h-4 w-4 align-[-3px] mr-1 shrink-0" aria-hidden="true" />
+                    {m.label}
+                  </div>
                   <div className="text-xs text-secondary-500">{m.desc}</div>
                 </button>
               ))}

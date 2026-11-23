@@ -13,7 +13,7 @@ import { TECH_DOCS_BUCKET } from '@apps/solaire/lib/etudeExport';
 import { storageService } from '@services/storage.service';
 import {
   Calculator, Grid3x3, Car, ChevronLeft, Plus, X, Loader2,
-  FileText, Upload, ExternalLink, Trash2, ClipboardList,
+  FileText, Upload, ExternalLink, Trash2, ClipboardList, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormField, SectionTitle, inputClass } from '../../components/FormFields';
@@ -96,7 +96,7 @@ function CalculTab({ form, patch }) {
         <SectionTitle>Économie</SectionTitle>
         <div className="grid sm:grid-cols-2 gap-4 mt-3">
           <NumberField label="Prix du kWh par défaut" value={form.default_price_kwh} step={0.01} suffix="€ TTC"
-            hint="⚠️ À aligner sur le TRV en vigueur" onChange={(v) => patch({ default_price_kwh: v })} />
+            hint={<><AlertTriangle className="inline h-3.5 w-3.5 align-[-2px] mr-1" aria-hidden="true" />À aligner sur le TRV en vigueur</>} onChange={(v) => patch({ default_price_kwh: v })} />
           <PctField label="Inflation prix électricité / an" value={form.inflation_rate}
             onChange={(v) => patch({ inflation_rate: v })} />
           <PctField label="Dégradation panneaux / an" value={form.degradation_rate}
@@ -202,8 +202,8 @@ function GrilleTab({ form, patch }) {
                 />
                 <span className="text-sm text-secondary-500">€ TTC</span>
                 <div className="flex-1 text-xs">
-                  {duplicate && <span className="text-[#0D47A1] font-medium">⚠ Doublon de puissance</span>}
-                  {!duplicate && invalidPrice && <span className="text-[#0D47A1] font-medium">⚠ Prix manquant</span>}
+                  {duplicate && <span className="text-[#0D47A1] font-medium"><AlertTriangle className="inline h-3.5 w-3.5 align-[-2px] mr-1" aria-hidden="true" />Doublon de puissance</span>}
+                  {!duplicate && invalidPrice && <span className="text-[#0D47A1] font-medium"><AlertTriangle className="inline h-3.5 w-3.5 align-[-2px] mr-1" aria-hidden="true" />Prix manquant</span>}
                 </div>
                 <button
                   onClick={() => removeRow(index)}

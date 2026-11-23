@@ -309,7 +309,7 @@ export default function ProspectDrawer({
                         onChange={(v) => setField('priorite', v)}
                         placeholder="Aucune"
                         options={[
-                          { value: 'A', label: '★ Priorité A' },
+                          { value: 'A', label: 'Priorité A' },
                           { value: 'B', label: 'Priorité B' },
                         ]}
                       />
