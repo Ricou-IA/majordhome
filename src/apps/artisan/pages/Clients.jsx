@@ -2,8 +2,11 @@
  * Clients.jsx - Majord'home Artisan
  * ============================================================================
  * Page liste des clients avec recherche, filtres et pagination.
- * Navigation vers la fiche client détaillée au clic sur une carte.
+ * Navigation vers la fiche client détaillée au clic sur une ligne (ou une carte
+ * sur téléphone).
  *
+ * v4.0.0 - Refonte UI phase 3 : tableau triable par en-tête, segments de catégorie
+ *          (même paramètre `?filter=` que les anciennes cartes), recherche « / »
  * v3.0.0 - Navigation vers ClientDetail au lieu de la modale
  * v2.0.0 - Suppression filtre secteur (sera dans Planning)
  *
@@ -15,174 +18,25 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Search,
-  Plus,
-  Users,
-  FileText,
-  X,
-  ChevronDown,
-  AlertCircle,
-  RefreshCw,
-  CheckCircle2,
-  SlidersHorizontal,
-  Building2,
-  Landmark,
-  Archive,
-  Upload,
-} from 'lucide-react';
+import { Plus, Users, X, AlertCircle, RefreshCw, Upload, MapPin } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useClients, useClientStats } from '@hooks/useClients';
 import { CLIENT_CATEGORIES } from '@services/clients.service';
-import { ClientCard, ClientCardSkeleton } from '@/apps/artisan/components/clients/ClientCard';
 import { ClientModal } from '@/apps/artisan/components/clients/ClientModal';
+import { ClientsBarreOutils } from '@/apps/artisan/components/clients/ClientsBarreOutils';
+import { ClientsTableau } from '@/apps/artisan/components/clients/ClientsTableau';
 import { PageHeader } from '@components/ui/page-header';
 import { EmptyState } from '@components/ui/empty-state';
-
-// ============================================================================
-// CONSTANTES
-// ============================================================================
-
-/**
- * Options de tri
- */
-const SORT_OPTIONS = [
-  { value: 'display_name:asc', label: 'Nom (A-Z)' },
-  { value: 'display_name:desc', label: 'Nom (Z-A)' },
-  { value: 'created_at:desc', label: 'Plus récent' },
-  { value: 'created_at:asc', label: 'Plus ancien' },
-];
+import { Button } from '@components/ui/button';
+import { sousTitreClients, triSuivant } from '@/lib/clientsAffichage';
 
 // ============================================================================
 // SOUS-COMPOSANTS
 // ============================================================================
 
-/**
- * Barre de recherche
- */
-const SearchBar = ({ value, onChange, placeholder = "Rechercher un client..." }) => {
-  return (
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary-400" />
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full pl-10 pr-4 py-2.5 bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-      />
-      {value && (
-        <button
-          onClick={() => onChange('')}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-secondary-400 hover:text-secondary-600"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
-    </div>
-  );
-};
-
-/**
- * Bouton filtre dropdown
- */
-const FilterDropdown = ({ label, icon: Icon, value, options, onChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const selectedOption = options.find(opt => opt.value === value);
-  const hasValue = value !== '' && value !== null;
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`
-          inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors
-          ${hasValue 
-            ? 'bg-blue-50 border-blue-200 text-blue-700' 
-            : 'bg-white border-secondary-300 text-secondary-700 hover:bg-secondary-50'
-          }
-        `}
-      >
-        {Icon && <Icon className="w-4 h-4" />}
-        <span className="text-sm font-medium">
-          {selectedOption?.label || label}
-        </span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setIsOpen(false)} 
-          />
-          <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-secondary-200 rounded-lg shadow-lg z-20 py-1">
-            {options.map(option => (
-              <button
-                key={option.value}
-                onClick={() => { onChange(option.value); setIsOpen(false); }}
-                className={`
-                  w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors
-                  ${option.value === value 
-                    ? 'bg-blue-50 text-blue-700' 
-                    : 'text-secondary-700 hover:bg-secondary-50'
-                  }
-                `}
-              >
-                {option.label}
-                {option.value === value && <CheckCircle2 className="w-4 h-4" />}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-/**
- * Carte statistiques
- */
-const StatCard = ({ icon: Icon, label, value, color = 'blue', onClick, active = false }) => {
-  const colorClasses = {
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    amber: 'bg-amber-100 text-amber-600',
-    purple: 'bg-purple-100 text-purple-600',
-    teal: 'bg-teal-100 text-teal-600',
-    red: 'bg-red-100 text-red-600',
-  };
-
-  const borderColor = {
-    blue: 'border-blue-500 ring-1 ring-blue-200',
-    green: 'border-green-500 ring-1 ring-green-200',
-    amber: 'border-amber-500 ring-1 ring-amber-200',
-    purple: 'border-purple-500 ring-1 ring-purple-200',
-    teal: 'border-teal-500 ring-1 ring-teal-200',
-    red: 'border-red-500 ring-1 ring-red-200',
-  };
-
-  return (
-    <div
-      onClick={onClick}
-      className={`bg-white rounded-lg border p-4 transition-all ${
-        onClick ? 'cursor-pointer hover:shadow-md' : ''
-      } ${active ? borderColor[color] : 'border-secondary-200'}`}
-    >
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorClasses[color]}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <div>
-          <p className="text-2xl font-semibold text-secondary-900">{value}</p>
-          <p className="text-sm text-secondary-500">{label}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
+/** Segments de catégorie : valeurs du paramètre `?filter=` (« tous » = pas de paramètre). */
+const SEGMENTS_CATEGORIE = ['particuliers', 'entreprises', 'publics'];
 
 /**
  * État vide
@@ -227,13 +81,10 @@ const ErrorState = ({ error, onRetry }) => (
     <p className="text-secondary-500 mb-6">
       {error?.message || 'Une erreur est survenue lors du chargement des clients.'}
     </p>
-    <button
-      onClick={onRetry}
-      className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-    >
-      <RefreshCw className="w-4 h-4" />
+    <Button type="button" variant="secondary" onClick={onRetry}>
+      <RefreshCw aria-hidden="true" />
       Réessayer
-    </button>
+    </Button>
   </div>
 );
 
@@ -368,14 +219,6 @@ export function Clients() {
     reset();
   }, [reset, setActiveStatCard]);
 
-  const handleSortChange = useCallback((value) => {
-    const [orderBy, order] = value.split(':');
-    setFilters({
-      orderBy,
-      ascending: order === 'asc'
-    });
-  }, [setFilters]);
-
   // Handler clic sur une carte stat (toggle filtre)
   const handleStatCardClick = useCallback((cardKey) => {
     // "Total" = toujours reset, pas de toggle
@@ -436,6 +279,30 @@ export function Clients() {
     }
   }, [activeStatCard, filters.orderBy, filters.ascending, setFilters, setActiveStatCard]);
 
+  // Segments de catégorie : mêmes filtres que les anciennes cartes ; un segment se choisit, il ne se décoche pas.
+  const segment = SEGMENTS_CATEGORIE.includes(activeStatCard) ? activeStatCard : 'tous';
+  const handleSegment = useCallback((valeur) => {
+    if (valeur === segment) return;
+    handleStatCardClick(valeur === 'tous' ? 'total' : valeur);
+  }, [segment, handleStatCardClick]);
+
+  const compte = (n) => (typeof n === 'number' ? n.toLocaleString('fr-FR') : undefined);
+  const segments = [
+    { value: 'tous', label: 'Tous', count: compte(stats?.total_clients) },
+    { value: 'particuliers', label: 'Particuliers', count: compte(stats?.particuliers) },
+    { value: 'entreprises', label: 'Entreprises', count: compte(stats?.entreprises) },
+    // Affiché seulement s'il y en a (ou s'il est choisi par l'adresse).
+    (stats?.publics > 0 || activeStatCard === 'publics')
+      && { value: 'publics', label: 'Secteur public', count: compte(stats?.publics) },
+  ].filter(Boolean);
+
+  // Tri par en-tête de colonne : mêmes clés `orderBy` / `ascending` qu'avant.
+  const tri = { cle: filters.orderBy, ascendant: filters.ascending };
+  const handleTri = useCallback((cle) => {
+    const suivant = triSuivant({ cle: filters.orderBy, ascendant: filters.ascending }, cle);
+    if (suivant) setFilters({ orderBy: suivant.cle, ascending: suivant.ascendant });
+  }, [filters.orderBy, filters.ascending, setFilters]);
+
   // Calcul des filtres actifs
   const activeFilters = [];
   if (filters.clientCategory) {
@@ -454,9 +321,6 @@ export function Clients() {
 
   const hasActiveFilters = searchInput || activeFilters.length > 0;
 
-  // Current sort value
-  const currentSort = `${filters.orderBy}:${filters.ascending ? 'asc' : 'desc'}`;
-
   return (
     <div className="min-h-screen bg-secondary-50">
       {/* Header */}
@@ -464,150 +328,39 @@ export function Clients() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <PageHeader
             title="Clients"
-            subtitle={`${totalCount.toLocaleString('fr-FR')} client${totalCount !== 1 ? 's' : ''} au total`}
+            subtitle={sousTitreClients(stats) || undefined}
             actions={[
+              can('territoire', 'view') && { label: 'Carte', icon: MapPin, variant: 'ghost', to: '/territoire' },
               isOrgAdmin && { label: 'Importer', icon: Upload, variant: 'secondary', onClick: () => navigate('/clients/import') },
               canCreateClient && { label: 'Nouveau client', icon: Plus, variant: 'primary', onClick: handleAddClient },
             ]}
           />
-
-          {/* Stats */}
-          {stats && (
-            <div className={`grid grid-cols-2 gap-4 mt-6 ${stats.publics > 0 ? 'md:grid-cols-3 xl:grid-cols-6' : 'md:grid-cols-5'}`}>
-              <StatCard
-                icon={Users}
-                label="Total clients"
-                value={stats.total_clients}
-                color="blue"
-                onClick={() => handleStatCardClick('total')}
-                active={activeStatCard === 'total'}
-              />
-              <StatCard
-                icon={FileText}
-                label="Contrats actifs"
-                value={stats.active_contracts}
-                color="green"
-                onClick={() => handleStatCardClick('contracts')}
-                active={activeStatCard === 'contracts'}
-              />
-              <StatCard
-                icon={Users}
-                label="Particuliers"
-                value={stats.particuliers || 0}
-                color="amber"
-                onClick={() => handleStatCardClick('particuliers')}
-                active={activeStatCard === 'particuliers'}
-              />
-              <StatCard
-                icon={Building2}
-                label="Entreprises"
-                value={stats.entreprises || 0}
-                color="purple"
-                onClick={() => handleStatCardClick('entreprises')}
-                active={activeStatCard === 'entreprises'}
-              />
-              {/* Affichée seulement s'il y en a : les cartes par catégorie retombent sur le total. */}
-              {stats.publics > 0 && (
-                <StatCard
-                  icon={Landmark}
-                  label="Secteur public"
-                  value={stats.publics}
-                  color="teal"
-                  onClick={() => handleStatCardClick('publics')}
-                  active={activeStatCard === 'publics'}
-                />
-              )}
-              <StatCard
-                icon={Archive}
-                label="Archivés"
-                value={stats.archived || 0}
-                color="red"
-                onClick={() => handleStatCardClick('archived')}
-                active={activeStatCard === 'archived'}
-              />
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Barre de recherche et filtres */}
+      {/* Barre de recherche, segments et filtres */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Recherche */}
-          <div className="flex-1">
-            <SearchBar 
-              value={searchInput}
-              onChange={setSearchInput}
-              placeholder="Rechercher par nom, email, téléphone, ville..."
-            />
-          </div>
-
-          {/* Filtres */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <FilterDropdown
-              label="Catégorie"
-              value={filters.clientCategory || ''}
-              options={[
-                { value: '', label: 'Toutes les catégories' },
-                ...CLIENT_CATEGORIES,
-              ]}
-              onChange={(v) => setFilters({ clientCategory: v || null })}
-            />
-
-            <FilterDropdown
-              label="Contrat"
-              icon={FileText}
-              value={filters.hasContract === null ? '' : (filters.hasContract ? 'with' : 'without')}
-              options={[
-                { value: '', label: 'Tous' },
-                { value: 'with', label: 'Avec contrat' },
-                { value: 'without', label: 'Sans contrat' },
-              ]}
-              onChange={(v) => setFilters({ 
-                hasContract: v === '' ? null : v === 'with' 
-              })}
-            />
-
-            <FilterDropdown
-              label="Tri"
-              icon={SlidersHorizontal}
-              value={currentSort}
-              options={SORT_OPTIONS}
-              onChange={handleSortChange}
-            />
-
-            {/* Toggle Archivés */}
-            <button
-              onClick={() => {
-                setActiveStatCard(null);
-                setFilters({ showArchived: !filters.showArchived, onlyArchived: false });
-              }}
-              className={`
-                inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm font-medium
-                ${filters.showArchived || filters.onlyArchived
-                  ? 'bg-amber-50 border-amber-200 text-amber-700'
-                  : 'bg-white border-secondary-300 text-secondary-500 hover:bg-secondary-50'
-                }
-              `}
-              title={filters.showArchived ? 'Masquer les archivés' : 'Afficher les archivés'}
-            >
-              <Archive className="w-4 h-4" />
-            </button>
-
-            {/* Bouton refresh */}
-            <button
-              onClick={refresh}
-              disabled={loading}
-              className="p-2.5 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
-              title="Rafraîchir"
-            >
-              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </div>
-
-
-
+        <ClientsBarreOutils
+          recherche={searchInput}
+          onRecherche={setSearchInput}
+          raccourciActif={!showCreateModal}
+          filtreContrat={filters.hasContract === null ? '' : (filters.hasContract ? 'with' : 'without')}
+          onFiltreContrat={(v) => setFilters({ hasContract: v === '' ? null : v === 'with' })}
+          onRafraichir={refresh}
+          chargement={loading}
+          segment={segment}
+          segments={segments}
+          onSegment={handleSegment}
+          contratsActifs={activeStatCard === 'contracts'}
+          onContratsActifs={() => handleStatCardClick('contracts')}
+          archives={activeStatCard === 'archived'}
+          onArchives={() => handleStatCardClick('archived')}
+          inclureArchives={filters.showArchived}
+          onInclureArchives={() => {
+            setActiveStatCard(null);
+            setFilters({ showArchived: !filters.showArchived, onlyArchived: false });
+          }}
+        />
       </div>
 
       {/* Liste des clients */}
@@ -627,58 +380,19 @@ export function Clients() {
           />
         )}
 
-        {/* Grille de clients */}
+        {/* Tableau (cartes sur téléphone) */}
         {(clients.length > 0 || loading) && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Skeletons pendant le chargement initial */}
-              {loading && clients.length === 0 && (
-                <>
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                    <ClientCardSkeleton key={i} />
-                  ))}
-                </>
-              )}
-
-              {/* Cartes clients */}
-              {clients.map(client => (
-                <ClientCard
-                  key={client.id}
-                  client={client}
-                  onClick={handleClientClick}
-                />
-              ))}
-
-              {/* Skeletons pendant loadMore */}
-              {loadingMore && (
-                <>
-                  {[1, 2, 3, 4].map(i => (
-                    <ClientCardSkeleton key={`loading-${i}`} />
-                  ))}
-                </>
-              )}
-            </div>
-
-            {/* Bouton charger plus */}
-            {hasMore && !loadingMore && (
-              <div className="text-center mt-8">
-                <button
-                  onClick={loadMore}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-white border border-secondary-300 text-secondary-700 rounded-lg hover:bg-secondary-50 transition-colors"
-                >
-                  Charger plus de clients
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
-            {/* Indicateur fin de liste */}
-            {!hasMore && clients.length > 0 && (
-              <p className="text-center text-secondary-500 mt-8">
-                Fin de la liste • {clients.length} client{clients.length !== 1 ? 's' : ''} affiché{clients.length !== 1 ? 's' : ''}
-              </p>
-            )}
-          </>
+          <ClientsTableau
+            clients={clients}
+            chargement={loading}
+            chargementSuite={loadingMore}
+            tri={tri}
+            onTri={handleTri}
+            onClient={handleClientClick}
+            totalCount={totalCount}
+            hasMore={hasMore}
+            onChargerPlus={loadMore}
+          />
         )}
       </div>
 

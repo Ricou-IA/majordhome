@@ -82,3 +82,23 @@ export function champsModifies(initial = {}, courant = {}) {
   const cles = [...new Set([...Object.keys(initial || {}), ...Object.keys(courant || {})])];
   return cles.filter((cle) => normaliser(initial?.[cle]) !== normaliser(courant?.[cle]));
 }
+
+/** Nombre affichable : un entier connu, sinon null (jamais un 0 inventé). */
+const nombreConnu = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/**
+ * Sous-titre de la liste des clients : « 3 612 clients · 490 contrats d'entretien actifs ».
+ * Une partie dont le chiffre est inconnu (chargement, échec) est omise.
+ * @param {{ total_clients?: number|null, active_contracts?: number|null }|null|undefined} stats
+ * @returns {string}  chaîne vide si aucun chiffre n'est connu
+ */
+export function sousTitreClients(stats) {
+  const total = nombreConnu(stats?.total_clients);
+  const contrats = nombreConnu(stats?.active_contracts);
+  const parties = [];
+  if (total !== null) parties.push(`${total.toLocaleString('fr-FR')} client${total > 1 ? 's' : ''}`);
+  if (contrats !== null) {
+    parties.push(`${contrats.toLocaleString('fr-FR')} contrat${contrats > 1 ? 's' : ''} d'entretien actif${contrats > 1 ? 's' : ''}`);
+  }
+  return parties.join(' · ');
+}
