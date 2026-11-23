@@ -281,10 +281,15 @@ export function Clients() {
 
   // Segments de catégorie : mêmes filtres que les anciennes cartes ; un segment se choisit, il ne se décoche pas.
   const segment = SEGMENTS_CATEGORIE.includes(activeStatCard) ? activeStatCard : 'tous';
+  // « Tous » retire tout paramètre `?filter=` (y compris une valeur hors catégorie, `total` d'un ancien lien).
   const handleSegment = useCallback((valeur) => {
+    if (valeur === 'tous') {
+      if (activeStatCard !== null) handleStatCardClick('total');
+      return;
+    }
     if (valeur === segment) return;
-    handleStatCardClick(valeur === 'tous' ? 'total' : valeur);
-  }, [segment, handleStatCardClick]);
+    handleStatCardClick(valeur);
+  }, [segment, activeStatCard, handleStatCardClick]);
 
   const compte = (n) => (typeof n === 'number' ? n.toLocaleString('fr-FR') : undefined);
   const segments = [

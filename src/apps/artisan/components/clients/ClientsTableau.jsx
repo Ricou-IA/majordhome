@@ -2,7 +2,7 @@
  * ClientsTableau.jsx - Majord'home Artisan
  * ============================================================================
  * Liste des clients : tableau triable à partir de `md` (tablette rendue en 1 024 px
- * comprise), cartes `ClientCard` sur téléphone. Pied commun : « 25 sur 3 612 » et
+ * comprise), cartes `ClientCard` sur téléphone. Triables : Client et Créé le. Pied commun : « 25 sur 3 612 » et
  * « Charger plus » (le hook charge par ajout, pas par page).
  * Aucune donnée calculée ici : tri et chargement viennent de la page (`useClients`).
  * ============================================================================
@@ -54,9 +54,9 @@ const COLONNES = [
     },
   },
   {
+    // Pas triable : des milliers d'égalités sur la ville, l'ordre ne tiendrait pas d'un « Charger plus » à l'autre.
     cle: 'city',
     titre: 'Ville',
-    triable: true,
     rendu: (client) => (client.city ? client.city : <span className="text-secondary-400">—</span>),
   },
   {
