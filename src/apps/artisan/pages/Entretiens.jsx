@@ -4,7 +4,7 @@
  * Module unifié Entretien (visites annuelles) & SAV (réparations).
  *
  * 4 onglets (+ raccourci « Clos ») :
- *   - Kanban (défaut) : board unifié EntretienSAVKanban
+ *   - Suivi (défaut, valeur `kanban`) : board unifié EntretienSAVKanban
  *   - Contrats : liste contrats existante
  *   - Programmation : vue secteurs avec CTA « Planifier »
  *   - Dashboard : KPIs contrats + SAV, tournées à surveiller, planification
@@ -13,8 +13,8 @@
  * une journée se fait depuis le Planning (puce d'état de la journée), ses
  * alertes vivent dans le Dashboard.
  *
- * Header : 4 stat cards workflow (Entretiens à planifier, SAV en cours,
- * Planifiés, Réalisés) basées sur useEntretienSAVStats.
+ * Header : bande de repères (Entretiens à faire, SAV gérés, Planifiés,
+ * Réalisés) basée sur useEntretienSAVStats.
  *
  * @version 4.0.0 - Sprint 8 Entretien & SAV (Kanban unifié, KPIs SAV)
  * ============================================================================
@@ -23,18 +23,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Plus,
-  BarChart3,
-  List,
-  Map,
-  Columns3,
-  Clock,
-  Wrench,
-  Calendar,
-  CheckCircle2,
-  Archive,
-} from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
@@ -53,48 +42,11 @@ import { ContractModal } from '@apps/artisan/components/entretiens/ContractModal
 import { CreateContractModal } from '@apps/artisan/components/entretiens/CreateContractModal';
 import { logger } from '@lib/logger';
 import { PageHeader } from '@/components/ui/page-header';
+import { StatStrip } from '@apps/artisan/components/shared/StatStrip';
 
-// ============================================================================
-// SOUS-COMPOSANTS
-// ============================================================================
-
-/**
- * Carte statistique (lecture seule, pas de toggle)
- */
-const StatCard = ({ icon: Icon, label, value, subtitle, color = 'blue' }) => {
-  const colorClasses = {
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    amber: 'bg-amber-100 text-amber-600',
-    emerald: 'bg-emerald-100 text-emerald-600',
-    red: 'bg-red-100 text-red-600',
-    orange: 'bg-orange-100 text-orange-600',
-    violet: 'bg-violet-100 text-violet-600',
-  };
-
-  return (
-    <div className="bg-white rounded-lg border border-secondary-200 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              colorClasses[color] || colorClasses.blue
-            }`}
-          >
-            <Icon className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-2xl font-semibold text-secondary-900">{value ?? '—'}</p>
-            <p className="text-sm text-secondary-500">{label}</p>
-          </div>
-        </div>
-        {subtitle && (
-          <p className="text-xs font-medium text-secondary-400 whitespace-nowrap">{subtitle}</p>
-        )}
-      </div>
-    </div>
-  );
-};
+// Onglet souligné, comme la fiche client : actif = texte foncé + filet cuivre (« vous êtes ici »).
+const ONGLET = 'gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-body-sm font-medium text-secondary-500 hover:text-secondary-700 data-[state=active]:border-primary-600 data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-secondary-900 data-[state=active]:shadow-none';
+const COMPTEUR = 'rounded-full bg-secondary-100 px-1.5 py-0.5 text-caption text-secondary-600';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -399,87 +351,71 @@ export default function Entretiens() {
         ]}
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          icon={Calendar}
-          label="Entretiens à faire"
-          value={savStatsLoading ? '...' : (savStats?.entretien_a_faire ?? 0)}
-          // Les refus du client ne sont pas « à faire » : on les nomme pour que le compteur s'explique.
-          subtitle={!savStatsLoading && savStats?.ca_a_faire != null
-            ? `CA : ${Math.round(savStats.ca_a_faire).toLocaleString('fr-FR')} €${savStats.entretien_refuse > 0 ? ` · ${savStats.entretien_refuse} refus` : ''}`
-            : null}
-          color="blue"
-        />
-        <StatCard
-          icon={Wrench}
-          label="SAV gérés"
-          value={savStatsLoading ? '...' : (savStats?.sav_en_cours ?? 0)}
-          color="orange"
-        />
-        <StatCard
-          icon={Clock}
-          label="Planifiés"
-          value={savStatsLoading ? '...' : (savStats?.entretien_planifie ?? 0)}
-          color="violet"
-        />
-        <StatCard
-          icon={CheckCircle2}
-          label="Réalisés"
-          value={savStatsLoading ? '...' : (savStats?.entretien_realise ?? 0)}
-          subtitle={!savStatsLoading && savStats?.ca_realise != null ? `CA : ${Math.round(savStats.ca_realise).toLocaleString('fr-FR')} €` : null}
-          color="emerald"
-        />
-      </div>
+      {/* Repères de l'année (mêmes chiffres et sous-lignes que les anciennes cartes) */}
+      <StatStrip
+        items={[
+          {
+            key: 'a_faire',
+            label: 'Entretiens à faire',
+            value: savStatsLoading ? '...' : (savStats?.entretien_a_faire ?? 0),
+            // Les refus du client ne sont pas « à faire » : on les nomme pour que le compteur s'explique.
+            sub: !savStatsLoading && savStats?.ca_a_faire != null
+              ? `CA : ${Math.round(savStats.ca_a_faire).toLocaleString('fr-FR')} €${savStats.entretien_refuse > 0 ? ` · ${savStats.entretien_refuse} refus` : ''}`
+              : null,
+          },
+          { key: 'sav', label: 'SAV gérés', value: savStatsLoading ? '...' : (savStats?.sav_en_cours ?? 0) },
+          { key: 'planifies', label: 'Planifiés', value: savStatsLoading ? '...' : (savStats?.entretien_planifie ?? 0) },
+          {
+            key: 'realises',
+            label: 'Réalisés',
+            value: savStatsLoading ? '...' : (savStats?.entretien_realise ?? 0),
+            sub: !savStatsLoading && savStats?.ca_realise != null ? `CA : ${Math.round(savStats.ca_realise).toLocaleString('fr-FR')} €` : null,
+          },
+        ]}
+      />
 
-      {/* ===== TABS ===== */}
+      {/* ===== TABS ===== (soulignés comme la fiche client ; valeurs inchangées) */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full justify-start gap-1 bg-secondary-100/80 p-1">
-          <TabsTrigger value="kanban" className="gap-2 data-[state=active]:bg-white">
-            <Columns3 className="h-4 w-4" />
-            Kanban
-          </TabsTrigger>
-          <TabsTrigger value="contrats" className="gap-2 data-[state=active]:bg-white">
-            <List className="h-4 w-4" />
-            Contrats
-            {/* Contrats ACTIFS (ce que la liste montre à l'ouverture), quel que soit le filtre en
-                cours : compté sur la liste filtrée, l'onglet affichait le même chiffre que « Clos »
-                dès qu'on l'ouvrait. */}
-            {contractStats?.openContracts > 0 && (
-              <span
-                className="ml-1 text-xs bg-secondary-100 text-secondary-600 px-1.5 py-0.5 rounded-full"
-                title="Contrats actifs"
-              >
-                {contractStats.openContracts}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="programmation" className="gap-2 data-[state=active]:bg-white">
-            <Map className="h-4 w-4" />
-            Programmation
-          </TabsTrigger>
-          <TabsTrigger value="dashboard" className="gap-2 data-[state=active]:bg-white">
-            <BarChart3 className="h-4 w-4" />
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger
-            value="clos"
-            className="gap-2 data-[state=active]:bg-white"
-            onClick={(e) => {
-              e.preventDefault();
-              setFilters({ search: '', status: 'cancelled', visitStatus: '' });
-              setActiveTab('contrats');
-            }}
-          >
-            <Archive className="h-4 w-4" />
-            Clos
-            {cancelledCount != null && (
-              <span className="ml-1 text-xs bg-secondary-100 text-secondary-600 px-1.5 py-0.5 rounded-full">
-                {cancelledCount}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto border-b border-secondary-200">
+          <TabsList className="h-auto justify-start gap-1 rounded-none bg-transparent p-0">
+            <TabsTrigger value="kanban" className={ONGLET}>
+              Suivi
+            </TabsTrigger>
+            <TabsTrigger value="contrats" className={ONGLET}>
+              Contrats
+              {/* Contrats ACTIFS (ce que la liste montre à l'ouverture), quel que soit le filtre en
+                  cours : compté sur la liste filtrée, l'onglet affichait le même chiffre que « Clos »
+                  dès qu'on l'ouvrait. */}
+              {contractStats?.openContracts > 0 && (
+                <span className={COMPTEUR} title="Contrats actifs">
+                  {contractStats.openContracts}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="programmation" className={ONGLET}>
+              Programmation
+            </TabsTrigger>
+            <TabsTrigger value="dashboard" className={ONGLET}>
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger
+              value="clos"
+              className={ONGLET}
+              onClick={(e) => {
+                e.preventDefault();
+                setFilters({ search: '', status: 'cancelled', visitStatus: '' });
+                setActiveTab('contrats');
+              }}
+            >
+              Clos
+              {cancelledCount != null && (
+                <span className={COMPTEUR}>
+                  {cancelledCount}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* TAB KANBAN */}
         <TabsContent value="kanban" className="mt-6">

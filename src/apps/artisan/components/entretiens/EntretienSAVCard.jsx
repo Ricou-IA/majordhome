@@ -2,7 +2,7 @@
  * EntretienSAVCard.jsx - Majord'home Artisan
  * ============================================================================
  * Carte individuelle pour le kanban Entretien & SAV.
- * Bandeau gauche coloré par type (bleu entretien / orange SAV).
+ * Bandeau gauche coloré par type (bleu entretien / orange SAV) ; pastilles en tons st-*.
  * Affiche : nom client, code postal, montant contrat/devis, date, tag type.
  *
  * @version 1.0.0 - Sprint 8 Entretien & SAV
@@ -42,14 +42,14 @@ const TYPE_CONFIG = {
   entretien: {
     label: 'Entretien',
     color: '#3B82F6',
-    bgClass: 'bg-blue-50 text-blue-700',
+    bgClass: 'bg-secondary-100 text-secondary-700',
     stripeClass: 'bg-blue-500',
     Icon: ClipboardCheck,
   },
   sav: {
     label: 'SAV',
     color: '#F97316',
-    bgClass: 'bg-orange-50 text-orange-700',
+    bgClass: 'bg-secondary-100 text-secondary-700',
     stripeClass: 'bg-orange-500',
     Icon: Wrench,
   },
@@ -61,8 +61,8 @@ function PartsOrderBadge({ status }) {
   if (!config) return null;
 
   const colorMap = {
-    commande: 'bg-amber-100 text-amber-700',
-    recu: 'bg-green-100 text-green-700',
+    commande: 'bg-st-attente-bg text-st-attente',
+    recu: 'bg-st-ok-bg text-st-ok',
   };
 
   return (
@@ -198,7 +198,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
       tabIndex={0}
       onClick={() => onClick?.(item)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(item); }}
-      className="relative w-full text-left bg-white rounded-lg border border-secondary-200 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="relative w-full text-left bg-white rounded-lg border border-secondary-200 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500"
     >
       {item.workflow_status === 'a_planifier' && canRanger && (
         <button
@@ -240,12 +240,12 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
             {(amount > 0 || Number(item.parts_total_ttc) > 0) && (
               <span className="flex items-baseline gap-1 flex-shrink-0">
                 {amount > 0 && (
-                  <span className="text-xs font-semibold text-emerald-700">
+                  <span className="text-xs font-semibold text-secondary-900">
                     {formatEuro(amount)}
                   </span>
                 )}
                 {Number(item.parts_total_ttc) > 0 && (
-                  <span className="text-[11px] font-medium text-amber-700" title="Pièces de rechange (à facturer en plus)">
+                  <span className="text-[11px] font-medium text-st-attente" title="Pièces de rechange (à facturer en plus)">
                     +{formatEuro(Number(item.parts_total_ttc))}
                   </span>
                 )}
@@ -268,19 +268,19 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
             </span>
             <SAVUrgencyBadge item={item} />
             {item.tags?.includes('Web') && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-secondary-100 text-secondary-600">
                 Web
               </span>
             )}
             {/* `tags` est un marqueur figé à la création — vide si le contrat a été saisi
                 après. On retombe sur le contrat effectif dérivé par la vue. */}
             {(item.tags?.includes('Contrat') || item.effective_contract_id) && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-ok-bg text-st-ok">
                 Contrat
               </span>
             )}
             {type === 'sav' && item.includes_entretien && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-info-bg text-st-info">
                 Entretien à faire
               </span>
             )}
@@ -288,7 +288,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                 (recette Eric 2026-10-10 : « pas tout le commentaire, ça fait trop chargé ») */}
             {anomalies.length > 0 && (
               <span
-                className="inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700"
+                className="inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-attente-bg text-st-attente"
                 title={anomalies.map((a) => `${a.equipement ? `${a.equipement} : ` : ''}${a.detail || a.bilanLabel}${a.actionLabel ? ` · ${a.actionLabel}` : ''}${a.savId ? ' · SAV créé' : ''}${a.photoPlaquePath ? ' · photo de plaque' : (a.photoPlaqueAbsence ? ` · pas de photo de plaque (${a.photoPlaqueAbsence})` : '')}`).join('\n')}
               >
                 <AlertTriangle className="w-3 h-3" />
@@ -298,7 +298,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
               </span>
             )}
             {type === 'sav' && item.sav_origin === 'entretien' && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700" title="Demande ouverte à la suite d'un entretien (certificat)">
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-attente-bg text-st-attente" title="Demande ouverte à la suite d'un entretien (certificat)">
                 Suite d&apos;entretien
               </span>
             )}
@@ -306,13 +306,13 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
               <PartsOrderBadge status={item.parts_order_status} />
             )}
             {item.call_count > 0 && (
-              <span className="text-xs flex items-center gap-0.5 text-amber-600"
+              <span className="text-xs flex items-center gap-0.5 text-st-attente"
                     title={`${item.call_count} appel${item.call_count > 1 ? 's' : ''}${item.last_call_result === 'voicemail' ? ' · répondeur' : ''}`}>
                 <Phone className="h-3 w-3" />{item.call_count}
               </span>
             )}
             {item.last_call_result === 'callback' && (
-              <span className="text-xs flex items-center gap-0.5 text-amber-700" title="À rappeler">
+              <span className="text-xs flex items-center gap-0.5 text-st-attente" title="À rappeler">
                 <PhoneForwarded className="h-3 w-3" />
               </span>
             )}
@@ -339,7 +339,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
 
           {/* Suivi de l'invitation auto-RDV du mois (À planifier uniquement) */}
           {item.workflow_status === 'a_planifier' && libelleInvitation(invitation) && (
-            <div className="text-xs text-indigo-700 mt-0.5">
+            <div className="text-xs text-st-info mt-0.5">
               {libelleInvitation(invitation)}
             </div>
           )}
@@ -350,7 +350,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
           {(type === 'entretien' || (type === 'sav' && item.includes_entretien))
             && item.workflow_status === 'planifie'
             && (item.effective_contract_id || item.contract_id) && (
-            <span className="inline-flex items-center gap-1 mt-1 px-2 py-1 bg-[#1B4F72] text-white text-xs font-medium rounded-md">
+            <span className="inline-flex items-center gap-1 mt-1 px-2 py-1 bg-st-info text-white text-xs font-medium rounded-md">
               <ClipboardCheck className="w-3 h-3" />
               Certificat à faire
             </span>
@@ -412,7 +412,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setCancelOpen(true); }}
                     title="Annuler cette facture par un avoir"
-                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-red-200 text-red-700 bg-white hover:bg-red-50"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-st-alerte/30 text-st-alerte bg-white hover:bg-st-alerte-bg"
                   >
                     <Undo2 className="w-3 h-3" />
                     Avoir
@@ -430,7 +430,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setSendEmailOpen(true); }}
                     title="Envoyer la facture par e-mail au client"
-                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 bg-white hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 bg-white hover:bg-secondary-50 hover:border-secondary-400 hover:text-secondary-800"
                   >
                     <Mail className="w-3 h-3" />
                     Envoyer par e-mail
@@ -466,7 +466,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                     }
                   }}
                   title={item.invoice_import_status === 'error' ? 'L’import Pennylane a échoué : rejouer' : 'Import Pennylane non fait : rejouer'}
-                  className="inline-flex items-center gap-1 px-2 py-1.5 text-xs rounded border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 px-2 py-1.5 text-xs rounded border border-st-attente/30 text-st-attente bg-st-attente-bg hover:border-st-attente/60 disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3 h-3 ${retryExport.isPending ? 'animate-spin' : ''}`} />
                   {retryExport.isPending ? 'Import…' : 'Import Pennylane à rejouer'}
@@ -511,7 +511,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                   }
                   onRefresh?.();
                 }}
-                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 bg-white hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-secondary-300 text-secondary-600 bg-white hover:bg-st-ok-bg hover:border-st-ok/40 hover:text-st-ok transition-colors"
                 title="Marquer comme encaissé (clôture la carte)"
               >
                 <Euro className="w-3 h-3" />
@@ -542,8 +542,8 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                 title={smsSent ? 'Demande d\'avis déjà envoyée' : 'Envoyer une demande d\'avis au client'}
                 className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
                   smsSent
-                    ? 'border-green-300 text-green-600 bg-green-50'
-                    : 'border-secondary-300 text-secondary-600 bg-white hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700'
+                    ? 'border-st-ok/30 text-st-ok bg-st-ok-bg'
+                    : 'border-secondary-300 text-secondary-600 bg-white hover:bg-secondary-50 hover:border-secondary-400 hover:text-secondary-800'
                 } disabled:opacity-60`}
               >
                 {smsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : smsSent ? <Check className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}

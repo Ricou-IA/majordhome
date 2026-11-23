@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PhoneCall } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { PhoningPanel } from './PhoningPanel';
 
 /**
@@ -13,16 +14,20 @@ export function LancerAppelButton({ items, orgId }) {
 
   return (
     <>
-      <button
+      {/* Action secondaire : « Nouveau contrat » reste la seule action principale de la page. */}
+      <Button
         type="button"
+        variant="secondary"
+        size="sm"
         onClick={(e) => { e.stopPropagation(); setOpen(true); }}
         disabled={disabled}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+        // L'infobulle « Aucune carte avec téléphone » doit rester lisible sur le bouton désactivé.
+        className="disabled:pointer-events-auto disabled:cursor-not-allowed"
         title={disabled ? 'Aucune carte avec téléphone' : `Appeler ${callable.length} contact(s)`}
       >
         <PhoneCall className="h-4 w-4" />
         Lancer l&apos;appel ({callable.length})
-      </button>
+      </Button>
       {open && (
         <PhoningPanel
           orgId={orgId}

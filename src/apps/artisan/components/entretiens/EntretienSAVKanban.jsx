@@ -17,6 +17,7 @@ import { useEntretienSAV, useEntretienSAVMutations } from '@hooks/useEntretienSA
 import { useInvitationsDuMois } from '@hooks/useTournees';
 import { KANBAN_COLUMNS, getTransitions, savService } from '@services/sav.service';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
+import { Button } from '@/components/ui/button';
 import { LancerAppelButton } from '../appels/LancerAppelButton';
 import { EntretienSAVCard } from './EntretienSAVCard';
 import { EntretienSAVModal } from './EntretienSAVModal';
@@ -311,13 +312,14 @@ export function EntretienSAVKanban() {
             />
           )}
           {canCreateSAV && (
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => { setCreateSAVPrefill(null); setCreateSAVOpen(true); }}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors"
             >
               <Wrench className="h-4 w-4" />
               Nouveau SAV
-            </button>
+            </Button>
           )}
           <button
             onClick={refresh}
