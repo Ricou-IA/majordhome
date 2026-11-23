@@ -3,9 +3,10 @@
 // des frais par défaut. Édite form.demarches (settings.pv.demarches) ; la page parente
 // sauve l'objet pv COMPLET (merge JSONB niveau 1). Aucune règle métier ici : les
 // libellés/unités viennent de parametres.js.
+import { Combobox } from '@/components/ui/combobox';
 import { Plus, Trash2 } from 'lucide-react';
 import { DELAIS_META, TARIFS_META } from '@apps/solaire/lib/demarches/parametres';
-import { FormField, SectionTitle, inputClass, selectClass } from '../../../components/FormFields';
+import { FormField, SectionTitle, inputClass } from '../../../components/FormFields';
 
 const PRISE_EN_CHARGE_OPTIONS = [
   { value: 'refacture', label: 'Avancés par nous, refacturés au client' },
@@ -120,14 +121,12 @@ export default function DemarchesTab({ form, patch }) {
         <SectionTitle>Prise en charge des frais par défaut</SectionTitle>
         <div className="grid sm:grid-cols-2 gap-4">
           <FormField label="Raccordement Enedis">
-            <select className={selectClass} value={d.prise_en_charge_defaut?.raccordement_enedis ?? 'refacture'} onChange={(e) => setPec('raccordement_enedis', e.target.value)}>
-              {PRISE_EN_CHARGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <Combobox value={d.prise_en_charge_defaut?.raccordement_enedis ?? 'refacture'} onChange={(v) => setPec('raccordement_enedis', v)} libelle="Raccordement Enedis"
+              options={PRISE_EN_CHARGE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} />
           </FormField>
           <FormField label="Attestation Consuel">
-            <select className={selectClass} value={d.prise_en_charge_defaut?.consuel ?? 'refacture'} onChange={(e) => setPec('consuel', e.target.value)}>
-              {PRISE_EN_CHARGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <Combobox value={d.prise_en_charge_defaut?.consuel ?? 'refacture'} onChange={(v) => setPec('consuel', v)} libelle="Attestation Consuel"
+              options={PRISE_EN_CHARGE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} />
           </FormField>
         </div>
         <p className="text-xs text-secondary-500">Réglable projet par projet dans la section Démarches de l’étude.</p>

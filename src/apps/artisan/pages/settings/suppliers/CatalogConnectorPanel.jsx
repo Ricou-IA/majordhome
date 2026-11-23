@@ -8,6 +8,7 @@
 //     avec « Appliquer la correspondance » (jamais appliqué pendant le relevé) ;
 //   - « Supprimer les identifiants ». Clés modèle (IA) et fusions : page Harmoniser les bases (org entière).
 // Visible org_admin seul. Spec : 2026-10-24-catalogue-photovoltaique-connexion-generique-design.md § 3.1, § 6, § 7.
+import { Combobox } from '@/components/ui/combobox';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { KeyRound, RefreshCw, Upload, Loader2, CheckCircle2, AlertTriangle, Trash2, Save } from 'lucide-react';
@@ -229,11 +230,9 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
                       <td className="py-1 text-secondary-800">{c.libelle || c.cle}{c.parent ? <span className="text-secondary-400"> · {c.parent}</span> : null}{c.cle === CLE_SANS_CATEGORIE ? <span className="text-secondary-400"> (articles sans rayon)</span> : null}</td>
                       <td className="py-1 text-right text-secondary-500">{c.nombre}</td>
                       <td className="py-1 pl-3">
-                        <select value={valeur} onChange={(e) => setMapping((m) => { const n = { ...m }; if (e.target.value) n[c.cle] = e.target.value; else delete n[c.cle]; return n; })}
-                          className="border border-secondary-300 rounded px-1.5 py-0.5 text-xs">
-                          <option value="">Défaut ({CIBLE_LABELS[cibleDefaut(frais.connector, c.cle)]})</option>
-                          {CIBLES.map((t) => <option key={t} value={t}>{CIBLE_LABELS[t]}</option>)}
-                        </select>
+                        <Combobox value={valeur} onChange={(v) => setMapping((m) => { const n = { ...m }; if (v) n[c.cle] = v; else delete n[c.cle]; return n; })}
+                          libelle={`Correspondance de ${c.libelle || c.cle}`} className="w-auto min-w-[10rem]"
+                          options={[{ value: '', label: `Défaut (${CIBLE_LABELS[cibleDefaut(frais.connector, c.cle)]})` }, ...CIBLES.map((t) => ({ value: t, label: CIBLE_LABELS[t] }))]} />
                       </td>
                     </tr>
                   );

@@ -3,6 +3,7 @@
 // Source de vérité : core.organizations.settings.pv via useOrgSettings().
 // ⚠️ La RPC org_update_settings merge au niveau 1 : on sauve TOUJOURS
 // l'objet pv complet (jamais un sous-objet partiel).
+import { Combobox } from '@/components/ui/combobox';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
@@ -15,7 +16,7 @@ import {
   FileText, Upload, ExternalLink, Trash2, ClipboardList,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { FormField, SectionTitle, inputClass, selectClass } from '../../components/FormFields';
+import { FormField, SectionTitle, inputClass } from '../../components/FormFields';
 import DemarchesTab from './solaire/DemarchesTab';
 import { validerDemarches } from '@apps/solaire/lib/demarches/parametres';
 import { logger } from '@lib/logger';
@@ -179,15 +180,13 @@ function GrilleTab({ form, patch }) {
             const invalidPrice = !isNum(row.prix_ttc) || row.prix_ttc <= 0;
             return (
               <div key={index} className="flex items-center gap-3 py-2">
-                <select
-                  className={`${inputClass} w-32`}
+                <Combobox
+                  className="w-32"
                   value={row.kwc}
-                  onChange={(e) => updateRow(index, { kwc: Number(e.target.value) })}
-                >
-                  {KWC_OPTIONS.map((k) => (
-                    <option key={k} value={k}>{k} kWc</option>
-                  ))}
-                </select>
+                  onChange={(v) => updateRow(index, { kwc: Number(v) })}
+                  libelle="Puissance en kWc"
+                  options={KWC_OPTIONS.map((k) => ({ value: k, label: `${k} kWc` }))}
+                />
                 <input
                   type="number"
                   className={`${inputClass} w-40`}
@@ -344,15 +343,13 @@ function BibliothequeTab({ form, patch, orgId }) {
                 placeholder="Libellé (ex : Panneau 500 Wc DualSun)"
                 onChange={(e) => updateDoc(doc.id, { label: e.target.value })}
               />
-              <select
-                className={`${selectClass} w-44`}
+              <Combobox
+                className="w-44"
                 value={doc.kind ?? 'autre'}
-                onChange={(e) => updateDoc(doc.id, { kind: e.target.value })}
-              >
-                {DOC_KINDS.map((k) => (
-                  <option key={k.value} value={k.value}>{k.label}</option>
-                ))}
-              </select>
+                onChange={(v) => updateDoc(doc.id, { kind: v })}
+                libelle="Type de document"
+                options={DOC_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+              />
               <label className="flex items-center gap-1.5 text-xs text-secondary-600 cursor-pointer whitespace-nowrap">
                 <input
                   type="checkbox"

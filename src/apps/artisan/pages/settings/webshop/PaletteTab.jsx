@@ -1,6 +1,7 @@
 // src/apps/artisan/pages/settings/webshop/PaletteTab.jsx
 // Settings → Webshop → Livraison palette : transporteur, dépôts, règles des tournées
 // (`settings.webshop.palette` + `settings.webshop.depots`). Défauts : src/lib/webshop/reglages.js.
+import { Combobox } from '@/components/ui/combobox';
 import { useMemo } from 'react';
 import { Plus, Send, Trash2 } from 'lucide-react';
 import { WEBSHOP_REGLAGES_DEFAUT, BORNES } from '@/lib/webshop/reglages';
@@ -157,9 +158,8 @@ export default function PaletteTab() {
             </div>
           </Champ>
           <Champ label="TVA du transport palette" erreur={erreurs.palette_tva_pct} aide={`Par défaut : ${D.tva_pct} %.`}>
-            <select value={form.palette_tva_pct} onChange={(e) => set('palette_tva_pct', e.target.value)} className={INPUT}>
-              {BORNES.tva_pct.map((t) => <option key={t} value={String(t)}>{String(t).replace('.', ',')} %</option>)}
-            </select>
+            <Combobox value={form.palette_tva_pct} onChange={(v) => set('palette_tva_pct', v)} libelle="TVA du transport palette"
+              options={BORNES.tva_pct.map((t) => ({ value: String(t), label: `${String(t).replace('.', ',')} %` }))} />
           </Champ>
         </div>
       </section>

@@ -4,6 +4,7 @@
 // juridique viennent de l'annuaire des entreprises, la TVA se calcule du SIRET (Eric 2026-11-21, comme
 // HésiaSun) ; la saisie à la main ne s'ouvre que si l'entreprise est introuvable. RCS et capital social, que
 // l'annuaire ne donne pas, sont lus dans les annonces légales de l'entreprise (BODACC, src/lib/organisation/bodacc.js).
+import { Combobox } from '@/components/ui/combobox';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Building2, CheckCircle2 } from 'lucide-react';
@@ -216,18 +217,14 @@ export default function IdentityTab() {
               label="Forme juridique"
               hint={!saisieLibre && formeAChoisir && form.siret ? 'L’annuaire ne la précise pas : choisissez-la.' : undefined}
             >
-              <select
+              <Combobox
                 value={form.legal_form}
-                onChange={(e) => set('legal_form', e.target.value)}
+                onChange={(v) => set('legal_form', v)}
                 // Reprise de l'annuaire ; elle ne se choisit à la main que s'il n'a pas su la traduire.
                 disabled={!saisieLibre && !formeAChoisir}
-                className={INPUT_CLASS}
-              >
-                <option value="">Non renseignée</option>
-                {formes.map((f) => (
-                  <option key={f} value={f}>{f}</option>
-                ))}
-              </select>
+                libelle="Forme juridique"
+                options={[{ value: '', label: 'Non renseignée' }, ...formes.map((f) => ({ value: f, label: f }))]}
+              />
             </Field>
             <Field label="Capital social (€)">
               <input

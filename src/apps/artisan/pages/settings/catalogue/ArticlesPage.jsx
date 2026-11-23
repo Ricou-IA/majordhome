@@ -4,6 +4,7 @@
 // paginée ; `?item=<id>` ouvre la fiche (ArticleDrawer). Page ouverte au rôle qui a `articles.edit` (team_leader par
 // défaut, org_admin compris — Eric 2026-10-27) via `SettingsPage acces` ; l'harmonisation reste réservée à l'org_admin.
 // Spec docs/superpowers/specs/2026-10-24-articles-majordhome-matrice-fournisseurs-design.md § 5.6.
+import { Combobox } from '@/components/ui/combobox';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search, Loader2, ChevronLeft, ChevronRight, Package, Boxes, Plus, Layers } from 'lucide-react';
@@ -88,23 +89,14 @@ export default function ArticlesPage() {
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mots du libellé, marque, modèle, EAN, référence fournisseur…"
               className="w-full pl-10 pr-4 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
           </div>
-          <select value={nature} onChange={(e) => setNature(e.target.value)} className="border border-secondary-300 rounded-lg px-2 py-2 text-sm" aria-label="Nature">
-            <option value="">Toutes les natures</option>
-            {NATURES_ARTICLE.map((n) => <option key={n.value} value={n.value}>{n.label}</option>)}
-          </select>
-          <select value={category} onChange={(e) => { setCategory(e.target.value); setGamme(''); }} className="border border-secondary-300 rounded-lg px-2 py-2 text-sm">
-            <option value="">Toutes les catégories</option>
-            {PRODUCT_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-            <option value={SANS_CATEGORIE}>Sans catégorie</option>
-          </select>
-          <select value={brand} onChange={(e) => setBrand(e.target.value)} className="border border-secondary-300 rounded-lg px-2 py-2 text-sm">
-            <option value="">Toutes les marques ({brands.length})</option>
-            {brands.map((b) => <option key={b} value={b}>{b}</option>)}
-          </select>
-          <select value={gamme} onChange={(e) => setGamme(e.target.value)} className="border border-secondary-300 rounded-lg px-2 py-2 text-sm">
-            <option value="">Toutes les gammes ({gammes.length})</option>
-            {gammes.map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
+          <Combobox value={nature} onChange={(v) => setNature(v)} libelle="Nature" className="w-auto min-w-[11rem]"
+            options={[{ value: '', label: 'Toutes les natures' }, ...NATURES_ARTICLE.map((n) => ({ value: n.value, label: n.label }))]} />
+          <Combobox value={category} onChange={(v) => { setCategory(v); setGamme(''); }} libelle="Catégorie" className="w-auto min-w-[11rem]"
+            options={[{ value: '', label: 'Toutes les catégories' }, ...PRODUCT_CATEGORIES.map((c) => ({ value: c.value, label: c.label })), { value: SANS_CATEGORIE, label: 'Sans catégorie' }]} />
+          <Combobox value={brand} onChange={(v) => setBrand(v)} libelle="Marque" className="w-auto min-w-[11rem]"
+            options={[{ value: '', label: `Toutes les marques (${brands.length})` }, ...brands.map((b) => ({ value: b, label: b }))]} />
+          <Combobox value={gamme} onChange={(v) => setGamme(v)} libelle="Gamme" className="w-auto min-w-[11rem]"
+            options={[{ value: '', label: `Toutes les gammes (${gammes.length})` }, ...gammes.map((g) => ({ value: g, label: g }))]} />
           <label className="inline-flex items-center gap-1.5 text-sm text-secondary-700 cursor-pointer">
             <input type="checkbox" checked={sansOffreFraiche} onChange={(e) => setSansOffreFraiche(e.target.checked)} className="w-4 h-4 rounded border-secondary-300 text-primary-600" />
             Sans offre fraîche

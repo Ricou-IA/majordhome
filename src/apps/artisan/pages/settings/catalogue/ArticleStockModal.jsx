@@ -3,6 +3,7 @@
 // offres sont les lignes déjà achetées chez Soditelem, Tereva… cochées ici (décision d'Eric, 2026-10-25 : « ce sont des
 // articles que j'ai déjà achetés, je vais les reprendre depuis la liste » ; 4 marques de disjoncteur ⇒ un seul type,
 // la marque se choisit dans le devis). Création (org_admin) puis rattachement de chaque ligne cochée.
+import { Combobox } from '@/components/ui/combobox';
 import { useEffect, useMemo, useState } from 'react';
 import { X, Search, Loader2, Check, Layers } from 'lucide-react';
 import { toast } from 'sonner';
@@ -68,14 +69,11 @@ export default function ArticleStockModal({ orgId, onClose, onCreated }) {
 
         <div className="px-5 py-3 border-b grid grid-cols-1 sm:grid-cols-4 gap-2">
           <input autoFocus value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Type d’article (ex. Disjoncteur 1P+N 16 A courbe C) *" className={`${INPUT} sm:col-span-2`} />
-          <select value={form.unit} onChange={(e) => set('unit', e.target.value)} className={INPUT} aria-label="Unité">
-            {PRODUCT_UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-          </select>
+          <Combobox value={form.unit} onChange={(v) => set('unit', v)} libelle="Unité"
+            options={PRODUCT_UNITS.map((u) => ({ value: u.value, label: u.label }))} />
           <input type="number" min="0" step="0.01" value={form.sellingPriceHt} onChange={(e) => set('sellingPriceHt', e.target.value)} placeholder="Prix de vente HT" className={INPUT} />
-          <select value={form.category} onChange={(e) => set('category', e.target.value)} className={`${INPUT} sm:col-span-2`} aria-label="Catégorie">
-            <option value="">Sans catégorie (proposé dans tous les devis)</option>
-            {PRODUCT_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
+          <Combobox value={form.category} onChange={(v) => set('category', v)} libelle="Catégorie" className="sm:col-span-2"
+            options={[{ value: '', label: 'Sans catégorie (proposé dans tous les devis)' }, ...PRODUCT_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))]} />
         </div>
 
         <div className="px-5 py-3 border-b">

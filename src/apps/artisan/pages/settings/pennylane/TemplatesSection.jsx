@@ -10,6 +10,7 @@
 // FacturationTab (form.templates_by_category), le seul état local ici est la carte
 // de refs des champs (pour insérer une variable au curseur).
 // ============================================================================
+import { Combobox } from '@/components/ui/combobox';
 import { useRef } from 'react';
 import { renderInvoiceTemplate, VAT_CODES } from '@/lib/entretienInvoiceModel';
 
@@ -137,17 +138,16 @@ export default function TemplatesSection({ categories, typesByCategory, value, o
               {ledger && (
                 <div className="w-full sm:w-80">
                   <label className={LABEL_CLASS}>Compte de vente Pennylane</label>
-                  <select
+                  <Combobox
                     value={ledger.value?.[cat.id] || ''}
-                    onChange={(e) => ledger.onChange(cat.id, e.target.value)}
+                    onChange={(v) => ledger.onChange(cat.id, v)}
                     disabled={ledger.disabled}
-                    className={INPUT_CLASS}
-                  >
-                    <option value="">— Compte par défaut Pennylane —</option>
-                    {(ledger.options || []).map((a) => (
-                      <option key={a.number} value={a.number}>{a.number} · {a.label}</option>
-                    ))}
-                  </select>
+                    libelle="Compte de vente Pennylane"
+                    options={[
+                      { value: '', label: '— Compte par défaut Pennylane —' },
+                      ...(ledger.options || []).map((a) => ({ value: a.number, label: `${a.number} · ${a.label}` })),
+                    ]}
+                  />
                 </div>
               )}
             </div>
@@ -214,16 +214,15 @@ export default function TemplatesSection({ categories, typesByCategory, value, o
                   </div>
                   <div>
                     <label className={LABEL_CLASS}>TVA</label>
-                    <select
+                    <Combobox
                       value={t.offered_vat}
-                      onChange={(e) => onChange(cat.id, { offered_vat: e.target.value })}
-                      className={INPUT_CLASS}
-                    >
-                      <option value="">TVA de la famille</option>
-                      {VAT_OPTIONS.map((v) => (
-                        <option key={v} value={v}>{String(v).replace('.', ',')} %</option>
-                      ))}
-                    </select>
+                      onChange={(v) => onChange(cat.id, { offered_vat: v })}
+                      libelle="TVA"
+                      options={[
+                        { value: '', label: 'TVA de la famille' },
+                        ...VAT_OPTIONS.map((v) => ({ value: v, label: `${String(v).replace('.', ',')} %` })),
+                      ]}
+                    />
                   </div>
                   <div>
                     <label className={LABEL_CLASS}>Remise (%)</label>

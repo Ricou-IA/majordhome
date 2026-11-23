@@ -7,6 +7,7 @@
 // ⚠️ org_update_settings merge au niveau 1 : on renvoie l'objet `tournees`
 // COMPLET (clés existantes + formulaire), jamais un sous-ensemble.
 // ============================================================================
+import { Combobox } from '@/components/ui/combobox';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -95,9 +96,8 @@ const libelleHeure = (h) => `${Math.floor(h)} h${h % 1 ? ' 30' : ''}`;
 
 function ChoixHeure({ valeur, onChange }) {
   return (
-    <select value={valeur} onChange={(e) => onChange(Number(e.target.value))} className={INPUT_CLASS}>
-      {HEURES_DEMI.map((h) => <option key={h} value={h}>{libelleHeure(h)}</option>)}
-    </select>
+    <Combobox value={valeur} onChange={(v) => onChange(Number(v))} libelle="Heure"
+      options={HEURES_DEMI.map((h) => ({ value: h, label: libelleHeure(h) }))} />
   );
 }
 
@@ -184,9 +184,8 @@ export default function TourneesTab() {
           </div>
           <div>
             <label className={LABEL_CLASS}>Souplesse par défaut d’un rendez-vous</label>
-            <select value={form.souplesse_defaut_minutes ?? 30} onChange={(e) => set('souplesse_defaut_minutes')(Number(e.target.value))} className={INPUT_CLASS}>
-              {form.souplesses_proposees.map((v) => <option key={v} value={v}>{optionSouplesse(v).label}</option>)}
-            </select>
+            <Combobox value={form.souplesse_defaut_minutes ?? 30} onChange={(v) => set('souplesse_defaut_minutes')(Number(v))} libelle="Souplesse par défaut d’un rendez-vous"
+              options={form.souplesses_proposees.map((v) => ({ value: v, label: optionSouplesse(v).label }))} />
             <p className={HINT_CLASS}>Appliquée aux entretiens et SAV sans souplesse renseignée. Figer reste un geste sur le rendez-vous.</p>
           </div>
           <ChampMinutes

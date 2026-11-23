@@ -10,11 +10,12 @@
  * désignent les types par code, un renommage à l'édition les casserait en silence.
  * ============================================================================
  */
+import { Combobox } from '@/components/ui/combobox';
 import { useState } from 'react';
 import { Loader2, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormField, TextInput } from '@apps/artisan/components/FormFields';
-import { ToolbarHeader, ActionButtons, ModalShell, selectClass } from '../pricing/ui';
+import { ToolbarHeader, ActionButtons, ModalShell } from '../pricing/ui';
 import { prochainOrdre } from '../pricing/ordre';
 import { GABARITS_RECEPTION, LIBELLES_GABARIT, GABARIT_GENERIQUE, normaliserGabarit } from '@/lib/pvPoints';
 
@@ -151,32 +152,27 @@ function TypeModal({ type, categories = [], nextSortOrder, onClose, onSave, isSa
           </FormField>
         </div>
         <FormField label="Catégorie" required>
-          <select
+          <Combobox
             value={form.category_id}
-            onChange={(e) => set('category_id', e.target.value)}
-            className={selectClass}
-            required
-          >
-            <option value="">— Choisir —</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.label}{c.is_active ? '' : ' (inactive)'}</option>
-            ))}
-          </select>
+            onChange={(v) => set('category_id', v)}
+            libelle="Catégorie"
+            options={[
+              { value: '', label: '— Choisir —' },
+              ...categories.map((c) => ({ value: c.id, label: `${c.label}${c.is_active ? '' : ' (inactive)'}` })),
+            ]}
+          />
           {categories.length === 0 && (
             <p className="text-xs text-amber-700 mt-1">Aucune catégorie active : créez-en une dans l&apos;onglet Catégories.</p>
           )}
           <p className="text-xs text-secondary-400 mt-1">Porte la compétence requise (Équipe) et le gabarit du certificat.</p>
         </FormField>
         <FormField label="Gabarit du PV de réception">
-          <select
+          <Combobox
             value={form.reception_profile}
-            onChange={(e) => set('reception_profile', e.target.value)}
-            className={selectClass}
-          >
-            {GABARITS_RECEPTION.map((code) => (
-              <option key={code} value={code}>{LIBELLES_GABARIT[code]}</option>
-            ))}
-          </select>
+            onChange={(v) => set('reception_profile', v)}
+            libelle="Gabarit du PV de réception"
+            options={GABARITS_RECEPTION.map((code) => ({ value: code, label: LIBELLES_GABARIT[code] }))}
+          />
           <p className="text-xs text-secondary-400 mt-1">Points que l&apos;entreprise déclare et que le client confirme sur le PV de réception de ce type d&apos;équipement.</p>
         </FormField>
         <label className="flex items-center gap-2 text-sm">

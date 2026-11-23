@@ -10,6 +10,7 @@
 // Un seul niveau de modale : jamais deux empilées. Les handlers (RPC + toasts)
 // restent dans TeamManagement, la modale ne fait que les appeler.
 // ============================================================================
+import { Combobox } from '@/components/ui/combobox';
 import { useEffect, useMemo, useState } from 'react';
 import { X, Shield, Loader2, Mail, Info } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -204,16 +205,14 @@ export function MemberModal({
                   <p className="text-sm text-secondary-400 italic">Vous ne pouvez pas changer votre propre rôle.</p>
                 ) : canEdit ? (
                   <div className="flex items-center gap-2">
-                    <select
+                    <Combobox
                       value={currentChoice}
-                      onChange={(e) => onRoleChangeRequest(member, currentChoice, e.target.value)}
+                      onChange={(v) => onRoleChangeRequest(member, currentChoice, v)}
                       disabled={isUpdatingRole}
-                      className="text-sm border border-secondary-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
-                    >
-                      {roleOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                      libelle="Rôle"
+                      className="w-auto min-w-[12rem]"
+                      options={roleOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+                    />
                     {isUpdatingRole && <Loader2 className="w-4 h-4 text-primary-600 animate-spin" />}
                   </div>
                 ) : (

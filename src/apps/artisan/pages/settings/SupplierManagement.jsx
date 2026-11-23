@@ -7,6 +7,7 @@
  * ============================================================================
  */
 
+import { Combobox } from '@/components/ui/combobox';
 import { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import { useSuppliers, useSupplierMutations, useSupplierProducts, useProductMutations, useSupplierBrands, useSupplierGammes } from '@hooks/useSuppliers';
@@ -791,16 +792,12 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
       {(brands.length > 1 || gammes.length > 1) && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           {brands.length > 1 && (
-            <select value={brandFilter} onChange={(e) => { setBrandFilter(e.target.value); setPage(0); }} className="border border-secondary-300 rounded-lg px-2.5 py-1.5 text-sm bg-white">
-              <option value="">Toutes les marques ({brands.length})</option>
-              {brands.map((b) => <option key={b} value={b}>{b}</option>)}
-            </select>
+            <Combobox value={brandFilter} onChange={(v) => { setBrandFilter(v); setPage(0); }} libelle="Marque" className="w-auto min-w-[11rem]"
+              options={[{ value: '', label: `Toutes les marques (${brands.length})` }, ...brands.map((b) => ({ value: b, label: b }))]} />
           )}
           {gammes.length > 1 && (
-            <select value={gammeFilter} onChange={(e) => { setGammeFilter(e.target.value); setPage(0); }} className="border border-secondary-300 rounded-lg px-2.5 py-1.5 text-sm bg-white">
-              <option value="">Toutes les gammes ({gammes.length})</option>
-              {gammes.map((g) => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <Combobox value={gammeFilter} onChange={(v) => { setGammeFilter(v); setPage(0); }} libelle="Gamme" className="w-auto min-w-[11rem]"
+              options={[{ value: '', label: `Toutes les gammes (${gammes.length})` }, ...gammes.map((g) => ({ value: g, label: g }))]} />
           )}
           {(brandFilter || gammeFilter) && (
             <button type="button" onClick={() => { setBrandFilter(''); setGammeFilter(''); setPage(0); }} className="text-xs text-secondary-500 hover:text-secondary-800 underline">Effacer les filtres</button>

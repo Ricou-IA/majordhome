@@ -2,6 +2,7 @@
 // Settings → Webshop → Process : ce que déclenche chaque changement de colonne d'une commande
 // (envoi COLIS) et chaque événement de tournée (envoi PALETTE). Réglage = `settings.webshop.process`
 // (défauts : src/lib/webshop/reglages.js), exécuté par l'edge `webshop-process`.
+import { Combobox } from '@/components/ui/combobox';
 import { ORDER_BOARD_COLUMNS } from '@/lib/webshop/orders';
 import { WEBSHOP_PROCESS_TRANSITIONS, WEBSHOP_PROCESS_EVENEMENTS_TOURNEE } from '@/lib/webshop/reglages';
 import { WEBSHOP_EMAIL_DEFAULTS } from '@/lib/webshop/emailTemplates';
@@ -10,7 +11,7 @@ import {
   gabaritsClient, gabaritsManquants, ordreColisSansPrestataire, processDepuisForm,
 } from '@/lib/webshop/settingsForm';
 import { useGabaritsExistants, useWebshopProcessForm } from './useWebshopReglagesForm';
-import { Avertissement, BarreEnregistrer, CARD, Champ, Chargement, INPUT, SECTION_TITLE } from './common';
+import { Avertissement, BarreEnregistrer, CARD, Champ, Chargement, SECTION_TITLE } from './common';
 
 const LIBELLE_COLONNE = Object.fromEntries(ORDER_BOARD_COLUMNS.map((c) => [c.id, c.label]));
 const LIBELLE_TOURNEE = { partie: 'Tournée partie', livree: 'Tournée livrée' };
@@ -22,13 +23,16 @@ const estClient = (key) => CLIENT.some((g) => g.key === key);
 /** @param {{ value: string, onChange: (v: string) => void }} p */
 function SelectGabarit({ value, onChange }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={INPUT}>
-      <option value="">Aucun</option>
-      {CLIENT.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
-      {value && !estClient(value) && (
-        <option value={value}>{libelleGabarit(value)} (gabarit non client : à remplacer)</option>
-      )}
-    </select>
+    <Combobox
+      value={value}
+      onChange={(v) => onChange(v)}
+      libelle="Gabarit d’e-mail"
+      options={[
+        { value: '', label: 'Aucun' },
+        ...CLIENT.map((g) => ({ value: g.key, label: g.label })),
+        ...(value && !estClient(value) ? [{ value, label: `${libelleGabarit(value)} (gabarit non client : à remplacer)` }] : []),
+      ]}
+    />
   );
 }
 

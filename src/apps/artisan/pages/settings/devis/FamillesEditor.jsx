@@ -1,6 +1,7 @@
 // src/apps/artisan/pages/settings/devis/FamillesEditor.jsx
 // Accordéon « Familles et chapitres » : la liste des familles proposées dans « Nouveau devis » et le
 // squelette (titres de chapitre) de chacune. Édition pure d'état : la validation est dans devisConfig.js.
+import { Combobox } from '@/components/ui/combobox';
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { CATEGORIES_PRODUIT, TYPES_CHAPITRE, TAUX_TVA, slugFamille, typeChapitreDeduit, nouvelleFamille, estFamilleCatalogue, outilDeFamille } from '@/lib/devisConfig.js';
@@ -98,9 +99,8 @@ export default function FamillesEditor({ familles, onChange, mode = 'devis' }) {
                   </div>
                 </div>
                 <label className="block text-xs text-secondary-600 max-w-xs">TVA par défaut des devis de cette famille <span className="text-secondary-400">(modifiable dans chaque devis)</span>
-                  <select value={f.tva ?? 10} onChange={(e) => set(i, { tva: Number(e.target.value) })} className={`${INPUT} mt-1`}>
-                    {TAUX_TVA.map((t) => <option key={t} value={t}>{String(t).replace('.', ',')} %</option>)}
-                  </select>
+                  <Combobox value={f.tva ?? 10} onChange={(v) => set(i, { tva: Number(v) })} libelle="TVA par défaut des devis de cette famille" className="mt-1"
+                    options={TAUX_TVA.map((t) => ({ value: t, label: `${String(t).replace('.', ',')} %` }))} />
                 </label>
                 <div>
                   <div className="text-xs text-secondary-600 mb-1">Chapitres du devis, dans l’ordre — le type décide de ce que propose le catalogue du chapitre</div>
@@ -108,9 +108,8 @@ export default function FamillesEditor({ familles, onChange, mode = 'devis' }) {
                     {chapitresDe(f).map((c, k, arr) => (
                       <div key={k} className="flex items-center gap-1.5">
                         <input value={c.titre} onChange={(e) => setChapitres(i, arr.map((x, m) => (m === k ? { ...x, titre: e.target.value.toUpperCase() } : x)))} className={INPUT} placeholder="TITRE DU CHAPITRE" />
-                        <select value={c.type} onChange={(e) => setChapitres(i, arr.map((x, m) => (m === k ? { ...x, type: e.target.value } : x)))} className={`${INPUT} max-w-[15rem]`} aria-label="Type du chapitre">
-                          {TYPES_CHAPITRE.map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-                        </select>
+                        <Combobox value={c.type} onChange={(v) => setChapitres(i, arr.map((x, m) => (m === k ? { ...x, type: v } : x)))} libelle="Type du chapitre" className="max-w-[15rem]"
+                          options={TYPES_CHAPITRE.map((t) => ({ value: t, label: TYPE_LABELS[t] }))} />
                         <button type="button" onClick={() => setChapitres(i, deplacer(arr, k, -1))} disabled={k === 0} className="p-1 text-secondary-400 hover:text-secondary-700 disabled:opacity-30" aria-label="Monter"><ArrowUp className="w-3.5 h-3.5" /></button>
                         <button type="button" onClick={() => setChapitres(i, deplacer(arr, k, 1))} disabled={k === arr.length - 1} className="p-1 text-secondary-400 hover:text-secondary-700 disabled:opacity-30" aria-label="Descendre"><ArrowDown className="w-3.5 h-3.5" /></button>
                         <button type="button" onClick={() => setChapitres(i, arr.filter((_, m) => m !== k))} className="p-1 text-secondary-400 hover:text-red-600" aria-label="Retirer le chapitre"><Trash2 className="w-3.5 h-3.5" /></button>

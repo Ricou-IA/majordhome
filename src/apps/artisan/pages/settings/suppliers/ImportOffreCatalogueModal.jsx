@@ -10,6 +10,7 @@
  * ============================================================================
  */
 
+import { Combobox } from '@/components/ui/combobox';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Loader2, Save, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -39,10 +40,11 @@ function LigneCatalogue({ ligne, rap, action, etat, onChange }) {
           {[referenceLigne(ligne), ligne.ref_fabricant && ligne.ref_fabricant !== ligne.code ? `réf. ${ligne.ref_fabricant}` : null, ligne.marque, uniteDepuisOffre(ligne.unite)].filter(Boolean).join(' · ')}
         </p>
       </div>
-      <select value={etat.nature} disabled={!etat.inclus || action.action !== 'creer'} onChange={(e) => onChange({ nature: e.target.value })}
-        className="border border-secondary-300 rounded-lg px-2 py-1 text-xs" title={action.action === 'creer' ? 'Nature de l’article créé' : 'Une ligne existante garde sa nature'}>
-        {NATURES.map((n) => <option key={n.value} value={n.value}>{n.label}</option>)}
-      </select>
+      <div title={action.action === 'creer' ? 'Nature de l’article créé' : 'Une ligne existante garde sa nature'}>
+        <Combobox value={etat.nature} disabled={!etat.inclus || action.action !== 'creer'} onChange={(v) => onChange({ nature: v })}
+          libelle="Nature de l’article" className="text-xs"
+          options={NATURES.map((n) => ({ value: n.value, label: n.label }))} />
+      </div>
       <div className="text-xs min-w-0">
         {action.action === 'creer' && <span className="text-st-info font-medium">Nouvelle référence · {action.nouveau != null ? formatEuro(action.nouveau) : '?'}</span>}
         {action.action === 'maj' && <span className="text-secondary-700">Achat {formatEuro(action.ancien)} → <b>{formatEuro(action.nouveau)}</b></span>}
@@ -51,11 +53,12 @@ function LigneCatalogue({ ligne, rap, action, etat, onChange }) {
       </div>
       <div className="min-w-0 text-xs">
         {action.action === 'creer' ? (
-          <select value={etat.rattacher} disabled={!etat.inclus} onChange={(e) => onChange({ rattacher: e.target.value })}
-            className="border border-secondary-300 rounded-lg px-2 py-1 text-xs w-full truncate">
-            <option value="">Article : posé par la base (nouveau ou même modèle)</option>
-            {candidats.map((c) => <option key={c.article.id} value={c.article.id}>Rattacher à : {c.article.name} — {c.raisons.join(', ') || 'proche'}</option>)}
-          </select>
+          <Combobox value={etat.rattacher} disabled={!etat.inclus} onChange={(v) => onChange({ rattacher: v })}
+            libelle="Article rattaché" className="text-xs"
+            options={[
+              { value: '', label: 'Article : posé par la base (nouveau ou même modèle)' },
+              ...candidats.map((c) => ({ value: c.article.id, label: `Rattacher à : ${c.article.name} — ${c.raisons.join(', ') || 'proche'}` })),
+            ]} />
         ) : (
           <span className="text-secondary-500 break-words">{rap?.article ? `Article : ${rap.article.name}` : 'Ligne sans article'}</span>
         )}

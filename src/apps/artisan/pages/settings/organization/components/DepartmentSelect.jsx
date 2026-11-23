@@ -1,6 +1,6 @@
+import { Combobox } from '@/components/ui/combobox';
 import { MapPin } from 'lucide-react';
 import { FRENCH_DEPARTMENTS } from '@lib/departments';
-import { INPUT_CLASS } from './layout';
 
 /**
  * Sélecteur de département français (95 + DOM-TOM).
@@ -20,19 +20,17 @@ export default function DepartmentSelect({
 }) {
   return (
     <div className="flex gap-2 items-center">
-      <select
+      <Combobox
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(v) => onChange(v)}
         disabled={disabled}
-        className={`${INPUT_CLASS} flex-1`}
-      >
-        <option value="">Choisir un département</option>
-        {FRENCH_DEPARTMENTS.map((d) => (
-          <option key={d.code} value={d.code}>
-            {d.code} · {d.name}
-          </option>
-        ))}
-      </select>
+        libelle="Département"
+        className="flex-1"
+        options={[
+          { value: '', label: 'Choisir un département' },
+          ...FRENCH_DEPARTMENTS.map((d) => ({ value: d.code, label: `${d.code} · ${d.name}` })),
+        ]}
+      />
       {onDetectFromHq && (
         <button
           type="button"

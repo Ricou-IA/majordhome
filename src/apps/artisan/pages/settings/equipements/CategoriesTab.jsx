@@ -12,12 +12,13 @@
  * Spec : docs/superpowers/specs/2026-09-12-referentiel-equipements-tarifs-competences-design.md §6.1
  * ============================================================================
  */
+import { Combobox } from '@/components/ui/combobox';
 import { useState } from 'react';
 import { Layers, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormField, TextInput } from '@apps/artisan/components/FormFields';
 import { CERTIFICATE_PROFILES } from '@/lib/equipmentReferential';
-import { ToolbarHeader, ActionButtons, ModalShell, selectClass } from '../pricing/ui';
+import { ToolbarHeader, ActionButtons, ModalShell } from '../pricing/ui';
 import { prochainOrdre } from '../pricing/ordre';
 
 const CODE_RE = /^[a-z0-9_]+$/;
@@ -186,15 +187,12 @@ function CategoryModal({ category, nextSortOrder, onClose, onSave, isSaving }) {
         </div>
 
         <FormField label="Gabarit du certificat d'entretien" required>
-          <select
+          <Combobox
             value={form.certificate_profile}
-            onChange={(e) => set('certificate_profile', e.target.value)}
-            className={selectClass}
-          >
-            {CERTIFICATE_PROFILES.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
+            onChange={(v) => set('certificate_profile', v)}
+            libelle="Gabarit du certificat d'entretien"
+            options={CERTIFICATE_PROFILES.map((p) => ({ value: p.value, label: p.label }))}
+          />
           {profil && <p className="text-xs text-secondary-500 mt-1">{profil.label} : {profil.description}.</p>}
         </FormField>
 

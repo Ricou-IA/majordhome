@@ -1,6 +1,7 @@
 // src/apps/artisan/pages/settings/webshop/PointsRetrait.jsx
 // Points de retrait de la boutique (`webshop_pickup_points`, écrits par RPC). On ne supprime
 // pas un point (des commandes le référencent) : on le désactive. L'identifiant est immuable.
+import { Combobox } from '@/components/ui/combobox';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { MapPin, Pencil, Plus } from 'lucide-react';
@@ -43,9 +44,8 @@ function FormPoint({ edition, onClose }) {
           <input value={f.opening_hours} onChange={(e) => set('opening_hours', e.target.value)} className={INPUT} />
         </Champ>
         <Champ label="Accepte" erreur={erreurs.accepts}>
-          <select value={f.accepts} onChange={(e) => set('accepts', e.target.value)} className={INPUT}>
-            {ACCEPTS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-          </select>
+          <Combobox value={f.accepts} onChange={(v) => set('accepts', v)} libelle="Accepte"
+            options={ACCEPTS.map((a) => ({ value: a.value, label: a.label }))} />
         </Champ>
       </div>
       <div className="flex justify-end gap-2">

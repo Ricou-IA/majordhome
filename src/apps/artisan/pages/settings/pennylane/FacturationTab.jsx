@@ -20,6 +20,7 @@
 // vat_rate, discount_percent }`. Présentationnel dans `TemplatesSection`, état ici
 // (`form.templates_by_category`), consommés par `buildEntretienInvoice`.
 // ============================================================================
+import { Combobox } from '@/components/ui/combobox';
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Wrench } from 'lucide-react';
@@ -300,15 +301,16 @@ export default function FacturationTab() {
           </div>
           <div>
             <label className={LABEL_CLASS}>Mode de création</label>
-            <select
+            <Combobox
               value={form.mode}
-              onChange={(e) => setForm({ ...form, mode: e.target.value })}
-              className={INPUT_CLASS}
-            >
-              <option value="draft">Brouillon — à finaliser dans Pennylane</option>
-              <option value="final">Finalisée — numérotée immédiatement</option>
-              <option value="hub">Émise par Majord&apos;home — numéro, PDF et avoir Majord&apos;home, comptabilisée dans Pennylane</option>
-            </select>
+              onChange={(v) => setForm({ ...form, mode: v })}
+              libelle="Mode de création"
+              options={[
+                { value: 'draft', label: 'Brouillon — à finaliser dans Pennylane' },
+                { value: 'final', label: 'Finalisée — numérotée immédiatement' },
+                { value: 'hub', label: "Émise par Majord'home — numéro, PDF et avoir Majord'home, comptabilisée dans Pennylane" },
+              ]}
+            />
             <p className={HINT_CLASS}>
               Brouillon : vous relisez et envoyez depuis Pennylane. Finalisée : document légal immédiat. Émise par Majord&apos;home :
               Majord&apos;home numérote (série continue par année, préfixe de l&apos;onglet Émission), produit le PDF, l&apos;archive, puis
@@ -357,17 +359,16 @@ export default function FacturationTab() {
         <div className="mt-6 grid sm:grid-cols-2 gap-4">
           <div>
             <label className={LABEL_CLASS}>Pièces de rechange — compte de vente</label>
-            <select
+            <Combobox
               value={form.ledger_parts || ''}
-              onChange={(e) => setForm({ ...form, ledger_parts: e.target.value })}
+              onChange={(v) => setForm({ ...form, ledger_parts: v })}
               disabled={loadingAccounts}
-              className={INPUT_CLASS}
-            >
-              <option value="">— Compte par défaut Pennylane —</option>
-              {accountOptions.map((a) => (
-                <option key={a.number} value={a.number}>{a.number} · {a.label}</option>
-              ))}
-            </select>
+              libelle="Pièces de rechange — compte de vente"
+              options={[
+                { value: '', label: '— Compte par défaut Pennylane —' },
+                ...accountOptions.map((a) => ({ value: a.number, label: `${a.number} · ${a.label}` })),
+              ]}
+            />
             <p className={HINT_CLASS}>Pièces facturées avec l&apos;entretien (certificat), quelle que soit la famille.</p>
           </div>
         </div>

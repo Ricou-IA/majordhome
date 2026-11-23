@@ -16,6 +16,7 @@
 // ⚠ `org_update_settings` merge le JSONB au niveau 1 : on sauve TOUJOURS l'objet
 // `sms` COMPLET (identité inchangée + templates), jamais un sous-objet partiel.
 // ============================================================================
+import { Combobox } from '@/components/ui/combobox';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Wand2 } from 'lucide-react';
@@ -63,7 +64,6 @@ const HEURES = Array.from(
   { length: RAPPEL_RDV_HEURE_MAX - RAPPEL_RDV_HEURE_MIN + 1 },
   (_, i) => RAPPEL_RDV_HEURE_MIN + i,
 );
-const SELECT_CLASS = 'px-2 py-1.5 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
 const MODES = [
   { value: 'off', label: 'Désactivé', hint: 'Aucun rappel automatique.' },
   { value: 'veille', label: 'La veille', hint: 'Chaque jour, pour les rendez-vous du lendemain.' },
@@ -103,24 +103,24 @@ function RappelRdvSection({ value, onChange, hasTemplate }) {
           {value.mode === 'hebdo' && (
             <label className="flex items-center gap-2">
               Le
-              <select
+              <Combobox
                 value={value.jour}
-                onChange={(e) => onChange({ jour: Number(e.target.value) })}
-                className={SELECT_CLASS}
-              >
-                {JOURS_SEMAINE.map((j) => <option key={j.value} value={j.value}>{j.label}</option>)}
-              </select>
+                onChange={(v) => onChange({ jour: Number(v) })}
+                libelle="Jour de la semaine"
+                className="w-auto min-w-[8rem]"
+                options={JOURS_SEMAINE.map((j) => ({ value: j.value, label: j.label }))}
+              />
             </label>
           )}
           <label className="flex items-center gap-2">
             à
-            <select
+            <Combobox
               value={value.heure}
-              onChange={(e) => onChange({ heure: Number(e.target.value) })}
-              className={SELECT_CLASS}
-            >
-              {HEURES.map((h) => <option key={h} value={h}>{h}h</option>)}
-            </select>
+              onChange={(v) => onChange({ heure: Number(v) })}
+              libelle="Heure d'envoi"
+              className="w-auto min-w-[6rem]"
+              options={HEURES.map((h) => ({ value: h, label: `${h}h` }))}
+            />
             <span className="text-xs text-secondary-500">heure de Paris</span>
           </label>
         </div>

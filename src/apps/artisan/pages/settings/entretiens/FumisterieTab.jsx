@@ -2,6 +2,7 @@
 // Settings → Entretiens & Contrats → Fumisterie (/settings/fumisterie) : `settings.fumisterie`.
 // Défauts et sémantique : src/lib/fumisterie/config.js (DEFAULTS_FUMISTERIE). ⚠ merge JSONB
 // niveau 1 → on renvoie l'objet `fumisterie` COMPLET (clés existantes + formulaire).
+import { Combobox } from '@/components/ui/combobox';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -131,7 +132,7 @@ export default function FumisterieTab() {
         <h3 className={SECTION_TITLE}>Choix par défaut</h3>
         <div className="grid sm:grid-cols-2 gap-4">
           <Champ label="Finition extérieure proposée">
-            <select value={form.finition_defaut} onChange={set('finition_defaut')} className={INPUT_CLASS}><option value="noir">Laqué noir</option><option value="inox">Inox</option></select>
+            <Combobox value={form.finition_defaut} onChange={set('finition_defaut')} libelle="Finition extérieure proposée" options={[{ value: 'noir', label: 'Laqué noir' }, { value: 'inox', label: 'Inox' }]} />
           </Champ>
           <Champ label="TVA fournitures / pose (%)" hint="Entre 0 et 30" error={errors.tva}><div className="flex gap-2"><input type="number" min={0} max={30} value={form.tva_fournitures} onChange={set('tva_fournitures')} className={INPUT_CLASS} /><input type="number" min={0} max={30} value={form.tva_pose} onChange={set('tva_pose')} className={INPUT_CLASS} /></div></Champ>
         </div>

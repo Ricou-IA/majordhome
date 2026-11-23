@@ -3,6 +3,7 @@
 // emplacement (saisi en euros, stocké en centimes), jours de passage (grille semaines 1-4 ×
 // lun-ven du cycle) et codes postaux. Écritures par RPC (webshop_sector_upsert puis
 // webshop_sector_set_postcodes) ; chaque refus est dit, jamais avalé.
+import { Combobox } from '@/components/ui/combobox';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, X } from 'lucide-react';
@@ -105,10 +106,11 @@ export default function SecteurEditor({ secteur, cfg, onClose }) {
           <input value={form.label} onChange={(e) => set('label', e.target.value)} className={INPUT} />
         </Champ>
         <Champ label="Dépôt de départ" erreur={erreurs.depot} aide="Dépôts enregistrés dans l’onglet Livraison palette.">
-          <select value={form.depot} onChange={(e) => set('depot', e.target.value)} className={INPUT}>
-            {!codesDepots.includes(form.depot) && <option value={form.depot}>{form.depot || '—'} (inconnu)</option>}
-            {cfg.depots.map((d) => <option key={d.code} value={d.code}>{d.libelle} ({d.code})</option>)}
-          </select>
+          <Combobox value={form.depot} onChange={(v) => set('depot', v)} libelle="Dépôt de départ"
+            options={[
+              ...(!codesDepots.includes(form.depot) ? [{ value: form.depot, label: `${form.depot || '—'} (inconnu)` }] : []),
+              ...cfg.depots.map((d) => ({ value: d.code, label: `${d.libelle} (${d.code})` })),
+            ]} />
         </Champ>
         <Champ label="Prix d’un emplacement (TTC)" erreur={erreurs.prix_euros}>
           <div className="flex items-center gap-2">

@@ -2,6 +2,7 @@
 // Documents d'un article Majord'home : UNE liste — ceux posés sur l'article et ceux de ses lignes fournisseur, sans
 // doublon (décision d'Eric, 2026-10-25 : « photo et fiche technique sont des métadonnées propres à l'article et pas au
 // fournisseur »). Ajout sur l'article (org_admin) ; un document d'une ligne fournisseur se gère sur la ligne.
+import { Combobox } from '@/components/ui/combobox';
 import { useState } from 'react';
 import { FileText, Upload, Loader2, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
@@ -41,9 +42,7 @@ export default function ArticleDocuments({ orgId, itemId, offers, canEdit }) {
     <div className="space-y-2">
       {canEdit && (
         <div className="flex flex-wrap items-center gap-2">
-          <select value={type} onChange={(e) => setType(e.target.value)} className="border border-secondary-300 rounded-md px-2 py-1 text-sm" aria-label="Type de document">
-            {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <Combobox value={type} onChange={(v) => setType(v)} options={TYPES.map((t) => ({ value: t, label: t }))} libelle="Type de document" className="w-auto min-w-[10rem]" />
           <label className="btn-secondary btn-sm cursor-pointer">
             {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Upload className="w-3.5 h-3.5 mr-1" />} Ajouter à l&apos;article
             <input type="file" accept=".pdf,.PDF,.png,.jpg,.jpeg,.webp" onChange={ajouter} className="hidden" />

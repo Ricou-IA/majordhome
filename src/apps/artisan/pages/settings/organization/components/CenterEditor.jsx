@@ -1,3 +1,4 @@
+import { Combobox } from '@/components/ui/combobox';
 import { useState } from 'react';
 import { MapPin } from 'lucide-react';
 import AddressSearch from './AddressSearch';
@@ -107,29 +108,25 @@ export default function CenterEditor({ value, onChange, labelHint, disabled = fa
             ? 'Jusqu’où vos équipes interviennent depuis ce point, en voiture. Au-delà, un lead est signalé hors zone.'
             : 'Si des équipes partent de cette agence, elle étend la zone où l’entreprise intervient.'}
         >
-          <select
+          <Combobox
             value={interventionDuCentre(value, estSiege)}
-            onChange={(e) => update({ intervention_minutes: Number(e.target.value) })}
+            onChange={(v) => update({ intervention_minutes: Number(v) })}
             disabled={disabled}
-            className={INPUT_CLASS}
-          >
-            {DUREES_INTERVENTION.filter((m) => !(estSiege && m === 0)).map((m) => (
-              <option key={m} value={m}>{m === 0 ? 'Aucun : agence commerciale seulement' : libelleDuree(m)}</option>
-            ))}
-          </select>
+            libelle="Périmètre d’intervention"
+            options={DUREES_INTERVENTION.filter((m) => !(estSiege && m === 0)).map((m) => ({ value: m, label: m === 0 ? 'Aucun : agence commerciale seulement' : libelleDuree(m) }))}
+          />
         </Field>
         <Field
           label="Périmètre commercial"
           hint="Jusqu’où le commercial de ce point se déplace. Il ne dépasse jamais la zone où l’entreprise intervient."
         >
-          <select
+          <Combobox
             value={dureeDuCentre(value)}
-            onChange={(e) => update({ minutes: Number(e.target.value) })}
+            onChange={(v) => update({ minutes: Number(v) })}
             disabled={disabled}
-            className={INPUT_CLASS}
-          >
-            {DUREES_TERRITOIRE.map((m) => <option key={m} value={m}>{libelleDuree(m)}</option>)}
-          </select>
+            libelle="Périmètre commercial"
+            options={DUREES_TERRITOIRE.map((m) => ({ value: m, label: libelleDuree(m) }))}
+          />
         </Field>
       </div>
 
