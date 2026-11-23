@@ -73,30 +73,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'mapbox-gl': ['mapbox-gl'],
-          'turf': ['@turf/turf'],
-          'fullcalendar': [
-            '@fullcalendar/core',
-            '@fullcalendar/react',
-            '@fullcalendar/daygrid',
-            '@fullcalendar/timegrid',
-            '@fullcalendar/interaction',
-          ],
-          'radix': [
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-collapsible',
-            '@radix-ui/react-label',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-tabs',
-          ],
-          'pdf': ['@react-pdf/renderer'],
-          'recharts': ['recharts'],
-        },
-      },
-    },
+    // Pas de `manualChunks` : sous forme d'objet, il rangeait dans chaque morceau nommé les
+    // dépendances communes (React dans « fullcalendar », clsx dans « recharts », buffer dans
+    // « pdf »…), si bien que chaque page chargeait mapbox, react-pdf, turf et recharts au
+    // démarrage (1,47 Mo compressés, mesuré le 2026-11-23). Le découpage par défaut suit les
+    // imports dynamiques des routes : une bibliothèque n'est chargée que par l'écran qui s'en sert.
   },
 });

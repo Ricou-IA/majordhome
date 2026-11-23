@@ -577,9 +577,13 @@ function normalizeName(s) {
 }
 
 /**
- * Fetch /quotes/{id} en parallèle pour récupérer les quote_number (D-YYYY-XXXX)
- * qui ne sont PAS stockés en DB (`quote_label` peut contenir le subject à la
- * place du numéro, héritage des premiers attachements).
+ * Numéros de devis Pennylane (D-YYYY-XXXX) — `quote_label` peut contenir l'objet à la place
+ * du numéro (héritage des premiers rattachements).
+ *
+ * Lus d'abord dans le miroir local `majordhome_pennylane_quotes` (une requête) ; seuls les
+ * devis absents du miroir (brouillons) sont demandés à Pennylane, un par un. Avant, chaque
+ * devis rattaché coûtait un appel direct (jusqu'à 6 s chacun, 14 au survol d'une carte).
+ * Une lecture du miroir en échec n'est pas bloquante : on retombe sur les appels directs.
  *
  * @param {Array<number|string>} quoteIds
  * @returns {Promise<Map<string, string>>} Map de string(id) → quote_number
@@ -590,36 +594,34 @@ async function fetchQuoteNumbersByIds(quoteIds) {
   );
   if (uniqueIds.length === 0) return new Map();
 
+  const map = new Map();
+  const { data: miroir, error: miroirError } = await supabase
+    .from('majordhome_pennylane_quotes')
+    .select('pennylane_quote_id, quote_number, label')
+    .in('pennylane_quote_id', uniqueIds.map(Number).filter(Number.isFinite));
+  if (miroirError) {
+    logger.warn('[pennylane.fetchQuoteNumbersByIds] miroir illisible, appels directs', miroirError.message);
+  } else {
+    for (const q of miroir || []) {
+      const num = q.quote_number || q.label || null;
+      if (num) map.set(String(q.pennylane_quote_id), num);
+    }
+  }
+
+  const manquants = uniqueIds.filter(id => !map.has(id));
+  if (manquants.length === 0) return map;
+
   const limit = pLimit(5);
   const results = await Promise.allSettled(
-    uniqueIds.map(id => limit(() => apiCall('GET', `/quotes/${id}`)))
+    manquants.map(id => limit(() => apiCall('GET', `/quotes/${id}`)))
   );
-
-  const map = new Map();
   results.forEach((r, i) => {
     if (r.status === 'fulfilled' && r.value) {
       const num = r.value.quote_number || r.value.label || null;
-      if (num) map.set(uniqueIds[i], num);
+      if (num) map.set(manquants[i], num);
     }
   });
   return map;
-}
-
-/**
- * Wrapper sur fetchCustomersByIds pour la rétro-compat des consumers qui
- * n'ont besoin que du display name.
- *
- * @param {Array<number|string>} customerIds
- * @returns {Promise<Map<string, string>>} Map de string(id) → name
- */
-async function fetchCustomerNamesByIds(customerIds) {
-  const customers = await fetchCustomersByIds(customerIds);
-  const names = new Map();
-  customers.forEach((c, id) => {
-    const name = formatPennylaneCustomerName(c);
-    if (name) names.set(id, name);
-  });
-  return names;
 }
 
 // Plafond de fetch live /customers/{id} par appel de resolveCustomerNames.
@@ -703,38 +705,10 @@ async function getQuotesByClient(clientId, orgId) {
 
   const plCustomerId = syncRecord.pennylane_id;
 
-  // 2. Fetch les devis PL paginés (l'API V2 ne supporte pas filter[customer_id]
-  //    → renvoie 400) + safety MAX_PAGES pour éviter timeout edge function (~50s).
-  //    Filtre côté client par customer.id.
-  const allQuotes = [];
-  let cursor = null;
-  let hasMore = true;
-  let pageCount = 0;
-  const MAX_PAGES = 10;
-
-  while (hasMore && pageCount < MAX_PAGES) {
-    let path = '/quotes?limit=100';
-    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
-    const result = await apiCall('GET', path);
-    const items = result?.items || [];
-    allQuotes.push(...items);
-    hasMore = result?.has_more && !!result?.next_cursor;
-    cursor = result?.next_cursor || null;
-    pageCount++;
-  }
-
-  if (pageCount === MAX_PAGES && hasMore) {
-    logger.warn(
-      `[pennylane.getQuotesByClient] reached MAX_PAGES=${MAX_PAGES}, some quotes may be missing for plCustomerId=${plCustomerId}`,
-    );
-  }
-
-  // 3. Filtrer par customer.id côté client
-  const clientQuotes = allQuotes.filter(q => q.customer?.id === plCustomerId);
-
-  // 4. Enrichir avec customer_name via /customers/{id} (1 seul appel : même customer)
-  const namesById = await fetchCustomerNamesByIds([plCustomerId]);
-  const customerName = namesById.get(String(plCustomerId)) || null;
+  // 2. Les devis de CE client seulement (filtre natif, une page en général) : avant,
+  //    tous les devis de l'organisation étaient parcourus, ~7 s pour une fiche.
+  //    Les brouillons sont absents du miroir local : la lecture reste chez Pennylane.
+  const clientQuotes = await fetchQuotesForCustomerId(plCustomerId);
 
   // 5. Formater pour l'affichage
   return clientQuotes.map(q => ({
@@ -751,7 +725,7 @@ async function getQuotesByClient(clientId, orgId) {
     pdf_url: q.public_file_url || null,
     linked_invoices: q.linked_invoices || null,
     customer_id: q.customer?.id || null,
-    customer_name: formatPennylaneCustomerName(q.customer) || customerName,
+    customer_name: formatPennylaneCustomerName(q.customer) || null,
   }));
 }
 
@@ -920,7 +894,7 @@ async function pullInvoices(orgId, since) {
 
 /**
  * Récupère les factures Pennylane d'un client via le proxy (fetch live).
- * Même logique que getQuotesByClient : lookup sync → fetch all → filter.
+ * Même logique que getQuotesByClient : lookup sync → factures du customer (filtre natif).
  *
  * @param {string} clientId — UUID MDH du client
  * @param {string} orgId — org_id core
@@ -933,34 +907,9 @@ async function getInvoicesByClient(clientId, orgId) {
 
   const plCustomerId = syncRecord.pennylane_id;
 
-  // 2. Fetch les factures PL paginées (l'API V2 ne supporte pas filter[customer_id]
-  //    → renvoie 400) + safety MAX_PAGES pour éviter timeout edge function.
-  //    Filtre côté client par customer.id.
-  const allInvoices = [];
-  let cursor = null;
-  let hasMore = true;
-  let pageCount = 0;
-  const MAX_PAGES = 10;
-
-  while (hasMore && pageCount < MAX_PAGES) {
-    let path = '/customer_invoices?limit=100';
-    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
-    const result = await apiCall('GET', path);
-    const items = result?.items || [];
-    allInvoices.push(...items);
-    hasMore = result?.has_more && !!result?.next_cursor;
-    cursor = result?.next_cursor || null;
-    pageCount++;
-  }
-
-  if (pageCount === MAX_PAGES && hasMore) {
-    logger.warn(
-      `[pennylane.getInvoicesByClient] reached MAX_PAGES=${MAX_PAGES}, some invoices may be missing for plCustomerId=${plCustomerId}`,
-    );
-  }
-
-  // 3. Filtrer par customer.id côté client
-  const clientInvoices = allInvoices.filter(inv => inv.customer?.id === plCustomerId);
+  // 2. Les factures de CE client seulement (filtre natif) : avant, toutes les factures de
+  //    l'organisation étaient parcourues, ~13 s pour une fiche.
+  const clientInvoices = await fetchDocumentsForCustomerId('/customer_invoices', plCustomerId);
 
   // 4. Formater pour l'affichage
   return clientInvoices.map(inv => ({
@@ -1190,25 +1139,30 @@ function phoneDigits(phone) {
 }
 
 /**
- * Récupère TOUS les devis PL d'un customer (sans fenêtre temporelle).
+ * Récupère TOUS les documents PL (devis ou factures) d'un customer, sans fenêtre temporelle.
  *
  * Stratégie :
- *   1. Tentative API V2 filter natif : `?filter=[{"field":"customer_id","operator":"eq","value":X}]`
- *      → 1-few requêtes paginées, sans scan global
- *   2. Fallback si le filter renvoie 400 (syntaxe rejetée, doc API évolue) :
- *      pagine all + filter côté client par `q.customer.id` (scan exhaustif).
+ *   1. Filtre natif de l'API V2 : `?filter=[{"field":"customer_id","operator":"eq","value":X}]`
+ *      → une ou quelques pages, sans parcourir toute l'organisation.
+ *   2. Repli si le filtre est refusé (400, syntaxe qui évolue) : parcours paginé de tout,
+ *      filtré côté navigateur.
+ * Dans les deux cas, le résultat est refiltré sur `customer.id` : un filtre ignoré en silence
+ * par Pennylane ne montrerait jamais les documents d'un autre client.
  *
  * Adresse bug #4 (SYLVIE ANE) : avant ce helper, getCandidateQuotesForLead
  * limitait à une fenêtre 30j tronquant les devis anciens d'un client bridgé.
  *
+ * @param {'/quotes'|'/customer_invoices'} ressource
  * @param {number|string} customerPlId
- * @returns {Promise<Array>} devis PL bruts (pas formatés)
+ * @returns {Promise<Array>} documents PL bruts (pas formatés)
  */
-async function fetchQuotesForCustomerId(customerPlId) {
+async function fetchDocumentsForCustomerId(ressource, customerPlId) {
   if (!customerPlId) return [];
+  const targetId = Number(customerPlId);
+  const duClient = (items) => items.filter(d => Number(d.customer?.id) === targetId);
 
   const filterParam = encodeURIComponent(
-    JSON.stringify([{ field: 'customer_id', operator: 'eq', value: Number(customerPlId) }])
+    JSON.stringify([{ field: 'customer_id', operator: 'eq', value: targetId }])
   );
 
   try {
@@ -1218,40 +1172,44 @@ async function fetchQuotesForCustomerId(customerPlId) {
     let pageCount = 0;
     const MAX_PAGES = 5;
     while (hasMore && pageCount < MAX_PAGES) {
-      let path = `/quotes?limit=100&filter=${filterParam}`;
+      let path = `${ressource}?limit=100&filter=${filterParam}`;
       if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
       const result = await apiCall('GET', path);
-      const items = result?.items || [];
-      collected.push(...items);
+      collected.push(...duClient(result?.items || []));
       hasMore = result?.has_more && !!result?.next_cursor;
       cursor = result?.next_cursor || null;
       pageCount++;
     }
+    if (hasMore) {
+      logger.warn(`[pennylane.fetchDocumentsForCustomerId] plafond de ${MAX_PAGES} pages atteint sur ${ressource} pour le client ${targetId} : liste incomplète`);
+    }
     return collected;
   } catch (err) {
     logger.warn(
-      '[pennylane.fetchQuotesForCustomerId] filter natif échoué, fallback scan paginé',
+      `[pennylane.fetchDocumentsForCustomerId] filtre natif refusé sur ${ressource}, repli parcours paginé`,
       err?.message || err,
     );
-    // Fallback exhaustif : pagine all puis filter côté client.
     const collected = [];
     let cursor = null;
     let hasMore = true;
     let pageCount = 0;
     const MAX_PAGES = 10;
-    const targetId = Number(customerPlId);
     while (hasMore && pageCount < MAX_PAGES) {
-      let path = '/quotes?limit=100';
+      let path = `${ressource}?limit=100`;
       if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
       const result = await apiCall('GET', path);
-      const items = result?.items || [];
-      collected.push(...items.filter(q => q.customer?.id === targetId));
+      collected.push(...duClient(result?.items || []));
       hasMore = result?.has_more && !!result?.next_cursor;
       cursor = result?.next_cursor || null;
       pageCount++;
     }
     return collected;
   }
+}
+
+/** Tous les devis PL d'un customer (cf. fetchDocumentsForCustomerId). */
+async function fetchQuotesForCustomerId(customerPlId) {
+  return fetchDocumentsForCustomerId('/quotes', customerPlId);
 }
 
 /**

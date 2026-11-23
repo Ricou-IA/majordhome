@@ -22,7 +22,7 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -44,7 +44,10 @@ import { useDeviceClass } from '@hooks/useDeviceClass';
 import { creneauParDefaut, bornesDeGrille } from '@/lib/planningGestes';
 import { cssDesCouloirs } from '@/lib/planningCouloirs';
 import { FeuilleDeRoutePanel } from '@/apps/artisan/components/planning/FeuilleDeRoutePanel';
-import { EventModal } from '@/apps/artisan/components/planning/EventModal';
+// Fenêtre de RDV chargée à la demande (267 Ko) : elle retardait le premier affichage du
+// planning alors qu'elle ne s'ouvre qu'au clic. Préchargée en tâche de fond une fois la grille affichée.
+const chargerEventModal = () => import('@/apps/artisan/components/planning/EventModal');
+const EventModal = lazy(() => chargerEventModal().then((m) => ({ default: m.EventModal })));
 import { CalendarToolbar } from '@/apps/artisan/components/planning/CalendarToolbar';
 import { CalendarFilters } from '@/apps/artisan/components/planning/CalendarFilters';
 import { PlanningClientSearchInput, PlanningClientAppointments } from '@/apps/artisan/components/planning/PlanningClientSearch';
@@ -130,6 +133,13 @@ export default function Planning() {
     calendarRef, moveAppointment, ouvrirCreation, ouvrirEdition,
   });
   const nouveauRdv = useCallback(() => ouvrirCreation(creneauParDefaut()), [ouvrirCreation]);
+
+  // La fenêtre de RDV se télécharge en tâche de fond, après le premier affichage :
+  // le premier clic l'ouvre sans attendre.
+  useEffect(() => {
+    const t = setTimeout(() => { chargerEventModal().catch(() => {}); }, 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   // Création directe (?nouveau=1, menu « Créer ») : ouvre la fenêtre de RDV puis retire
   // le paramètre, pour qu'un rechargement ne la rouvre pas.
@@ -362,7 +372,9 @@ export default function Planning() {
         </div>
       </div>
 
-      {/* Fenêtre de RDV */}
+      {/* Fenêtre de RDV (montée seulement ouverte : elle rend null fermée) */}
+      {fenetre.open && (
+      <Suspense fallback={null}>
       <EventModal
         isOpen={fenetre.open}
         mode={fenetre.mode}
@@ -378,6 +390,8 @@ export default function Planning() {
         onCancel={annuler}
         isSaving={isCreating || isUpdating}
       />
+      </Suspense>
+      )}
 
       {/* Remplir / figer une journée de technicien — clic sur sa ligne de charge.
           Seule porte de programmation au fil de l'eau (spec auto-RDV § 5). */}
