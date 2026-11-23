@@ -296,7 +296,8 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
               type="button"
               onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
               className={`ml-auto shrink-0 inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors ${
-                card?.column_key === 'perdu' ? 'bg-st-neutre-bg text-st-neutre' : 'bg-st-info-bg text-st-info'
+                card?.column_key === 'perdu' ? 'bg-st-neutre-bg text-st-neutre'
+                  : card?.column_key === 'gagne' ? 'bg-st-ok-bg text-st-ok' : 'bg-st-info-bg text-st-info'
               }`}
               title="Voir les devis Pennylane attachés"
             >
