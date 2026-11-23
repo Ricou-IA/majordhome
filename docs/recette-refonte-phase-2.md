@@ -46,11 +46,11 @@
 ### En-têtes de page
 
 - [ ] **P1. Un titre, une seule action cuivre.**
-  Où : Planning, Leads, Chantiers, Entretiens, Contrats, Devis, Messages, Carte, Paramètres, Clients. Ce que vous devez voir : un grand titre au nom du menu (police des titres) ; au plus un bouton cuivre, tout à droite.
+  Où : Planning, Leads, Chantiers, Entretiens, Contrats, Messages, Carte, Paramètres, Clients, et la page Devis Pennylane (hors menu). Ce que vous devez voir : un grand titre au nom du menu (police des titres) ; au plus un bouton cuivre, tout à droite.
 - [ ] **P2. Les chiffres en sous-titre.**
-  Où : Entretiens → sous le titre « 490 contrats actifs · 161 entretiens à faire » (vos vrais chiffres) ; Contrats → « N contrats en cours de traitement ». Pendant le chargement : pas de « … », la ligne apparaît quand le chiffre est connu.
+  Où : Entretiens → sous le titre « 490 contrats actifs · 161 entretiens à faire · Année 2026 » (vos vrais chiffres) ; Contrats → « N contrats en cours de traitement ». Pendant le chargement : pas de « … », la ligne apparaît quand le chiffre est connu.
 - [ ] **P3. Les phrases d'explication ont disparu.**
-  Où : Chantiers (plus de « Suivi post-vente… », plus d'icône de casque orange), Paramètres (plus de « Gérez les paramètres… »), Devis (plus de « Tous les devis Pennylane… »), Carte (plus de « Carte interactive… »).
+  Où : Chantiers (plus de « Suivi post-vente… », plus d'icône de casque orange), Paramètres (plus de « Gérez les paramètres… »), Devis Pennylane (plus de « Tous les devis Pennylane… »), Carte (plus de « Carte interactive… »).
 - [ ] **P4. Les boutons d'action marchent comme avant.**
   Où : Entretiens → « Nouveau contrat » ; Clients → « Nouveau client » et « Importer » ; Carte → boutons de géocodage. Ce que vous devez voir : la même fenêtre ou le même effet qu'avant.
 
@@ -65,4 +65,4 @@
 - [ ] **C4. Chiffres de l'accueil.**
   Où : Accueil. Ce que vous devez voir : les mêmes chiffres qu'avant, dans des cartes avec un grand chiffre ; l'explication du CA programmé derrière le petit (i). Un chiffre inconnu s'affiche « — », jamais 0.
 - [ ] **C5. Liste Clients vide.**
-  Où : Clients, chercher un nom qui n'existe pas. Ce que vous devez voir : une icône dans un cercle, une phrase, « Effacer les filtres » et « Ajouter un client ».
+  Où : Clients, chercher un nom qui n'existe pas. Ce que vous devez voir : une icône dans un cercle, une phrase, « Effacer les filtres » et « Ajouter un client » (ce dernier seulement pour un compte qui a le droit de créer un client).

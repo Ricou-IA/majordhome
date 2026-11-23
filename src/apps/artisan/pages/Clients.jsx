@@ -206,9 +206,9 @@ const EtatVideClients = ({ hasFilters, onClearFilters, onAddClient, activeStatCa
       message={hasFilters ? 'Aucun client trouvé' : 'Aucun client'}
       detail={hasFilters
         ? 'Essayez de modifier vos critères de recherche ou de supprimer les filtres.'
-        : 'Commencez par ajouter votre premier client.'}
+        : onAddClient ? 'Commencez par ajouter votre premier client.' : undefined}
       secondaryAction={hasFilters ? { label: 'Effacer les filtres', icon: X, onClick: onClearFilters } : undefined}
-      action={{ label: 'Ajouter un client', icon: Plus, onClick: onAddClient }}
+      action={onAddClient ? { label: 'Ajouter un client', icon: Plus, onClick: onAddClient } : undefined}
     />
   );
 };
@@ -464,7 +464,7 @@ export function Clients() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <PageHeader
             title="Clients"
-            subtitle={`${totalCount} client${totalCount !== 1 ? 's' : ''} au total`}
+            subtitle={`${totalCount.toLocaleString('fr-FR')} client${totalCount !== 1 ? 's' : ''} au total`}
             actions={[
               isOrgAdmin && { label: 'Importer', icon: Upload, variant: 'secondary', onClick: () => navigate('/clients/import') },
               canCreateClient && { label: 'Nouveau client', icon: Plus, variant: 'primary', onClick: handleAddClient },
@@ -622,7 +622,7 @@ export function Clients() {
           <EtatVideClients
             hasFilters={hasActiveFilters}
             onClearFilters={handleClearFilters}
-            onAddClient={handleAddClient}
+            onAddClient={canCreateClient ? handleAddClient : undefined}
             activeStatCard={activeStatCard}
           />
         )}

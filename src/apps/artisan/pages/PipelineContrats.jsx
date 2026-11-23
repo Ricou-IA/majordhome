@@ -361,7 +361,7 @@ export default function PipelineContrats() {
       {/* Header */}
       <PageHeader
         title="Contrats"
-        subtitle={loading ? null : `${contracts.length} contrat${contracts.length !== 1 ? 's' : ''} en cours de traitement`}
+        subtitle={loading ? null : `${contracts.length.toLocaleString('fr-FR')} contrat${contracts.length !== 1 ? 's' : ''} en cours de traitement`}
       />
 
       {/* KPI Cards */}

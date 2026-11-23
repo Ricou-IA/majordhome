@@ -102,7 +102,7 @@ export default function DevisExplorer() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Devis" />
+      <PageHeader title="Devis Pennylane" />
 
       {error && (
         <div className="p-4 rounded-lg bg-amber-50 text-amber-800 flex items-start gap-3">

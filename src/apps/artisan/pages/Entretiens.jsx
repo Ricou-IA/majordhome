@@ -387,7 +387,8 @@ export default function Entretiens() {
           !savStatsLoading && savStats?.entretien_a_faire != null
             ? `${savStats.entretien_a_faire.toLocaleString('fr-FR')} entretiens à faire`
             : null,
-        ].filter(Boolean).join(' · ') || null}
+          `Année ${currentYear}`,
+        ].filter(Boolean).join(' · ')}
         actions={[
           canCreateContract && {
             label: 'Nouveau contrat',
