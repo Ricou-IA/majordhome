@@ -109,6 +109,7 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/catalogue/cataloguePieces.js', // accord du marchand + mode « boutique publique » : lu par l'edge supplier-catalog-sync via la copie _shared/catalogue
   'src/lib/catalogue/modelKey.js',
   'src/lib/catalogue/mapping.js',
+  'src/components/ui/date-input.jsx', // refonte UI phase 5 : consommé par la migration des dates (tâche 7), à retirer d'ici à ce moment
 ]);
 
 const allFiles = walk(SRC);

@@ -537,3 +537,18 @@ html[data-device-class="phone"] .mdh-kanban-repliee {
     scrollbar-width: none;
   }
 }
+
+/* Calendrier du champ de date (react-day-picker) aux couleurs de la DA : sélection cuivre,
+   jours fériés en gris (choisissables), aujourd'hui en gras. */
+.mdh-calendrier .rdp-root {
+  --rdp-accent-color: #C2532B;
+  --rdp-accent-background-color: #FDF3EE;
+  --rdp-day-height: 36px;
+  --rdp-day-width: 36px;
+  --rdp-day_button-height: 34px;
+  --rdp-day_button-width: 34px;
+  font-size: 14px;
+}
+.mdh-calendrier .mdh-jour-ferie:not(.rdp-selected) {
+  color: #A39A8E;
+}
