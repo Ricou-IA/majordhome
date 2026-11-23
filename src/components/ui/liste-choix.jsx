@@ -49,10 +49,12 @@ export function ListeChoix({ value, onChange, options = [], placeholder, disable
       aria-label={libelle}
       className={cn(
         'min-h-[44px] w-full rounded-lg border border-secondary-300 bg-white px-3 text-sm text-secondary-900 outline-none',
-        'focus-visible:border-primary-600 disabled:cursor-not-allowed disabled:bg-secondary-50 disabled:text-secondary-600',
+        'focus-visible:border-primary-600 focus-visible:shadow-ring disabled:cursor-not-allowed disabled:bg-secondary-50 disabled:text-secondary-600',
         selectClassName,
       )}
     >
+      {/* Liste vide : le texte d'attente s'affiche, comme le déclencheur du Combobox. */}
+      {options.length === 0 && placeholder && <option value="">{placeholder}</option>}
       {options.map((o, i) => (
         <option key={`${String(o.value ?? '')}-${i}`} value={String(o.value ?? '')} disabled={o.disabled}>
           {o.label}

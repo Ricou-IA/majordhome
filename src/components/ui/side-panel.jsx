@@ -24,8 +24,10 @@ const LARGEURS = {
  * @param {React.ReactNode} [props.pied]
  * @param {'md'|'lg'} [props.largeur]   480 px ou 640 px
  * @param {boolean} [props.bloquerFermeture]
+ * @param {string} [props.retourFocus]  sélecteur de l'élément qui reprend le focus à la fermeture
+ *   (le panneau n'a pas de déclencheur Radix : sans lui, le focus tombe sur la page)
  */
-export function SidePanel({ ouvert, onFermer, titre, description, pied, largeur = 'md', bloquerFermeture = false, children }) {
+export function SidePanel({ ouvert, onFermer, titre, description, pied, largeur = 'md', bloquerFermeture = false, retourFocus, children }) {
   const retenir = (e) => { if (bloquerFermeture) e.preventDefault(); };
   return (
     <Dialog.Root open={ouvert} onOpenChange={(o) => { if (!o) onFermer(); }}>
@@ -35,6 +37,10 @@ export function SidePanel({ ouvert, onFermer, titre, description, pied, largeur 
           onEscapeKeyDown={retenir}
           onPointerDownOutside={retenir}
           onInteractOutside={retenir}
+          onCloseAutoFocus={(e) => {
+            const cible = retourFocus ? document.querySelector(retourFocus) : null;
+            if (cible) { e.preventDefault(); cible.focus(); }
+          }}
           className={cn(
             'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-lg focus:outline-none',
             'data-[state=open]:animate-in data-[state=open]:slide-in-from-right',

@@ -52,7 +52,7 @@ export function MoveToLongTermModal({
       >
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Hourglass className="h-5 w-5 text-purple-600" />
+            <Hourglass className="h-5 w-5 text-secondary-500" />
             <h3 className="text-lg font-semibold text-secondary-900">Passer en suivi des objectifs</h3>
           </div>
           <button
@@ -90,7 +90,7 @@ export function MoveToLongTermModal({
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Ex: client doit boucler son financement, attente fin de chantier voisin, décision en famille..."
             rows={4}
-            className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none"
+            className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:shadow-ring focus:border-primary-600 outline-none resize-none"
             autoFocus
           />
         </div>
@@ -106,7 +106,7 @@ export function MoveToLongTermModal({
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             Confirmer

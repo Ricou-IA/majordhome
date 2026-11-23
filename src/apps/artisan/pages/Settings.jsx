@@ -6,8 +6,10 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useCanAccess } from '@hooks/usePermissions';
 import DemarrageCard from './settings/DemarrageCard';
 import { PageHeader } from '@/components/ui/page-header';
+import { Card, CardHeader } from '@/components/ui/card';
 import {
   Building2,
+  ChevronRight,
   Users,
   Shield,
   Wrench,
@@ -81,28 +83,29 @@ export default function Settings() {
 
       {/* Un groupe par module */}
       {groupes.map((m) => (
-        <section key={m.key} className="space-y-3">
-          <div>
-            <h2 className="text-base font-semibold text-secondary-900">{m.label}</h2>
-            {m.description && <p className="text-sm text-secondary-500">{m.description}</p>}
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4">
+        <Card key={m.key} as="section" className="overflow-hidden">
+          <CardHeader title={m.label} subtitle={m.description || undefined} />
+          <ul className="grid border-t border-secondary-100 sm:grid-cols-2">
             {m.tiles.map((t) => {
               const Icon = ICONS[t.icon] || HelpCircle;
               return (
-                <NavLink key={t.key} to={t.href} className="card-hover flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-secondary-100 flex items-center justify-center flex-shrink-0">
-                    <Icon className="w-5 h-5 text-secondary-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-secondary-900">{t.title}</h3>
-                    <p className="text-sm text-secondary-600">{t.description}</p>
-                  </div>
-                </NavLink>
+                <li key={t.key} className="border-b border-secondary-100 sm:odd:border-r">
+                  <NavLink
+                    to={t.href}
+                    className="flex min-h-[56px] items-center gap-3 px-5 py-3 hover:bg-secondary-50 focus-visible:bg-secondary-50 focus-visible:outline-none"
+                  >
+                    <Icon className="h-[18px] w-[18px] shrink-0 text-secondary-400" strokeWidth={1.75} aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-cell font-semibold text-secondary-900">{t.title}</span>
+                      <span className="block text-body-sm text-secondary-500">{t.description}</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-secondary-300" aria-hidden="true" />
+                  </NavLink>
+                </li>
               );
             })}
-          </div>
-        </section>
+          </ul>
+        </Card>
       ))}
 
       {/* Aide — emplacement RÉSERVÉ à l'agent d'onboarding (décision Eric,

@@ -57,6 +57,7 @@ export function PanneauModifierClient({
         description={nom}
         largeur="lg"
         bloquerFermeture={modaleImbriquee}
+        retourFocus="[data-retour-focus='modifier-fiche']"
         pied={(
           <>
             <Button type="button" variant="ghost" onClick={demanderFermeture} disabled={isUpdating}>

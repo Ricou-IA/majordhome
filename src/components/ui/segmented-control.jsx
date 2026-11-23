@@ -58,7 +58,7 @@ export function SegmentedControl({ value, onChange, options, label, className })
             onClick={() => onChange(option.value)}
             onKeyDown={(event) => onKeyDown(event, index)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:shadow-ring',
+              'mdh-segment inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:shadow-ring',
               actif ? 'bg-white text-secondary-900 shadow-sm' : 'text-secondary-600 hover:text-secondary-900',
             )}
           >

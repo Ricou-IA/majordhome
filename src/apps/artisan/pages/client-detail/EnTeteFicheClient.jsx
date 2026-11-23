@@ -168,7 +168,7 @@ export function EnTeteFicheClient({
 
           <MenuActions libelle="Autres actions sur le client" actions={actionsMenu} className={tactileIcone} />
 
-          <Button type="button" variant="secondary" className={tactile} onClick={onModifier} title="Modifier la fiche">
+          <Button type="button" variant="secondary" className={tactile} onClick={onModifier} title="Modifier la fiche" data-retour-focus="modifier-fiche">
             <Pencil aria-hidden="true" />
             Modifier
           </Button>

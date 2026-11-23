@@ -552,3 +552,12 @@ html[data-device-class="phone"] .mdh-kanban-repliee {
 .mdh-calendrier .mdh-jour-ferie:not(.rdp-selected) {
   color: #A39A8E;
 }
+
+/* Cibles tactiles (DA § 10) : au doigt, un segment ou un bouton compact fait au moins 44 px
+   de haut, sur téléphone comme sur la tablette (rendue en 1 024 px, donc en tailles « bureau »). */
+html[data-device-class="phone"] .mdh-segment,
+html[data-device-class="tablet"] .mdh-segment,
+html[data-device-class="phone"] .mdh-tactile,
+html[data-device-class="tablet"] .mdh-tactile {
+  min-height: 44px;
+}

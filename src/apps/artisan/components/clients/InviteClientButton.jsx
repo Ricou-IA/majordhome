@@ -25,7 +25,7 @@ export function InviteClientButton({ client }) {
   if (client.auth_user_id) {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 px-2.5 py-1.5 rounded-lg">
-        <Globe className="w-3.5 h-3.5" />
+        <Globe className="h-4 w-4" />
         Portail actif
       </span>
     );
@@ -35,11 +35,12 @@ export function InviteClientButton({ client }) {
   if (!client.email) {
     return (
       <button
+        type="button"
         disabled
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-secondary-400 bg-secondary-100 px-2.5 py-1.5 rounded-lg cursor-not-allowed"
+        className="inline-flex h-[38px] items-center gap-2 rounded-lg border border-secondary-200 bg-secondary-50 px-3 text-body-sm font-semibold text-secondary-400 cursor-not-allowed mdh-tactile"
         title="Le client doit avoir un email pour être invité"
       >
-        <UserPlus className="w-3.5 h-3.5" />
+        <UserPlus className="h-4 w-4" />
         Email requis
       </button>
     );
@@ -70,14 +71,15 @@ export function InviteClientButton({ client }) {
     <button
       onClick={handleInvite}
       disabled={inviting}
-      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+      type="button"
+      className="inline-flex h-[38px] items-center gap-2 rounded-lg border border-secondary-300 bg-white px-3 text-body-sm font-semibold text-secondary-800 shadow-xs transition-colors hover:bg-secondary-50 disabled:opacity-50 mdh-tactile"
     >
       {inviting ? (
-        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
-        <UserPlus className="w-3.5 h-3.5" />
+        <UserPlus className="h-4 w-4" />
       )}
-      {inviting ? 'Envoi...' : 'Inviter au portail'}
+      {inviting ? 'Envoi…' : 'Inviter au portail'}
     </button>
   );
 }
