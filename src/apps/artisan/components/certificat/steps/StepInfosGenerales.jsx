@@ -7,6 +7,7 @@
 
 import { FormField, TextInput, SelectInput } from '@apps/artisan/components/FormFields';
 import { SectionTitle } from '@apps/artisan/components/FormFields';
+import { DateInput } from '@/components/ui/date-input';
 import {
   COMBUSTIBLES,
   FLUIDES_FRIGORIGENES,
@@ -161,8 +162,8 @@ export function StepInfosGenerales({ formData, onChange, client, technicians = [
       {/* ── Date intervention ── */}
       <SectionTitle>Date d&apos;intervention</SectionTitle>
       <FormField label="Date" required>
-        <TextInput
-          type="date"
+        <DateInput
+          libelle="Date d'intervention"
           value={formData.date_intervention}
           onChange={(val) => onChange('date_intervention', val)}
         />

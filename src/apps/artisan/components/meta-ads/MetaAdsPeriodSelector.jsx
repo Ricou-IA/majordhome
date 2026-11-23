@@ -1,4 +1,5 @@
 import { Calendar } from 'lucide-react';
+import { DateInput } from '@/components/ui/date-input';
 
 const PRESETS = [
   { key: '7d', label: '7 jours', days: 7 },
@@ -67,20 +68,20 @@ export function MetaAdsPeriodSelector({ presetKey, onPresetChange, startDate, en
 
       {presetKey === 'custom' && (
         <div className="flex items-center gap-2">
-          <input
-            type="date"
+          <DateInput
+            libelle="Date de début"
             value={startDate}
             max={endDate}
-            onChange={(e) => onCustomChange({ startDate: e.target.value, endDate })}
-            className="rounded-md border border-secondary-200 bg-white px-2 py-1.5 text-sm"
+            onChange={(v) => onCustomChange({ startDate: v, endDate })}
+            className="w-48"
           />
           <span className="text-secondary-400">—</span>
-          <input
-            type="date"
+          <DateInput
+            libelle="Date de fin"
             value={endDate}
             min={startDate}
-            onChange={(e) => onCustomChange({ startDate, endDate: e.target.value })}
-            className="rounded-md border border-secondary-200 bg-white px-2 py-1.5 text-sm"
+            onChange={(v) => onCustomChange({ startDate, endDate: v })}
+            className="w-48"
           />
         </div>
       )}

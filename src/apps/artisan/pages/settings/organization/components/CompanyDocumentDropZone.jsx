@@ -10,6 +10,7 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Upload, Trash2, Loader2, FileText, ExternalLink, Sparkles, RotateCw } from 'lucide-react';
 import { storageService } from '@services/storage.service';
+import { DateInput } from '@/components/ui/date-input';
 import { companyDocumentsService } from '@services/companyDocuments.service';
 import {
   COMPANY_DOCUMENT_MIME_TYPES, COMPANY_DOCUMENT_MAX_BYTES,
@@ -75,12 +76,11 @@ function DocumentRow({ kind, doc, reading, onOpen, onRemove, onPatch, onRetry })
         ))}
         <label className="text-xs text-secondary-500">
           Valide jusqu’au
-          <input
-            type="date"
+          <DateInput
+            libelle="Valide jusqu’au"
             value={doc.valid_until || ''}
             disabled={reading}
-            onChange={(e) => onPatch({ valid_until: e.target.value || null })}
-            className={FIELD_CLASS}
+            onChange={(v) => onPatch({ valid_until: v || null })}
           />
         </label>
       </div>

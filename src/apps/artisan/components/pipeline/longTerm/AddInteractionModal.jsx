@@ -12,6 +12,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { DateInput } from '@/components/ui/date-input';
 import { CHANNEL_CONFIG } from './longTermUtils';
 import { logger } from '@lib/logger';
 
@@ -125,11 +126,11 @@ export function AddInteractionModal({
         {/* Date */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-secondary-700 mb-1">Date</label>
-          <input
-            type="date"
+          <DateInput
+            libelle="Date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            onChange={(v) => setDate(v)}
+            className="w-56"
           />
         </div>
 
@@ -146,11 +147,11 @@ export function AddInteractionModal({
               placeholder="Ex: rappeler M. Dupont après le 15/05"
               className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
-            <input
-              type="date"
+            <DateInput
+              libelle="Date de la prochaine action"
               value={nextActionDate}
-              onChange={(e) => setNextActionDate(e.target.value)}
-              className="px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              onChange={(v) => setNextActionDate(v)}
+              className="w-56"
             />
           </div>
         </details>

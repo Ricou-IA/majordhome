@@ -4,6 +4,7 @@
 // sauve l'objet pv COMPLET (merge JSONB niveau 1). Aucune règle métier ici : les
 // libellés/unités viennent de parametres.js.
 import { Combobox } from '@/components/ui/combobox';
+import { DateInput } from '@/components/ui/date-input';
 import { Plus, Trash2 } from 'lucide-react';
 import { DELAIS_META, TARIFS_META } from '@apps/solaire/lib/demarches/parametres';
 import { FormField, SectionTitle, inputClass } from '../../../components/FormFields';
@@ -64,10 +65,10 @@ function TarifTable({ cle, liste, onChange }) {
             <tbody>
               {rows.map((r, idx) => (
                 <tr key={`${cle}-${idx}`}>
-                  <td className="py-1 pr-2"><input type="date" className={inputClass} value={r.date_effet ?? ''} onChange={(e) => update(idx, { date_effet: e.target.value })} /></td>
+                  <td className="py-1 pr-2"><DateInput libelle="Date d’effet" value={r.date_effet ?? ''} onChange={(v) => update(idx, { date_effet: v })} /></td>
                   <td className="py-1 pr-2"><input type="number" step="any" min={0} inputMode="decimal" className={inputClass} value={r.valeur ?? ''}
                     onChange={(e) => { const n = e.target.value === '' ? '' : Number(e.target.value); update(idx, { valeur: Number.isNaN(n) ? '' : n }); }} /></td>
-                  <td className="py-1 pr-2"><input type="date" className={inputClass} value={r.valide_jusqu_au ?? ''} onChange={(e) => update(idx, { valide_jusqu_au: e.target.value || undefined })} /></td>
+                  <td className="py-1 pr-2"><DateInput libelle="Valide jusqu’au" value={r.valide_jusqu_au ?? ''} onChange={(v) => update(idx, { valide_jusqu_au: v || undefined })} /></td>
                   <td className="py-1 pr-2"><input type="text" className={inputClass} value={r.note ?? ''} placeholder="source, remarque" onChange={(e) => update(idx, { note: e.target.value || undefined })} /></td>
                   <td className="py-1">
                     <button type="button" onClick={() => remove(idx)} className="p-1 text-secondary-400 hover:text-secondary-700" aria-label="Supprimer cette période">

@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ExternalLink, Link2, Loader2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
+import { DateInput } from '@/components/ui/date-input';
 import { useChantierPvMutations } from '@hooks/useChantiers';
 import { reponseReservesNonEnregistree, suiteDesReserves } from '@/lib/chantierApresVente';
 import { dateLongue, jourDeParis, messagePv, validerReponseReserves } from '@/lib/pvReception';
@@ -122,9 +123,9 @@ export function ChantierPvReserves({ chantier, pv, canEdit, communicationOuverte
             </div>
             <div>
               <label htmlFor={`pv-ech-${chantier.id}`} className="block text-xs text-secondary-600 mb-1">Réserves levées avant le</label>
-              <input
-                id={`pv-ech-${chantier.id}`} type="date" value={echeance} disabled={!canEdit} min={jourSignature || undefined}
-                onChange={(e) => setEcheance(e.target.value)} className={`${champ} sm:w-auto`}
+              <DateInput
+                id={`pv-ech-${chantier.id}`} value={echeance} disabled={!canEdit} min={jourSignature || undefined}
+                onChange={(v) => setEcheance(v)} className="sm:w-56"
               />
             </div>
             {erreur && <p className="text-sm text-red-700" role="alert">{erreur}</p>}

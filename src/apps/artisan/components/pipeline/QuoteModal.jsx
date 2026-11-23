@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { X, FileText, Euro } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DateInput } from '@/components/ui/date-input';
 
 export const QuoteModal = ({ isOpen, onClose, onConfirm, loading = false, defaultAmount = '' }) => {
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -75,11 +76,10 @@ export const QuoteModal = ({ isOpen, onClose, onConfirm, loading = false, defaul
             <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Date d&apos;envoi
             </label>
-            <input
-              type="date"
+            <DateInput
+              libelle="Date d'envoi"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-colors"
+              onChange={(v) => setDate(v)}
             />
           </div>
         </div>

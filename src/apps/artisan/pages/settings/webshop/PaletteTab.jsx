@@ -2,6 +2,7 @@
 // Settings → Webshop → Livraison palette : transporteur, dépôts, règles des tournées
 // (`settings.webshop.palette` + `settings.webshop.depots`). Défauts : src/lib/webshop/reglages.js.
 import { Combobox } from '@/components/ui/combobox';
+import { DateInput } from '@/components/ui/date-input';
 import { useMemo } from 'react';
 import { Plus, Send, Trash2 } from 'lucide-react';
 import { WEBSHOP_REGLAGES_DEFAUT, BORNES } from '@/lib/webshop/reglages';
@@ -147,7 +148,7 @@ export default function PaletteTab() {
           <NombreChamp r={r} champ="delai_fermeture_jours" label="Fermeture des réservations" unite="jours avant" aide={`De ${bp.delai_fermeture_jours.min} à ${bp.delai_fermeture_jours.max}. Par défaut : J-${D.delai_fermeture_jours}.`} />
           <NombreChamp r={r} champ="horizon_semaines" label="Horizon de génération des créneaux" unite="semaines" aide={`Par défaut : ${D.horizon_semaines} semaines.`} />
           <Champ label="Ancre du cycle de 4 semaines" erreur={erreurs.ancre_cycle} aide={`Lundi de la semaine 1. Par défaut : ${D.ancre_cycle}.`}>
-            <input type="date" value={form.ancre_cycle} onChange={(e) => set('ancre_cycle', e.target.value)} className={INPUT} />
+            <DateInput libelle="Ancre du cycle de 4 semaines" value={form.ancre_cycle} onChange={(v) => set('ancre_cycle', v)} />
           </Champ>
           <NombreChamp r={r} champ="capacite_emplacements" label="Capacité d’un camion" unite="emplacements" aide={`Par défaut : ${D.capacite_emplacements}.`} />
           <NombreChamp r={r} champ="max_emplacements_panier" label="Emplacements max par panier" unite="emplacements" aide={`Au plus la capacité d’un camion. Par défaut : ${D.max_emplacements_panier}.`} />

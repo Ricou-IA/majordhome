@@ -1,4 +1,5 @@
 import { ListeChoix } from '@/components/ui/liste-choix';
+import { DateInput } from '@/components/ui/date-input';
 import { useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { X, Loader2, Users, Filter, History, Eye, ChevronDown, ChevronRight } from 'lucide-react';
@@ -617,20 +618,18 @@ function AttributesFields({ filters, set, audience, leadSources, leadCommercials
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1">Créé depuis</label>
-          <input
-            type="date"
+          <DateInput
+            libelle="Créé depuis"
             value={a.created_between?.from || ''}
-            onChange={(e) => set(['attributes', 'created_between', 'from'], e.target.value || null)}
-            className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm"
+            onChange={(v) => set(['attributes', 'created_between', 'from'], v || null)}
           />
         </div>
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1">Créé jusqu&apos;au</label>
-          <input
-            type="date"
+          <DateInput
+            libelle="Créé jusqu'au"
             value={a.created_between?.to || ''}
-            onChange={(e) => set(['attributes', 'created_between', 'to'], e.target.value || null)}
-            className="w-full rounded-lg border border-secondary-300 px-3 py-1.5 text-sm"
+            onChange={(v) => set(['attributes', 'created_between', 'to'], v || null)}
           />
         </div>
       </div>

@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { X, Phone, PhoneOff, PhoneForwarded } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DateInput } from '@/components/ui/date-input';
 
 const CALL_RESULTS = [
   { value: 'no_answer', label: 'Pas de réponse', icon: PhoneOff, color: 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100' },
@@ -63,11 +64,10 @@ export const CallModal = ({ isOpen, onClose, onConfirm, loading = false, title =
             <label className="block text-sm font-medium text-secondary-700 mb-1.5">
               Date de l&apos;appel
             </label>
-            <input
-              type="date"
+            <DateInput
+              libelle="Date de l'appel"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-colors"
+              onChange={(v) => setDate(v)}
             />
           </div>
 

@@ -18,6 +18,7 @@ import { formatEuro } from '@/lib/utils';
 import { formatDateForInput, formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { DateInput } from '@/components/ui/date-input';
 import { CreateContractModal } from '@/apps/artisan/components/entretiens/CreateContractModal';
 import { ContractPricingSection } from './ContractPricingSection';
 import { ContractPdfSection } from './ContractPdfSection';
@@ -324,10 +325,10 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <FormField label="Date de passage" required>
-                          <TextInput
+                          <DateInput
+                            libelle="Date de passage"
                             value={visitForm.date}
                             onChange={(v) => setVisitForm((p) => ({ ...p, date: v }))}
-                            type="date"
                             max={formatDateForInput(new Date())}
                           />
                         </FormField>
@@ -562,10 +563,10 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
             <TextInput value={contractForm.amount} onChange={(v) => setContractForm((p) => ({ ...p, amount: v }))} placeholder="0.00" type="number" />
           </FormField>
           <FormField label="Date début">
-            <TextInput value={contractForm.startDate} onChange={(v) => setContractForm((p) => ({ ...p, startDate: v }))} type="date" />
+            <DateInput libelle="Date début" value={contractForm.startDate} onChange={(v) => setContractForm((p) => ({ ...p, startDate: v }))} />
           </FormField>
           <FormField label="Date fin">
-            <TextInput value={contractForm.endDate} onChange={(v) => setContractForm((p) => ({ ...p, endDate: v }))} type="date" />
+            <DateInput libelle="Date fin" value={contractForm.endDate} onChange={(v) => setContractForm((p) => ({ ...p, endDate: v }))} />
           </FormField>
           <FormField label="Mois d'entretien">
             <ListeChoix

@@ -19,6 +19,7 @@ import {
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import { formatDateFR, formatPhoneNumber, formatEuro } from '@/lib/utils';
 import { InfoTip } from '@components/ui/info-tip';
+import { DateInput } from '@components/ui/date-input';
 import {
   APPOINTMENT_TYPES,
   COMMERCIAL_TYPES,
@@ -164,8 +165,8 @@ export const SectionDateTime = ({ formData, updateField, errors, isCancelled, re
     </h3>
     <div className="grid grid-cols-2 gap-4">
       <FormField label="Date" required error={errors.scheduled_date}>
-        <TextInput
-          type="date"
+        <DateInput
+          libelle="Date"
           value={formData.scheduled_date}
           onChange={(v) => updateField('scheduled_date', v)}
           disabled={isCancelled}

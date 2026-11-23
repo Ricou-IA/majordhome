@@ -4,11 +4,12 @@
 // marge d'un jour de chaque côté, le filtre exact se fait sur jourParis(done_at).
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { DateInput } from '@/components/ui/date-input';
 import { Loader2, FileDown } from 'lucide-react';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useMaintenanceReferentiel, useMaintenanceLogs } from '@hooks/useMaintenance';
 import { jourParis, ajouterJours } from '@/lib/maintenance/echeances';
-import { FormField, TextInput, SelectInput } from '@apps/artisan/components/FormFields';
+import { FormField, SelectInput } from '@apps/artisan/components/FormFields';
 import { telechargerRegistre } from '../lib/registreExport';
 
 const DATE_HEURE = new Intl.DateTimeFormat('fr-FR', {
@@ -68,8 +69,8 @@ export default function HistoriqueTab({ orgId, v }) {
   return (
     <div className="space-y-4">
       <div className="card grid sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
-        <FormField label="Du"><TextInput type="date" value={f.du} onChange={maj('du')} /></FormField>
-        <FormField label="Au"><TextInput type="date" value={f.au} onChange={maj('au')} /></FormField>
+        <FormField label="Du"><DateInput libelle="Du" value={f.du} onChange={maj('du')} /></FormField>
+        <FormField label="Au"><DateInput libelle="Au" value={f.au} onChange={maj('au')} /></FormField>
         <FormField label={v.unite}>
           <SelectInput value={f.unitId} onChange={maj('unitId')} placeholder="Toutes"
             options={units.map((u) => ({ value: u.id, label: u.archived_at ? `${u.name} (archivée)` : u.name }))} />

@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, FileCheck, Loader2 } from 'lucide-react';
 import { ListeChoix } from '@/components/ui/liste-choix';
+import { DateInput } from '@/components/ui/date-input';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 
 const EMPTY = {
@@ -87,7 +88,7 @@ export default function ValidateDossierModal({ open, onClose, onSubmit, isSubmit
 
         <div className="grid grid-cols-3 gap-3">
           <FormField label="Né(e) le" required>
-            <input type="date" className={inputClass} value={form.date_naissance} onChange={(e) => set({ date_naissance: e.target.value })} />
+            <DateInput libelle="Né(e) le" value={form.date_naissance} onChange={(v) => set({ date_naissance: v })} />
           </FormField>
           <FormField label="À (commune)" required>
             <input className={inputClass} value={form.naissance_commune} onChange={(e) => set({ naissance_commune: e.target.value })} />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CalendarDays } from 'lucide-react';
+import { DateInput } from '@/components/ui/date-input';
 import { formatDuree, formatDateCourte } from '../lib/chantierGaillacModel';
 import TaskRow from './TaskRow';
 
@@ -11,14 +12,14 @@ function DatePrevueInput({ planning, onSave }) {
     <label className="inline-flex items-center gap-2 text-sm font-normal text-secondary-700">
       <CalendarDays className="h-4 w-4 text-[#1565C0]" aria-hidden />
       <span className="sr-only">Date prévue pour {planning.code}</span>
-      <input
-        type="date"
+      <DateInput
+        libelle={`Date prévue pour ${planning.code}`}
         value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-          onSave(planning.code, e.target.value || null);
+        onChange={(v) => {
+          setValue(v);
+          onSave(planning.code, v || null);
         }}
-        className="min-h-[40px] rounded-lg border border-secondary-300 bg-white px-2 text-sm"
+        className="w-48"
       />
     </label>
   );

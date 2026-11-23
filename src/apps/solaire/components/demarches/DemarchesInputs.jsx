@@ -1,6 +1,7 @@
 // src/apps/solaire/components/demarches/DemarchesInputs.jsx
 // Saisies projet du module Démarches (le reste est dérivé de la simulation et du dossier).
 import { ListeChoix } from '@/components/ui/liste-choix';
+import { DateInput } from '@/components/ui/date-input';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 
 const PEC_OPTIONS = [
@@ -51,13 +52,13 @@ export default function DemarchesInputs({ value, onChange, prisesEnChargeDefaut,
         />
       </FormField>
       <FormField label="Point de départ du planning">
-        <input type="date" className={inputClass} value={value.date_depart ?? ''} disabled={disabled} onChange={(e) => onChange({ date_depart: e.target.value })} />
+        <DateInput libelle="Point de départ du planning" value={value.date_depart ?? ''} disabled={disabled} onChange={(v) => onChange({ date_depart: v })} />
       </FormField>
       <FormField label="Devis de référence (n°)">
         <input type="text" className={inputClass} value={value.devis?.numero ?? ''} placeholder="D-2026-042" disabled={disabled} onChange={(e) => onChange({ devis: { ...value.devis, numero: e.target.value } })} />
       </FormField>
       <FormField label="Date du devis">
-        <input type="date" className={inputClass} value={value.devis?.date ?? ''} disabled={disabled} onChange={(e) => onChange({ devis: { ...value.devis, date: e.target.value } })} />
+        <DateInput libelle="Date du devis" value={value.devis?.date ?? ''} disabled={disabled} onChange={(v) => onChange({ devis: { ...value.devis, date: v } })} />
       </FormField>
       <FormField label="Frais Enedis">
         <ListeChoix

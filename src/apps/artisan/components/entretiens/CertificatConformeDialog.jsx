@@ -16,7 +16,7 @@ import { ListeChoix } from '@/components/ui/liste-choix';
 import { useEffect, useState } from 'react';
 import { AlertTriangle, XCircle } from 'lucide-react';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
-import { inputClass } from '@/apps/artisan/components/FormFields';
+import { DateInput } from '@/components/ui/date-input';
 
 /**
  * @param {object} props
@@ -85,12 +85,11 @@ export function CertificatConformeDialog({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-secondary-700">Date de passage</span>
-            <input
-              type="date"
+            <DateInput
+              libelle="Date de passage"
               value={date || ''}
               max={today}
-              onChange={(e) => setDate(e.target.value)}
-              className={inputClass}
+              onChange={(v) => setDate(v)}
               disabled={!!blocage || loading}
             />
             {!dateValide && <span className="mt-1 block text-xs text-red-700">Date absente ou dans le futur.</span>}

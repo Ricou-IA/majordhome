@@ -4,6 +4,7 @@
 // par echeances.js (même règle que la borne) pour vérifier avant d'enregistrer.
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { DateInput } from '@/components/ui/date-input';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { FormField, TextInput, TextArea, SelectInput } from '@apps/artisan/components/FormFields';
 import { prochaineEcheance, decrireFrequence, jourParis } from '@/lib/maintenance/echeances';
@@ -135,7 +136,7 @@ export default function TacheForm({ open, onOpenChange, tache, unitId, dernierLo
         )}
 
         <FormField label="À partir du" required>
-          <TextInput type="date" value={f.start_date} onChange={maj('start_date')} />
+          <DateInput libelle="À partir du" value={f.start_date} onChange={maj('start_date')} />
         </FormField>
 
         <div className="rounded-lg bg-secondary-50 p-3 text-sm text-secondary-700">

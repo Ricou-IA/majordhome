@@ -7,6 +7,7 @@
  */
 
 import { ListeChoix } from '@/components/ui/liste-choix';
+import { DateInput } from '@/components/ui/date-input';
 import { useMemo, useState } from 'react';
 import { X, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -91,7 +92,7 @@ export function SAVInterventionFaiteModal({ item, onClose, onDone }) {
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-3 sm:col-span-1">
               <label htmlFor="sif-date" className="block text-sm font-medium text-secondary-700 mb-1.5">Date</label>
-              <input id="sif-date" type="date" max={aujourdhui} value={saisie.date} onChange={(e) => set('date')(e.target.value)} className={champ} />
+              <DateInput id="sif-date" max={aujourdhui} value={saisie.date} onChange={(v) => set('date')(v)} />
             </div>
             <div>
               <label htmlFor="sif-heure" className="block text-sm font-medium text-secondary-700 mb-1.5">Début</label>

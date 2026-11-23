@@ -7,8 +7,9 @@
  */
 
 import { User, Wrench } from 'lucide-react';
-import { FormField, TextInput, SelectInput, TextArea } from '../FormFields';
+import { FormField, SelectInput, TextArea } from '../FormFields';
 import { MAINTENANCE_MONTHS } from '@services/contracts.service';
+import { DateInput } from '@/components/ui/date-input';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -92,8 +93,8 @@ export function Step3Contract({
       {/* Date de début + Mois de maintenance */}
       <div className="grid grid-cols-2 gap-3">
         <FormField label="Date de début">
-          <TextInput
-            type="date"
+          <DateInput
+            libelle="Date de début"
             value={contractData.startDate}
             onChange={(val) => onContractDataChange('startDate', val)}
           />

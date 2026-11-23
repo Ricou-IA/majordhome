@@ -12,12 +12,13 @@
  */
 
 import { ListeChoix } from '@/components/ui/liste-choix';
+import { DateInput } from '@/components/ui/date-input';
 import { useState } from 'react';
 import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
 import { BanAddressInput } from '@/apps/artisan/components/shared/BanAddressInput';
 import {
   Search, PenLine, Unlink, Link2, X,
-  Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, ChevronDown, CalendarDays,
+  Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, ChevronDown,
   Target, Loader2, Wrench, Undo2,
   FileText, ChevronRight, Plus, Info, MapPinOff,
 } from 'lucide-react';
@@ -537,15 +538,11 @@ export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLog
     {/* RDV planifié : date du RDV */}
     {currentStatus.display_order >= 3 && (
       <FormField label="Date du RDV" className="mt-3">
-        <div className="relative">
-          <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400" />
-          <input
-            type="date"
-            value={form.appointment_date}
-            onChange={(e) => setField('appointment_date', e.target.value)}
-            className={`${inputClass} pl-9`}
-          />
-        </div>
+        <DateInput
+          libelle="Date du RDV"
+          value={form.appointment_date}
+          onChange={(v) => setField('appointment_date', v)}
+        />
       </FormField>
     )}
 

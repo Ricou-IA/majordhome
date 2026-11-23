@@ -8,6 +8,7 @@
  */
 
 import { ListeChoix } from '@/components/ui/liste-choix';
+import { DateInput } from '@/components/ui/date-input';
 import { useMemo, useState } from 'react';
 import { X, FileText, Loader2, Send, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
@@ -172,7 +173,7 @@ export function RapportSavDialog({ item, equipements = [], referentiel, membres 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="rs-date" className={etiquette}>Date d&apos;intervention</label>
-                  <input id="rs-date" type="date" max={aujourdhui} value={contenu.date} onChange={(e) => set('date')(e.target.value)} className={champ} />
+                  <DateInput id="rs-date" max={aujourdhui} value={contenu.date} onChange={(v) => set('date')(v)} />
                 </div>
                 <div className="sm:col-span-2">
                   <label htmlFor="rs-qui" className={etiquette}>Intervenant(s)</label>
