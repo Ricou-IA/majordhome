@@ -1,6 +1,8 @@
 /**
  * AccueilJournee.jsx — bloc « Aujourd'hui » de la page d'accueil : les RDV du jour,
  * ou ceux du prochain jour qui en a (règle : journeeAffichee, src/lib/accueil.js).
+ * Deux blocs côte à côte, Interventions et Commercial (Eric 2026-11-24, `repartirRdvDuJour`) ;
+ * un RDV d'un autre type n'est jamais masqué, il s'affiche dessous (« Autres RDV »).
  * Affichage seul. Une lecture en échec se dit, elle ne s'affiche jamais « aucun RDV ».
  */
 
@@ -12,7 +14,7 @@ import { Card, CardHeader } from '@components/ui/card';
 import { Avatar } from '@components/ui/avatar';
 import { Tag } from '@components/ui/tag';
 import { LienWaze } from '@apps/artisan/components/shared/LienWaze';
-import { personnesDuRdv, lieuDuRdv, rdvEnCours } from '@/lib/accueil';
+import { personnesDuRdv, lieuDuRdv, rdvEnCours, repartirRdvDuJour } from '@/lib/accueil';
 
 /** L'heure, rafraîchie chaque minute : la ligne « En cours » suit l'horloge, page ouverte. */
 function useMaintenant() {
@@ -87,6 +89,25 @@ function LigneRdv({ rdv, equipe, maintenant }) {
   );
 }
 
+/** Un bloc de RDV (Interventions, Commercial, Autres) : titre, nombre, lignes ou phrase vide. */
+function BlocRdv({ titre, rdvs, vide, equipe, maintenant, className = '' }) {
+  return (
+    <section aria-label={titre} className={`min-w-0 ${className}`}>
+      <h3 className="flex items-baseline gap-2 border-b border-secondary-100 bg-secondary-25 px-5 py-2 text-sm font-semibold text-secondary-800">
+        {titre}
+        <span className="text-xs font-normal tabular-nums text-secondary-500">{rdvs.length}</span>
+      </h3>
+      {rdvs.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-secondary-500">{vide}</p>
+      ) : (
+        <ul className="divide-y divide-secondary-100">
+          {rdvs.map((rdv) => <LigneRdv key={rdv.id} rdv={rdv} equipe={equipe} maintenant={maintenant} />)}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /**
  * @param {Object} props
  * @param {{ date: string, estAujourdhui: boolean, rdvs: Object[], conges: Object[] }} props.journee  cf. journeeAffichee
@@ -98,6 +119,7 @@ function LigneRdv({ rdv, equipe, maintenant }) {
 export function AccueilJournee({ journee, equipe, isLoading, error, finDeLecture }) {
   const enConges = [...new Map(journee.conges.flatMap((c) => personnesDuRdv(c, equipe)).map((p) => [p.cle, p])).values()];
   const nombre = journee.rdvs.length;
+  const blocs = repartirRdvDuJour(journee.rdvs);
   const maintenant = useMaintenant();
 
   let titre = 'Aujourd’hui';
@@ -130,9 +152,13 @@ export function AccueilJournee({ journee, equipe, isLoading, error, finDeLecture
         <Vide>Aucun RDV posé d’ici au {jourEnClair(finDeLecture)}.</Vide>
       ) : (
         <>
-          <ul className="divide-y divide-secondary-100 border-t border-secondary-100">
-            {journee.rdvs.map((rdv) => <LigneRdv key={rdv.id} rdv={rdv} equipe={equipe} maintenant={maintenant} />)}
-          </ul>
+          <div className="grid border-t border-secondary-100 md:grid-cols-2 md:divide-x md:divide-secondary-100">
+            <BlocRdv titre="Interventions" rdvs={blocs.interventions} vide="Aucune intervention ce jour-là." equipe={equipe} maintenant={maintenant} />
+            <BlocRdv titre="Commercial" rdvs={blocs.commercial} vide="Aucun RDV commercial ce jour-là." equipe={equipe} maintenant={maintenant} className="max-md:border-t max-md:border-secondary-100" />
+          </div>
+          {blocs.autres.length > 0 && (
+            <BlocRdv titre="Autres RDV" rdvs={blocs.autres} equipe={equipe} maintenant={maintenant} className="border-t border-secondary-100" />
+          )}
           {enConges.length > 0 && (
             <p className="border-t border-secondary-100 px-5 py-2.5 text-sm text-secondary-600">
               En congés : {enConges.map((p) => p.nom).join(', ')}

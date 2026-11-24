@@ -14,6 +14,7 @@
  */
 
 import { dateLocale, jourDOuverture } from './planningGestes.js';
+import { appointmentKind } from './planningEvents.js';
 
 /** Jours lus à partir du lundi de la semaine de référence (deux semaines). */
 const JOURS_LUS = 14;
@@ -178,4 +179,24 @@ export function sousTitreAccueil({ dateDuJour, rdvAujourdhui = null, aRappeler =
     parties.push(`${nombre(aRappeler)} ${pluriel(aRappeler, 'lead')} à contacter`);
   }
   return parties.length ? `${dateDuJour} · ${parties.join(' et ')}` : dateDuJour;
+}
+
+/**
+ * Répartit les RDV du jour en deux blocs (Eric 2026-11-24 : « ça permet de distinguer ») :
+ * interventions (installation, entretien, SAV) et commercial (visites, agence, signature).
+ * Même classement que les filtres du planning (`appointmentKind`). Un RDV d'un autre type
+ * n'est jamais masqué : il va dans `autres`, affiché sous les deux blocs.
+ * L'ordre de chaque liste est celui reçu (heure de début).
+ * @param {Object[]} rdvs
+ * @returns {{ interventions: Object[], commercial: Object[], autres: Object[] }}
+ */
+export function repartirRdvDuJour(rdvs = []) {
+  const blocs = { interventions: [], commercial: [], autres: [] };
+  for (const rdv of rdvs) {
+    const nature = appointmentKind(rdv?.appointment_type);
+    if (nature === 'intervention') blocs.interventions.push(rdv);
+    else if (nature === 'commercial') blocs.commercial.push(rdv);
+    else blocs.autres.push(rdv);
+  }
+  return blocs;
 }

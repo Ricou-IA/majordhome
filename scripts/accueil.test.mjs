@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { plageAccueil, journeeAffichee, compterRdv, personnesDuRdv, lieuDuRdv, lignesATraiter, rdvEnCours, sousTitreAccueil } from '../src/lib/accueil.js';
+import { plageAccueil, journeeAffichee, compterRdv, personnesDuRdv, lieuDuRdv, lignesATraiter, rdvEnCours, sousTitreAccueil, repartirRdvDuJour } from '../src/lib/accueil.js';
 
 const rdv = (date, heure, extra = {}) => ({ scheduled_date: date, scheduled_start: heure, status: 'scheduled', appointment_type: 'maintenance', ...extra });
 
@@ -142,4 +142,20 @@ test('sousTitreAccueil : date, rendez-vous et leads à contacter, parties inconn
   assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 0, aRappeler: 1 }), 'Lundi 23 novembre · aucun rendez-vous et 1 lead à contacter');
   assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: null, aRappeler: 0 }), 'Lundi 23 novembre · aucun lead à contacter');
   assert.equal(sousTitreAccueil({ dateDuJour: d, rdvAujourdhui: 1200, aRappeler: 2 }), 'Lundi 23 novembre · 1 200 rendez-vous et 2 leads à contacter');
+});
+
+test('repartirRdvDuJour : interventions, commercial, et rien de masqué', () => {
+  const rdvs = [
+    { id: 1, appointment_type: 'installation' },
+    { id: 2, appointment_type: 'rdv_technical' },
+    { id: 3, appointment_type: 'maintenance' },
+    { id: 4, appointment_type: 'rdv_closing' },
+    { id: 5, appointment_type: 'other' },
+    { id: 6, appointment_type: 'service' },
+  ];
+  const b = repartirRdvDuJour(rdvs);
+  assert.deepEqual(b.interventions.map((r) => r.id), [1, 3, 6]);
+  assert.deepEqual(b.commercial.map((r) => r.id), [2, 4]);
+  assert.deepEqual(b.autres.map((r) => r.id), [5]);
+  assert.deepEqual(repartirRdvDuJour([]), { interventions: [], commercial: [], autres: [] });
 });
