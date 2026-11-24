@@ -14,12 +14,19 @@
  *   onConfirm={handleDelete}
  *   loading={isDeleting}
  * />
+ *
+ * Suppression définitive : `texteASaisir="DUPONT Élise"` ajoute un champ où retaper le nom
+ * affiché ; « Confirmer » reste fermé tant que la saisie ne correspond pas (casse, accents et
+ * espaces ignorés, règle `saisieConforme` de src/lib/confirmationSaisie.js). Le champ se vide
+ * à chaque ouverture.
  * ============================================================================
  */
 
+import { useEffect, useId, useState } from 'react';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@lib/utils';
+import { saisieConforme, saisieDemandee } from '@lib/confirmationSaisie';
 
 export function ConfirmDialog({
   open,
@@ -33,8 +40,14 @@ export function ConfirmDialog({
   loading = false,
   confirmDisabled = false, // bloque la confirmation (ex. aperçu en erreur) sans masquer le bouton
   size = 'md', // 'md' (confirmation simple) | 'lg' | 'xl' (contenu éditable : tableau de lignes, aperçu de facture)
+  texteASaisir = null, // nom à retaper pour une suppression définitive (null = pas de saisie)
   children,
 }) {
+  const champId = useId();
+  const [saisie, setSaisie] = useState('');
+  useEffect(() => { if (open) setSaisie(''); }, [open]);
+  const demandeSaisie = saisieDemandee(texteASaisir);
+  const saisieOk = saisieConforme(saisie, texteASaisir);
   const confirmButtonClass = variant === 'destructive'
     ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
     : 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500';
@@ -81,6 +94,23 @@ export function ConfirmDialog({
 
           {children}
 
+          {demandeSaisie && (
+            <div className="mt-4">
+              <label htmlFor={champId} className="block text-sm text-secondary-700">
+                Pour confirmer, saisissez <span className="font-semibold text-secondary-900">{texteASaisir}</span>
+              </label>
+              <input
+                id={champId}
+                type="text"
+                value={saisie}
+                onChange={(e) => setSaisie(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                className="mt-1.5 w-full rounded-lg border border-secondary-300 px-3 py-2 text-sm text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          )}
+
           <div className="mt-6 flex items-center justify-end gap-3">
             <AlertDialogPrimitive.Cancel
               className="px-4 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors focus:outline-none focus:ring-2 focus:ring-secondary-300 max-sm:flex-1 max-sm:py-3"
@@ -94,10 +124,11 @@ export function ConfirmDialog({
                 'max-sm:flex-1 max-sm:py-3',
                 confirmButtonClass,
               )}
-              disabled={loading || confirmDisabled}
+              disabled={loading || confirmDisabled || !saisieOk}
               onClick={(e) => {
                 // Empêcher la fermeture auto pour gérer le loading
                 e.preventDefault();
+                if (!saisieOk) return;
                 onConfirm?.();
               }}
             >

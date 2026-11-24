@@ -4,6 +4,7 @@
 // résultat FIGÉ + engine_version) est rendu à l'appelant, qui l'enregistre après création du devis.
 import { useEffect, useMemo, useState } from 'react';
 import { X, ArrowLeft, Check, Loader2, AlertTriangle } from 'lucide-react';
+import { CalqueModal } from '@/components/ui/calque-modal';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -115,9 +116,9 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-secondary-100 flex flex-col">
+    <CalqueModal onClose={fermer} titreId="metre-titre" fermerAuFond={false} className="bg-secondary-100 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-secondary-200">
-        <div><p className="text-xs uppercase tracking-wide text-secondary-500">Métré assisté · fumisterie</p><h2 className="text-lg font-semibold text-secondary-900">{etape === 0 ? 'Qualifier le projet' : bundle?.configuration?.titre}</h2></div>
+        <div><p className="text-xs uppercase tracking-wide text-secondary-500">Métré assisté · fumisterie</p><h2 id="metre-titre" className="text-lg font-semibold text-secondary-900">{etape === 0 ? 'Qualifier le projet' : bundle?.configuration?.titre}</h2></div>
         <button type="button" onClick={fermer} className="p-2 rounded hover:bg-secondary-100" aria-label="Fermer"><X className="w-5 h-5" /></button>
       </header>
       <main className="flex-1 overflow-y-auto p-4">
@@ -156,6 +157,6 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
           {alertesBloquantes.map((a, i) => <li key={`${a.code}-${i}`} className="flex gap-2"><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-primary-700" /><span>{a.message}</span></li>)}
         </ul>
       </ConfirmDialog>
-    </div>
+    </CalqueModal>
   );
 }

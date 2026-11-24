@@ -24,7 +24,6 @@ export function TypesPanel({ admin }) {
   const [editing, setEditing] = useState(null);
 
   const handleDelete = async (type) => {
-    if (!window.confirm(`Supprimer le type "${type.label}" ?`)) return;
     try {
       await admin.deleteEquipmentType.mutateAsync(type.id);
       toast.success('Type supprimé');
@@ -74,6 +73,7 @@ export function TypesPanel({ admin }) {
                     <ActionButtons
                       onEdit={() => { setEditing(type); setShowModal(true); }}
                       onDelete={() => handleDelete(type)}
+                      nom={type.label}
                     />
                   </td>
                 </tr>

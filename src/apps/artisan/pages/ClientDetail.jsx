@@ -512,6 +512,7 @@ export default function ClientDetail() {
         cancelLabel="Annuler"
         variant="destructive"
         loading={isHardDeleting}
+        texteASaisir={displayName}
         onConfirm={handleConfirmHardDelete}
       >
         <div className="mt-4 rounded-lg border border-red-100 bg-red-50/60 p-3 text-sm text-secondary-700">

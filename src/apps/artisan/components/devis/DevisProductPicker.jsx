@@ -13,6 +13,7 @@
  */
 
 import { ListeChoix } from '@/components/ui/liste-choix';
+import { CalqueModal } from '@/components/ui/calque-modal';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Package, X, Loader2, Search, Minus, Plus, ShoppingCart } from 'lucide-react';
@@ -127,15 +128,15 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
   const stockVide = filtre.key === 'stock' && !isLoading && count === 0 && !debounced && !brand && !gamme;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+    <CalqueModal onClose={onClose} z="z-[60]" titreId="catalogue-devis-titre" className="flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[88vh] flex flex-col m-4">
         {/* En-tête */}
         <div className="flex items-center justify-between px-5 py-3 border-b">
           <div>
-            <h3 className="text-base font-semibold text-secondary-900">Ajouter des articles</h3>
+            <h3 id="catalogue-devis-titre" className="text-base font-semibold text-secondary-900">Ajouter des articles</h3>
             {cats.length > 0 && <p className="text-xs text-secondary-400">Catégorie{cats.length > 1 ? 's' : ''} : {cats.join(', ')}</p>}
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-secondary-100 rounded"><X className="w-5 h-5 text-secondary-500" /></button>
+          <button type="button" onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Retour au devis" title="Retour au devis"><X className="w-5 h-5 text-secondary-500" /></button>
         </div>
 
         {/* Filtres */}
@@ -251,13 +252,13 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
             )}
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="btn-secondary btn-sm">Annuler</button>
+            <button type="button" onClick={onClose} className="btn-secondary btn-sm">Retour au devis</button>
             <button type="button" onClick={handleConfirm} disabled={totalSelected === 0 || ajout} className="btn-primary btn-sm">
               <ShoppingCart className="w-4 h-4 mr-1" /> Ajouter au devis
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </CalqueModal>
   );
 }

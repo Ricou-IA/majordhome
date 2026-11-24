@@ -25,6 +25,9 @@ import DevisEntete from './DevisEntete';
 import DevisStepLines from './DevisStepLines';
 import DevisConditions from './DevisConditions';
 import { X, Loader2 } from 'lucide-react';
+import { CalqueModal } from '@/components/ui/calque-modal';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { saisieDevisAPerdre } from '@/lib/devisFermeture.js';
 import { toast } from 'sonner';
 
 /**
@@ -109,6 +112,15 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   }, []);
 
   const setField = useCallback((field, value) => setForm((prev) => ({ ...prev, [field]: value })), []);
+
+  // Fermer sans perdre une saisie : Échap, fond, croix et « Annuler » passent par demanderFermeture.
+  // `touche` = l'utilisateur a modifié quelque chose (des lignes reçues d'un dimensionnement comptent).
+  const [touche, setTouche] = useState(() => !edition && Array.isArray(initialLines) && initialLines.length > 0);
+  const [confirmerAbandon, setConfirmerAbandon] = useState(false);
+  const setLinesSaisie = useCallback((maj) => { setTouche(true); setLines(maj); }, []);
+  const setFieldSaisie = useCallback((field, value) => { setTouche(true); setField(field, value); }, [setField]);
+  const aPerdre = saisieDevisAPerdre({ touche, lines, subject: form.subject });
+  const demanderFermeture = () => { if (aPerdre) setConfirmerAbandon(true); else onClose(); };
 
   // Changer d'installation ne jette plus aucune ligne (retour d'Eric 2026-10-25 : après un import d'offre, on ne pouvait
   // plus changer d'installation sans tout perdre) : les chapitres de la nouvelle installation remplacent les anciens et
@@ -204,18 +216,18 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <CalqueModal onClose={demanderFermeture} titreId="devis-titre" className="flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[92vh] flex flex-col m-4">
         <div className="flex items-center justify-between px-6 py-3 border-b">
-          <h2 className="text-lg font-semibold text-secondary-900">{edition ? `Modifier le devis ${devisAModifier.quote.quote_number || ''}` : 'Nouveau devis'}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer"><X className="w-5 h-5 text-secondary-500" /></button>
+          <h2 id="devis-titre" className="text-lg font-semibold text-secondary-900">{edition ? `Modifier le devis ${devisAModifier.quote.quote_number || ''}` : 'Nouveau devis'}</h2>
+          <button type="button" onClick={demanderFermeture} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer"><X className="w-5 h-5 text-secondary-500" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          <DevisEntete lead={lead} form={form} setField={setField} selectedFamily={selectedFamily} onSelectFamily={handleSelectFamily}
-            templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={handleSelectTemplate} familles={famillesActives(devisConfig).map((f) => f.label)} onImportOffre={() => setImportOffre(true)} />
-          <DevisStepLines orgId={orgId} lines={lines} setLines={setLines} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} articles={articles} />
-          {nbLignes > 0 && <DevisConditions form={form} setField={setField} lines={lines} devisConfig={devisConfig} />}
+          <DevisEntete lead={lead} form={form} setField={setFieldSaisie} selectedFamily={selectedFamily} onSelectFamily={(f) => { setTouche(true); handleSelectFamily(f); }}
+            templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={(t) => { setTouche(true); handleSelectTemplate(t); }} familles={famillesActives(devisConfig).map((f) => f.label)} onImportOffre={() => setImportOffre(true)} />
+          <DevisStepLines orgId={orgId} lines={lines} setLines={setLinesSaisie} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} articles={articles} />
+          {nbLignes > 0 && <DevisConditions form={form} setField={setFieldSaisie} lines={lines} devisConfig={devisConfig} />}
         </div>
 
         {/* Pied : totaux vivants + action unique */}
@@ -227,13 +239,23 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
             {nbLignes === 0 && <span className="text-xs text-secondary-400">Aucune ligne</span>}
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
+            <button type="button" onClick={demanderFermeture} className="btn-secondary">Annuler</button>
             <button type="button" onClick={handleCreate} disabled={isCreating || enregistrement || nbLignes === 0} className="btn-primary">
               {(isCreating || enregistrement) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{edition ? 'Enregistrer les modifications' : 'Créer le devis'}
             </button>
           </div>
         </div>
       </div>
-    </div>
+
+      <ConfirmDialog
+        open={confirmerAbandon}
+        onOpenChange={setConfirmerAbandon}
+        title={edition ? 'Abandonner les modifications ?' : 'Abandonner le devis ?'}
+        description={edition ? 'Les modifications non enregistrées seront perdues.' : 'Les lignes saisies seront perdues : le devis n’est pas encore créé.'}
+        confirmLabel="Abandonner"
+        cancelLabel="Continuer la saisie"
+        onConfirm={() => { setConfirmerAbandon(false); onClose(); }}
+      />
+    </CalqueModal>
   );
 }

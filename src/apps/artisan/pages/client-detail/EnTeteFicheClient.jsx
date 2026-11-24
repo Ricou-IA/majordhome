@@ -76,7 +76,9 @@ export function EnTeteFicheClient({
 
   const actionsMenu = [
     canCreateSAV && !isArchived && { label: 'Nouveau SAV', icon: LifeBuoy, onClick: onNouveauSav },
+    { separateur: true },
     !isArchived && { label: 'Archiver', icon: Archive, onClick: onArchiver },
+    { separateur: true },
     isAdmin && {
       label: 'Supprimer définitivement', icon: Trash2, danger: true, disabled: isHardDeleting, onClick: onSupprimer,
     },

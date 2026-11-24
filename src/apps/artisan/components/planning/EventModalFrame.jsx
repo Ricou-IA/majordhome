@@ -3,6 +3,7 @@
  */
 import { X, Save, Loader2, Trash2, Ban, CalendarDays } from 'lucide-react';
 import { MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
+import { MenuActions } from '@/components/ui/menu-actions';
 
 /** En-tête : pastille de la couleur du type, titre, client du RDV en édition. */
 export function EventModalHeader({ typeConfig, title, subtitle, onClose }) {
@@ -33,7 +34,7 @@ export function EventModalHeader({ typeConfig, title, subtitle, onClose }) {
 }
 
 /**
- * Pied : actions danger (édition au repos), Retour / Fermer, bouton principal.
+ * Pied : menu « … » (annuler / supprimer le RDV, édition au repos), Retour / Fermer, bouton principal.
  * Bouton principal = assistant (créer / enregistrer le créneau / ajouter la suite)
  * ou chemin classique (Enregistrer / Créer le RDV).
  */
@@ -48,27 +49,19 @@ export function EventModalFooter({
     /* Sous `sm`, quatre boutons ne tiennent pas sur 390 px : retour de ligne (sinon le panneau
        en overflow-hidden rogne le bouton principal), groupe principal gardé à droite. */
     <div className={`flex items-center justify-between max-sm:flex-wrap max-sm:gap-y-2 px-4 sm:px-6 py-4 border-t border-secondary-200 bg-secondary-50 shrink-0 ${MODAL_FOOTER_PHONE}`}>
-      {/* Actions danger (mode edit seulement, hors re-planification) */}
-      <div className="flex items-center gap-2">
+      {/* Annuler / supprimer le RDV (édition au repos) : menu « … » à gauche, jamais à côté de
+          Fermer ou Enregistrer. Chaque entrée ouvre sa confirmation (EventConfirmations). */}
+      <div className="flex items-center">
         {showDangerActions && (
-          <>
-            <button
-              onClick={onRequestCancel}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
-              title="Annuler le RDV"
-            >
-              <Ban className="w-4 h-4" />
-              Annuler
-            </button>
-            <button
-              onClick={onRequestDelete}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-              title="Supprimer le RDV"
-            >
-              <Trash2 className="w-4 h-4" />
-              Supprimer
-            </button>
-          </>
+          <MenuActions
+            libelle="Autres actions sur le RDV"
+            align="start"
+            actions={[
+              { label: 'Annuler le RDV', icon: Ban, onClick: onRequestCancel },
+              { separateur: true },
+              { label: 'Supprimer le RDV', icon: Trash2, danger: true, onClick: onRequestDelete },
+            ]}
+          />
         )}
       </div>
 

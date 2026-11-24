@@ -701,6 +701,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         open={showHardDelete}
         onOpenChange={setShowHardDelete}
         leadId={leadId}
+        nomAffiche={lead ? `${lead.last_name || ''} ${lead.first_name || ''}`.trim() : null}
         hardDeleteLead={hardDeleteLead}
         isHardDeleting={isHardDeleting}
         onDeleted={() => {

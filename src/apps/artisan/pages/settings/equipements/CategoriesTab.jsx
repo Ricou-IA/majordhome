@@ -35,13 +35,14 @@ export function CategoriesPanel({ admin }) {
     typesParCategorie.set(t.category_id, (typesParCategorie.get(t.category_id) || 0) + 1);
   }
 
-  const handleDelete = async (cat) => {
+  const refusSuppression = (cat) => {
     const nTypes = typesParCategorie.get(cat.id) || 0;
-    if (nTypes > 0) {
-      toast.error(`« ${cat.label} » est utilisée par ${nTypes} type(s) d'équipement : désactivez-la plutôt.`);
-      return;
-    }
-    if (!window.confirm(`Supprimer la catégorie "${cat.label}" ?`)) return;
+    return nTypes > 0
+      ? `« ${cat.label} » est utilisée par ${nTypes} type(s) d'équipement : désactivez-la plutôt.`
+      : null;
+  };
+
+  const handleDelete = async (cat) => {
     try {
       await admin.deleteCategory.mutateAsync(cat.id);
       toast.success('Catégorie supprimée');
@@ -99,6 +100,8 @@ export function CategoriesPanel({ admin }) {
                     <ActionButtons
                       onEdit={() => { setEditing(cat); setShowModal(true); }}
                       onDelete={() => handleDelete(cat)}
+                      nom={cat.label}
+                      refusSuppression={refusSuppression(cat)}
                     />
                   </td>
                 </tr>

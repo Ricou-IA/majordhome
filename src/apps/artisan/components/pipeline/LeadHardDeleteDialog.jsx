@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@lib/logger';
 
-export function LeadHardDeleteDialog({ open, onOpenChange, leadId, hardDeleteLead, isHardDeleting, onDeleted }) {
+export function LeadHardDeleteDialog({ open, onOpenChange, leadId, nomAffiche, hardDeleteLead, isHardDeleting, onDeleted }) {
   const [counts, setCounts] = useState(null);
 
   useEffect(() => {
@@ -73,6 +73,7 @@ export function LeadHardDeleteDialog({ open, onOpenChange, leadId, hardDeleteLea
       cancelLabel="Annuler"
       variant="destructive"
       loading={isHardDeleting}
+      texteASaisir={nomAffiche}
       onConfirm={handleConfirm}
     >
       <div className="mt-4 rounded-lg border border-red-100 bg-red-50/60 p-3 text-sm text-secondary-700">

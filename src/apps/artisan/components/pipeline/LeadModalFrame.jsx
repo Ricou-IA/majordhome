@@ -4,6 +4,7 @@
 import { X, Save, Loader2, ArrowLeft, Trash2, Link2, GitMerge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { MenuActions } from '@/components/ui/menu-actions';
 
 /**
  * En-tête : titre, statut courant, retour depuis le mode planification RDV.
@@ -67,52 +68,39 @@ export function LeadModalHeader({ isEditing, currentStatus, pennylaneActive, onA
   );
 }
 
-/** Pied : Annuler, god mode org_admin (Fusionner / Supprimer), Enregistrer. */
+/**
+ * Pied : Fermer (Annuler pour une demande pas encore créée) et Enregistrer. Fusionner et
+ * Supprimer (org_admin) sont dans le menu « … » à gauche, jamais à côté d'Enregistrer ;
+ * la suppression se confirme en retapant le nom (LeadHardDeleteDialog).
+ */
 export function LeadModalFooter({ isEditing, isAdmin, isSaving, isHardDeleting, onCancel, onMerge, onHardDelete, onSave }) {
+  const actions = isEditing && isAdmin ? [
+    { label: 'Fusionner avec un doublon', icon: GitMerge, onClick: onMerge },
+    { separateur: true },
+    { label: 'Supprimer définitivement', icon: Trash2, danger: true, disabled: isHardDeleting, onClick: onHardDelete },
+  ] : [];
   return (
-    <div className="border-t bg-white px-6 py-4 flex items-center justify-between sticky bottom-0">
-      <div className="flex items-center gap-2">
-        <Button variant="outline" onClick={onCancel} className="min-h-[44px]">
-          Annuler
-        </Button>
-        {isEditing && isAdmin && (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onMerge}
-              className="min-h-[44px] text-secondary-600 hover:bg-secondary-100 hover:text-secondary-800 gap-1.5"
-              title="God mode — absorber un doublon dans cette carte (org_admin)"
-            >
-              <GitMerge className="h-4 w-4" />
-              Fusionner
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onHardDelete}
-              disabled={isHardDeleting}
-              className="min-h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
-              title="God mode — supprimer définitivement (org_admin)"
-            >
-              <Trash2 className="h-4 w-4" />
-              Supprimer
-            </Button>
-          </>
-        )}
+    <div className="border-t bg-white px-6 py-4 flex items-center justify-between gap-3 sticky bottom-0">
+      <div className="flex items-center">
+        <MenuActions libelle="Autres actions sur la demande" actions={actions} align="start" className="min-h-[44px] min-w-[44px]" />
       </div>
-      <Button
-        onClick={onSave}
-        disabled={isSaving}
-        className="gap-2 min-h-[44px] bg-primary-600 hover:bg-primary-700"
-      >
-        {isSaving ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Save className="h-4 w-4" />
-        )}
-        {isEditing ? 'Enregistrer' : 'Créer le lead'}
-      </Button>
+      <div className="flex items-center gap-3">
+        <Button variant="outline" onClick={onCancel} className="min-h-[44px]">
+          {isEditing ? 'Fermer' : 'Annuler'}
+        </Button>
+        <Button
+          onClick={onSave}
+          disabled={isSaving}
+          className="gap-2 min-h-[44px] bg-primary-600 hover:bg-primary-700"
+        >
+          {isSaving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          {isEditing ? 'Enregistrer' : 'Créer le lead'}
+        </Button>
+      </div>
     </div>
   );
 }

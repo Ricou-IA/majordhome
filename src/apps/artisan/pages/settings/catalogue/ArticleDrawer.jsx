@@ -5,6 +5,7 @@
 // Spec docs/superpowers/specs/2026-10-24-articles-majordhome-matrice-fournisseurs-design.md § 5.6 / § 8.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Save, Loader2, Link2, Image as ImageIcon, Upload, Sparkles } from 'lucide-react';
+import { CalqueModal } from '@/components/ui/calque-modal';
 import { toast } from 'sonner';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useCatalogItem, useCatalogItemOffers, useCatalogItemMutations } from '@hooks/useCatalogItems';
@@ -97,12 +98,12 @@ export default function ArticleDrawer({ orgId, itemId, onClose, enrichirDOffice 
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex justify-end bg-black/30" onClick={onClose}>
-      <div className="bg-white w-full max-w-3xl h-full shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <CalqueModal onClose={onClose} z="z-[60]" titreId="article-tiroir-titre" className="flex justify-end bg-black/30">
+      <div className="bg-white w-full max-w-3xl h-full shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-secondary-200">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wide text-secondary-400">Article Majord&apos;home</p>
-            <h2 className="text-lg font-semibold text-secondary-900 truncate">{item?.name || (isLoading ? 'Chargement…' : 'Article')}</h2>
+            <h2 id="article-tiroir-titre" className="text-lg font-semibold text-secondary-900 truncate">{item?.name || (isLoading ? 'Chargement…' : 'Article')}</h2>
             {item && (
               <p className="text-xs text-secondary-500">
                 {offresActives.length} offre{offresActives.length > 1 ? 's' : ''} active{offresActives.length > 1 ? 's' : ''}
@@ -224,6 +225,6 @@ export default function ArticleDrawer({ orgId, itemId, onClose, enrichirDOffice 
           propose={proposeEnrichment} apply={applyEnrichment} applying={isApplyingEnrichment} />
       )}
       {attaching && item && <ArticleAttachModal orgId={orgId} item={item} offers={offers} onClose={() => setAttaching(false)} onAttach={handleAttach} attaching={isLinking} />}
-    </div>
+    </CalqueModal>
   );
 }

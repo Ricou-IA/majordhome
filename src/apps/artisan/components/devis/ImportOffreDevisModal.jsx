@@ -16,6 +16,7 @@
 import { ListeChoix } from '@/components/ui/liste-choix';
 import { useMemo, useState } from 'react';
 import { X, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { CalqueModal } from '@/components/ui/calque-modal';
 import { toast } from 'sonner';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useSuppliers } from '@hooks/useSuppliers';
@@ -176,11 +177,11 @@ export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose })
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+    <CalqueModal onClose={onClose} z="z-[60]" titreId="import-offre-titre" className="flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[92vh] flex flex-col m-4">
         <div className="flex items-center justify-between px-5 py-3 border-b">
-          <h3 className="text-base font-semibold text-secondary-900">Importer une offre fournisseur</h3>
-          <button onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer"><X className="w-5 h-5 text-secondary-500" /></button>
+          <h3 id="import-offre-titre" className="text-base font-semibold text-secondary-900">Importer une offre fournisseur</h3>
+          <button type="button" onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Retour au devis" title="Retour au devis"><X className="w-5 h-5 text-secondary-500" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
@@ -249,7 +250,7 @@ export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose })
           </p>
           <div className="flex gap-2">
             {lecture && <button type="button" onClick={() => { setLecture(null); setNatures({}); setExistants({}); }} className="btn-secondary btn-sm">Autre fichier</button>}
-            <button type="button" onClick={onClose} className="btn-secondary btn-sm">Annuler</button>
+            <button type="button" onClick={onClose} className="btn-secondary btn-sm">Retour au devis</button>
             {lecture && (
               <button type="button" onClick={valider} disabled={!rows?.length || enCours || isApplying || bloquee} className="btn-primary btn-sm">
                 {(enCours || isApplying) ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <ArrowRight className="w-4 h-4 mr-1" />}
@@ -259,6 +260,6 @@ export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose })
           </div>
         </div>
       </div>
-    </div>
+    </CalqueModal>
   );
 }

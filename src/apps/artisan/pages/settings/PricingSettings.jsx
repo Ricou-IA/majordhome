@@ -107,7 +107,6 @@ function ZonesPanel({ admin }) {
   const [editing, setEditing] = useState(null);
 
   const handleDelete = async (zone) => {
-    if (!window.confirm(`Supprimer la zone "${zone.label}" ?`)) return;
     try {
       await admin.deleteZone.mutateAsync(zone.id);
       toast.success('Zone supprimée');
@@ -157,6 +156,7 @@ function ZonesPanel({ admin }) {
                     <ActionButtons
                       onEdit={() => { setEditing(zone); setShowModal(true); }}
                       onDelete={() => handleDelete(zone)}
+                      nom={zone.label}
                     />
                   </td>
                 </tr>
@@ -437,7 +437,6 @@ function DiscountsPanel({ admin }) {
   const [editing, setEditing] = useState(null);
 
   const handleDelete = async (discount) => {
-    if (!window.confirm(`Supprimer la remise "${discount.label}" ?`)) return;
     try {
       await admin.deleteDiscount.mutateAsync(discount.id);
       toast.success('Remise supprimée');
@@ -484,6 +483,7 @@ function DiscountsPanel({ admin }) {
                     <ActionButtons
                       onEdit={() => { setEditing(discount); setShowModal(true); }}
                       onDelete={() => handleDelete(discount)}
+                      nom={discount.label}
                     />
                   </td>
                 </tr>
@@ -578,7 +578,6 @@ function ExtrasPanel({ admin }) {
   const [editing, setEditing] = useState(null);
 
   const handleDelete = async (extra) => {
-    if (!window.confirm(`Supprimer "${extra.label}" ?`)) return;
     try {
       await admin.deleteExtra.mutateAsync(extra.id);
       toast.success('Option supprimée');
@@ -626,6 +625,7 @@ function ExtrasPanel({ admin }) {
                     <ActionButtons
                       onEdit={() => { setEditing(extra); setShowModal(true); }}
                       onDelete={() => handleDelete(extra)}
+                      nom={extra.label}
                     />
                   </td>
                 </tr>

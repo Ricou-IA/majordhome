@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Plus, Edit, Copy, Archive, ArchiveRestore, Trash2, ChevronDown, ChevronRight, Loader2, Mail, Users, Clock, Play, Check, Zap, Target, Send, RefreshCw } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
+import { MenuActions } from '@components/ui/menu-actions';
 import { useAuth } from '@contexts/AuthContext';
 import { useMailCampaigns, useNombreEnvois } from '@hooks/useMailCampaigns';
 import { useMailSegments } from '@hooks/useMailSegments';
@@ -231,10 +232,11 @@ export default function EditorTab() {
                     <ArchiveRestore className="w-3.5 h-3.5 mr-1" />
                     Restaurer
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => demander('supprimer', c)} disabled={isMutating} className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                    <Trash2 className="w-3.5 h-3.5 mr-1" />
-                    Supprimer
-                  </Button>
+                  <MenuActions
+                    libelle={`Autres actions sur ${c.label}`}
+                    className="h-8 w-8"
+                    actions={[{ label: 'Supprimer définitivement', icon: Trash2, danger: true, disabled: isMutating, onClick: () => demander('supprimer', c) }]}
+                  />
                 </li>
               ))}
             </ul>
@@ -363,30 +365,18 @@ function CampaignCard({ campaign, nature, accent, segment, onEdit, onDuplicate, 
           <Edit className="w-3.5 h-3.5 mr-1" />
           {gerer ? 'Éditer' : 'Ouvrir'}
         </Button>
-        {gerer && (
-          <Button variant="ghost" size="sm" onClick={onDuplicate} disabled={disabled}>
-            <Copy className="w-3.5 h-3.5 mr-1" />
-            Dupliquer
-          </Button>
-        )}
-        {gestes.archiver.affiche && (
-          <Button variant="ghost" size="sm" onClick={onArchive} disabled={disabled} className="ml-auto">
-            <Archive className="w-3.5 h-3.5 mr-1" />
-            Archiver
-          </Button>
-        )}
-        {gestes.supprimer.affiche && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDelete}
-            disabled={disabled}
-            className={`text-red-600 hover:text-red-700 hover:bg-red-50 ${gestes.archiver.affiche ? '' : 'ml-auto'}`}
-          >
-            <Trash2 className="w-3.5 h-3.5 mr-1" />
-            Supprimer
-          </Button>
-        )}
+        {/* Dupliquer, archiver et supprimer : menu « … », jamais une corbeille rouge à côté d'Éditer. */}
+        <MenuActions
+          libelle={`Autres actions sur ${campaign.label}`}
+          className="ml-auto h-8 w-8"
+          actions={[
+            gerer && { label: 'Dupliquer', icon: Copy, disabled, onClick: onDuplicate },
+            { separateur: true },
+            gestes.archiver.affiche && { label: 'Archiver', icon: Archive, disabled, onClick: onArchive },
+            { separateur: true },
+            gestes.supprimer.affiche && { label: 'Supprimer définitivement', icon: Trash2, danger: true, disabled, onClick: onDelete },
+          ]}
+        />
       </div>
     </div>
   );

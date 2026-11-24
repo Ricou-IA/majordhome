@@ -3,7 +3,11 @@
  * Settings → Tarification (PricingSettings.jsx et pricing/CategoriesTab.jsx).
  * Extraits tels quels de PricingSettings.jsx (2026-09) : aucune logique métier.
  */
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { MenuActions } from '@/components/ui/menu-actions';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 export function ToolbarHeader({ title, count, onAdd, addLabel }) {
   return (
@@ -16,15 +20,44 @@ export function ToolbarHeader({ title, count, onAdd, addLabel }) {
   );
 }
 
-export function ActionButtons({ onEdit, onDelete }) {
+/**
+ * Crayon (Modifier) seul sur la ligne ; Supprimer est dans le menu « … » et passe par une
+ * confirmation dans l'app (plus de window.confirm). `onDelete` est la suppression elle-même
+ * (asynchrone, elle dit son résultat par un toast) : elle n'est appelée qu'après « Supprimer ».
+ * `refusSuppression` (texte) : la suppression est impossible, le menu le dit au lieu d'ouvrir
+ * la confirmation (ex. catégorie encore utilisée par des types).
+ */
+export function ActionButtons({ onEdit, onDelete, nom, refusSuppression = null }) {
+  const [demande, setDemande] = useState(false);
+  const [enCours, setEnCours] = useState(false);
+  const confirmer = async () => {
+    setEnCours(true);
+    try { await onDelete?.(); } finally { setEnCours(false); setDemande(false); }
+  };
   return (
-    <div className="flex gap-1 justify-end">
-      <button onClick={onEdit} className="p-1.5 hover:bg-primary-50 rounded" title="Modifier">
+    <div className="flex gap-1 justify-end items-center">
+      <button type="button" onClick={onEdit} className="p-1.5 hover:bg-primary-50 rounded" title="Modifier" aria-label={nom ? `Modifier ${nom}` : 'Modifier'}>
         <Pencil className="w-3.5 h-3.5 text-primary-500" />
       </button>
-      <button onClick={onDelete} className="p-1.5 hover:bg-red-50 rounded" title="Supprimer">
-        <Trash2 className="w-3.5 h-3.5 text-red-400" />
-      </button>
+      {onDelete && (
+        <MenuActions
+          libelle={nom ? `Autres actions sur ${nom}` : 'Autres actions'}
+          className="h-7 w-7"
+          actions={[{
+            label: 'Supprimer', icon: Trash2, danger: true,
+            onClick: () => (refusSuppression ? toast.error(refusSuppression) : setDemande(true)),
+          }]}
+        />
+      )}
+      <ConfirmDialog
+        open={demande}
+        onOpenChange={(o) => { if (!enCours) setDemande(o); }}
+        title={nom ? `Supprimer « ${nom} » ?` : 'Supprimer cet élément ?'}
+        description="Cette suppression est définitive."
+        confirmLabel={enCours ? 'Suppression…' : 'Supprimer'}
+        loading={enCours}
+        onConfirm={confirmer}
+      />
     </div>
   );
 }

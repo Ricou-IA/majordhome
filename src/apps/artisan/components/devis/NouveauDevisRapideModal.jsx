@@ -10,6 +10,7 @@
 // Rien n'est créé tant que l'utilisateur n'a pas validé la fiche ; le lead créé reste si le devis est abandonné
 // (il est dans le pipeline, en « Nouveau »).
 import { ListeChoix } from '@/components/ui/liste-choix';
+import { CalqueModal } from '@/components/ui/calque-modal';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { X, Loader2, ArrowRight } from 'lucide-react';
@@ -128,11 +129,11 @@ export default function NouveauDevisRapideModal({ onClose, onDone }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <CalqueModal onClose={onClose} titreId="devis-rapide-titre">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-3 border-b">
           <div>
-            <h2 className="text-lg font-semibold text-secondary-900">Nouveau devis</h2>
+            <h2 id="devis-rapide-titre" className="text-lg font-semibold text-secondary-900">Nouveau devis</h2>
             <p className="text-xs text-secondary-500">Le client d&apos;abord : cherchez-le, ou saisissez-le s&apos;il est nouveau. Le lead est créé en « Nouveau », puis le devis s&apos;ouvre.</p>
           </div>
           <button type="button" onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer"><X className="w-5 h-5 text-secondary-500" /></button>
@@ -226,6 +227,6 @@ export default function NouveauDevisRapideModal({ onClose, onDone }) {
         onCreateAnyway={() => { setDoublons(null); creerLead({ force: true }); }}
         onCancel={() => setDoublons(null)}
       />
-    </div>
+    </CalqueModal>
   );
 }
