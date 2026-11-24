@@ -9,6 +9,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
+import { useAuth } from '@contexts/AuthContext';
+import { masquerIban } from '@/lib/masquage';
 import { invoicingSettings, validateIban, validateBic, validateNumberPrefix, INVOICING_DEFAULTS } from '@/lib/invoiceDocumentModel';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
@@ -43,6 +45,10 @@ export default function EmissionTab() {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
   const [form, setForm] = useState(() => pickForm({}));
   const [initial, setInitial] = useState(() => pickForm({}));
+  // IBAN masqué au chargement (brief UX P0-12) : l'administrateur clique « Afficher » pour le lire
+  // ou le modifier ; un autre rôle ne le voit jamais en entier.
+  const { isOrgAdmin } = useAuth();
+  const [ibanVisible, setIbanVisible] = useState(false);
 
   useEffect(() => {
     const picked = pickForm(settings);
@@ -100,7 +106,16 @@ export default function EmissionTab() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className={LABEL_CLASS}>IBAN</label>
-            <input type="text" value={form.iban} onChange={set('iban')} onBlur={() => setForm((f) => ({ ...f, iban: validateIban(f.iban).value || f.iban }))} className={INPUT_CLASS} placeholder="FR76 …" />
+            {form.iban && (!isOrgAdmin || (!ibanVisible && !errors.iban)) ? (
+              <div className="flex items-center gap-2">
+                <span className="flex-1 rounded-md border border-secondary-200 bg-secondary-50 px-3 py-2 font-mono text-sm text-secondary-700">{masquerIban(form.iban)}</span>
+                {isOrgAdmin && (
+                  <button type="button" onClick={() => setIbanVisible(true)} className="btn-secondary btn-sm">Afficher</button>
+                )}
+              </div>
+            ) : (
+              <input type="text" value={form.iban} onChange={set('iban')} onBlur={() => setForm((f) => ({ ...f, iban: validateIban(f.iban).value || f.iban }))} className={INPUT_CLASS} placeholder="FR76 …" autoComplete="off" />
+            )}
             {errors.iban && <p className={ERROR_CLASS}>{errors.iban}</p>}
             <p className={HINT_CLASS}>Vide : la facture ne porte pas de bloc IBAN.</p>
           </div>

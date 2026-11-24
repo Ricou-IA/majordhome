@@ -2,7 +2,9 @@
 // Panneau gauche de Settings → Devis : accordéons (familles, émetteur, contenu, paiement, affichage).
 // `zoneActive` (zone cliquée dans l'aperçu) ouvre l'accordéon et surligne le champ ; le focus d'un champ
 // remonte `onFocusZone(id)` pour encadrer la zone dans l'aperçu. Correspondance = ZONES du modèle.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@contexts/AuthContext';
+import { masquerIban } from '@/lib/masquage';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Layers, Building2, FileText, CreditCard, Eye } from 'lucide-react';
 import { ZONES } from '@/lib/devisDocumentModel.js';
@@ -55,6 +57,21 @@ function Champ({ champ, label, hint, type = 'text', rows, form, onChange, zoneAc
   );
 }
 
+/** Rappel de l'IBAN : masqué au chargement, « Afficher » pour l'administrateur (brief UX P0-12). */
+function IbanMasque({ iban }) {
+  const { isOrgAdmin } = useAuth();
+  const [visible, setVisible] = useState(false);
+  if (isOrgAdmin && visible) return <span className="font-mono">{iban}</span>;
+  return (
+    <>
+      <span className="font-mono">{masquerIban(iban)}</span>
+      {isOrgAdmin && (
+        <button type="button" onClick={() => setVisible(true)} className="ml-1 text-primary-700 underline">Afficher</button>
+      )}
+    </>
+  );
+}
+
 export default function ReglagesDevisPanel({ form, onChange, onFamilles, ouverts, onToggle, zoneActive, onFocusZone, company, invoicing }) {
   const champ = (props) => <Champ {...props} form={form} onChange={onChange} zoneActive={zoneActive} onFocusZone={onFocusZone} />;
   return (
@@ -85,7 +102,7 @@ export default function ReglagesDevisPanel({ form, onChange, onFamilles, ouverts
 
       <Accordeon k="paiement" label="Paiement" icon={CreditCard} ouvert={ouverts.paiement} onToggle={() => onToggle('paiement')}>
         {champ({ champ: 'paiement.afficher', label: 'Afficher le bloc paiement (IBAN, BIC)', type: 'checkbox' })}
-        <p className="text-xs text-secondary-500">IBAN : {invoicing?.iban ? <span className="font-mono">{invoicing.iban}</span> : <em>non renseigné</em>}{invoicing?.bic ? <> · BIC <span className="font-mono">{invoicing.bic}</span></> : null}. Modifiables dans <Link to="/settings/pennylane" className="text-primary-700 underline">Facturation</Link>.</p>
+        <p className="text-xs text-secondary-500">IBAN : {invoicing?.iban ? <IbanMasque iban={invoicing.iban} /> : <em>non renseigné</em>}{invoicing?.bic ? <> · BIC <span className="font-mono">{invoicing.bic}</span></> : null}. Modifiables dans <Link to="/settings/pennylane" className="text-primary-700 underline">Facturation</Link>.</p>
         {champ({ champ: 'paiement.etablissement', label: 'Établissement bancaire' })}
         {champ({ champ: 'paiement.texte', label: 'Texte d’accompagnement', type: 'textarea', rows: 2 })}
       </Accordeon>

@@ -14,6 +14,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
+import { useAuth } from '@contexts/AuthContext';
+import { masquerIdentifiant } from '@/lib/masquage';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -38,6 +40,10 @@ export default function TelephonieTab() {
   const [agentId, setAgentId] = useState('');
   const [message, setMessage] = useState('');
   const [initial, setInitial] = useState({ agentId: '', message: '' });
+  // Identifiant du prestataire masqué au chargement (brief UX P0-13) : « Afficher » pour
+  // l'administrateur ; un autre rôle ne voit que « Configuré » ou « Non configuré ».
+  const { isOrgAdmin } = useAuth();
+  const [idVisible, setIdVisible] = useState(false);
 
   useEffect(() => {
     const id = settings?.telephonie?.elevenlabs_agent_id ?? '';
@@ -85,16 +91,25 @@ export default function TelephonieTab() {
       <section>
         <h3 className={SECTION_TITLE}>Agent vocal ElevenLabs</h3>
         <label className={LABEL_CLASS} htmlFor="elevenlabs-agent-id">Identifiant de l&apos;agent</label>
-        <input
-          id="elevenlabs-agent-id"
-          type="text"
-          value={agentId}
-          onChange={(e) => setAgentId(e.target.value)}
-          placeholder="agent_3101m42037pbepbvh52d81h8nn8w"
-          className={INPUT_CLASS}
-          autoComplete="off"
-          spellCheck={false}
-        />
+        {!isOrgAdmin ? (
+          <p id="elevenlabs-agent-id" className="text-sm text-secondary-700">{initial.agentId ? 'Configuré' : 'Non configuré'}</p>
+        ) : agentId && !idVisible && !erreur ? (
+          <div className="flex items-center gap-2">
+            <span id="elevenlabs-agent-id" className="flex-1 rounded-md border border-secondary-200 bg-secondary-50 px-3 py-2 font-mono text-sm text-secondary-700">{masquerIdentifiant(agentId)}</span>
+            <button type="button" onClick={() => setIdVisible(true)} className="btn-secondary btn-sm">Afficher</button>
+          </div>
+        ) : (
+          <input
+            id="elevenlabs-agent-id"
+            type="text"
+            value={agentId}
+            onChange={(e) => setAgentId(e.target.value)}
+            placeholder="agent_…"
+            className={INPUT_CLASS}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        )}
         {erreur && <p className={ERROR_CLASS}>{erreur}</p>}
         <p className={HINT_CLASS}>
           Visible dans ElevenLabs, sur la page de l&apos;agent. Sans cet identifiant, l&apos;agent ne reconnaît aucun
