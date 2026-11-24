@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit, Copy, Archive, Loader2, Filter, Users, UserCheck, Lock } from 'lucide-react';
+import { Plus, Edit, Copy, Archive, Loader2, Filter, Users, UserCheck, Lock, Eye } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { useAuth } from '@contexts/AuthContext';
 import { useMailSegments, useSegmentCount } from '@hooks/useMailSegments';
@@ -175,8 +175,9 @@ function SegmentCard({ segment, orgId, onEdit, onDuplicate, onArchive, disabled 
 
       <div className="flex gap-2 mt-1 pt-2 border-t">
         <Button variant="secondary" size="sm" onClick={onEdit} disabled={disabled}>
-          <Edit className="w-3.5 h-3.5 mr-1" />
-          {segment.is_preset ? 'Voir' : 'Éditer'}
+          {/* Consulter (œil) un segment prédéfini, Modifier (crayon) un segment éditable (brief UX P2-13) */}
+          {segment.is_preset ? <Eye className="w-3.5 h-3.5 mr-1" /> : <Edit className="w-3.5 h-3.5 mr-1" />}
+          {segment.is_preset ? 'Consulter' : 'Modifier'}
         </Button>
         <Button variant="ghost" size="sm" onClick={onDuplicate} disabled={disabled}>
           <Copy className="w-3.5 h-3.5 mr-1" />

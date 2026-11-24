@@ -113,6 +113,10 @@ export default function PaletteTab() {
 
   return (
     <div className="space-y-6 max-w-3xl">
+      {/* Avertissement sous le titre, visible sans défiler (brief UX P2-09) ; le geste reste dans « Dépôts » plus bas. */}
+      {form.depots.length === 0 && (
+        <Avertissement>Aucun dépôt saisi : le dépôt par défaut (Castanet-Tolosan, adresse approximative) s’applique. Précisez-le dans « Dépôts », plus bas.</Avertissement>
+      )}
       <div className="flex items-start gap-3 rounded-lg border border-secondary-200 bg-secondary-50 px-4 py-3">
         <Send className="w-4 h-4 mt-0.5 text-secondary-500 shrink-0" />
         <ResumeEnvoi cfg={r.cfg} />

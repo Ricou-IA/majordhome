@@ -91,11 +91,11 @@ export default function ReglagesDevisPanel({ form, onChange, onFamilles, ouverts
 
       <Accordeon k="contenu" label="Contenu du document" icon={FileText} ouvert={ouverts.contenu} onToggle={() => onToggle('contenu')}>
         {champ({ champ: 'document.titre', label: 'Titre du document' })}
-        {champ({ champ: 'document.intro', label: 'Introduction', type: 'textarea', rows: 3, hint: 'Sous l’objet, avant les lignes. Vide = rien.' })}
-        {champ({ champ: 'document.acompte', label: 'Acompte et échéancier', type: 'textarea', rows: 2, hint: 'Ex. « Acompte de 30 % à la commande, solde à la mise en service. »' })}
+        {champ({ champ: 'document.intro', label: 'Introduction', type: 'textarea', rows: 3 })}
+        {champ({ champ: 'document.acompte', label: 'Acompte et échéancier', type: 'textarea', rows: 2 })}
         {champ({ champ: 'document.validite_jours', label: 'Validité par défaut (jours)', type: 'number', min: 1, max: 365 })}
-        {champ({ champ: 'document.conditions', label: 'Conditions de vente par défaut', type: 'textarea', rows: 5, hint: 'Proposées à chaque nouveau devis ; modifiables devis par devis.' })}
-        {champ({ champ: 'document.mention_speciale', label: 'Mention spéciale', type: 'textarea', rows: 2, hint: 'En gras sous les conditions (ex. aides, garantie).' })}
+        {champ({ champ: 'document.conditions', label: 'Conditions de vente par défaut', type: 'textarea', rows: 5 })}
+        {champ({ champ: 'document.mention_speciale', label: 'Mention spéciale', type: 'textarea', rows: 2 })}
         {champ({ champ: 'document.signature', label: 'Libellé de la zone de signature' })}
         {champ({ champ: 'document.pied_de_page', label: 'Pied de page', type: 'textarea', rows: 2, hint: 'Vide = nom, adresse, SIRET, TVA et mentions légales de l’entreprise.' })}
       </Accordeon>
