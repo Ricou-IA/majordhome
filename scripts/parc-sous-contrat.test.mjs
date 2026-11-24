@@ -191,3 +191,16 @@ test('filtrerArbre — garde la branche des correspondances, recalcule les compt
   assert.equal(tout.racines, racines);
   assert.deepEqual([tout.equipements, tout.contrats], [3, 3]);
 });
+
+test('contratsSansEquipement : une fois par contrat, triés par client', async () => {
+  const { contratsSansEquipement } = await import('../src/lib/parcSousContrat.js');
+  const lignes = [
+    { contract_id: 'c1', equipment_id: 'e1', client_name: 'Alpha' },
+    { contract_id: 'c2', equipment_id: null, client_name: 'Zoé' },
+    { contract_id: 'c3', equipment_id: null, client_name: ' Bernard ' },
+    { contract_id: 'c3', equipment_id: null, client_name: 'Bernard' },
+    { contract_id: 'c1', equipment_id: null, client_name: 'Alpha' },
+  ];
+  assert.deepEqual(contratsSansEquipement(lignes), [{ id: 'c3', client: 'Bernard' }, { id: 'c2', client: 'Zoé' }]);
+  assert.deepEqual(contratsSansEquipement([]), []);
+});

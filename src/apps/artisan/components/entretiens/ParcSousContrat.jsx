@@ -25,7 +25,7 @@ import { ChevronRight, Layers, AlertCircle, Search, X, User, FileText } from 'lu
 import { useParcSousContrat } from '@hooks/useContracts';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { useDebounce } from '@hooks/useDebounce';
-import { agregerParc, construireArbreParc, filtrerArbre, formatPart } from '@/lib/parcSousContrat';
+import { agregerParc, construireArbreParc, filtrerArbre, formatPart, contratsSansEquipement, LABEL_SANS_TYPE } from '@/lib/parcSousContrat';
 
 const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
 
@@ -185,6 +185,9 @@ export function ParcSousContrat({ coreOrgId, onOpenContract }) {
   const [recherche, setRecherche] = useState('');
   const terme = useDebounce(recherche, 200);
   const [ouverts, setOuverts] = useState(() => new Set());
+  // Alerte « sans équipement » : un clic déplie la liste des contrats à compléter (brief UX P1-15).
+  const [voirSansEquipement, setVoirSansEquipement] = useState(false);
+  const sansEquipement = useMemo(() => (lignes ? contratsSansEquipement(lignes) : []), [lignes]);
 
   const arbre = useMemo(() => (lignes ? construireArbreParc(lignes, index) : null), [lignes, index]);
   const parc = useMemo(() => (lignes ? agregerParc(lignes, index) : null), [lignes, index]);
@@ -228,11 +231,12 @@ export function ParcSousContrat({ coreOrgId, onOpenContract }) {
           <h3 className="text-base font-semibold text-secondary-900">Parc sous contrat</h3>
           <p className="text-sm text-secondary-500">
             {pluriel(parc.contrats, 'contrat actif', 'contrats actifs')} · {pluriel(parc.equipements, 'équipement', 'équipements')}
+            {/* Chaque alerte est un lien vers ce qu'il faut corriger, jamais un chiffre mort. */}
             {parc.contratsSansEquipement > 0 && (
-              <> · <span className="text-amber-700">{parc.contratsSansEquipement} sans équipement</span></>
+              <> · <button type="button" onClick={() => setVoirSansEquipement((v) => !v)} aria-expanded={voirSansEquipement} className="text-amber-700 underline underline-offset-2 hover:text-amber-800">{parc.contratsSansEquipement} sans équipement · Corriger</button></>
             )}
             {parc.equipementsSansType > 0 && (
-              <> · <span className="text-amber-700">{parc.equipementsSansType} équip. sans type</span></>
+              <> · <button type="button" onClick={() => setRecherche(LABEL_SANS_TYPE)} className="text-amber-700 underline underline-offset-2 hover:text-amber-800">{parc.equipementsSansType} équip. sans type · Corriger</button></>
             )}
           </p>
         </div>
@@ -258,6 +262,21 @@ export function ParcSousContrat({ coreOrgId, onOpenContract }) {
           )}
         </label>
       </div>
+
+      {voirSansEquipement && sansEquipement.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+          <p className="mb-2 text-sm font-medium text-secondary-800">Contrats sans équipement : ouvrez-les pour rattacher leurs équipements</p>
+          <ul className="flex flex-wrap gap-2">
+            {sansEquipement.map((c) => (
+              <li key={c.id}>
+                {onOpenContract ? (
+                  <button type="button" onClick={() => onOpenContract(c.id)} className="rounded-md border border-secondary-200 bg-white px-2.5 py-1 text-sm text-primary-700 hover:bg-secondary-50">{c.client}</button>
+                ) : <span className="text-sm text-secondary-700">{c.client}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {arbre.equipements === 0 ? (
         <p className="text-sm text-secondary-500">Aucun équipement rattaché à un contrat actif.</p>

@@ -11,7 +11,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft, Loader2, AlertCircle, Archive, ArchiveRestore } from 'lucide-react';
 import { CreateSAVModal } from '../components/entretiens/CreateSAVModal';
@@ -38,7 +38,7 @@ import { TabDevisFactures } from './client-detail/TabDevisFactures';
 import { TabEchanges } from './client-detail/TabEchanges';
 import { logger } from '@lib/logger';
 import { emailRefuse, EMAIL_INVALIDE_MESSAGE } from '@/lib/emailUtils';
-import { ONGLETS, LIBELLE_ONGLET, ongletDeDepart } from '@/lib/ficheClientOnglets';
+import { ONGLETS, LIBELLE_ONGLET, ongletActif } from '@/lib/ficheClientOnglets';
 import { champsModifies, casseTitre } from '@/lib/clientsAffichage';
 
 export default function ClientDetail() {
@@ -48,7 +48,16 @@ export default function ClientDetail() {
   const location = useLocation();
   const isAdmin = effectiveRole === 'org_admin';
 
-  const [activeTab, setActiveTab] = useState(() => ongletDeDepart(location.state?.tab));
+  // Onglet dans l'URL (`?onglet=`) : F5 et Retour le restaurent ; Résumé n'écrit rien dans l'URL.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = ongletActif({ url: searchParams.get('onglet'), etat: location.state?.tab });
+  const setActiveTab = useCallback((onglet) => {
+    setSearchParams((prev) => {
+      const suivant = new URLSearchParams(prev);
+      if (onglet && onglet !== 'resume') suivant.set('onglet', onglet); else suivant.delete('onglet');
+      return suivant;
+    });
+  }, [setSearchParams]);
   const [modificationOuverte, setModificationOuverte] = useState(false);
   const [formData, setFormData] = useState({});
   const [initialData, setInitialData] = useState({});
@@ -148,7 +157,7 @@ export default function ClientDetail() {
     setShowInvestigation(false);
     setActiveTab('equipements');
     setEquipmentDraft(draft);
-  }, []);
+  }, [setActiveTab]);
 
   // Rend true si la fiche est enregistrée (le panneau ne se ferme qu'alors).
   const handleSave = async () => {
@@ -402,6 +411,7 @@ export default function ClientDetail() {
           onCreateEquipment={handleCreateEquipmentFromDpe}
           onInvestigate={() => setShowInvestigation(true)}
           onOuvrirOnglet={setActiveTab}
+          onModifier={() => setModificationOuverte(true)}
         />
       )}
       {activeTab === 'devis-factures' && <TabDevisFactures client={client} clientId={id} orgId={organization?.id} />}

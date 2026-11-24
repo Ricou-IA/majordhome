@@ -183,7 +183,7 @@ function ContractRow({
   return (
     <div
       className={`flex items-center gap-3 px-4 py-2.5 pl-11 transition-colors group ${
-        isDone ? 'opacity-50 bg-secondary-50' : 'hover:bg-secondary-100'
+        isDone ? 'opacity-70' : 'hover:bg-secondary-100'
       }`}
     >
       {/* Nom (cliquable) */}
@@ -331,7 +331,9 @@ export function SectorGroupView({
   onSendReminder,
   canSendReminder = false,
 }) {
-  const [selectedMonth, setSelectedMonth] = useState('');
+  // Ouvre sur le mois civil en cours (brief UX P1-14) : voir les entretiens du mois = un clic d'onglet.
+  // « Tous les mois » reste au choix dans la liste.
+  const [selectedMonth, setSelectedMonth] = useState(() => String(new Date().getMonth() + 1));
   const [searchQuery, setSearchQuery] = useState('');
   // Filtre sur l'avancement de l'année civile (Eric 2026-11-23) : tous, reste à faire
   // (planifiés + à planifier), à planifier seulement, faits.

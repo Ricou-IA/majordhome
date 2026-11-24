@@ -197,3 +197,46 @@ export function bornesDeGrille(events = []) {
   }
   return { slotMinTime: heureDeGrille(Math.max(0, debut)), slotMaxTime: heureDeGrille(Math.min(24 * 60, fin)) };
 }
+
+/**
+ * Vue et date du Planning dans l'URL (brief UX P1-09) : `/planning?vue=mois&date=2026-11-01`.
+ * Après F5 ou un retour arrière, le calendrier rouvre sur la même vue et la même période.
+ * Valeurs lisibles, pas les noms FullCalendar ; une valeur inconnue est ignorée (vue par défaut).
+ */
+export const VUE_PAR_URL = Object.freeze({
+  jour: 'timeGridDay',
+  semaine: 'timeGridWeek',
+  mois: 'dayGridMonth',
+  'jour-liste': 'listDay',
+  'semaine-liste': 'listWeek',
+});
+const URL_PAR_VUE = Object.fromEntries(Object.entries(VUE_PAR_URL).map(([u, v]) => [v, u]));
+
+/**
+ * @param {string|null} valeur  `?vue=`
+ * @param {string[]} vuesPermises  vues proposées sur cet appareil (types FullCalendar)
+ * @returns {string|null}  type FullCalendar, ou null si absent / inconnu / non proposé ici
+ */
+export function vueDepuisUrl(valeur, vuesPermises = []) {
+  const vue = VUE_PAR_URL[valeur];
+  return vue && vuesPermises.includes(vue) ? vue : null;
+}
+
+/** Type FullCalendar → valeur d'URL (`null` pour une vue non nommée). */
+export function valeurUrlDeVue(vue) {
+  return URL_PAR_VUE[vue] || null;
+}
+
+/** `?date=` valide (`YYYY-MM-DD`, date réelle) ou null. */
+export function dateDepuisUrl(valeur) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(valeur || ''))) return null;
+  const [a, m, j] = valeur.split('-').map(Number);
+  const d = new Date(a, m - 1, j);
+  return d.getFullYear() === a && d.getMonth() === m - 1 && d.getDate() === j ? valeur : null;
+}
+
+/** Vues proposées par appareil (mêmes valeurs que VUES_BUREAU / VUES_MOBILE de CalendarToolbar). */
+export const VUES_PERMISES = Object.freeze({
+  bureau: ['timeGridDay', 'timeGridWeek', 'dayGridMonth'],
+  mobile: ['listDay', 'listWeek', 'timeGridDay', 'dayGridMonth'],
+});

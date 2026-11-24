@@ -41,7 +41,7 @@ import { usePlanningCharge } from '@hooks/usePlanningCharge';
 import { usePlanningJournee } from '@hooks/usePlanningJournee';
 import { usePlanningImpression } from '@hooks/usePlanningImpression';
 import { useDeviceClass } from '@hooks/useDeviceClass';
-import { creneauParDefaut, bornesDeGrille } from '@/lib/planningGestes';
+import { creneauParDefaut, bornesDeGrille, vueDepuisUrl, VUES_PERMISES } from '@/lib/planningGestes';
 import { cssDesCouloirs } from '@/lib/planningCouloirs';
 import { FeuilleDeRoutePanel } from '@/apps/artisan/components/planning/FeuilleDeRoutePanel';
 // Fenêtre de RDV chargée à la demande (267 Ko) : elle retardait le premier affichage du
@@ -74,7 +74,10 @@ export default function Planning() {
   // Sur appareil tenu en main (tablette, téléphone) : la journée en liste, pas la
   // semaine en grille (cf. VUES_MOBILE de CalendarToolbar).
   const { isMobileDevice } = useDeviceClass();
-  const vueInitiale = isMobileDevice ? 'listDay' : 'timeGridWeek';
+  // Vue et date reprises de l'URL (`?vue=mois&date=…`, brief UX P1-09) : F5 garde l'écran.
+  const [vueUrl] = useState(() => new URLSearchParams(window.location.search).get('vue'));
+  const vueInitiale = vueDepuisUrl(vueUrl, VUES_PERMISES[isMobileDevice ? 'mobile' : 'bureau'])
+    || (isMobileDevice ? 'listDay' : 'timeGridWeek');
 
   // Ce que le calendrier affiche : vue, titre, semaine, plage chargée, période du titre.
   const {

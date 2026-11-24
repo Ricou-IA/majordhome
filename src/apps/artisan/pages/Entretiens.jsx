@@ -62,17 +62,17 @@ export default function Entretiens() {
   const queryClient = useQueryClient();
 
   // ---------- URL / Tab ----------
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Tab par défaut : kanban (backward compat : si ?filter= → onglet contrats)
-  const [activeTab, setActiveTab] = useState(() => {
-    const tab = new URLSearchParams(window.location.search).get('tab');
-    // Ancien lien vers l'onglet Tournées (supprimé) : ses alertes sont dans le Dashboard.
-    if (tab === 'tournees') return 'dashboard';
-    if (tab) return tab;
-    const filter = new URLSearchParams(window.location.search).get('filter');
-    return filter ? 'contrats' : 'kanban';
-  });
+  // Onglet dans l'URL (`?onglet=`, brief UX P1-11) : F5 et Retour le restaurent. Anciens liens
+  // compris : `?tab=`, `?filter=clos` (onglet Clos), `?filter=…` (onglet Contrats).
+  const ONGLETS_ENTRETIENS = ['kanban', 'contrats', 'programmation', 'dashboard', 'clos'];
+  const ongletDemande = searchParams.get('onglet') || searchParams.get('tab');
+  const filtreDemande = searchParams.get('filter');
+  const activeTab = ongletDemande === 'tournees' ? 'dashboard'
+    : ONGLETS_ENTRETIENS.includes(ongletDemande) ? ongletDemande
+      : filtreDemande === 'clos' ? 'clos'
+        : filtreDemande ? 'contrats' : 'kanban';
 
   // Backward compat : lire le filtre stat card depuis l'URL
   const activeStatCard = searchParams.get('filter') || null;
@@ -84,7 +84,8 @@ export default function Entretiens() {
 
   // ---------- Filtres contrats (backward compat URL) ----------
   const [initialFilters] = useState(() => {
-    const filter = new URLSearchParams(window.location.search).get('filter');
+    const params = new URLSearchParams(window.location.search);
+    const filter = params.get('onglet') === 'clos' ? 'clos' : params.get('filter');
     const base = { search: '', status: '', visitStatus: '' };
     switch (filter) {
       case 'actifs':
@@ -119,6 +120,30 @@ export default function Entretiens() {
     loadMore,
     refresh,
   } = useContracts({ orgId, initialFilters });
+
+  // Contrats en liste ou en cartes (`?vue=`, brief UX P1-13) : liste d'office au-delà de 50 contrats.
+  const vueUrl = searchParams.get('vue');
+  const vueContrats = vueUrl === 'liste' || vueUrl === 'cartes' ? vueUrl : (totalCount > 50 ? 'liste' : 'cartes');
+  const setVueContrats = useCallback((vue) => {
+    setSearchParams((prev) => {
+      const suivant = new URLSearchParams(prev);
+      suivant.set('vue', vue);
+      return suivant;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  // Changer d'onglet écrit l'URL ; Clos et Contrats partagent la liste, chacun avec son statut.
+  const setActiveTab = useCallback((onglet) => {
+    if (onglet === 'clos') setFilters({ search: '', status: 'cancelled', visitStatus: '' });
+    else if (onglet === 'contrats' && filters.status === 'cancelled') setFilters({ search: '', status: 'active', visitStatus: '' });
+    setSearchParams((prev) => {
+      const suivant = new URLSearchParams(prev);
+      suivant.delete('tab');
+      suivant.delete('filter');
+      if (onglet && onglet !== 'kanban') suivant.set('onglet', onglet); else suivant.delete('onglet');
+      return suivant;
+    });
+  }, [filters.status, setFilters, setSearchParams]);
 
   // Stats contrats (onglet Dashboard)
   const { stats: contractStats, isLoading: contractStatsLoading } =
@@ -193,16 +218,6 @@ export default function Entretiens() {
     resetFilters();
   }, [resetFilters]);
 
-  const handleToggleArchived = useCallback(
-    (showArchived) => {
-      if (showArchived) {
-        setFilters({ search: '', status: 'cancelled', visitStatus: '' });
-      } else {
-        setFilters({ search: '', status: 'active', visitStatus: '' });
-      }
-    },
-    [setFilters],
-  );
 
   // Planifier un contrat → créer entretien « à planifier »
   const handlePlanContract = useCallback(
@@ -406,15 +421,7 @@ export default function Entretiens() {
             <TabsTrigger value="dashboard" className={ONGLET}>
               Dashboard
             </TabsTrigger>
-            <TabsTrigger
-              value="clos"
-              className={ONGLET}
-              onClick={(e) => {
-                e.preventDefault();
-                setFilters({ search: '', status: 'cancelled', visitStatus: '' });
-                setActiveTab('contrats');
-              }}
-            >
+            <TabsTrigger value="clos" className={ONGLET}>
               Clos
               {cancelledCount != null && (
                 <span className={COMPTEUR}>
@@ -430,24 +437,27 @@ export default function Entretiens() {
           <EntretienSAVKanban />
         </TabsContent>
 
-        {/* TAB CONTRATS */}
-        <TabsContent value="contrats" className="mt-6">
-          <ContractsList
-            contracts={contracts}
-            totalCount={totalCount}
-            isLoading={contractsLoading}
-            loadingMore={loadingMore}
-            hasMore={hasMore}
-            filters={filters}
-            setFilters={setFilters}
-            setSearch={setSearch}
-            resetFilters={handleClearFilters}
-            loadMore={loadMore}
-            onContractClick={handleContractClick}
-            activeStatCard={activeStatCard}
-            onToggleArchived={handleToggleArchived}
-          />
-        </TabsContent>
+        {/* TAB CONTRATS et TAB CLOS : même liste, statut actif ou clos (setActiveTab) */}
+        {['contrats', 'clos'].map((onglet) => (
+          <TabsContent key={onglet} value={onglet} className="mt-6">
+            <ContractsList
+              contracts={contracts}
+              totalCount={totalCount}
+              isLoading={contractsLoading}
+              loadingMore={loadingMore}
+              hasMore={hasMore}
+              filters={filters}
+              setFilters={setFilters}
+              setSearch={setSearch}
+              resetFilters={handleClearFilters}
+              loadMore={loadMore}
+              onContractClick={handleContractClick}
+              activeStatCard={activeStatCard}
+              vue={vueContrats}
+              onVue={setVueContrats}
+            />
+          </TabsContent>
+        ))}
 
         {/* TAB PROGRAMMATION */}
         <TabsContent value="programmation" className="mt-6">

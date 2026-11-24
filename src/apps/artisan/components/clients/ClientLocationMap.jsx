@@ -100,8 +100,11 @@ const LEGENDE_SOURCE = {
  * @param {string} props.city
  * @param {{lat:number,lng:number,label:string}|null} props.siege  getOrgHeadquarters(settings)
  * @param {string} [props.mapHeight]  classe de hauteur EXPLICITE de la carte (Mapbox a besoin d'une hauteur définie)
+ * @param {Function} [props.onCorrigerAdresse]  geste proposé à côté d'une position estimée ou approchée
+ *   (« Corriger l'adresse » : champ d'adresse, panneau Modifier). Sans lui, la phrase « position
+ *   estimée » n'est pas affichée (brief UX P1-10 : jamais un message sans geste à côté).
  */
-export function ClientLocationMap({ saved, savedAddress, address, postalCode, city, siege, mapHeight = 'h-[300px]' }) {
+export function ClientLocationMap({ saved, savedAddress, address, postalCode, city, siege, mapHeight = 'h-[300px]', onCorrigerAdresse = null }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   // Carte dont le style est chargé (instance) : déclenche le tracé de la route.
@@ -175,7 +178,7 @@ export function ClientLocationMap({ saved, savedAddress, address, postalCode, ci
   }
 
   const km = point && siege ? Math.round(haversineKm(point, siege)) : null;
-  const legende = source ? LEGENDE_SOURCE[source] : null;
+  const legende = source && (onCorrigerAdresse || source !== 'adresse') ? LEGENDE_SOURCE[source] : null;
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -213,7 +216,14 @@ export function ClientLocationMap({ saved, savedAddress, address, postalCode, ci
           </span>
         )}
       </div>
-      {legende && <p className="text-xs text-amber-700">{legende}</p>}
+      {legende && (
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-amber-700">
+          <span>{legende}</span>
+          {onCorrigerAdresse && (
+            <button type="button" onClick={onCorrigerAdresse} className="font-medium text-primary-700 underline">Corriger l&apos;adresse</button>
+          )}
+        </p>
+      )}
       {!siege && (
         <p className="text-xs text-secondary-500">Siège non configuré (Réglages → Organisation → Territoire).</p>
       )}

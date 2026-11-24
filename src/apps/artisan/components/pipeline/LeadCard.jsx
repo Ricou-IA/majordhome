@@ -21,6 +21,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Tag } from '@/components/ui/tag';
 import { StatusPill } from '@/components/ui/status-pill';
 import { QuoteSubCard } from './QuoteSubCard';
+import { MenuActions } from '@/components/ui/menu-actions';
 
 // Statuts depuis lesquels un lead peut partir en suivi MT-LT : tout le funnel
 // actif. Un prospect intéressé mais à échéance lointaine n'a pas forcément de
@@ -229,20 +230,23 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
         <div className="flex items-start justify-between gap-2">
           <p className="text-body-sm font-semibold text-secondary-900 truncate">{name}</p>
           <div className="flex items-center gap-1.5 shrink-0">
-            {onMoveToLongTerm && LONG_TERM_ELIGIBLE_STATUSES.has(lead.statuses?.label) && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onMoveToLongTerm(lead); }}
-                className="inline-flex items-center justify-center h-5 w-5 rounded-full text-secondary-500 hover:bg-secondary-100 transition-colors"
-                title="Passer en suivi des objectifs (sortir du pipeline)"
-                aria-label="Passer en suivi des objectifs (sortir du pipeline)"
-              >
-                <Hourglass className="h-3.5 w-3.5" />
-              </button>
+            {/* Pas de « 0 € » pour une demande sans devis : un montant absent ne s'affiche pas. */}
+            {amount > 0 && (
+              <span className="text-xs font-semibold whitespace-nowrap text-secondary-900">
+                {formatEuroCeil(amount)}
+              </span>
             )}
-            <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-secondary-900' : 'text-secondary-400'}`}>
-              {formatEuroCeil(amount)}
-            </span>
+            {/* Menu « … » de la carte (plus d'icône seule) ; isolé du clic et du glisser de la carte,
+                y compris pour le menu ouvert (portail : ses événements remontent par l'arbre React). */}
+            {onMoveToLongTerm && LONG_TERM_ELIGIBLE_STATUSES.has(lead.statuses?.label) && (
+              <span onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                <MenuActions
+                  libelle={`Autres actions sur ${name}`}
+                  className="h-6 w-6"
+                  actions={[{ label: 'Passer en suivi long terme', icon: Hourglass, onClick: () => onMoveToLongTerm(lead) }]}
+                />
+              </span>
+            )}
           </div>
         </div>
 

@@ -19,10 +19,31 @@ import {
   ChevronDown,
   CheckCircle2,
   FileText,
-  Archive,
 } from 'lucide-react';
 import { ContractCard, ContractCardSkeleton } from './ContractCard';
 import { CONTRACT_STATUSES } from '@services/entretiens.service';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { DataTable } from '@/components/ui/data-table';
+import { StatusPill } from '@/components/ui/status-pill';
+import { toneFor } from '@/lib/tonsStatut';
+import { formatEuro } from '@/lib/utils';
+
+const nomDuMois = (m) => (m >= 1 && m <= 12
+  ? new Date(2000, m - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }).replace(/^./, (c) => c.toUpperCase())
+  : '—');
+
+/** Colonnes de la vue liste (brief UX P1-13) : triables côté base (entretiens.service getContracts). */
+const COLONNES_LISTE = [
+  { cle: 'client_name', titre: 'Client', triable: true, rendu: (c) => <span className="font-medium text-secondary-900">{c.client_name || 'Client inconnu'}</span> },
+  { cle: 'client_city', titre: 'Commune', triable: true, rendu: (c) => [c.client_postal_code, c.client_city].filter(Boolean).join(' ') || '—' },
+  { cle: 'maintenance_month', titre: 'Mois d’entretien', triable: true, rendu: (c) => nomDuMois(c.maintenance_month) },
+  { cle: 'amount', titre: 'Montant', alignement: 'droite', rendu: (c) => (c.amount ? formatEuro(c.amount) : '—') },
+  {
+    cle: 'status', titre: 'Statut', triable: true, rendu: (c) => (
+      <StatusPill tone={toneFor('contrat', c.status)}>{CONTRACT_STATUSES.find((s) => s.value === c.status)?.label || c.status}</StatusPill>
+    ),
+  },
+];
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -125,7 +146,8 @@ export function ContractsList({
   loadMore,
   onContractClick,
   activeStatCard = null,
-  onToggleArchived,
+  vue = 'cartes',
+  onVue,
 }) {
   const isArchivedMode = filters.status === 'cancelled';
   const [searchInput, setSearchInput] = useState(filters.search || '');
@@ -169,25 +191,6 @@ export function ContractsList({
 
         {/* Filtres */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Bouton Archivés (toggle) */}
-          <button
-            onClick={() => onToggleArchived?.(!isArchivedMode)}
-            className={`
-              inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm font-medium
-              ${isArchivedMode
-                ? 'bg-secondary-100 border-secondary-300 text-secondary-700'
-                : 'bg-white border-secondary-300 text-secondary-700 hover:bg-secondary-50'
-              }
-            `}
-            title={isArchivedMode ? 'Masquer les clos' : 'Voir les clos'}
-          >
-            <Archive className="w-4 h-4" />
-            <span>Clos</span>
-          </button>
-
-          {/* Séparateur visuel */}
-          <div className="w-px h-6 bg-secondary-200" />
-
           {/* Dropdowns (masqués en mode archivé car le filtre status est forcé) */}
           {!isArchivedMode && (
             <>
@@ -216,25 +219,47 @@ export function ContractsList({
         </div>
       </div>
 
-      {/* Liste des contrats clos : le dire en clair, avec le retour aux actifs. Sans cette
-          ligne, rien à l'écran ne distinguait cette liste de celle des contrats actifs. */}
+      {/* Contrats clos : onglet « Clos » de la page Entretiens (brief UX P1-16) — plus de
+          bouton ni de bandeau ici, un seul onglet actif à la fois. */}
       {isArchivedMode && !isLoading && (
-        <p className="text-sm text-secondary-700">
-          <span className="font-semibold">
-            {totalCount} contrat{totalCount > 1 ? 's' : ''} clos.
-          </span>{' '}
-          <button
-            type="button"
-            onClick={() => onToggleArchived?.(false)}
-            className="font-medium text-primary-700 underline underline-offset-2 hover:text-primary-800"
-          >
-            Revenir aux contrats actifs
-          </button>
-        </p>
+        <p className="text-sm font-semibold text-secondary-700">{totalCount} contrat{totalCount > 1 ? 's' : ''} clos</p>
       )}
 
-      {/* Grille de contrats */}
-      {isLoading ? (
+      {/* Cartes ou liste (URL `?vue=`, page Entretiens) */}
+      {onVue && (
+        <SegmentedControl
+          label="Affichage des contrats"
+          value={vue}
+          onChange={onVue}
+          options={[{ value: 'liste', label: 'Liste' }, { value: 'cartes', label: 'Cartes' }]}
+        />
+      )}
+
+      {vue === 'liste' && (isLoading || contracts.length > 0) ? (
+        <>
+          <DataTable
+            libelle="Contrats"
+            colonnes={COLONNES_LISTE}
+            lignes={contracts}
+            cleLigne={(c) => c.id}
+            chargement={isLoading}
+            tri={{ cle: filters.orderBy || 'client_name', ascendant: filters.ascending !== false }}
+            onTri={(cle) => setFilters({ orderBy: cle, ascending: (filters.orderBy || 'client_name') === cle ? filters.ascending === false : true })}
+            onLigne={(c) => onContractClick?.(c)}
+            libelleLigne={(c) => `Ouvrir le contrat de ${c.client_name || 'ce client'}`}
+          />
+          {!isLoading && (
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-sm text-secondary-500">{contracts.length} sur {totalCount} contrat{totalCount !== 1 ? 's' : ''}</p>
+              {hasMore && (
+                <button type="button" onClick={loadMore} disabled={loadingMore} className="btn-secondary btn-sm">
+                  {loadingMore ? 'Chargement…' : 'Afficher les 50 suivants'}
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      ) : isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(8)].map((_, i) => (
             <ContractCardSkeleton key={i} />

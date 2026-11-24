@@ -113,7 +113,7 @@ export function CalendarToolbar({
         </div>
         {weekNumber != null && (
           <span title={`Semaine ${weekNumber}`} className="shrink-0">
-            <Tag className="font-semibold tabular-nums">S{weekNumber}</Tag>
+            <Tag className="font-semibold tabular-nums">Semaine {weekNumber}</Tag>
           </span>
         )}
         <h2 className="font-display text-count text-secondary-900 whitespace-nowrap sm:min-w-[200px] xl:min-w-0 first-letter:uppercase">

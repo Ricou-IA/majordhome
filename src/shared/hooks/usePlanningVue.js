@@ -8,7 +8,8 @@
  */
 
 import { useCallback, useState } from 'react';
-import { plageDeVue } from '@/lib/planningGestes';
+import { useSearchParams } from 'react-router-dom';
+import { plageDeVue, valeurUrlDeVue } from '@/lib/planningGestes';
 
 /**
  * @param {object} p
@@ -23,6 +24,7 @@ import { plageDeVue } from '@/lib/planningGestes';
  *   grille déborde sur les mois voisins) : c'est elle qui borne le cumul du CA.
  */
 export function usePlanningVue({ calendarRef, vueInitiale }) {
+  const [, setSearchParams] = useSearchParams();
   const [etat, setEtat] = useState({
     vue: vueInitiale, titre: '', semaine: null, plage: { startDate: null, endDate: null }, periode: null,
   });
@@ -30,6 +32,15 @@ export function usePlanningVue({ calendarRef, vueInitiale }) {
   // La vue ou les dates changent.
   const surDates = useCallback((info) => {
     const suivant = plageDeVue(info);
+    // Vue et début de période dans l'URL (brief UX P1-09), sans empiler l'historique à chaque flèche.
+    const vueUrl = valeurUrlDeVue(suivant.vue);
+    setSearchParams((prev) => {
+      if (prev.get('vue') === vueUrl && prev.get('date') === suivant.periode.debut) return prev;
+      const p = new URLSearchParams(prev);
+      if (vueUrl) p.set('vue', vueUrl); else p.delete('vue');
+      p.set('date', suivant.periode.debut);
+      return p;
+    }, { replace: true });
     // Mêmes bornes ⇒ mêmes objets : la plage et la période alimentent des requêtes et des calculs.
     setEtat((e) => ({
       ...suivant,
@@ -37,7 +48,7 @@ export function usePlanningVue({ calendarRef, vueInitiale }) {
       periode: e.periode?.debut === suivant.periode.debut && e.periode?.finExclue === suivant.periode.finExclue
         ? e.periode : suivant.periode,
     }));
-  }, []);
+  }, [setSearchParams]);
 
   const changerDeVue = useCallback((vue) => {
     calendarRef.current?.getApi().changeView(vue);

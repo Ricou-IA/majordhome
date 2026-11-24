@@ -43,3 +43,13 @@ export function ongletDeDepart(etat) {
   if (ONGLETS.includes(etat)) return etat;
   return ANCIENS_ONGLETS.get(etat) || 'resume';
 }
+
+/**
+ * Onglet affiché : celui de l'URL (`?onglet=`, brief UX P1-11 — un rechargement ou le bouton
+ * Retour restaure l'onglet, un lien peut viser `/clients/:id?onglet=devis-factures`), sinon
+ * celui transmis par la navigation (`location.state.tab`), sinon Résumé.
+ * @param {{ url?: string|null, etat?: string }} p
+ */
+export function ongletActif({ url = null, etat } = {}) {
+  return url ? ongletDeDepart(url) : ongletDeDepart(etat);
+}

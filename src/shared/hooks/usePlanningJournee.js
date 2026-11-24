@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { panneauDeLigne, sortJourneeDemandee } from '@/lib/planningCharge';
-import { jourDOuverture } from '@/lib/planningGestes';
+import { jourDOuverture, dateDepuisUrl } from '@/lib/planningGestes';
 
 /**
  * @param {object} p
@@ -38,7 +38,8 @@ export function usePlanningJournee({ journeesHorizon, etatsLoading, etatsError, 
     const technicienId = searchParams.get('tech');
     return date && technicienId ? { date, technicienId } : null;
   });
-  const [dateInitiale] = useState(() => searchParams.get('journee') || jourDOuverture());
+  // Lien direct d'une journée, sinon la date de l'URL (`?date=`, brief UX P1-09), sinon le jour d'ouverture.
+  const [dateInitiale] = useState(() => searchParams.get('journee') || dateDepuisUrl(searchParams.get('date')) || jourDOuverture());
   const [feuilleOuverte, setFeuilleOuverte] = useState(null);
 
   const ouvrirJournee = useCallback((ligne) => {

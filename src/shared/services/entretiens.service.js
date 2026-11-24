@@ -292,11 +292,15 @@ export const entretiensService = {
   async getContracts({ orgId, filters = {}, limit = 50, offset = 0 }) {
     try {
 
+      // Tri de la vue liste (brief UX P1-13) : colonnes permises seulement, nom du client en départage.
+      const TRIS_PERMIS = ['client_name', 'maintenance_month', 'client_city', 'status'];
+      const tri = TRIS_PERMIS.includes(filters.orderBy) ? filters.orderBy : 'client_name';
       let query = supabase
         .from('majordhome_contracts')
         .select('*', { count: 'exact' })
         .eq('org_id', orgId)
-        .order('client_name', { ascending: true, nullsFirst: false });
+        .order(tri, { ascending: filters.ascending !== false, nullsFirst: false });
+      if (tri !== 'client_name') query = query.order('client_name', { ascending: true, nullsFirst: false });
 
       // Filtre statut visite (PRIORITAIRE — implique status='active')
       // 'remaining' = actifs SANS visite (completed/scheduled) pour l'année en cours

@@ -2,7 +2,7 @@
 // node --test scripts/fiche-client-onglets.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ONGLETS, LIBELLE_ONGLET, ongletDeDepart } from '../src/lib/ficheClientOnglets.js';
+import { ONGLETS, LIBELLE_ONGLET, ongletDeDepart, ongletActif } from '../src/lib/ficheClientOnglets.js';
 
 test('six onglets, dans l’ordre, chacun avec son libellé', () => {
   assert.deepEqual(ONGLETS, ['resume', 'contrat', 'equipements', 'interventions', 'devis-factures', 'echanges']);
@@ -38,4 +38,12 @@ test('absent ou inconnu : Résumé', () => {
   assert.equal(ongletDeDepart(''), 'resume');
   assert.equal(ongletDeDepart('xyz'), 'resume');
   assert.equal(ongletDeDepart('constructor'), 'resume', 'pas de propriété héritée d’Object');
+});
+
+test('ongletActif : l’URL prime sur l’état de navigation, Résumé par défaut', () => {
+  assert.equal(ongletActif({ url: 'devis-factures', etat: 'contract' }), 'devis-factures');
+  assert.equal(ongletActif({ url: 'timeline' }), 'echanges');
+  assert.equal(ongletActif({ url: null, etat: 'contract' }), 'contrat');
+  assert.equal(ongletActif({}), 'resume');
+  assert.equal(ongletActif({ url: 'nimporte' }), 'resume');
 });

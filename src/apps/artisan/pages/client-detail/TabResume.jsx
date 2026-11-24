@@ -174,7 +174,7 @@ function HistoriqueRecent({ clientId, projectId, onToutVoir }) {
   );
 }
 
-function Coordonnees({ client }) {
+function Coordonnees({ client, onModifier = null }) {
   const { settings } = useOrgSettings();
   const siege = getOrgHeadquarters(settings);
   const adresse = formaterAdresse({ address: client.address, postalCode: client.postal_code, city: client.city });
@@ -226,6 +226,7 @@ function Coordonnees({ client }) {
           city={client.city || ''}
           siege={siege}
           mapHeight="h-[200px]"
+          onCorrigerAdresse={onModifier}
         />
       </div>
     </Card>
@@ -332,7 +333,7 @@ function Notes({ client }) {
  */
 export function TabResume({
   client, owner, tenants, members, formHousingType, formSurface,
-  onApplyDpe, onCreateEquipment, onInvestigate, onOuvrirOnglet,
+  onApplyDpe, onCreateEquipment, onInvestigate, onOuvrirOnglet, onModifier = null,
 }) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -341,7 +342,7 @@ export function TabResume({
         <HistoriqueRecent clientId={client.id} projectId={client.project_id} onToutVoir={() => onOuvrirOnglet('echanges')} />
       </div>
       <div className="min-w-0 space-y-6">
-        <Coordonnees client={client} />
+        <Coordonnees client={client} onModifier={onModifier} />
         <Logement
           client={client}
           formHousingType={formHousingType}

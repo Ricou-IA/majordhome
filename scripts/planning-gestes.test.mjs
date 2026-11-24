@@ -130,3 +130,19 @@ test('plagesVoisines : vue Jour = jour ouvré voisin ; vue Mois et plage inconnu
       { slotMinTime: '08:00:00', slotMaxTime: '18:00:00' });
   });
 }
+
+test('vue et date du planning dans l’URL', async () => {
+  const { vueDepuisUrl, valeurUrlDeVue, dateDepuisUrl } = await import('../src/lib/planningGestes.js');
+  const bureau = ['timeGridDay', 'timeGridWeek', 'dayGridMonth'];
+  assert.equal(vueDepuisUrl('mois', bureau), 'dayGridMonth');
+  assert.equal(vueDepuisUrl('jour-liste', bureau), null, 'vue non proposée sur cet appareil');
+  assert.equal(vueDepuisUrl('xyz', bureau), null);
+  assert.equal(vueDepuisUrl(null, bureau), null);
+  assert.equal(valeurUrlDeVue('dayGridMonth'), 'mois');
+  assert.equal(valeurUrlDeVue('listWeek'), 'semaine-liste');
+  assert.equal(valeurUrlDeVue('inconnue'), null);
+  assert.equal(dateDepuisUrl('2026-11-24'), '2026-11-24');
+  assert.equal(dateDepuisUrl('2026-02-30'), null);
+  assert.equal(dateDepuisUrl('24/11/2026'), null);
+  assert.equal(dateDepuisUrl(null), null);
+});

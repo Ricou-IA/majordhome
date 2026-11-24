@@ -405,7 +405,9 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
         <div className="grid grid-cols-1 gap-6">
         <div className="space-y-4">
           <FormField label="Adresse">
-            <TextInput value={formData.address} onChange={(v) => u('address', v)} placeholder="12 rue des Lilas" disabled={isLocked} />
+            <div id="fiche-client-adresse">
+              <TextInput value={formData.address} onChange={(v) => u('address', v)} placeholder="12 rue des Lilas" disabled={isLocked} />
+            </div>
           </FormField>
           <FormField label="Complément">
             <TextInput value={formData.addressComplement} onChange={(v) => u('addressComplement', v)} placeholder="Bâtiment, étage..." disabled={isLocked} />
@@ -429,6 +431,7 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, save
           postalCode={formData.postalCode || ''}
           city={formData.city || ''}
           siege={siege}
+          onCorrigerAdresse={isLocked ? null : () => document.querySelector('#fiche-client-adresse input')?.focus()}
         />
         </div>
       </section>

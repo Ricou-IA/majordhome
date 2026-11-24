@@ -105,7 +105,8 @@ export function Clients() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // État local
-  const [searchInput, setSearchInput] = useState('');
+  // Recherche dans l'URL (`?q=`, brief UX P1-12) : revenir d'une fiche retrouve la recherche.
+  const [searchInput, setSearchInput] = useState(() => searchParams.get('q') || '');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Filtre stat card persisté dans l'URL (?filter=particuliers)
@@ -145,7 +146,7 @@ export function Clients() {
   useEffect(() => {
     if (!initialFilter) return;
     const base = {
-      search: '',
+      search: searchParams.get('q') || '',
       clientCategory: null,
       hasContract: null,
       showArchived: false,
@@ -181,10 +182,17 @@ export function Clients() {
       if (searchInput !== filters.search) {
         setFilters({ search: searchInput });
       }
+      setSearchParams((prev) => {
+        const texte = searchInput.trim();
+        if ((prev.get('q') || '') === texte) return prev;
+        const next = new URLSearchParams(prev);
+        if (texte) next.set('q', texte); else next.delete('q');
+        return next;
+      }, { replace: true });
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchInput, filters.search, setFilters]);
+  }, [searchInput, filters.search, setFilters, setSearchParams]);
 
   // Handlers
   const handleClientClick = useCallback((client) => {
@@ -225,9 +233,9 @@ export function Clients() {
     if (cardKey === 'total') {
       if (activeStatCard === null) return; // déjà sur total, ne rien faire
       setActiveStatCard(null);
-      setSearchInput('');
+      // La recherche reste : pastille et recherche se cumulent (brief UX P1-12).
       setFilters({
-        search: '',
+        search: filters.search,
         clientCategory: null,
         hasContract: null,
         showArchived: false,
@@ -238,9 +246,8 @@ export function Clients() {
       return;
     }
 
-    setSearchInput('');
     const baseFilters = {
-      search: '',
+      search: filters.search,
       clientCategory: null,
       hasContract: null,
       showArchived: false,
@@ -277,7 +284,7 @@ export function Clients() {
           break;
       }
     }
-  }, [activeStatCard, filters.orderBy, filters.ascending, setFilters, setActiveStatCard]);
+  }, [activeStatCard, filters.search, filters.orderBy, filters.ascending, setFilters, setActiveStatCard]);
 
   // Segments de catégorie : mêmes filtres que les anciennes cartes ; un segment se choisit, il ne se décoche pas.
   const segment = SEGMENTS_CATEGORIE.includes(activeStatCard) ? activeStatCard : 'tous';
@@ -291,7 +298,9 @@ export function Clients() {
     handleStatCardClick(valeur);
   }, [segment, activeStatCard, handleStatCardClick]);
 
-  const compte = (n) => (typeof n === 'number' ? n.toLocaleString('fr-FR') : undefined);
+  // Compteurs des pastilles = parc entier ; pendant une recherche ils se taisent (sinon ils
+  // contrediraient la liste affichée, dont le nombre est dit au-dessus des résultats).
+  const compte = (n) => (!searchInput.trim() && typeof n === 'number' ? n.toLocaleString('fr-FR') : undefined);
   const segments = [
     { value: 'tous', label: 'Tous', count: compte(stats?.total_clients) },
     { value: 'particuliers', label: 'Particuliers', count: compte(stats?.particuliers) },

@@ -340,3 +340,24 @@ export function formatPart(part) {
   const pct = Math.round(part * 100);
   return pct === 0 ? '< 1 %' : `${pct} %`;
 }
+
+/**
+ * Contrats actifs qui n'ont aucun équipement rattaché (alerte « N sans équipement » du
+ * tableau de bord, brief UX P1-15 : un clic ouvre la liste à corriger). Un contrat porté par
+ * plusieurs lignes n'apparaît qu'une fois ; tri par nom de client.
+ * @param {Array<{ contract_id: string, equipment_id?: string|null, client_name?: string }>} lignes
+ * @returns {Array<{ id: string, client: string }>}
+ */
+export function contratsSansEquipement(lignes) {
+  const avecEquipement = new Set();
+  const noms = new Map();
+  for (const l of lignes || []) {
+    if (!l?.contract_id) continue;
+    if (l.equipment_id) avecEquipement.add(l.contract_id);
+    if (!noms.has(l.contract_id)) noms.set(l.contract_id, normaliser(l.client_name) || 'Client inconnu');
+  }
+  return [...noms]
+    .filter(([id]) => !avecEquipement.has(id))
+    .map(([id, client]) => ({ id, client }))
+    .sort((a, b) => a.client.localeCompare(b.client, 'fr'));
+}
