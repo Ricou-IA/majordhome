@@ -46,6 +46,7 @@ import AccesCompteFournisseur from './suppliers/AccesCompteFournisseur';
 import { useCatalogItemsResume } from '@hooks/useCatalogItems';
 import { photoDeLigne, autresFournisseurs } from '@/lib/catalogue/articleLigne.js';
 import { logger } from '@lib/logger';
+import { normaliser } from '@/lib/catalogue/recherchePieces';
 
 // =============================================================================
 // MODAL FOURNISSEUR
@@ -984,6 +985,12 @@ export default function SupplierManagement() {
 
   const { suppliers, isLoading } = useSuppliers(orgId);
   const { createSupplier, updateSupplier, deactivateSupplier, isCreating, isUpdating } = useSupplierMutations(orgId);
+  // Recherche par nom (brief UX P2-06), sans accents ni casse.
+  const [rechercheFournisseur, setRechercheFournisseur] = useState('');
+  const terme = normaliser(rechercheFournisseur).trim();
+  const fournisseursAffiches = terme
+    ? suppliers.filter((f) => normaliser(f.name).includes(terme))
+    : suppliers;
 
   const [showModal, setShowModal] = useState(false);
   const [editSupplier, setEditSupplier] = useState(null);
@@ -1072,8 +1079,18 @@ export default function SupplierManagement() {
 
       {/* La base du devis : articles Majord'home (un par ligne fournisseur, fusionnés quand communs) */}
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <Link to="/settings/suppliers/articles" className="text-primary-700 hover:underline">Articles Majord&apos;home →</Link>
-        <Link to="/settings/suppliers/harmoniser" className="text-primary-700 hover:underline">Harmoniser les bases →</Link>
+        <Link to="/settings/suppliers/articles" className="text-primary-700 hover:underline">Voir les articles</Link>
+        <Link to="/settings/suppliers/harmoniser" className="text-primary-700 hover:underline">Associer les catalogues</Link>
+        {suppliers.length > 5 && (
+          <input
+            type="search"
+            value={rechercheFournisseur}
+            onChange={(e) => setRechercheFournisseur(e.target.value)}
+            placeholder="Rechercher un fournisseur"
+            aria-label="Rechercher un fournisseur"
+            className="ml-auto w-full sm:w-64 px-3 py-1.5 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        )}
       </div>
 
       {/* Liste */}
@@ -1091,7 +1108,10 @@ export default function SupplierManagement() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {suppliers.map((supplier) => (
+          {fournisseursAffiches.length === 0 && (
+            <p className="text-sm text-secondary-500">Aucun fournisseur ne correspond à « {rechercheFournisseur} ».</p>
+          )}
+          {fournisseursAffiches.map((supplier) => (
             <div
               key={supplier.id}
               className="card-hover flex items-center gap-4 cursor-pointer"
@@ -1102,9 +1122,9 @@ export default function SupplierManagement() {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-medium text-secondary-900">{supplier.name}</h3>
-                <p className="text-sm text-secondary-500 truncate">
-                  {[supplier.contact_name, supplier.city].filter(Boolean).join(' · ') || 'Aucun contact'}
-                </p>
+                {(supplier.contact_name || supplier.city) && (
+                  <p className="text-sm text-secondary-500 truncate">{[supplier.contact_name, supplier.city].filter(Boolean).join(' · ')}</p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button

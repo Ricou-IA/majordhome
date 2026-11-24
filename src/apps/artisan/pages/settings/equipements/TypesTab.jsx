@@ -53,7 +53,6 @@ export function TypesPanel({ admin }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-secondary-200 text-left text-secondary-500">
-                <th className="py-2 pr-3 font-medium">Code</th>
                 <th className="py-2 pr-3 font-medium">Libellé</th>
                 <th className="py-2 pr-3 font-medium">Catégorie</th>
                 <th className="py-2 pr-3 font-medium">PV de réception</th>
@@ -64,7 +63,6 @@ export function TypesPanel({ admin }) {
             <tbody>
               {admin.equipmentTypes.map((type) => (
                 <tr key={type.id} className="border-b border-secondary-100">
-                  <td className="py-2 pr-3 font-mono text-xs">{type.code}</td>
                   <td className="py-2 pr-3 font-medium text-secondary-900">{type.label}</td>
                   <td className="py-2 pr-3 text-secondary-500 text-xs">{libelleCategorie(type.category_id)}</td>
                   <td className="py-2 pr-3 text-secondary-500 text-xs">{LIBELLES_GABARIT[normaliserGabarit(type.reception_profile)]}</td>

@@ -15,6 +15,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings, pennylaneChart, PENNYLANE_CHART_CONTEXTS } from '@hooks/useOrgSettings';
 import { useLedgerAccounts } from '@hooks/usePennylane';
+import { LignesSquelette } from '@/components/ui/squelette';
+
+// Convention de comptes de vente (706 / 707 / 708) affichée quand Pennylane ne rend aucun compte :
+// à valider par l'expert-comptable, pas une écriture.
+const COMPTES_CONVENTION = [
+  { numero: '706', usage: 'Main-d’œuvre' },
+  { numero: '707', usage: 'Marchandise' },
+  { numero: '708', usage: 'Périphérique' },
+];
 
 const ERROR_CLASS = 'mt-1 text-xs text-red-600';
 const CHECKBOX_CLASS = 'h-4 w-4 rounded border-secondary-300 text-primary-600 focus:ring-primary-500';
@@ -83,7 +92,7 @@ export default function PlanComptableTab() {
     }
   };
 
-  if (isLoading) return <div className="card text-sm text-secondary-500">Chargement…</div>;
+  if (isLoading) return <div className="card"><LignesSquelette nombre={5} libelle="Chargement du plan comptable" /></div>;
 
   return (
     <div className="card space-y-4">
@@ -104,7 +113,19 @@ export default function PlanComptableTab() {
       </div>
 
       {accountsError && <p className={ERROR_CLASS}>Comptes Pennylane indisponibles : {accountsError.message || 'erreur'}</p>}
-      {loadingAccounts && <p className="text-sm text-secondary-500">Lecture du plan comptable Pennylane…</p>}
+      {loadingAccounts && <LignesSquelette nombre={6} libelle="Lecture du plan comptable Pennylane" />}
+
+      {/* Aucun compte lu : les trois comptes de la convention restent visibles (en attente de rattachement). */}
+      {!loadingAccounts && numbers.length === 0 && (
+        <table className="w-full text-sm">
+          <thead className="text-xs text-secondary-500"><tr><th className="text-left font-medium px-3 py-2 w-20">Compte</th><th className="text-left font-medium px-3 py-2">Usage</th></tr></thead>
+          <tbody className="divide-y divide-secondary-100">
+            {COMPTES_CONVENTION.map((c) => (
+              <tr key={c.numero}><td className="px-3 py-2 font-mono text-secondary-900">{c.numero}</td><td className="px-3 py-2 text-secondary-700">{c.usage} <span className="text-secondary-500">· en attente de rattachement</span></td></tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       {!loadingAccounts && numbers.length > 0 && (
         <div className="border border-secondary-200 rounded-md max-h-[32rem] overflow-y-auto">

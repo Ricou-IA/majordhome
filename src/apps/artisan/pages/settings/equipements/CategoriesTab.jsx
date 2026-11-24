@@ -78,7 +78,6 @@ export function CategoriesPanel({ admin }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-secondary-200 text-left text-secondary-500">
-                <th className="py-2 pr-3 font-medium">Code</th>
                 <th className="py-2 pr-3 font-medium">Libellé</th>
                 <th className="py-2 pr-3 font-medium">Certificat</th>
                 <th className="py-2 pr-3 font-medium text-right">TVA</th>
@@ -90,7 +89,6 @@ export function CategoriesPanel({ admin }) {
             <tbody>
               {admin.categories.map((cat) => (
                 <tr key={cat.id} className="border-b border-secondary-100">
-                  <td className="py-2 pr-3 font-mono text-xs">{cat.code}</td>
                   <td className="py-2 pr-3 font-medium text-secondary-900">{cat.label}</td>
                   <td className="py-2 pr-3 text-secondary-600 text-xs">{profilLabel(cat.certificate_profile)}</td>
                   <td className="py-2 pr-3 text-right">{String(Number(cat.default_vat_rate)).replace('.', ',')} %</td>
