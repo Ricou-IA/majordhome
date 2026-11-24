@@ -105,7 +105,7 @@ function TemperaturesTab({ form, patchTheta }) {
   return (
     <div className="card space-y-4">
       <div>
-        <SectionTitle>Températures intérieures par défaut (θint)</SectionTitle>
+        <SectionTitle>Température intérieure par défaut, par pièce</SectionTitle>
         <p className="text-sm text-secondary-600 mt-1">
           Consigne proposée pour chaque type de pièce à la création d&apos;une étude.
           Les pièces non chauffées par défaut (garage, cellier) utilisent cette valeur si on les chauffe.

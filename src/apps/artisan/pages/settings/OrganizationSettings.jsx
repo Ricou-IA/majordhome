@@ -23,7 +23,7 @@ export default function OrganizationSettings() {
 
   return (
     <SettingsPage
-      title="Organisation"
+      title="Entreprise"
       tabs={TABS}
       tab={tab}
       onTabChange={(key) => setParams(key === 'identity' ? {} : { tab: key }, { replace: true })}

@@ -20,7 +20,7 @@ export default function PennylaneSettings() {
   const Active = TABS.find((t) => t.key === tab)?.Component || EmissionTab;
   return (
     <SettingsPage
-      title="Facturation"
+      title="Pennylane"
       description="Les factures émises par Majord'home (numérotation, mentions, coordonnées bancaires) et le lien avec Pennylane."
       tabs={TABS}
       tab={tab}

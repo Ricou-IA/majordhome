@@ -16,9 +16,9 @@ export const PAGE_COMMUNICATION = '/settings/communication';
 /** @type {ReadonlyArray<Readonly<Chapitre>>} */
 export const CHAPITRES = Object.freeze([
   Object.freeze({ key: 'expediteur', label: 'Expéditeur et domaine', communication: false }),
-  Object.freeze({ key: 'habillage', label: 'Habillage', communication: true }),
+  Object.freeze({ key: 'habillage', label: 'Apparence des e-mails', communication: true }),
   Object.freeze({ key: 'automatiques', label: 'E-mails automatiques', communication: true }),
-  Object.freeze({ key: 'sequences', label: 'Séquences', communication: true }),
+  Object.freeze({ key: 'sequences', label: 'Relances automatiques', communication: true }),
   Object.freeze({ key: 'sms', label: 'SMS & WhatsApp', communication: false }),
 ]);
 

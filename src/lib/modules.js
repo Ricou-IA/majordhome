@@ -24,12 +24,12 @@ export const MODULES = [
     label: 'Socle',
     description: 'Votre entreprise, votre équipe, vos clients et leur parc — toujours inclus.',
     tiles: [
-      { key: 'organization', title: 'Organisation', description: 'Identité, coordonnées, siège et territoire', icon: 'Building2', href: '/settings/organization', adminOnly: true, horsCrm: true },
+      { key: 'organization', title: 'Entreprise', description: 'Identité, coordonnées, siège et territoire', icon: 'Building2', href: '/settings/organization', adminOnly: true, horsCrm: true },
       { key: 'team', title: 'Administration utilisateurs', description: 'Membres, rôles, profils et droits d\'accès, couleur planning, compétences', icon: 'Users', href: '/settings/team', adminOnly: true },
       { key: 'equipements', title: 'Équipements', description: 'Catégories et types d\'équipement du parc client', icon: 'Wrench', href: '/settings/equipements', adminOnly: true },
       // Ouverte au team_leader (Eric 2026-10-27) : visible dès que le rôle a le droit `articles.edit` (org_admin compris)
       { key: 'suppliers', title: 'Fournisseurs & catalogue', description: 'Fournisseurs et catalogues produits', icon: 'Truck', href: '/settings/suppliers', acces: { resource: 'articles', action: 'edit' } },
-      { key: 'pennylane', title: 'Facturation', description: 'Numérotation, mentions et coordonnées bancaires des factures ; lien Pennylane et comptes de vente', icon: 'Receipt', href: '/settings/pennylane', adminOnly: true },
+      { key: 'pennylane', title: 'Pennylane', description: 'Lien Pennylane, mentions et coordonnées bancaires', icon: 'Receipt', href: '/settings/pennylane', adminOnly: true },
       { key: 'plan-comptable', title: 'Plan comptable', description: 'Les comptes de vente Pennylane utilisables dans Majord\'home', icon: 'BookOpen', href: '/settings/plan-comptable', adminOnly: true, si: 'pennylane' },
       { key: 'devis', title: 'Devis', description: 'Chapitres par type de projet, mentions et affichage du document', icon: 'FileSignature', href: '/settings/devis', adminOnly: true },
     ],
@@ -40,7 +40,7 @@ export const MODULES = [
     label: 'Webshop',
     description: 'Commandes de la boutique en ligne, catalogue, livraisons.',
     tiles: [
-      { key: 'webshop', title: 'Webshop', description: 'Livraison palette, secteurs, colis, adresses de la boutique', icon: 'ShoppingCart', href: '/settings/webshop', adminOnly: true },
+      { key: 'webshop', title: 'Boutique', description: 'Livraison palette, secteurs, colis, adresses de la boutique', icon: 'ShoppingCart', href: '/settings/webshop', adminOnly: true },
     ],
   },
   {

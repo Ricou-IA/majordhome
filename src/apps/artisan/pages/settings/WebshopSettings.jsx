@@ -26,7 +26,7 @@ export default function WebshopSettings() {
   const [tab, setTab] = useState('general');
   return (
     <SettingsPage
-      title="Webshop"
+      title="Boutique"
       description="Livraison palette, secteurs, colis, process des commandes et e-mails de la boutique en ligne."
       tabs={TABS}
       tab={tab}

@@ -232,12 +232,12 @@ export default function TourneesTab() {
           <ChampMinutes
             label="Dépassement toléré de la journée" valeur={form.depassement_journee_minutes} onChange={set('depassement_journee_minutes')} min={0} max={120}
             error={errors.depassement_journee_minutes}
-            hint="Le budget journalier (Settings → Équipe) reste ce qu’on affiche ; le moteur accepte de le dépasser d’autant. Certains jours sont « fini-parti », d’autres finissent plus tard."
+            hint="Le budget journalier (Paramètres → Équipe) reste ce qu’on affiche ; le moteur accepte de le dépasser d’autant. Certains jours sont « fini-parti », d’autres finissent plus tard."
           />
           <ChampMinutes
             label="Tolérance du retour au dépôt" valeur={form.tolerance_retour_depot_minutes} onChange={set('tolerance_retour_depot_minutes')} min={0} max={60}
             error={errors.tolerance_retour_depot_minutes}
-            hint="Le dernier client finit toujours dans l’amplitude de la journée (Settings → Équipe) ; seul le trajet de retour au dépôt peut la déborder d’autant."
+            hint="Le dernier client finit toujours dans l’amplitude de la journée (Paramètres → Équipe) ; seul le trajet de retour au dépôt peut la déborder d’autant."
           />
           <ChampMinutes
             label="Pause déjeuner" valeur={form.pause_minutes} onChange={set('pause_minutes')} min={0} max={120}

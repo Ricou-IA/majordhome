@@ -110,7 +110,7 @@ function CalculTab({ form, patch }) {
       <div>
         <SectionTitle>Technique</SectionTitle>
         <div className="grid sm:grid-cols-2 gap-4 mt-3">
-          <NumberField label="Pertes système (PVGIS)" value={form.system_loss} step={1} suffix="%"
+          <NumberField label="Pertes système du productible solaire" value={form.system_loss} step={1} suffix="%"
             onChange={(v) => patch({ system_loss: v })} />
           <NumberField label="Puissance panneau" value={form.panel_power_wc} step={5} suffix="Wc"
             onChange={(v) => patch({ panel_power_wc: v })} />

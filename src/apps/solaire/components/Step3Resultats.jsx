@@ -43,7 +43,7 @@ export default function Step3Resultats({
     return (
       <div className="card flex items-center justify-center gap-3 py-12 text-secondary-600">
         <Loader2 className="w-5 h-5 animate-spin text-primary-600" />
-        Interrogation PVGIS (production solaire du lieu)…
+        Calcul du productible solaire du lieu…
       </div>
     );
   }
@@ -52,7 +52,7 @@ export default function Step3Resultats({
       <div className="card space-y-4 py-8 text-center">
         <AlertTriangle className="w-8 h-8 text-secondary-500 mx-auto" />
         <div>
-          <p className="font-medium text-secondary-900">PVGIS est indisponible</p>
+          <p className="font-medium text-secondary-900">Le calcul du productible solaire est indisponible</p>
           <p className="text-sm text-secondary-600 mt-1">{pvgisError}</p>
         </div>
         <div className="flex items-center justify-center gap-3">

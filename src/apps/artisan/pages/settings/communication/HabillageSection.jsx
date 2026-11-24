@@ -122,10 +122,10 @@ export default function HabillageSection() {
       await save(patch);
       repartirDe({ ...settings, ...patch });
       setVoirActuel(false);
-      toast.success('Habillage des e-mails enregistré : vos prochains e-mails partiront ainsi.');
+      toast.success('Apparence des e-mails enregistrée : vos prochains e-mails partiront ainsi.');
     } catch (err) {
       logger.error('[HabillageSection] enregistrement', err);
-      toast.error('L’habillage n’a pas pu être enregistré. Réessayez dans un instant.');
+      toast.error('L’apparence des e-mails n’a pas pu être enregistrée. Réessayez dans un instant.');
     }
   };
 
@@ -149,7 +149,7 @@ export default function HabillageSection() {
 
   return (
     <section id="habillage" className="card scroll-mt-24">
-      <h3 className={SECTION_TITLE}>Habillage des e-mails</h3>
+      <h3 className={SECTION_TITLE}>Apparence des e-mails</h3>
       <p className="text-sm text-secondary-600">
         L’allure de tous les e-mails de votre entreprise : en-tête, couleurs, pied de page et blocs fixes. Réglée une fois,
         elle s’applique à chaque e-mail envoyé.
@@ -162,7 +162,7 @@ export default function HabillageSection() {
             celui de l’aperçu, que vous pouvez d’abord ajuster. L’habillage précédent est conservé : vous pourrez y revenir.
           </p>
           <button type="button" onClick={() => setVoirActuel((v) => !v)} className={`mt-2 text-sm ${LIEN_CLASS}`}>
-            {voirActuel ? 'Voir le nouvel habillage' : 'Voir l’habillage actuel'}
+            {voirActuel ? 'Voir la nouvelle apparence' : 'Voir l’apparence actuelle'}
           </button>
         </div>
       )}

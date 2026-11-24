@@ -80,7 +80,7 @@ export default function PiecesTable({ saisie, config, compositions, onChange, ni
               <th className="py-1.5 pr-2 font-medium">Nom</th>
               <th className="py-1.5 pr-2 font-medium">Type</th>
               <th className="py-1.5 pr-2 font-medium text-center">Chauffée</th>
-              <th className="py-1.5 pr-2 font-medium">θint</th>
+              <th className="py-1.5 pr-2 font-medium">Température intérieure</th>
               <th className="py-1.5 pr-2 font-medium">L (cm)</th>
               <th className="py-1.5 pr-2 font-medium">l (cm)</th>
               <th className="py-1.5 pr-2 font-medium">H (cm)</th>
