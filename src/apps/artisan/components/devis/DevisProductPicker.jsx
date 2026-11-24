@@ -15,7 +15,7 @@
 import { ListeChoix } from '@/components/ui/liste-choix';
 import { CalqueModal } from '@/components/ui/calque-modal';
 import { useAfficherMarges } from '@hooks/useAfficherMarges';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Package, X, Loader2, Search, Minus, Plus, ShoppingCart } from 'lucide-react';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -25,6 +25,7 @@ import { formatEuro } from '@/lib/utils';
 import { catalogItemsService } from '@services/catalogItems.service';
 import { CATEGORIE_PIECE_DETACHEE, exclurePiecesDetachees, referenceLigneArticle } from '@/lib/catalogue/piecesDetachees';
 import DevisCreateArticleForm from './DevisCreateArticleForm';
+import { LignesSquelette } from '@/components/ui/squelette';
 
 const LIMITE = 100;
 
@@ -69,13 +70,17 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
   const [gamme, setGamme] = useState('');
   const [quantities, setQuantities] = useState({}); // { itemId: qty }
   const [creation, setCreation] = useState(false);
+  // Lecture par paquets de LIMITE : « Afficher les suivants » en ajoute un (plus de plafond silencieux).
+  // Tout changement de critère repart du premier paquet.
+  const [plafond, setPlafond] = useState(LIMITE);
+  useEffect(() => { setPlafond(LIMITE); }, [debounced, cats, filtreKey, brand, gamme]);
 
   const criteres = useMemo(() => ({
-    search: debounced, categories: cats, natures: filtre.natures, brand: brand || null, gamme: gamme || null, proposable: true, pageSize: LIMITE,
+    search: debounced, categories: cats, natures: filtre.natures, brand: brand || null, gamme: gamme || null, proposable: true, pageSize: plafond,
     // les pièces détachées (des milliers d'« accessoires ») n'ont pas leur place dans le choix d'un équipement / d'une option
     sansPiecesDetachees: exclurePiecesDetachees(typeChapitre),
-  }), [debounced, cats, filtre.natures, brand, gamme, typeChapitre]);
-  const { items, count, isLoading } = useCatalogItems(orgId, criteres);
+  }), [debounced, cats, filtre.natures, brand, gamme, typeChapitre, plafond]);
+  const { items, count, isLoading, isFetching } = useCatalogItems(orgId, criteres);
   const { brands } = useCatalogBrands(orgId, cats);
   const { gammes } = useCatalogGammes(orgId, cats);
 
@@ -176,7 +181,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
               />
             </div>
             <span className="ml-auto self-center text-xs text-secondary-400">
-              {count} article{count > 1 ? 's' : ''}{count > LIMITE ? ` · les ${LIMITE} premiers, affinez` : ''}
+              {count} article{count > 1 ? 's' : ''}{count > items.length ? ` · ${items.length} affichés` : ''}
             </span>
           </div>
         </div>
@@ -194,7 +199,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
             />
           )}
           {isLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
+            <LignesSquelette nombre={6} libelle="Chargement du catalogue" className="py-2" />
           ) : items.length === 0 ? (
             <div className="text-center py-8 text-secondary-400 space-y-2">
               <Package className="w-8 h-8 mx-auto opacity-40" />
@@ -217,7 +222,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
                     {it.image_url ? <img src={it.image_url} alt="" className="w-9 h-9 object-contain rounded border border-secondary-100 bg-white flex-shrink-0" />
                       : <div className="w-9 h-9 rounded bg-secondary-100 flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-secondary-900 break-words">{it.code && <span className="font-mono text-[11px] text-secondary-500 mr-1">{it.code}</span>}{it.name}</p>
+                      <p className="text-sm font-medium text-secondary-900 break-words">{it.code && <span className="font-mono text-xs text-secondary-500 mr-1">{it.code}</span>}{it.name}</p>
                       <p className="text-xs text-secondary-400 break-words">
                         {[it.brand, it.gamme].filter(Boolean).join(' · ')}
                         {it.fournisseurs?.length ? ` · ${it.fournisseurs.join(', ')}` : ''}
@@ -241,6 +246,14 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
                   </div>
                 );
               })}
+              {count > items.length && (
+                <div className="flex justify-center pt-2">
+                  <button type="button" onClick={() => setPlafond((p) => p + LIMITE)} disabled={isFetching} className="btn-secondary btn-sm inline-flex items-center gap-1.5">
+                    {isFetching && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+                    Afficher les suivants ({count - items.length} restant{count - items.length > 1 ? 's' : ''})
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

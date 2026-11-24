@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { ChargementApp } from '@/components/ui/chargement-app';
 
 // =============================================================================
 // PROTECTED ROUTE
@@ -37,12 +37,7 @@ export default function ProtectedRoute({
 
   if (!initialized || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-secondary-50">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 text-primary-600 animate-spin mx-auto" />
-          <p className="mt-4 text-secondary-600">Chargement...</p>
-        </div>
-      </div>
+      <ChargementApp />
     );
   }
 
@@ -130,12 +125,7 @@ export function ClientRoute({ children }) {
 
   if (!initialized || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-secondary-50">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 text-primary-600 animate-spin mx-auto" />
-          <p className="mt-4 text-secondary-600">Chargement...</p>
-        </div>
-      </div>
+      <ChargementApp sansMenu />
     );
   }
 
@@ -162,12 +152,7 @@ export function PublicOnlyRoute({ children }) {
   // d'une connexion refusée ne s'affichait jamais.
   if (!initialized || (loading && user)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-secondary-50">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 text-primary-600 animate-spin mx-auto" />
-          <p className="mt-4 text-secondary-600">Chargement...</p>
-        </div>
-      </div>
+      <ChargementApp sansMenu />
     );
   }
 

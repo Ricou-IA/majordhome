@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- fichier de routes : wrappers locaux + export de config, l'édition recharge l'app entière, fast refresh sans objet */
 import { lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
 import { useCanAccess } from '@hooks/usePermissions';
 import AccueilSelonOrg from '@apps/maintenance/components/AccueilSelonOrg';
 
@@ -87,6 +86,7 @@ const ThermiqueHistorique = lazy(() => import('@apps/thermique/pages/ThermiqueHi
 
 // Chantier Gaillac — module PROVISOIRE (retrait : CLAUDE.md → Modules provisoires)
 import { CHANTIER_GAILLAC_ACTIF } from '@apps/chantier-gaillac/config';
+import { ChargementPage } from '@/components/ui/chargement-app';
 const ChantierGaillac = lazy(() => import('@apps/chantier-gaillac/pages/ChantierGaillac'));
 
 // =============================================================================
@@ -94,14 +94,8 @@ const ChantierGaillac = lazy(() => import('@apps/chantier-gaillac/pages/Chantier
 // =============================================================================
 
 function PageLoader() {
-  return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="text-center">
-        <Loader2 className="w-8 h-8 text-primary-600 animate-spin mx-auto" />
-        <p className="mt-3 text-sm text-secondary-500">Chargement...</p>
-      </div>
-    </div>
-  );
+  // Structure de page en blocs gris (brief UX P1-06) : jamais un « Chargement… » seul.
+  return <ChargementPage />;
 }
 
 // =============================================================================

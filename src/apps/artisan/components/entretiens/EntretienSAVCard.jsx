@@ -75,7 +75,7 @@ function PartsOrderBadge({ status }) {
   };
 
   return (
-    <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${colorMap[status] || 'bg-secondary-100 text-secondary-600'}`}>
+    <span className={`text-caption font-medium px-1.5 py-0.5 rounded ${colorMap[status] || 'bg-secondary-100 text-secondary-600'}`}>
       {config.label}
     </span>
   );
@@ -312,7 +312,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
           title={attentePieces ? 'Pièces commandées, pas encore reçues' : undefined}
         >
           <span className="text-sm font-bold leading-none">{dayNum}</span>
-          <span className="text-[11px] uppercase leading-tight mt-0.5">{monthShort}</span>
+          <span className="text-caption uppercase leading-tight mt-0.5">{monthShort}</span>
         </div>
 
         {/* Contenu : quatre lignes, la dernière collée en bas */}
@@ -330,7 +330,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                   </span>
                 )}
                 {Number(item.parts_total_ttc) > 0 && (
-                  <span className="text-[11px] font-medium text-st-attente" title="Pièces de rechange (à facturer en plus)">
+                  <span className="text-caption font-medium text-st-attente" title="Pièces de rechange (à facturer en plus)">
                     +{formatEuro(Number(item.parts_total_ttc))}
                   </span>
                 )}
@@ -348,17 +348,17 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
 
           {/* Ligne 3 : type + repères, sur une seule ligne */}
           <div className="mt-1.5 flex items-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap">
-            <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${config.bgClass}`}>
+            <span className={`text-caption font-semibold px-1.5 py-0.5 rounded shrink-0 ${config.bgClass}`}>
               {config.label}
             </span>
             <SAVUrgencyBadge item={item} />
             {item.tags?.includes('Web') && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-secondary-100 text-secondary-600 shrink-0">
+              <span className="text-caption font-semibold px-1.5 py-0.5 rounded bg-secondary-100 text-secondary-600 shrink-0">
                 Web
               </span>
             )}
             {type === 'sav' && item.includes_entretien && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-info-bg text-st-info shrink-0">
+              <span className="text-caption font-semibold px-1.5 py-0.5 rounded bg-st-info-bg text-st-info shrink-0">
                 Entretien à faire
               </span>
             )}
@@ -366,7 +366,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                 (recette Eric 2026-10-10 : « pas tout le commentaire, ça fait trop chargé ») */}
             {anomalies.length > 0 && (
               <span
-                className="inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-attente-bg text-st-attente shrink-0"
+                className="inline-flex items-center gap-0.5 text-caption font-semibold px-1.5 py-0.5 rounded bg-st-attente-bg text-st-attente shrink-0"
                 title={anomalies.map((a) => `${a.equipement ? `${a.equipement} : ` : ''}${a.detail || a.bilanLabel}${a.actionLabel ? ` · ${a.actionLabel}` : ''}${a.savId ? ' · SAV créé' : ''}${a.photoPlaquePath ? ' · photo de plaque' : (a.photoPlaqueAbsence ? ` · pas de photo de plaque (${a.photoPlaqueAbsence})` : '')}`).join('\n')}
               >
                 <AlertTriangle className="w-3 h-3" />
@@ -376,7 +376,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
               </span>
             )}
             {type === 'sav' && item.sav_origin === 'entretien' && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-st-attente-bg text-st-attente shrink-0" title="Demande ouverte à la suite d'un entretien (certificat)">
+              <span className="text-caption font-semibold px-1.5 py-0.5 rounded bg-st-attente-bg text-st-attente shrink-0" title="Demande ouverte à la suite d'un entretien (certificat)">
                 Suite d&apos;entretien
               </span>
             )}

@@ -46,7 +46,8 @@ export function PageHeader({ title, subtitle, breadcrumb, actions = [], classNam
       {/* Sur un écran étroit, les actions passent sous le titre au lieu de le recouvrir. */}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-[12rem] flex-1">
-          <h1 className="font-display text-title text-secondary-900">{title}</h1>
+          {/* Sous lg (téléphone) : 20 px, la page garde sa hauteur utile (brief UX P1-07). */}
+          <h1 className="font-display text-xl font-semibold text-secondary-900 lg:text-title">{title}</h1>
           {subtitle && <p className="mt-1 truncate text-body-sm text-secondary-500">{subtitle}</p>}
         </div>
         {ordonnees.length > 0 && (

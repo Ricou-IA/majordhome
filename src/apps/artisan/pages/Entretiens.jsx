@@ -43,6 +43,7 @@ import { CreateContractModal } from '@apps/artisan/components/entretiens/CreateC
 import { logger } from '@lib/logger';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatStrip } from '@apps/artisan/components/shared/StatStrip';
+import { Squelette } from '@/components/ui/squelette';
 
 // Onglet souligné, comme la fiche client : actif = texte foncé + filet cuivre (« vous êtes ici »).
 const ONGLET = 'gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-body-sm font-medium text-secondary-500 hover:text-secondary-700 data-[state=active]:border-primary-600 data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-secondary-900 data-[state=active]:shadow-none';
@@ -328,6 +329,10 @@ export default function Entretiens() {
   }
 
   // (removed — stats are now direct from savStats)
+  // Compteur des repères : bloc gris pendant le chargement (plus de « ... »), « — » si inconnu (jamais 0).
+  const compteur = (n) => (savStatsLoading
+    ? <Squelette className="inline-block h-6 w-12 align-middle" />
+    : (n ?? '—'));
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -360,18 +365,18 @@ export default function Entretiens() {
             // À planifier = rien de fait ni d'ouvert cette année ; + « Planifiés » = reste à faire.
             // Même partition que la Programmation (compterProgrammation).
             label: 'À planifier',
-            value: savStatsLoading ? '...' : (savStats?.entretien_a_faire ?? 0),
+            value: compteur(savStats?.entretien_a_faire),
             // Les refus du client ne sont pas « à faire » : on les nomme pour que le compteur s'explique.
             sub: !savStatsLoading && savStats?.ca_a_faire != null
               ? `CA : ${Math.round(savStats.ca_a_faire).toLocaleString('fr-FR')} €${savStats.entretien_refuse > 0 ? ` · ${savStats.entretien_refuse} refus` : ''}`
               : null,
           },
-          { key: 'sav', label: 'SAV gérés', value: savStatsLoading ? '...' : (savStats?.sav_en_cours ?? 0) },
-          { key: 'planifies', label: 'Planifiés', value: savStatsLoading ? '...' : (savStats?.entretien_planifie ?? 0) },
+          { key: 'sav', label: 'SAV gérés', value: compteur(savStats?.sav_en_cours) },
+          { key: 'planifies', label: 'Planifiés', value: compteur(savStats?.entretien_planifie) },
           {
             key: 'realises',
             label: 'Réalisés',
-            value: savStatsLoading ? '...' : (savStats?.entretien_realise ?? 0),
+            value: compteur(savStats?.entretien_realise),
             sub: !savStatsLoading && savStats?.ca_realise != null ? `CA : ${Math.round(savStats.ca_realise).toLocaleString('fr-FR')} €` : null,
           },
         ]}

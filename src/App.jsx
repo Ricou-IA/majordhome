@@ -38,6 +38,7 @@ const ChantierGaillacPartage = lazy(() => import('@apps/chantier-gaillac/pages/C
 import Unauthorized from '@pages/Unauthorized';
 import JoinOrganization from '@pages/JoinOrganization';
 import AuthCallback from '@pages/AuthCallback';
+import { ChargementApp } from '@/components/ui/chargement-app';
 
 // =============================================================================
 // APP
@@ -87,7 +88,7 @@ export default function App() {
         <Route
           path="/gaillac/:token"
           element={(
-            <Suspense fallback={<div className="min-h-screen bg-secondary-50" />}>
+            <Suspense fallback={<ChargementApp sansMenu />}>
               <ChantierGaillacPartage />
             </Suspense>
           )}
@@ -98,7 +99,7 @@ export default function App() {
       <Route
         path="/pv/:token"
         element={(
-          <Suspense fallback={<div className="min-h-screen bg-secondary-50" />}>
+          <Suspense fallback={<ChargementApp sansMenu />}>
             <PvReception />
           </Suspense>
         )}
@@ -108,7 +109,7 @@ export default function App() {
       <Route
         path="/rdv/:token"
         element={(
-          <Suspense fallback={<div className="min-h-screen bg-secondary-50" />}>
+          <Suspense fallback={<ChargementApp sansMenu />}>
             <PriseRdv />
           </Suspense>
         )}
@@ -147,11 +148,7 @@ export default function App() {
         element={
           <ClientRoute>
             <Suspense
-              fallback={
-                <div className="min-h-screen flex items-center justify-center bg-secondary-50">
-                  <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
-                </div>
-              }
+              fallback={<ChargementApp sansMenu />}
             >
               <ClientLayout />
             </Suspense>
