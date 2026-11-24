@@ -6,9 +6,9 @@ import { ZONES } from '@/lib/devisDocumentModel.js';
 
 const LIBELLES = Object.fromEntries(ZONES.map((z) => [z.id, z]));
 
-function Zone({ id, active, onClick, className = '', children, inline = false }) {
+function Zone({ id, active, onClick, className = '', children, inline = false, lecture = false }) {
   const z = LIBELLES[id];
-  const editable = !!z?.accordeon;
+  const editable = !lecture && !!z?.accordeon;
   const Tag = inline ? 'span' : 'div';
   return (
     <Tag
@@ -16,7 +16,7 @@ function Zone({ id, active, onClick, className = '', children, inline = false })
       tabIndex={editable ? 0 : undefined}
       onClick={editable ? () => onClick?.(id) : undefined}
       onKeyDown={editable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(id); } } : undefined}
-      title={z ? (editable ? `Modifier : ${z.libelle}` : `${z.libelle} (porté par le devis)`) : undefined}
+      title={z && !lecture ? (editable ? `Modifier : ${z.libelle}` : `${z.libelle} (porté par le devis)`) : undefined}
       className={`relative rounded-sm outline-offset-2 transition-shadow ${editable ? 'cursor-pointer hover:ring-2 hover:ring-primary-300/70' : ''} ${active ? 'ring-2 ring-primary-500 bg-primary-50/40' : ''} ${className}`}
     >
       {children}
@@ -24,11 +24,12 @@ function Zone({ id, active, onClick, className = '', children, inline = false })
   );
 }
 
-export default function ApercuDevis({ model: m, zoneActive, onZoneClick }) {
+// `lecture` : aperçu du devis en cours de saisie (éditeur) — aucune zone cliquable ni encadrée.
+export default function ApercuDevis({ model: m, zoneActive, onZoneClick, lecture = false }) {
   if (!m) return null;
   const accent = m.emetteur.couleur;
   const col = m.tableau.colonnes;
-  const props = (id, extra = '') => ({ id, active: zoneActive === id, onClick: onZoneClick, className: extra });
+  const props = (id, extra = '') => ({ id, active: !lecture && zoneActive === id, onClick: onZoneClick, className: extra, lecture });
 
   return (
     <div className="bg-white shadow-xl rounded-sm mx-auto w-full max-w-[720px] px-10 py-9 text-[11px] leading-snug text-secondary-900 font-sans" style={{ minHeight: 960 }}>

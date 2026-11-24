@@ -99,10 +99,11 @@ export function indexVoisin(index, total, sens) {
  * @param {{ rdv?: boolean, lead?: boolean, client?: boolean }} droits
  * @returns {Array<{ cle: string, libelle: string, href: string }>}
  */
-export function actionsCreer({ rdv = false, lead = false, client = false } = {}) {
+export function actionsCreer({ rdv = false, lead = false, client = false, devis = false } = {}) {
   return [
     rdv && { cle: 'rdv', libelle: 'Nouveau RDV', href: '/planning?nouveau=1' },
     lead && { cle: 'lead', libelle: 'Nouveau lead', href: '/pipeline?tab=kanban&new=1' },
     client && { cle: 'client', libelle: 'Nouveau client', href: '/clients?new=1' },
+    devis && { cle: 'devis', libelle: 'Nouveau devis', href: '/devis?nouveau=1' },
   ].filter(Boolean);
 }

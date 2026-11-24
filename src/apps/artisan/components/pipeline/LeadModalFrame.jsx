@@ -1,7 +1,7 @@
 /**
  * LeadModalFrame.jsx — en-tête et pied du slide-over LeadModal (présentation seule).
  */
-import { X, Save, Loader2, ArrowLeft, Trash2, Link2, GitMerge } from 'lucide-react';
+import { X, Save, Loader2, ArrowLeft, Trash2, Link2, GitMerge, FilePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MenuActions } from '@/components/ui/menu-actions';
@@ -10,7 +10,7 @@ import { MenuActions } from '@/components/ui/menu-actions';
  * En-tête : titre, statut courant, retour depuis le mode planification RDV.
  * `onBack` est fourni seulement en mode planification (sinon la croix ferme la modale).
  */
-export function LeadModalHeader({ isEditing, currentStatus, pennylaneActive, onAttachQuotes, scheduling, contactName, onBack, onClose }) {
+export function LeadModalHeader({ isEditing, currentStatus, pennylaneActive, onAttachQuotes, onNouveauDevis = null, scheduling, contactName, onBack, onClose }) {
   return (
     <div className="flex items-center justify-between px-6 py-4 border-b bg-white sticky top-0 z-10">
       <div className="flex items-center gap-3">
@@ -58,12 +58,23 @@ export function LeadModalHeader({ isEditing, currentStatus, pennylaneActive, onA
           )}
         </div>
       </div>
-      <button
-        onClick={scheduling ? onBack : onClose}
-        className="p-2 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
-      >
-        <X className="h-5 w-5" />
-      </button>
+      <div className="flex items-center gap-1 shrink-0">
+        {/* Raccourci : l'éditeur de devis en un clic, sans descendre en bas de la fiche */}
+        {!scheduling && onNouveauDevis && (
+          <Button type="button" variant="secondary" size="sm" onClick={onNouveauDevis} className="gap-1.5">
+            <FilePlus className="h-4 w-4" aria-hidden="true" />
+            Devis
+          </Button>
+        )}
+        <button
+          type="button"
+          onClick={scheduling ? onBack : onClose}
+          aria-label="Fermer"
+          className="p-2 text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 rounded-lg transition-colors"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
     </div>
   );
 }

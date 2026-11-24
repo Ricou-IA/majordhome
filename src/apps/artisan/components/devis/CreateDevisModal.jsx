@@ -24,10 +24,17 @@ import { formatEuro } from '@/lib/utils';
 import DevisEntete from './DevisEntete';
 import DevisStepLines from './DevisStepLines';
 import DevisConditions from './DevisConditions';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Eye } from 'lucide-react';
+import ApercuDevis from '@/apps/artisan/pages/settings/devis/ApercuDevis';
+import { buildDevisDocumentModel } from '@/lib/devisDocumentModel.js';
+import { quoteApercu } from '@/lib/devisApercu.js';
+import { buildCompanyInfo } from '@/lib/orgBranding';
+import { invoicingSettings } from '@/lib/invoiceDocumentModel.js';
 import { CalqueModal } from '@/components/ui/calque-modal';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { saisieDevisAPerdre } from '@/lib/devisFermeture.js';
+import { manquesDevis, RAISONS_DEVIS } from '@/lib/devisValidation.js';
+import { useAfficherMarges } from '@hooks/useAfficherMarges';
 import { toast } from 'sonner';
 
 /**
@@ -89,6 +96,13 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const nbLignes = useMemo(() => lines.filter((l) => l.line_type !== 'section_title').length, [lines]);
   const totals = useMemo(() => computeQuoteTotals(lines, form.globalDiscountPercent), [lines, form.globalDiscountPercent]);
   const marge = useMemo(() => margeFournitures(lines), [lines]);
+  const marges = useAfficherMarges();
+  // Aperçu pendant la saisie : même modèle de document que le PDF (buildDevisDocumentModel), rien de recalculé ici.
+  const [apercuOuvert, setApercuOuvert] = useState(false);
+  const modeleApercu = useMemo(() => buildDevisDocumentModel({
+    quote: quoteApercu({ lead, form, quote: edition ? devisAModifier.quote : null }),
+    lines, totals, company: buildCompanyInfo(settings), config: devisConfig, invoicing: invoicingSettings(settings),
+  }), [lead, form, edition, devisAModifier, lines, totals, settings, devisConfig]); // prix d'achat et marge masqués par défaut, affichables par l'administrateur
 
   // Caractéristiques des articles posés : lues à l'enregistrement pour être FIGÉES sur les lignes cochées
   const idsArticles = useMemo(() => lines.map((l) => l.catalog_item_id).filter(Boolean), [lines]);
@@ -121,6 +135,12 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const setFieldSaisie = useCallback((field, value) => { setTouche(true); setField(field, value); }, [setField]);
   const aPerdre = saisieDevisAPerdre({ touche, lines, subject: form.subject });
   const demanderFermeture = () => { if (aPerdre) setConfirmerAbandon(true); else onClose(); };
+
+  // Créer n'est ouvert qu'avec un objet et une ligne chiffrée (règle pure devisValidation.js).
+  // L'erreur sous l'objet n'apparaît qu'une fois le champ quitté, ou quand c'est le seul manque.
+  const manques = manquesDevis({ subject: form.subject, lines });
+  const [objetQuitte, setObjetQuitte] = useState(false);
+  const erreurObjet = manques.objet && (objetQuitte || !manques.ligne) ? RAISONS_DEVIS.objet : null;
 
   // Changer d'installation ne jette plus aucune ligne (retour d'Eric 2026-10-25 : après un import d'offre, on ne pouvait
   // plus changer d'installation sans tout perdre) : les chapitres de la nouvelle installation remplacent les anciens et
@@ -174,7 +194,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   };
 
   const handleCreate = async () => {
-    if (nbLignes === 0) { toast.error('Ajoutez au moins une ligne de devis'); return; }
+    if (manques.raison) { toast.error(manques.raison); return; }
     // Article non chargé / supprimé : la ligne garde ses caractéristiques déjà figées, on prévient sans bloquer le devis
     const nonResolues = lignesNonResolues(lines, articles);
     if (nonResolues > 0) toast.warning(`Caractéristiques non actualisées pour ${nonResolues} ligne${nonResolues > 1 ? 's' : ''}`);
@@ -217,17 +237,25 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
 
   return (
     <CalqueModal onClose={demanderFermeture} titreId="devis-titre" className="flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[92vh] flex flex-col m-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl xl:max-w-[min(96vw,100rem)] max-h-[92vh] flex flex-col m-4">
         <div className="flex items-center justify-between px-6 py-3 border-b">
           <h2 id="devis-titre" className="text-lg font-semibold text-secondary-900">{edition ? `Modifier le devis ${devisAModifier.quote.quote_number || ''}` : 'Nouveau devis'}</h2>
           <button type="button" onClick={demanderFermeture} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer"><X className="w-5 h-5 text-secondary-500" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5">
           <DevisEntete lead={lead} form={form} setField={setFieldSaisie} selectedFamily={selectedFamily} onSelectFamily={(f) => { setTouche(true); handleSelectFamily(f); }}
-            templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={(t) => { setTouche(true); handleSelectTemplate(t); }} familles={famillesActives(devisConfig).map((f) => f.label)} onImportOffre={() => setImportOffre(true)} />
+            templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={(t) => { setTouche(true); handleSelectTemplate(t); }}
+            erreurObjet={erreurObjet} onObjetQuitte={() => setObjetQuitte(true)} familles={famillesActives(devisConfig).map((f) => f.label)} onImportOffre={() => setImportOffre(true)} />
           <DevisStepLines orgId={orgId} lines={lines} setLines={setLinesSaisie} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} articles={articles} />
           {nbLignes > 0 && <DevisConditions form={form} setField={setFieldSaisie} lines={lines} devisConfig={devisConfig} />}
+        </div>
+        {/* Aperçu du devis tel que le client le recevra (même modèle que le PDF) : à droite sur grand écran */}
+        <aside aria-label="Aperçu du devis" className="hidden xl:block w-[32rem] shrink-0 overflow-y-auto border-l border-secondary-200 bg-secondary-100 p-4">
+          <p className="mb-2 text-xs font-medium text-secondary-600">Aperçu</p>
+          <div style={{ zoom: 0.66 }}><ApercuDevis model={modeleApercu} lecture /></div>
+        </aside>
         </div>
 
         {/* Pied : totaux vivants + action unique */}
@@ -235,17 +263,37 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
           <div className="text-sm text-secondary-600 flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>Total HT <b className="text-secondary-900">{formatEuro(totals.total_ht)}</b></span>
             <span>TTC <b className="text-secondary-900 text-base">{formatEuro(totals.total_ttc)}</b></span>
-            {marge.nb > 0 && <span className="text-xs">marge fournitures {formatEuro(marge.marge)} HT · {marge.taux.toFixed(0)} %</span>}
+            {marges.visibles && marge.nb > 0 && <span className="text-xs">marge fournitures {formatEuro(marge.marge)} HT · {marge.taux.toFixed(0)} %</span>}
+            {marges.peut && (
+              <label className="inline-flex items-center gap-1.5 text-xs text-secondary-600">
+                <input type="checkbox" checked={marges.visibles} onChange={marges.basculer} className="rounded border-secondary-300" />
+                Afficher les marges
+              </label>
+            )}
             {nbLignes === 0 && <span className="text-xs text-secondary-400">Aucune ligne</span>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {manques.raison && <span className="text-xs text-st-attente" role="status">{manques.raison}</span>}
+            <button type="button" onClick={() => setApercuOuvert(true)} className="btn-secondary xl:hidden inline-flex items-center gap-1.5"><Eye className="w-4 h-4" aria-hidden="true" />Aperçu</button>
             <button type="button" onClick={demanderFermeture} className="btn-secondary">Annuler</button>
-            <button type="button" onClick={handleCreate} disabled={isCreating || enregistrement || nbLignes === 0} className="btn-primary">
+            <button type="button" onClick={handleCreate} disabled={isCreating || enregistrement || !!manques.raison} className="btn-primary">
               {(isCreating || enregistrement) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{edition ? 'Enregistrer les modifications' : 'Créer le devis'}
             </button>
           </div>
         </div>
       </div>
+
+      {apercuOuvert && (
+        <CalqueModal onClose={() => setApercuOuvert(false)} z="z-[60]" titreId="apercu-devis-titre">
+          <div className="bg-secondary-100 rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-3 border-b bg-white rounded-t-xl">
+              <h3 id="apercu-devis-titre" className="text-base font-semibold text-secondary-900">Aperçu du devis</h3>
+              <button type="button" onClick={() => setApercuOuvert(false)} className="btn-secondary btn-sm">Retour au devis</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4"><ApercuDevis model={modeleApercu} lecture /></div>
+          </div>
+        </CalqueModal>
+      )}
 
       <ConfirmDialog
         open={confirmerAbandon}

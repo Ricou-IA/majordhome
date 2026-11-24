@@ -98,7 +98,7 @@ test('indexVoisin : en boucle, première ou dernière ligne depuis « aucune »'
 });
 
 test('actionsCreer : seulement ce que les droits permettent', () => {
-  assert.deepEqual(actionsCreer({ rdv: true, lead: true, client: true }).map((a) => a.cle), ['rdv', 'lead', 'client']);
+  assert.deepEqual(actionsCreer({ rdv: true, lead: true, client: true, devis: true }).map((a) => a.cle), ['rdv', 'lead', 'client', 'devis']);
   assert.deepEqual(actionsCreer({ rdv: true }).map((a) => a.libelle), ['Nouveau RDV']);
   assert.deepEqual(actionsCreer({}), []);
   assert.deepEqual(actionsCreer(), []);
@@ -110,4 +110,5 @@ test('chaque lien de création est lu par la page qu’il ouvre', () => {
   assert.match(lire('Pipeline.jsx'), /searchParams\.get\('new'\)/, 'Pipeline.jsx ne lit pas ?new=1');
   assert.match(lire('Pipeline.jsx'), /searchParams\.get\('lead'\)/, 'Pipeline.jsx ne lit pas ?lead=<id>');
   assert.match(lire('Clients.jsx'), /searchParams\.get\('new'\)/, 'Clients.jsx ne lit pas ?new=1');
+  assert.match(lire('Devis.jsx'), /params\.get\('nouveau'\)/, 'Devis.jsx ne lit pas ?nouveau=1');
 });

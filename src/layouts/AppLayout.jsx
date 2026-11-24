@@ -31,6 +31,7 @@ import {
   ClipboardCheck,
   Snowflake,
   ClipboardList,
+  FileSignature,
   Search,
 } from 'lucide-react';
 import { chantierGaillacVisible } from '@apps/chantier-gaillac/config';
@@ -49,6 +50,7 @@ const navigation = [
   { name: 'Clients',    href: '/clients',    icon: Users,           resource: 'clients', groupe: 'ventes' },
   { name: 'Carte',      alias: 'Territoire', href: '/territoire', icon: MapPin,          resource: 'territoire', groupe: 'outils' },
   { name: 'Leads',      alias: 'Pipeline', href: '/pipeline',   icon: Kanban,          resource: 'pipeline', groupe: 'ventes' },
+  { name: 'Devis',      href: '/devis',      icon: FileSignature,   resource: 'devis', groupe: 'ventes' },
   { name: 'Boutique',   alias: 'Webshop', href: '/webshop',    icon: ShoppingCart,    resource: 'pipeline', module: 'webshop', groupe: 'ventes' },
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,         resource: 'chantiers', groupe: 'terrain' },
   { name: 'Contrats',   href: '/contrats',   icon: FileText,        resource: 'entretiens', module: 'entretiens', groupe: 'ventes' },
@@ -144,6 +146,7 @@ export default function AppLayout() {
     rdv: crmActif && can('planning', 'create'),
     lead: crmActif && can('pipeline', 'create'),
     client: crmActif && can('clients', 'create'),
+    devis: crmActif && can('devis', 'create') && can('pipeline', 'create'),
   });
   // Téléphone : pages du quotidien en accès direct dans la barre du bas, selon les droits.
   const raccourcis = raccourcisBarre(entreesVisibles, { avecCreer: creations.length > 0 }).map((item) => (

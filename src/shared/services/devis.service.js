@@ -11,6 +11,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { DEFAULT_FAMILLES, buildDevisConfig, sectionsParDefaut, categoriesPourSection, tauxTvaLigne } from '@/lib/devisConfig.js';
 import { logger } from '@lib/logger';
+import { fetchAllPages } from '@/lib/postgrestUtils';
 
 // ============================================================================
 // CONSTANTES
@@ -109,6 +110,28 @@ export const devisService = {
     } catch (error) {
       logger.error('[devisService] getQuotes:', error);
       return { data: [], count: 0, error };
+    }
+  },
+
+  /**
+   * Tous les devis de l'organisation (page Devis), lus en entier par pages de 1 000 :
+   * PostgREST plafonne en silence, une liste tronquée ferait dire « aucun devis » à tort.
+   * Tri stable : création décroissante puis id.
+   */
+  async getAllQuotes(orgId) {
+    try {
+      if (!orgId) throw new Error('[devisService] orgId requis');
+      const data = await fetchAllPages((from, to) => supabase
+        .from('majordhome_quotes')
+        .select('id, org_id, quote_number, lead_id, client_id, intervention_id, status, subject, total_ht, total_ttc, created_at, sent_at, accepted_at, refused_at, validity_date, pennylane_quote_id, client_display_name, client_city')
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to));
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[devisService] getAllQuotes:', error);
+      return { data: [], error };
     }
   },
 

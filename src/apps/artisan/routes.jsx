@@ -55,7 +55,7 @@ const CommercialPipeline = lazy(() => import('@apps/prospection/commercial/Comme
 const PipelineContrats = lazy(() => import('./pages/PipelineContrats'));
 
 // Explorateur de devis Pennylane
-const DevisExplorer = lazy(() => import('./pages/DevisExplorer'));
+const Devis = lazy(() => import('./pages/Devis'));
 
 // Webshop (commandes site web + tarifs produits)
 const Webshop = lazy(() => import('./pages/Webshop'));
@@ -243,12 +243,12 @@ export const artisanRoutes = [
     ),
   },
   {
-    // Explorateur de devis PL — garde fine org_admin in-component
+    // Devis faits dans Majord'home (+ onglet « Orphelins Pennylane », admin, garde dans la page)
     path: 'devis',
     element: (
       <SuspenseWrapper>
-        <RouteGuard resource="pipeline">
-          <DevisExplorer />
+        <RouteGuard resource="devis">
+          <Devis />
         </RouteGuard>
       </SuspenseWrapper>
     ),

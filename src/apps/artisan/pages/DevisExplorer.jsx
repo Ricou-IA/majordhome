@@ -4,6 +4,8 @@
  * Explorateur des devis Pennylane par statut. Sert à repérer et traiter les
  * devis jamais rattachés à un lead.
  * Accès org_admin uniquement (un devis PL ne porte pas de commercial).
+ * Depuis le 2026-11-24, c'est l'onglet « Orphelins Pennylane » de la page Devis (pages/Devis.jsx,
+ * `embarque` : sans titre de page). La page /devis liste d'abord les devis faits dans Majord'home.
  * ============================================================================
  */
 
@@ -41,7 +43,7 @@ const VIEW_TABS = [
   { id: EXPLORER_VIEWS.DISMISSED, label: 'Écartés' },
 ];
 
-export default function DevisExplorer() {
+export default function DevisExplorer({ embarque = false }) {
   const { isOrgAdmin } = useAuth();
   const pennylaneActive = usePennylaneEnabled();
 
@@ -112,7 +114,7 @@ export default function DevisExplorer() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Devis Pennylane" />
+      {!embarque && <PageHeader title="Devis Pennylane" />}
 
       {error && (
         <div className="p-4 rounded-lg bg-st-attente-bg text-st-attente flex items-start gap-3">

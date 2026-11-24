@@ -14,6 +14,7 @@
 
 import { ListeChoix } from '@/components/ui/liste-choix';
 import { CalqueModal } from '@/components/ui/calque-modal';
+import { useAfficherMarges } from '@hooks/useAfficherMarges';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Package, X, Loader2, Search, Minus, Plus, ShoppingCart } from 'lucide-react';
@@ -54,6 +55,7 @@ const NATURE_PAR_TYPE = { equipement: 'main', option: 'accessory', stock: 'stock
  *   onAddLines: (lines: object[]) => void, onClose: () => void }} p
  */
 export default function DevisProductPicker({ orgId, categories = [], typeChapitre = 'libre', tvaDevis = 20, onAddLines, onClose }) {
+  const { visibles: margesVisibles } = useAfficherMarges(); // prix d'achat masqués par défaut (devant le client)
   const { can } = useCanAccess();
   const filtres = FILTRES[typeChapitre] || FILTRES.libre;
   const [filtreKey, setFiltreKey] = useState(filtres[0].key);
@@ -219,7 +221,7 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
                       <p className="text-xs text-secondary-400 break-words">
                         {[it.brand, it.gamme].filter(Boolean).join(' · ')}
                         {it.fournisseurs?.length ? ` · ${it.fournisseurs.join(', ')}` : ''}
-                        {it.meilleur_prix_achat != null ? ` · achat ${formatEuro(it.meilleur_prix_achat)}` : ''}
+                        {margesVisibles && it.meilleur_prix_achat != null ? ` · achat ${formatEuro(it.meilleur_prix_achat)}` : ''}
                         {it.product_kind === 'stock' && it.offres_actives > 1 ? ' · marque au choix dans le devis' : ''}
                       </p>
                     </div>

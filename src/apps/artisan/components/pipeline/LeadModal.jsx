@@ -450,6 +450,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           currentStatus={currentStatus}
           pennylaneActive={pennylaneActive}
           onAttachQuotes={() => setShowQuoteCandidates(true)}
+          onNouveauDevis={isEditing && can('devis', 'create') ? () => setShowCreateDevis(true) : null}
           scheduling={false}
           contactName={`${form.first_name || ''} ${form.last_name || ''}`}
           onBack={cancelScheduling}

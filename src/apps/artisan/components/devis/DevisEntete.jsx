@@ -11,8 +11,9 @@ import { QUOTE_TEMPLATE_FAMILIES } from '@services/devis.service';
 
 /** `familles` = labels des familles actives de l'org (famillesActives(devisConfig)) ; défauts si absent. */
 import { inputClass } from '../FormFields';
+import { cn } from '@/lib/utils';
 
-export default function DevisEntete({ lead, form, setField, selectedFamily, onSelectFamily, templates, selectedTemplateId, onSelectTemplate, familles, onImportOffre }) {
+export default function DevisEntete({ lead, form, setField, selectedFamily, onSelectFamily, templates, selectedTemplateId, onSelectTemplate, familles, onImportOffre, erreurObjet = null, onObjetQuitte }) {
   const listeFamilles = familles?.length ? familles : QUOTE_TEMPLATE_FAMILIES;
   const clientName = [lead?.first_name, lead?.last_name].filter(Boolean).join(' ') || '—';
   const clientAddress = [lead?.address, lead?.postal_code, lead?.city].filter(Boolean).join(', ');
@@ -48,8 +49,15 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
           partir d'un contenu tout fait, au même niveau que le devis type — Eric 2026-10-25) */}
       <div className={`grid gap-3 md:items-end ${onImportOffre ? 'md:grid-cols-[1fr_16rem_auto]' : 'md:grid-cols-[1fr_16rem]'}`}>
         <div>
-          <label className="block text-xs font-medium text-secondary-600 mb-1.5">Objet du devis</label>
-          <input type="text" value={form.subject} onChange={(e) => setField('subject', e.target.value)} placeholder="Ex : Poêle à granulés + tubage du conduit existant" className={inputClass} />
+          <label htmlFor="devis-objet" className="block text-xs font-medium text-secondary-600 mb-1.5">Objet du devis <span className="text-st-alerte" aria-hidden="true">*</span></label>
+          <input
+            id="devis-objet" type="text" value={form.subject}
+            onChange={(e) => setField('subject', e.target.value)} onBlur={onObjetQuitte}
+            placeholder="Ex : Poêle à granulés + tubage du conduit existant"
+            aria-invalid={erreurObjet ? true : undefined} aria-describedby={erreurObjet ? 'devis-objet-erreur' : undefined}
+            className={cn(inputClass, erreurObjet && 'border-st-alerte focus:ring-st-alerte')}
+          />
+          {erreurObjet && <p id="devis-objet-erreur" className="mt-1 text-xs text-st-alerte">{erreurObjet}</p>}
         </div>
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1.5">Devis type</label>

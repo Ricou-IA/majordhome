@@ -27,6 +27,26 @@ export { devisKeys } from '@hooks/cacheKeys';
 // ============================================================================
 
 /**
+ * Tous les devis de l'organisation (page Devis). `devis` reste `undefined` tant que la
+ * liste n'est pas connue (chargement ou échec) : l'écran ne dit jamais « aucun devis » à tort.
+ */
+export function useDevisListe({ enabled = true } = {}) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: devisKeys.list(orgId, 'tous'),
+    queryFn: async () => {
+      const { data: rows, error: err } = await devisService.getAllQuotes(orgId);
+      if (err) throw err;
+      return rows;
+    },
+    enabled: !!orgId && enabled,
+    staleTime: 30_000,
+  });
+  return { devis: data, isLoading, error, refetch };
+}
+
+/**
  * Devis liés à un lead
  */
 export function useDevisByLead(leadId) {

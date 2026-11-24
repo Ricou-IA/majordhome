@@ -13,6 +13,7 @@
  */
 
 import { useState } from 'react';
+import { useAfficherMarges } from '@hooks/useAfficherMarges';
 import { TVA_RATES, computeLineTotals } from '@services/devis.service';
 import { formatEuro } from '@/lib/utils';
 import { GripVertical, Trash2, BookmarkPlus, Loader2, AlignLeft, Pencil } from 'lucide-react';
@@ -23,6 +24,7 @@ import { GripVertical, Trash2, BookmarkPlus, Loader2, AlignLeft, Pencil } from '
  *   onCreerArticle?: () => void, creationEnCours?: boolean, nbCaracteristiques?: number, onEditerArticle?: () => void }} p
  */
 export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee, marques = [], onMarque, onCreerArticle, creationEnCours = false, nbCaracteristiques = 0, onEditerArticle }) {
+  const { visibles: margesVisibles } = useAfficherMarges(); // prix d'achat masqués par défaut (devant le client)
   const [descriptionOuverte, setDescriptionOuverte] = useState(false);
   const setLineField = (field, value) => onUpdate(index, { ...line, [field]: value });
   const lineTotals = computeLineTotals(line);
@@ -61,7 +63,7 @@ export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee,
                   >
                     <option value="">Marque au choix</option>
                     {marques.map((m) => (
-                      <option key={m.marque} value={m.marque}>{m.marque}{m.prix != null ? ` · achat ${formatEuro(m.prix)}` : ''}</option>
+                      <option key={m.marque} value={m.marque}>{m.marque}{margesVisibles && m.prix != null ? ` · achat ${formatEuro(m.prix)}` : ''}</option>
                     ))}
                   </select>
                 )}
