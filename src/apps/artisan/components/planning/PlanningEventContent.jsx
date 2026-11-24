@@ -120,11 +120,13 @@ export function PlanningEventContent({ eventInfo }) {
   if (m.gabarit === 'etroit') {
     return (
       <div ref={refLargeur} className={racine} title={m.infobulle}>
-        <div className="flex items-center gap-0.5 whitespace-nowrap overflow-hidden">
-          <Reperes rdv={rdv} />
+        {/* L'heure d'abord, entière ; les repères passent à la ligne s'ils ne tiennent pas (recette H7 : « 1… »). */}
+        <div className="flex flex-wrap items-center gap-0.5">
           {heure}
+          <Reperes rdv={rdv} />
         </div>
-        {m.nom && <div className={`font-bold break-all ${LIGNES_NOM[m.lignesNom] || 'line-clamp-4'}`}>{m.nom}</div>}
+        {/* Coupé entre deux syllabes (page en lang="fr"), jamais au hasard d'une lettre (« CORMAR/Y »). */}
+        {m.nom && <div className={`font-bold break-words hyphens-auto ${LIGNES_NOM[m.lignesNom] || 'line-clamp-4'}`}>{m.nom}</div>}
       </div>
     );
   }

@@ -29,6 +29,8 @@ import { logger } from '@lib/logger';
 import { toast } from 'sonner';
 import { leadsService } from '@services/leads.service';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
+import { CalqueModal } from '@/components/ui/calque-modal';
+import { MenuActions } from '@/components/ui/menu-actions';
 
 export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, onEdit }) {
   const { organization, user } = useAuth();
@@ -308,15 +310,16 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
     }
   };
 
+  // Échap et clic sur le fond ferment la fenêtre du dessus seulement (CalqueModal, recette 2026-11-24).
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <CalqueModal onClose={onClose} titreId="devis-fiche-titre" className="flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col m-4">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <div className="flex items-center gap-3">
             <FileText className="w-5 h-5 text-primary-600" />
             <div>
-              <h2 className="text-lg font-semibold text-secondary-900">{quote.quote_number}</h2>
+              <h2 id="devis-fiche-titre" className="text-lg font-semibold text-secondary-900">{quote.quote_number}</h2>
               {quote.subject && <p className="text-sm text-secondary-500">{quote.subject}</p>}
             </div>
             <DevisStatusBadge status={quote.status} />
@@ -486,18 +489,17 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
 
         {/* Footer — Actions */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t bg-white">
-          <div className="flex gap-2">
-            {/* Destructive actions */}
-            <button onClick={() => setShowDeleteConfirm(true)} disabled={isDeleting} className="btn-secondary btn-sm text-red-600 hover:bg-red-50" title="Supprimer">
-              <Trash2 className="w-4 h-4" />
-            </button>
-            <button onClick={handleDuplicate} className="btn-secondary btn-sm" title="Dupliquer">
-              <Copy className="w-4 h-4" />
-            </button>
-            <button onClick={() => setShowTemplateForm(!showTemplateForm)} className="btn-secondary btn-sm" title="Enregistrer en devis type">
-              <BookmarkPlus className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Supprimer : menu « … », jamais à côté de « Générer PDF » (brief UX, règle 2). */}
+          <MenuActions
+            libelle="Autres actions sur le devis"
+            align="start"
+            actions={[
+              { label: 'Dupliquer', icon: Copy, onClick: handleDuplicate },
+              { label: 'Enregistrer en devis type', icon: BookmarkPlus, onClick: () => setShowTemplateForm(!showTemplateForm) },
+              { separateur: true },
+              { label: 'Supprimer le devis', icon: Trash2, danger: true, disabled: isDeleting, onClick: () => setShowDeleteConfirm(true) },
+            ]}
+          />
 
           <div className="flex flex-wrap justify-end gap-2 [&>button]:whitespace-nowrap">
             {/* PDF */}
@@ -613,6 +615,6 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
         onConfirm={handleDelete}
         loading={isDeleting}
       />
-    </div>
+    </CalqueModal>
   );
 }

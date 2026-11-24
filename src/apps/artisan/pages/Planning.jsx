@@ -342,7 +342,8 @@ export default function Planning() {
             slotMaxTime={grille.slotMaxTime}
             slotDuration="00:30:00"
             slotLabelInterval="01:00:00"
-            slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+            // « 8 h 00 », écriture française (recette H4 : « 08:00 »)
+            slotLabelContent={(arg) => `${arg.date.getHours()} h ${String(arg.date.getMinutes()).padStart(2, '0')}`}
             // Événements
             events={events}
             eventContent={(eventInfo) => <PlanningEventContent eventInfo={eventInfo} />}

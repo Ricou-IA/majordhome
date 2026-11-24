@@ -48,10 +48,17 @@ export function heureLocale(date) {
  *   `plage` = la grille chargée (déborde sur les mois voisins en vue Mois) ;
  *   `periode` = ce que le titre annonce (cumul du CA) ; `semaine` = numéro ISO, null en vue Mois.
  */
+/** « novembre 2026 » → « Novembre 2026 » ; le reste du titre n'est pas touché. */
+export function majusculeInitiale(texte) {
+  const t = String(texte || '');
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+}
+
 export function plageDeVue(info) {
   return {
     vue: info.view.type,
-    titre: info.view.title,
+    // Une seule écriture : majuscule initiale (« Novembre 2026 », « Janvier 2027 » — recette H5).
+    titre: majusculeInitiale(info.view.title),
     plage: {
       startDate: info.startStr?.split('T')[0] || dateLocale(info.start),
       endDate: info.endStr?.split('T')[0] || dateLocale(info.end),

@@ -16,6 +16,7 @@ import { useClient } from '@hooks/useClients';
 import { FormField, TextInput } from '../FormFields';
 import { LIBELLES_CHAMPS_CLIENT_PENNYLANE } from '@/lib/pennylaneCustomerRequirements.js';
 import { emailsValides } from '@/lib/emailUtils.js';
+import { CalqueModal } from '@/components/ui/calque-modal';
 
 // clé de la fiche → clé attendue par clientsService.updateClient
 const CLE_UPDATE = { company_name: 'companyName', first_name: 'firstName', last_name: 'lastName', address: 'address', postal_code: 'postalCode', city: 'city', email: 'email' };
@@ -51,10 +52,11 @@ export default function CompleterClientPennylaneModal({ client, champs, onClose,
   const libelle = (c) => { const l = c.label || LIBELLES_CHAMPS_CLIENT_PENNYLANE[c.key] || c.key; return l.charAt(0).toUpperCase() + l.slice(1); };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+    // Calque au-dessus de la fiche du devis : Échap ferme celui-ci seulement (CalqueModal).
+    <CalqueModal onClose={onClose} z="z-[60]" titreId="completer-client-titre" className="flex items-center justify-center bg-black/40">
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col m-4">
         <div className="flex items-center justify-between px-5 py-3 border-b">
-          <h3 className="text-base font-semibold text-secondary-900">Compléter la fiche client</h3>
+          <h3 id="completer-client-titre" className="text-base font-semibold text-secondary-900">Compléter la fiche client</h3>
           <button type="button" onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer"><X className="w-5 h-5 text-secondary-500" /></button>
         </div>
 
@@ -89,6 +91,6 @@ export default function CompleterClientPennylaneModal({ client, champs, onClose,
           </button>
         </div>
       </form>
-    </div>
+    </CalqueModal>
   );
 }

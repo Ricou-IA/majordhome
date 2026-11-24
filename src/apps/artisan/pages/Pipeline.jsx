@@ -45,14 +45,25 @@ export default function Pipeline() {
   // Commercial sur lequel le Kanban s'ouvre quand on vient du bloc « À traiter » du Dashboard
   const [kanbanCommercialId, setKanbanCommercialId] = useState('');
 
+  // L'onglet est écrit dans l'adresse (?tab=) : un retour sur la page rouvre le même (recette 2026-11-24).
+  const ecrireOnglet = (tab) => {
+    setActiveTab(tab);
+    setSearchParams((prev) => {
+      if (prev.get('tab') === tab) return prev;
+      const p = new URLSearchParams(prev);
+      p.set('tab', tab);
+      return p;
+    }, { replace: true });
+  };
+
   const handleTabChange = (tab) => {
     if (tab !== 'kanban') setKanbanCommercialId('');
-    setActiveTab(tab);
+    ecrireOnglet(tab);
   };
 
   const ouvrirKanban = (commercialId) => {
     setKanbanCommercialId(commercialId || '');
-    setActiveTab('kanban');
+    ecrireOnglet('kanban');
   };
 
   // Création directe depuis le Dashboard (?new=1) : ouvre la modale en création

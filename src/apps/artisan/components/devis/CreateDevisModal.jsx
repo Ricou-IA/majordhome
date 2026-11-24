@@ -209,8 +209,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
 
   const handleCreate = async () => {
     if (manques.raison) {
-      // Le champ prend le focus AVANT l'ouverture : la fenêtre le lui rendra en se fermant (au lieu du bouton).
-      if (manques.objet) { setObjetQuitte(true); document.getElementById('devis-objet')?.focus({ preventScroll: true }); }
+      if (manques.objet) setObjetQuitte(true);
       setManqueOuvert(true);
       return;
     }
@@ -326,13 +325,15 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
 
       <ConfirmDialog
         open={manqueOuvert}
-        onOpenChange={(o) => { setManqueOuvert(o); if (!o) allerAuManque(); }}
+        onOpenChange={setManqueOuvert}
+        // Le curseur va au champ une fois la fenêtre fermée : posé avant, il était repris par la fenêtre (recette H17).
+        onCloseAutoFocus={(e) => { e.preventDefault(); allerAuManque(); }}
         title={manques.raison || ''}
         description={null}
         confirmLabel="OK"
         cancelLabel={null}
         variant="default"
-        onConfirm={() => { setManqueOuvert(false); allerAuManque(); }}
+        onConfirm={() => setManqueOuvert(false)}
       />
       <ConfirmDialog
         open={confirmerAbandon}

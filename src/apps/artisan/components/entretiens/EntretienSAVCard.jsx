@@ -14,7 +14,7 @@
 
 import { useState } from 'react';
 import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Archive, Phone, PhoneForwarded, Receipt, Undo2, Mail, AlertTriangle, Camera, FileText } from 'lucide-react';
-import { RepereCarte, RepereBouton } from '../shared/RepereCarte';
+import { RepereCarte, RepereBouton, RangeeReperes } from '../shared/RepereCarte';
 import { piecesEnAttente } from '@/lib/kanbanEntretienSav';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -398,7 +398,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
 
           {/* Ligne 4 (bas de carte) : suites d'un réalisé — mêmes pastilles que le chantier
               réceptionné —, certificat à faire, devis fléché ou invitation */}
-          <div className="mt-auto flex items-center gap-0.5 min-w-0 overflow-hidden">
+          <RangeeReperes actif={item.workflow_status === 'realise'} className="mt-auto flex items-center gap-0.5 min-w-0 overflow-hidden">
             {item.workflow_status === 'realise' ? (
               <>
                 {isTeamLeaderOrAbove ? (
@@ -471,7 +471,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
             ) : invitationLibelle ? (
               <span className="text-xs text-st-info truncate" title={invitationLibelle}>{invitationLibelle}</span>
             ) : null}
-          </div>
+          </RangeeReperes>
         </div>
       </div>
 

@@ -36,6 +36,7 @@ test('plageDeVue : en vue Mois la grille déborde, la période reste le mois, pa
     view: { type: 'dayGridMonth', title: 'novembre 2026', currentStart: le(1), currentEnd: new Date(2026, 11, 1) },
   };
   const p = plageDeVue(info);
+  assert.equal(p.titre, 'Novembre 2026'); // majuscule initiale, comme « Janvier 2027 » (recette H5)
   // Sans startStr / endStr : dates locales de la grille.
   assert.deepEqual(p.plage, { startDate: '2026-10-26', endDate: '2026-12-07' });
   assert.deepEqual(p.periode, { debut: '2026-11-01', finExclue: '2026-12-01' });

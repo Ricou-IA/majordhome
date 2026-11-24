@@ -37,6 +37,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import { MenuActions } from '@/components/ui/menu-actions';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ProductDocumentsPanel } from './ProductDocumentsPanel';
 import ProductDetailDrawer from './ProductDetailDrawer';
 import CatalogConnectorPanel from './suppliers/CatalogConnectorPanel';
@@ -642,8 +644,13 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
     }
   };
 
-  const handleDelete = async (product) => {
-    if (!window.confirm(`Supprimer "${product.name}" ?`)) return;
+  // Retrait confirmé dans l'application, jamais par window.confirm (brief UX, règle 2).
+  const [produitARetirer, setProduitARetirer] = useState(null);
+  const handleDelete = (product) => setProduitARetirer(product);
+  const confirmerRetraitProduit = async () => {
+    const product = produitARetirer;
+    setProduitARetirer(null);
+    if (!product) return;
     try {
       await deactivateProduct(product.id);
       toast.success('Produit supprimé');
@@ -905,13 +912,10 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
                       >
                         <Pencil className="w-3.5 h-3.5 text-primary-500" />
                       </button>
-                      <button
-                        onClick={() => handleDelete(product)}
-                        className="p-1.5 hover:bg-red-50 rounded"
-                        title="Supprimer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                      </button>
+                      <MenuActions
+                        libelle={`Autres actions sur ${product.name}`}
+                        actions={[{ label: 'Supprimer le produit', icon: Trash2, danger: true, onClick: () => handleDelete(product) }]}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -971,6 +975,15 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
           onClose={() => setDetailProductId(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={!!produitARetirer}
+        onOpenChange={(o) => { if (!o) setProduitARetirer(null); }}
+        title={`Supprimer « ${produitARetirer?.name || ''} » ?`}
+        description="Le produit disparaît du catalogue de ce fournisseur."
+        confirmLabel="Supprimer"
+        onConfirm={confirmerRetraitProduit}
+      />
     </div>
   );
 }
@@ -1012,8 +1025,12 @@ export default function SupplierManagement() {
     }
   };
 
-  const handleDelete = async (supplier) => {
-    if (!window.confirm(`Supprimer "${supplier.name}" et tout son catalogue ?`)) return;
+  const [fournisseurARetirer, setFournisseurARetirer] = useState(null);
+  const handleDelete = (supplier) => setFournisseurARetirer(supplier);
+  const confirmerRetraitFournisseur = async () => {
+    const supplier = fournisseurARetirer;
+    setFournisseurARetirer(null);
+    if (!supplier) return;
     try {
       await deactivateSupplier(supplier.id);
       toast.success('Fournisseur supprimé');
@@ -1134,13 +1151,13 @@ export default function SupplierManagement() {
                 >
                   <Pencil className="w-4 h-4 text-secondary-500" />
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(supplier); }}
-                  className="p-2 hover:bg-red-50 rounded-lg"
-                  title="Supprimer"
-                >
-                  <Trash2 className="w-4 h-4 text-red-400" />
-                </button>
+                {/* La ligne s'ouvre au clic : le menu ne doit pas l'ouvrir aussi. */}
+                <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                  <MenuActions
+                    libelle={`Autres actions sur ${supplier.name}`}
+                    actions={[{ label: 'Supprimer le fournisseur', icon: Trash2, danger: true, onClick: () => handleDelete(supplier) }]}
+                  />
+                </span>
                 <ChevronRight className="w-5 h-5 text-secondary-400" />
               </div>
             </div>
@@ -1149,6 +1166,14 @@ export default function SupplierManagement() {
       )}
 
       {modal}
+      <ConfirmDialog
+        open={!!fournisseurARetirer}
+        onOpenChange={(o) => { if (!o) setFournisseurARetirer(null); }}
+        title={`Supprimer « ${fournisseurARetirer?.name || ''} » ?`}
+        description="Le fournisseur et tout son catalogue disparaissent de la liste."
+        confirmLabel="Supprimer"
+        onConfirm={confirmerRetraitFournisseur}
+      />
     </div>
   );
 }

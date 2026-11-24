@@ -577,3 +577,9 @@ html[data-device-class="phone"] .mdh-tactile,
 html[data-device-class="tablet"] .mdh-tactile {
   min-height: 44px;
 }
+
+/* Rangée de repères d'une carte de Kanban trop étroite : icônes seules, libellé dans l'infobulle
+   (RangeeReperes de RepereCarte.jsx pose data-serree après mesure ; recette H22). */
+.mdh-reperes[data-serree="true"] .mdh-repere-libelle {
+  display: none;
+}

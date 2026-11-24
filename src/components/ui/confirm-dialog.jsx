@@ -41,6 +41,9 @@ export function ConfirmDialog({
   confirmDisabled = false, // bloque la confirmation (ex. aperçu en erreur) sans masquer le bouton
   size = 'md', // 'md' (confirmation simple) | 'lg' | 'xl' (contenu éditable : tableau de lignes, aperçu de facture)
   texteASaisir = null, // nom à retaper pour une suppression définitive (null = pas de saisie)
+  // Appelé quand la fenêtre rend la main (après sa fermeture) : e.preventDefault() puis placer soi-même le focus
+  // (ex. champ manquant). Un focus posé AVANT ce moment est repris par la fenêtre, qui le rend à l'élément d'avant.
+  onCloseAutoFocus,
   children,
 }) {
   const champId = useId();
@@ -60,6 +63,7 @@ export function ConfirmDialog({
           className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
         />
         <AlertDialogPrimitive.Content
+          onCloseAutoFocus={onCloseAutoFocus}
           className={cn(
             'fixed left-[50%] top-[50%] z-50 w-full translate-x-[-50%] translate-y-[-50%]',
             sizeClass,

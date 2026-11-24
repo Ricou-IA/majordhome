@@ -30,7 +30,7 @@ export const MODULES = [
       { key: 'equipements', title: 'Équipements', description: 'Catégories et types d\'équipement du parc client', icon: 'Wrench', href: '/settings/equipements', adminOnly: true },
       // Ouverte au team_leader (Eric 2026-10-27) : visible dès que le rôle a le droit `articles.edit` (org_admin compris)
       { key: 'suppliers', title: 'Fournisseurs & catalogue', description: 'Fournisseurs et catalogues produits', icon: 'Truck', href: '/settings/suppliers', acces: { resource: 'articles', action: 'edit' } },
-      { key: 'pennylane', title: 'Pennylane', description: 'Lien Pennylane, mentions et coordonnées bancaires', icon: 'Receipt', href: '/settings/pennylane', adminOnly: true },
+      { key: 'pennylane', title: 'Pennylane', description: 'Lien Pennylane, mentions et coordonnées bancaires (IBAN, BIC)', icon: 'Receipt', href: '/settings/pennylane', adminOnly: true },
       { key: 'plan-comptable', title: 'Plan comptable', description: 'Les comptes de vente Pennylane utilisables dans Majord\'home', icon: 'BookOpen', href: '/settings/plan-comptable', adminOnly: true, si: 'pennylane' },
       { key: 'devis', title: 'Devis', description: 'Chapitres par type de projet, mentions et affichage du document', icon: 'FileSignature', href: '/settings/devis', adminOnly: true },
     ],
@@ -38,7 +38,7 @@ export const MODULES = [
   {
     // Boutique en ligne : module activable depuis le 2026-11-21 (il était dans le socle).
     key: 'webshop',
-    label: 'Webshop',
+    label: 'Boutique',
     description: 'Commandes de la boutique en ligne, catalogue, livraisons.',
     tiles: [
       { key: 'webshop', title: 'Boutique', description: 'Livraison palette, secteurs, colis, adresses de la boutique', icon: 'ShoppingCart', href: '/settings/webshop', adminOnly: true },

@@ -21,6 +21,18 @@ const REMARQUES = {
   org_majordhome_introuvable: 'Organisation sans module Majord’home',
 };
 
+/**
+ * Erreur d'un passage, en une ligne : le message est parfois l'objet d'erreur entier (JSON, adresse de plusieurs
+ * Ko — recette 2026-11-24). Le texte complet reste dans l'infobulle.
+ */
+const erreurCourte = (erreur) => {
+  let texte = String(erreur || '');
+  try { texte = JSON.parse(texte)?.message || texte; } catch { /* texte brut */ }
+  if (/error sending request|fetch failed|network|http2/i.test(texte)) return 'Erreur réseau : passage interrompu, repris au suivant';
+  texte = texte.replace(/https?:\/\/\S+/g, '…');
+  return texte.length > 140 ? `${texte.slice(0, 140)}…` : texte;
+};
+
 const compterVerdict = (rapport, verdict) => (rapport?.journees || []).filter((j) => j.verdict === verdict).length;
 
 /** Colonnes par job : ce que chaque cron a fait, en chiffres. */
@@ -91,8 +103,8 @@ export function PlanificationJournal({ coreOrgId, job = 'tournees-figer' }) {
               <tr key={r.id} className="border-t border-secondary-100">
                 <td className="py-1">{formatDateTimeFR(r.ran_at)}{r.dry_run ? ' (essai)' : ''}</td>
                 {cfg.colonnes.map(([label, calcul]) => <td key={label} className="text-right">{calcul(r.rapport)}</td>)}
-                <td className="pl-3 text-xs text-secondary-500">
-                  {r.erreur || (r.rapport?.skipped ? (REMARQUES[r.rapport.skipped] || r.rapport.skipped) : (cfg.remarque?.(r.rapport) || ''))}
+                <td className="pl-3 text-xs text-secondary-500" title={r.erreur ? String(r.erreur).slice(0, 500) : undefined}>
+                  {(r.erreur && erreurCourte(r.erreur)) || (r.rapport?.skipped ? (REMARQUES[r.rapport.skipped] || r.rapport.skipped) : (cfg.remarque?.(r.rapport) || ''))}
                 </td>
               </tr>
             ))}
