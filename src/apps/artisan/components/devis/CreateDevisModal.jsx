@@ -141,6 +141,18 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const manques = manquesDevis({ subject: form.subject, lines });
   const [objetQuitte, setObjetQuitte] = useState(false);
   const erreurObjet = manques.objet && (objetQuitte || !manques.ligne) ? RAISONS_DEVIS.objet : null;
+  // La raison écrite à côté du bouton mène au champ qui manque (Eric 2026-11-24 : avec beaucoup de lignes, l'objet est
+  // hors de vue et le bouton grisé ne se comprenait pas).
+  const allerAuManque = () => {
+    if (manques.objet) {
+      setObjetQuitte(true);
+      const champ = document.getElementById('devis-objet');
+      champ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      champ?.focus({ preventScroll: true });
+    } else if (manques.ligne) {
+      document.getElementById('devis-lignes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // Changer d'installation ne jette plus aucune ligne (retour d'Eric 2026-10-25 : après un import d'offre, on ne pouvait
   // plus changer d'installation sans tout perdre) : les chapitres de la nouvelle installation remplacent les anciens et
@@ -248,7 +260,9 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
           <DevisEntete lead={lead} form={form} setField={setFieldSaisie} selectedFamily={selectedFamily} onSelectFamily={(f) => { setTouche(true); handleSelectFamily(f); }}
             templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={(t) => { setTouche(true); handleSelectTemplate(t); }}
             erreurObjet={erreurObjet} onObjetQuitte={() => setObjetQuitte(true)} familles={famillesActives(devisConfig).map((f) => f.label)} onImportOffre={() => setImportOffre(true)} />
-          <DevisStepLines orgId={orgId} lines={lines} setLines={setLinesSaisie} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} articles={articles} />
+          <div id="devis-lignes" className="scroll-mt-4">
+            <DevisStepLines orgId={orgId} lines={lines} setLines={setLinesSaisie} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} articles={articles} />
+          </div>
           {nbLignes > 0 && <DevisConditions form={form} setField={setFieldSaisie} lines={lines} devisConfig={devisConfig} />}
         </div>
         {/* Aperçu du devis tel que le client le recevra (même modèle que le PDF) : à droite sur grand écran */}
@@ -273,7 +287,15 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
             {nbLignes === 0 && <span className="text-xs text-secondary-400">Aucune ligne</span>}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {manques.raison && <span className="text-xs text-st-attente" role="status">{manques.raison}</span>}
+            {manques.raison && (
+              <span role="status">
+                <button type="button" onClick={allerAuManque}
+                  className="text-xs text-st-attente underline underline-offset-2 hover:text-secondary-900"
+                  title="Aller au champ à compléter">
+                  {manques.raison}
+                </button>
+              </span>
+            )}
             <button type="button" onClick={() => setApercuOuvert(true)} className="btn-secondary xl:hidden inline-flex items-center gap-1.5"><Eye className="w-4 h-4" aria-hidden="true" />Aperçu</button>
             <button type="button" onClick={demanderFermeture} className="btn-secondary">Annuler</button>
             <button type="button" onClick={handleCreate} disabled={isCreating || enregistrement || !!manques.raison} className="btn-primary">
