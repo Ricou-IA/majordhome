@@ -22,6 +22,7 @@ import { logger } from '@lib/logger';
 import SettingsPage from './SettingsPage';
 import { BarreEnregistrement } from './BarreEnregistrement';
 import { LignesSquelette } from '@/components/ui/squelette';
+import { cn } from '@/lib/utils';
 
 const TABS = [
   { key: 'calcul', label: 'Paramètres calcul', icon: Calculator },
@@ -191,7 +192,7 @@ function GrilleTab({ form, patch }) {
                 />
                 <input
                   type="number"
-                  className={`${inputClass} w-40`}
+                  className={cn(inputClass, 'w-40 shrink-0')}
                   value={row.prix_ttc ?? ''}
                   placeholder="Prix € TTC"
                   step={10}

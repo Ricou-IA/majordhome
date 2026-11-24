@@ -140,7 +140,7 @@ export default function ClimTab() {
           <Champ label="Vitrage protégé : part conservée (%)" hint="Volets ou stores extérieurs" error={errors.facteur_protection_solaire}>{num('facteur_protection_solaire', { min: 0, max: 100 })}</Champ>
           <Champ label="Sous toiture : majoration (%)" error={errors.sous_toiture_majoration}>{num('sous_toiture_majoration', { min: 0, max: 50 })}</Champ>
           <Champ label="Occupants inclus dans la base" error={errors.occupants_inclus}>{num('occupants_inclus', { min: 0, max: 10 })}</Champ>
-          <Champ label="W par occupant supplémentaire" error={errors.w_par_occupant_supplementaire}>{num('w_par_occupant_supplementaire', { min: 0, max: 300 })}</Champ>
+          <Champ label="Puissance par occupant supplémentaire (W)" error={errors.w_par_occupant_supplementaire}>{num('w_par_occupant_supplementaire', { min: 0, max: 300 })}</Champ>
         </div>
       </section>
       <section>
@@ -149,7 +149,7 @@ export default function ClimTab() {
           <Champ label="Gamme proposée par défaut" hint="Telle qu'elle est nommée dans le catalogue" error={errors.gamme_defaut}><input value={form.gamme_defaut} onChange={set('gamme_defaut')} className={INPUT_CLASS} /></Champ>
           <Champ label="Tolérance sous le besoin (%)" hint="Une unité à 95 % du besoin reste proposée" error={errors.tolerance_sous}>{num('tolerance_sous', { min: 0, max: 20 })}</Champ>
           <Champ label="Alerte surdimensionnement au-delà de (%)" error={errors.tolerance_sur}>{num('tolerance_sur', { min: 5, max: 100 })}</Champ>
-          <Champ label="Multi-split : Σ unités ≤ (%) du groupe" hint="130 % = ratio courant des constructeurs" error={errors.ratio_max_ui_ge}>{num('ratio_max_ui_ge', { min: 100, max: 200 })}</Champ>
+          <Champ label="Multi-split : somme des unités intérieures, au plus (%) du groupe" hint="130 % = ratio courant des constructeurs" error={errors.ratio_max_ui_ge}>{num('ratio_max_ui_ge', { min: 100, max: 200 })}</Champ>
           <Champ label="Contrôle volume : BTU par m³" error={errors.btu_par_m3}>{num('btu_par_m3', { min: 50, max: 200 })}</Champ>
           <Champ label="Contrôle volume : BTU par paroi vitrée" error={errors.btu_par_paroi_vitree}>{num('btu_par_paroi_vitree', { min: 0, max: 3000 })}</Champ>
         </div>

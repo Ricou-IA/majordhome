@@ -92,7 +92,7 @@ export default function LiaisonHesiasun({ formulaireModifie }) {
     return (
       <button type="button" onClick={() => setOuvert(true)} className="mt-4 flex items-center gap-2 text-sm text-secondary-600 hover:text-secondary-900">
         <Link2 className="w-4 h-4" />
-        Vous utilisez aussi HésiaSun ? Relier les deux comptes
+        Études solaires HésiaSun · Non connecté · Relier les deux comptes
         <ChevronDown className="w-4 h-4" />
       </button>
     );
@@ -105,8 +105,7 @@ export default function LiaisonHesiasun({ formulaireModifie }) {
     <div className="mt-4">
       <SettingsSurface>
         <SettingsSection
-          title="HésiaSun"
-          description="Votre identité se saisit une seule fois, ici : elle est envoyée à HésiaSun à chaque enregistrement."
+          title={`Études solaires HésiaSun · ${etat?.ouverte ? 'Connecté' : 'Non connecté'}`}
         >
           {!etat && (
             <div className="space-y-3">

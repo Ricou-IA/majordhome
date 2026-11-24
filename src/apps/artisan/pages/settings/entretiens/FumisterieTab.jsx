@@ -156,7 +156,7 @@ export default function FumisterieTab() {
         <div className="grid sm:grid-cols-3 gap-4">
           <Champ label="Au-dessus du faîtage (cm)" hint="De 10 à 200" error={errors.zone1_pente_cm}><input type="number" min={10} max={200} value={form.zone1_pente_cm} onChange={set('zone1_pente_cm')} className={INPUT_CLASS} /></Champ>
           <Champ label="Au-dessus d'un toit plat (cm)" hint="De 50 à 300" error={errors.zone1_plat_cm}><input type="number" min={50} max={300} value={form.zone1_plat_cm} onChange={set('zone1_plat_cm')} className={INPUT_CLASS} /></Champ>
-          <Champ label="Pente traitée comme toit plat (≤ °)" hint="De 0 à 30" error={errors.zone1_pente_plat_deg}><input type="number" min={0} max={30} value={form.zone1_pente_plat_deg} onChange={set('zone1_pente_plat_deg')} className={INPUT_CLASS} /></Champ>
+          <Champ label="Pente traitée comme toit plat, jusqu’à (degrés)" hint="De 0 à 30" error={errors.zone1_pente_plat_deg}><input type="number" min={0} max={30} value={form.zone1_pente_plat_deg} onChange={set('zone1_pente_plat_deg')} className={INPUT_CLASS} /></Champ>
         </div>
       </section>
       <section>

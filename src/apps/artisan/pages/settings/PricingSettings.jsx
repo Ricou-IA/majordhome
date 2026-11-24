@@ -242,13 +242,13 @@ function ZoneModal({ zone, nextSortOrder, onClose, onSave, isSaving }) {
           <TextInput value={form.departments} onChange={(v) => set('departments', v)} placeholder="81, 82, 31" />
         </FormField>
         <div className="grid grid-cols-3 gap-3">
-          <FormField label="Supplément €">
+          <FormField label="Supplément (€)">
             <TextInput value={form.supplement} onChange={(v) => set('supplement', v)} type="number" step="0.01" min="0" />
           </FormField>
-          <FormField label="Trajet min">
+          <FormField label="Trajet minimum (min)">
             <TextInput value={form.min_driving_minutes} onChange={(v) => set('min_driving_minutes', v)} type="number" min="0" />
           </FormField>
-          <FormField label="Trajet max">
+          <FormField label="Trajet maximum (min)">
             <TextInput value={form.max_driving_minutes} onChange={(v) => set('max_driving_minutes', v)} type="number" min="0" />
           </FormField>
         </div>
@@ -549,7 +549,7 @@ function DiscountModal({ discount, onClose, onSave, isSaving }) {
           <FormField label="Seuil équipements" required>
             <TextInput value={form.min_equipments} onChange={(v) => set('min_equipments', v)} type="number" min="1" />
           </FormField>
-          <FormField label="Remise %" required>
+          <FormField label="Remise (%)" required>
             <TextInput value={form.discount_percent} onChange={(v) => set('discount_percent', v)} type="number" step="0.5" min="0" max="100" />
           </FormField>
         </div>

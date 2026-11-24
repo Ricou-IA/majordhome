@@ -13,6 +13,7 @@ import { FormField, SectionTitle, inputClass } from '../../components/FormFields
 import SettingsPage from './SettingsPage';
 import { BarreEnregistrement } from './BarreEnregistrement';
 import { LignesSquelette } from '@/components/ui/squelette';
+import { cn } from '@/lib/utils';
 
 const TABS = [
   { key: 'temperatures', label: 'Températures', icon: Thermometer },
@@ -115,10 +116,10 @@ function TemperaturesTab({ form, patchTheta }) {
       <div className="divide-y divide-secondary-100">
         {TYPES_PIECE.map((type) => (
           <div key={type.id} className="flex items-center gap-3 py-2">
-            <span className="flex-1 text-sm text-secondary-700">{type.label}</span>
+            <span className="min-w-0 flex-1 text-sm text-secondary-700">{type.label}</span>
             <input
               type="number"
-              className={`${inputClass} w-28`}
+              className={cn(inputClass, 'w-28 shrink-0')}
               value={form.theta_int_defauts[type.id] ?? ''}
               step={0.5}
               min={BOUNDS.theta_int.min}
