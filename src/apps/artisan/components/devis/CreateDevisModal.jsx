@@ -141,8 +141,10 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const manques = manquesDevis({ subject: form.subject, lines });
   const [objetQuitte, setObjetQuitte] = useState(false);
   const erreurObjet = manques.objet && (objetQuitte || !manques.ligne) ? RAISONS_DEVIS.objet : null;
-  // La raison écrite à côté du bouton mène au champ qui manque (Eric 2026-11-24 : avec beaucoup de lignes, l'objet est
-  // hors de vue et le bouton grisé ne se comprenait pas).
+  // « Créer le devis » reste actif (Eric 2026-11-24 : un bouton grisé ne se comprenait pas, l'objet étant hors de vue
+  // après un import d'offre) : un clic avec un manque ouvre une fenêtre qui le dit, et la fermer mène au champ. La raison
+  // écrite à côté du bouton y mène aussi.
+  const [manqueOuvert, setManqueOuvert] = useState(false);
   const allerAuManque = () => {
     if (manques.objet) {
       setObjetQuitte(true);
@@ -206,7 +208,12 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   };
 
   const handleCreate = async () => {
-    if (manques.raison) { toast.error(manques.raison); return; }
+    if (manques.raison) {
+      // Le champ prend le focus AVANT l'ouverture : la fenêtre le lui rendra en se fermant (au lieu du bouton).
+      if (manques.objet) { setObjetQuitte(true); document.getElementById('devis-objet')?.focus({ preventScroll: true }); }
+      setManqueOuvert(true);
+      return;
+    }
     // Article non chargé / supprimé : la ligne garde ses caractéristiques déjà figées, on prévient sans bloquer le devis
     const nonResolues = lignesNonResolues(lines, articles);
     if (nonResolues > 0) toast.warning(`Caractéristiques non actualisées pour ${nonResolues} ligne${nonResolues > 1 ? 's' : ''}`);
@@ -298,7 +305,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
             )}
             <button type="button" onClick={() => setApercuOuvert(true)} className="btn-secondary xl:hidden inline-flex items-center gap-1.5"><Eye className="w-4 h-4" aria-hidden="true" />Aperçu</button>
             <button type="button" onClick={demanderFermeture} className="btn-secondary">Annuler</button>
-            <button type="button" onClick={handleCreate} disabled={isCreating || enregistrement || !!manques.raison} className="btn-primary">
+            <button type="button" onClick={handleCreate} disabled={isCreating || enregistrement} className="btn-primary">
               {(isCreating || enregistrement) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{edition ? 'Enregistrer les modifications' : 'Créer le devis'}
             </button>
           </div>
@@ -317,6 +324,18 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
         </CalqueModal>
       )}
 
+      <ConfirmDialog
+        open={manqueOuvert}
+        onOpenChange={(o) => { setManqueOuvert(o); if (!o) allerAuManque(); }}
+        title={manques.objet ? 'Renseigner le titre du devis' : 'Ajouter une ligne chiffrée'}
+        description={manques.objet
+          ? 'Le devis ne peut pas être créé sans objet : c’est son titre, celui que lit le client. Saisissez-le en haut de la fenêtre.'
+          : 'Le devis doit contenir au moins une ligne avec une désignation et un montant HT supérieur à 0.'}
+        confirmLabel={manques.objet ? 'Renseigner le titre' : 'Voir les lignes'}
+        cancelLabel="Fermer"
+        variant="default"
+        onConfirm={() => { setManqueOuvert(false); allerAuManque(); }}
+      />
       <ConfirmDialog
         open={confirmerAbandon}
         onOpenChange={setConfirmerAbandon}
