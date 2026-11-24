@@ -8,6 +8,7 @@
 
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { formatEuro } from '@/lib/utils';
+import { LIBELLES_DOCUMENT } from '@/lib/catalogue/offreFournisseur.js';
 
 const dateFr = (iso) => (iso ? iso.split('-').reverse().join('/') : '—');
 
@@ -17,7 +18,7 @@ export default function OffreEntete({ lecture }) {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-secondary-700">
-        <span>Offre de <b>{offre.fournisseur?.nom || 'fournisseur non lu'}</b></span>
+        <span>{LIBELLES_DOCUMENT[offre.type] || 'Offre'} de <b>{offre.fournisseur?.nom || 'fournisseur non lu'}</b></span>
         <span>n° <b>{offre.numero || '—'}</b></span>
         <span>du {dateFr(offre.date)}</span>
         {offre.validite && <span>valable jusqu&apos;au {dateFr(offre.validite)}</span>}
@@ -26,7 +27,7 @@ export default function OffreEntete({ lecture }) {
       </div>
       {controle?.total_verifie && (
         <p className="flex items-center gap-1.5 text-xs text-secondary-500">
-          <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" /> La somme des lignes retombe sur le total de l&apos;offre.
+          <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" /> La somme des lignes retombe sur le total du document.
         </p>
       )}
       {alertes.length > 0 && (

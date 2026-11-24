@@ -99,7 +99,7 @@ export const suppliersService = {
   // FOURNISSEURS — ÉCRITURE
   // ==========================================================================
 
-  async createSupplier({ orgId, name, contactName, contactEmail, contactPhone, address, postalCode, city, siret, notes, connector, siteUrl, connectorConfig }) {
+  async createSupplier({ orgId, name, contactName, contactEmail, contactPhone, address, postalCode, city, siret, notes, connector, siteUrl, connectorConfig, customerAccount }) {
     try {
       if (!orgId || !name) throw new Error('[suppliersService] orgId et name requis');
 
@@ -118,6 +118,7 @@ export const suppliersService = {
           notes: notes || null,
           connector: connector || null,
           site_url: siteUrl?.trim() || null,
+          customer_account: customerAccount?.trim() || null,
           connector_config: connectorConfig && typeof connectorConfig === 'object' ? connectorConfig : {},
         })
         .select()
@@ -147,6 +148,7 @@ export const suppliersService = {
       if (updates.notes !== undefined) updateData.notes = updates.notes || null;
       if (updates.connector !== undefined) updateData.connector = updates.connector || null;
       if (updates.siteUrl !== undefined) updateData.site_url = updates.siteUrl?.trim() || null;
+      if (updates.customerAccount !== undefined) updateData.customer_account = updates.customerAccount?.trim() || null;
       if (updates.connectorConfig !== undefined) updateData.connector_config = updates.connectorConfig && typeof updates.connectorConfig === 'object' ? updates.connectorConfig : {};
       if (updates.categoryMapping !== undefined) updateData.category_mapping = updates.categoryMapping && typeof updates.categoryMapping === 'object' ? updates.categoryMapping : {};
       if (updates.autoSync !== undefined) updateData.auto_sync = updates.autoSync === true;
@@ -182,7 +184,7 @@ export const suppliersService = {
   async setConnectorCredentials(orgId, supplierId, { email, password }) {
     try {
       if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
-      if (!email?.trim() || !password) throw new Error('E-mail et mot de passe requis');
+      if (!email?.trim() || !password) throw new Error('Identifiant et mot de passe requis');
       const { error } = await supabase.rpc('org_secret_set', {
         p_org_id: orgId,
         p_key: this.connectorSecretKey(supplierId),
@@ -192,6 +194,23 @@ export const suppliersService = {
       return { data: true, error: null };
     } catch (error) {
       logger.error('[suppliersService] setConnectorCredentials:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Relit l'identifiant et le mot de passe du compte fournisseur (recueil des accès) — org_admin actif seul, vérifié en
+   * base (RPC supplier_credentials_reveal, ce fournisseur de cette organisation seulement). `null` si rien n'est
+   * enregistré. La valeur n'est jamais mise en cache : l'écran la garde le temps de l'afficher.
+   */
+  async revealCredentials(orgId, supplierId) {
+    try {
+      if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
+      const { data, error } = await supabase.rpc('supplier_credentials_reveal', { p_org_id: orgId, p_supplier_id: supplierId });
+      if (error) throw error;
+      return { data: data ? { identifiant: data.identifiant || '', motDePasse: data.mot_de_passe || '' } : null, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] revealCredentials:', error);
       return { data: null, error };
     }
   },

@@ -89,3 +89,16 @@ test('codes du relevé public : https, adresse publique, redirection — libell�
   }
   assert.equal(libelleResultat({ ok: false, code: 'site_non_https', at }), "Échec du relevé du 24/10/2026 : l'adresse du site doit commencer par https://");
 });
+
+test('dernière mise à jour : date et heure, retard du relevé de nuit au-delà de 36 h (Eric 2026-11-24)', async () => {
+  const { etatDerniereMiseAJour } = await import('../../src/lib/catalogue/syncResult.js');
+  const r = { ok: true, at: '2026-11-24T04:02:00.000Z' };
+  const e = etatDerniereMiseAJour(r, { autoSync: true, maintenant: new Date('2026-11-24T10:00:00Z') });
+  assert.match(e.texte, /^Dernière mise à jour le 24\/11\/2026 à \d{2}:02$/);
+  assert.equal(e.retard, false);
+  assert.equal(etatDerniereMiseAJour(r, { autoSync: true, maintenant: new Date('2026-11-25T17:00:00Z') }).retard, true);
+  assert.equal(etatDerniereMiseAJour(r, { autoSync: false, maintenant: new Date('2026-12-25T17:00:00Z') }).retard, false);
+  // un échec n'est pas une mise à jour
+  assert.equal(etatDerniereMiseAJour({ ok: false, at: '2026-11-24T04:02:00Z', code: 'x' }, { autoSync: true }).retard, true);
+  assert.equal(etatDerniereMiseAJour(null).texte, 'Aucune mise à jour réussie pour l\'instant');
+});

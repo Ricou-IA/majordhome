@@ -37,6 +37,8 @@ import ProductReleveBlock from './product-detail/ProductReleveBlock';
 import ProductArticleBlock from './product-detail/ProductArticleBlock';
 import ArticleDrawer from './catalogue/ArticleDrawer';
 import { useCanAccess } from '@hooks/usePermissions';
+import { useCatalogItem } from '@hooks/useCatalogItems';
+import { photoDeLigne } from '@/lib/catalogue/articleLigne.js';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supplierKeys } from '@hooks/cacheKeys';
@@ -154,6 +156,10 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
   // Champs humains (libellé, marque, catégorie, gamme, prix de vente) : portés par l'article Majord'home dès que la
   // ligne y est rattachée — ils se corrigent sur la fiche article, plus ici (spec articles § 5.6 / § 9).
   const verrouArticle = !!product?.catalog_item_id;
+  // Photo affichée = même règle que la vignette de la liste (photoDeLigne) : celle de la ligne, sinon celle de son
+  // article (2026-11-24 : la liste montrait la photo de l'article, la fiche restait vide).
+  const { item: article } = useCatalogItem(orgId, product?.catalog_item_id);
+  const photo = photoDeLigne(product, article);
   // « Enrichir web » : l'enrichissement appartient à l'ARTICLE (photo, fiche technique, caractéristiques lues par le
   // devis). Le bouton ouvre donc la fiche article sur sa fenêtre d'enrichissement ; il dit pourquoi quand il est fermé.
   const enrichirFerme = !product?.catalog_item_id
@@ -178,8 +184,8 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
         {/* Header */}
         <div className="flex items-center gap-4 px-6 py-4 border-b border-secondary-200 bg-white">
           <div className="w-14 h-14 rounded-lg bg-secondary-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
-            {product?.image_url ? (
-              <img src={product.image_url} alt="" className="w-full h-full object-cover" />
+            {photo ? (
+              <img src={photo} alt="" className="w-full h-full object-cover" />
             ) : (
               <ImageIcon className="w-6 h-6 text-secondary-300" />
             )}
@@ -398,7 +404,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
             {/* --------- Tab Photo --------- */}
             <TabsContent value="image" className="flex-1 overflow-y-auto px-6 py-5 m-0">
               <div className="max-w-lg mx-auto">
-                <ProductImageSection product={product} orgId={orgId} supplierId={supplierId} />
+                <ProductImageSection product={product} orgId={orgId} supplierId={supplierId} photoArticle={article?.image_url || null} />
               </div>
             </TabsContent>
 

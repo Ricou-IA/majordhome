@@ -4,6 +4,8 @@
  * - Drop zone drag&drop + input file
  * - Preview avec bouton supprimer
  * - Gère aussi les image_url externes (scrapées) avec badge "Image externe"
+ * - Ligne sans photo propre : montre celle de son article Majord'home (même règle que la vignette de la liste,
+ *   photoDeLigne) en le disant ; déposer une image ici en donne une à CETTE ligne seulement.
  * ============================================================================
  */
 
@@ -12,7 +14,7 @@ import { Upload, Image as ImageIcon, Trash2, Loader2, ExternalLink } from 'lucid
 import { toast } from 'sonner';
 import { useProductImageMutations } from '@hooks/useSuppliers';
 
-export default function ProductImageSection({ product, orgId, supplierId }) {
+export default function ProductImageSection({ product, orgId, supplierId, photoArticle = null }) {
   const { uploadImage, clearImage, isUploading, isClearing } = useProductImageMutations(
     orgId,
     product?.id,
@@ -23,6 +25,7 @@ export default function ProductImageSection({ product, orgId, supplierId }) {
 
   const hasImage = !!product?.image_url;
   const isExternalImage = !!product?.image_source_url;
+  const photoHeritee = !hasImage && photoArticle ? photoArticle : null;
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -75,7 +78,21 @@ export default function ProductImageSection({ product, orgId, supplierId }) {
         className="hidden"
       />
 
-      {hasImage ? (
+      {photoHeritee ? (
+        <div className="space-y-2">
+          <div className="aspect-[4/3] rounded-lg overflow-hidden bg-secondary-50 border border-secondary-200">
+            <img src={photoHeritee} alt={product?.name || ''} className="w-full h-full object-contain"
+              onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+          </div>
+          <p className="text-xs text-secondary-500">
+            Photo de l&apos;article Majord&apos;home, partagée par tous ses fournisseurs : elle se change sur la fiche de l&apos;article.
+          </p>
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="btn-secondary btn-sm">
+            {isUploading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
+            Mettre une photo propre à cette ligne
+          </button>
+        </div>
+      ) : hasImage ? (
         <div className="relative group">
           <div className="aspect-[4/3] rounded-lg overflow-hidden bg-secondary-50 border border-secondary-200">
             <img

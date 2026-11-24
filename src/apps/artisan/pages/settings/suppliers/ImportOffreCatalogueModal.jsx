@@ -1,9 +1,9 @@
 /**
- * ImportOffreCatalogueModal.jsx — « Importer une offre » sur la fiche d'un fournisseur (page Fournisseurs ; l'écriture exige articles.edit côté edge)
+ * ImportOffreCatalogueModal.jsx — « Importer un devis ou une facture » sur la fiche d'un fournisseur (page Fournisseurs ; l'écriture exige articles.edit côté edge)
  * ============================================================================
  * Demande d'Eric (2026-10-25) : mettre à jour la base d'articles depuis une offre de prix PDF — références nouvelles
  * créées, prix d'achat des existantes mis à jour — avec un écran de validation avant écriture. Écriture par l'écrivain
- * unique supplier_catalog_upsert (edge supplier-offer-import, apply, desactiver_absents = false : les articles absents
+ * unique supplier_catalog_upsert (étendu aux devis et factures le 2026-11-24 ; un avoir est lu mais bloqué) (edge supplier-offer-import, apply, desactiver_absents = false : les articles absents
  * de l'offre ne bougent pas ; libellé, prix de vente et nature d'une ligne existante non plus). Une ligne créée reçoit
  * son article Majord'home de la base (rattachement franc ou création) ; l'admin peut la rattacher à un article choisi
  * parmi les suggestions (catalog_item_attach, après l'écriture). Un prix connu plus récent que l'offre est décoché.
@@ -129,7 +129,7 @@ export default function ImportOffreCatalogueModal({ supplier, orgId, onClose }) 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[92vh] flex flex-col m-4">
         <div className="flex items-center justify-between px-5 py-3 border-b">
-          <h3 className="text-base font-semibold text-secondary-900">Importer une offre de prix · {supplier.name}</h3>
+          <h3 className="text-base font-semibold text-secondary-900">Importer un devis ou une facture · {supplier.name}</h3>
           <button onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer"><X className="w-5 h-5 text-secondary-500" /></button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
@@ -139,7 +139,7 @@ export default function ImportOffreCatalogueModal({ supplier, orgId, onClose }) 
               {autreFournisseur && (
                 <p className="flex gap-1.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  L&apos;offre semble venir de « {nomLu} », pas de « {supplier.name} » : vérifiez avant d&apos;écrire dans ce catalogue.
+                  Le document semble venir de « {nomLu} », pas de « {supplier.name} » : vérifiez avant d&apos;écrire dans ce catalogue.
                 </p>
               )}
               {error && <p className="text-sm text-red-600">Rapprochement impossible : {error.message}</p>}
@@ -149,7 +149,7 @@ export default function ImportOffreCatalogueModal({ supplier, orgId, onClose }) 
               ) : (
                 <div className="space-y-1.5">
                   <div className={`${GRILLE} px-3 text-[11px] font-medium uppercase tracking-wider text-secondary-400`}>
-                    <span className="w-3.5" /><span>Ligne de l&apos;offre</span><span>Nature</span><span>Prix d&apos;achat</span><span>Article</span>
+                    <span className="w-3.5" /><span>Ligne du document</span><span>Nature</span><span>Prix d&apos;achat</span><span>Article</span>
                   </div>
                   {lignes.map((l, i) => (
                     <LigneCatalogue key={`${l.rang}-${i}`} ligne={l} rap={rapprochements[i]} action={actions[i]} etat={etats[i]}
@@ -162,7 +162,7 @@ export default function ImportOffreCatalogueModal({ supplier, orgId, onClose }) 
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-t bg-secondary-50 rounded-b-xl">
           <p className="text-xs text-secondary-500 max-w-xl">
-            Prix d&apos;achat = prix net de l&apos;offre, éco-participation exclue, daté de l&apos;offre. Les articles absents de l&apos;offre ne sont pas touchés ; le libellé, la nature et le prix de vente d&apos;une référence existante non plus.
+            Prix d&apos;achat = prix net du document, éco-participation exclue, daté du document. Les articles absents du document ne sont pas touchés ; le libellé, la nature et le prix de vente d&apos;une référence existante non plus.
           </p>
           <div className="flex gap-2">
             {lecture && <button type="button" onClick={() => { setLecture(null); setEtats([]); fait.current = false; }} className="btn-secondary btn-sm">Autre fichier</button>}

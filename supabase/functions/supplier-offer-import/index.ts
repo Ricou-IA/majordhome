@@ -1,14 +1,15 @@
 // supabase/functions/supplier-offer-import/index.ts
 // ============================================================================
-// supplier-offer-import — offre de prix fournisseur (PDF) lue par l'IA, puis écrite au catalogue du fournisseur
-// (demande d'Eric, 2026-10-25 : « certains devis dépendent du dimensionnement fait par le fournisseur »)
+// supplier-offer-import — offre de prix, devis ou facture fournisseur (PDF) lu par l'IA, puis écrit au catalogue du
+// fournisseur (demande d'Eric, 2026-10-25 : « certains devis dépendent du dimensionnement fait par le fournisseur » ;
+// factures le 2026-11-24 : le prix net facturé est le prix d'achat réel ; un avoir est lu mais jamais écrit)
 // ============================================================================
 // verify_jwt:true + requireOrgMembership. Deux actions, rien n'est écrit sans validation humaine :
 //   - extract : { org_id, pdf_base64, file_name? } — tout membre de l'org (création de devis). Claude lit le PDF
 //     (bloc document : texte ET image des pages, un scan passe aussi) avec un format de sortie STRICT
 //     (structured outputs, SCHEMA_OFFRE) ; la réponse est relue de façon tolérante et contrôlée (montants, total)
 //     par le module pur _shared/catalogue/offreFournisseur.js (copie de src/lib/catalogue). N'écrit RIEN.
-//   - apply : { org_id, supplier_id, offre: { numero, date }, lignes } — droit articles.edit (RPC user_can). Lignes validées à l'écran →
+//   - apply : { org_id, supplier_id, offre: { type, numero, date }, lignes } — droit articles.edit (RPC user_can). Lignes validées à l'écran →
 //     public.supplier_catalog_upsert (écrivain unique, service_role) avec p_meta.desactiver_absents = false (une
 //     offre ne liste que quelques articles) : références nouvelles créées (article Majord'home posé par
 //     catalog_items_ensure), prix d'achat des existantes mis à jour, champs humains jamais touchés. Répond les
@@ -123,8 +124,9 @@ Deno.serve(async (req) => {
     if (!brutes.length || brutes.length > LIGNES_MAX) return jsonResponse({ error: `entre 1 et ${LIGNES_MAX} lignes` }, 400, req);
     const o = (body.offre && typeof body.offre === "object") ? body.offre as Record<string, unknown> : {};
     // relecture des lignes envoyées par l'écran : mêmes règles que la lecture de l'IA (types, libellés)
-    const lues = lireOffre({ numero: o.numero, date: o.date, lignes: brutes });
-    const offre = { numero: lues.numero, date: lues.date };
+    const lues = lireOffre({ type_document: o.type, numero: o.numero, date: o.date, lignes: brutes });
+    const offre = { type: lues.type, numero: lues.numero, date: lues.date };
+    if (offre.type === "avoir") return jsonResponse({ error: "un avoir ne donne pas de prix d'achat : rien n'est écrit" }, 400, req);
 
     // client au jeton de l'utilisateur : lectures sous RLS (fournisseur et lignes de l'org)
     const user = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -143,7 +145,7 @@ Deno.serve(async (req) => {
     const admin = getAdminClient();
     const { data: resultat, error: errUp } = await admin.rpc("supplier_catalog_upsert", {
       p_org_id: orgId, p_supplier_id: supplierId, p_source_version: version, p_rows: lignes,
-      p_meta: { desactiver_absents: false, source: "offre_fournisseur", offre_numero: offre.numero },
+      p_meta: { desactiver_absents: false, source: offre.type === "facture" ? "facture_fournisseur" : "offre_fournisseur", offre_numero: offre.numero, type_document: offre.type },
     });
     if (errUp) {
       const code = Object.keys(ERREURS_RPC).find((k) => errUp.message?.includes(k));

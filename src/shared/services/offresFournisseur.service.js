@@ -1,7 +1,7 @@
 /**
  * offresFournisseur.service.js — Offre de prix fournisseur (PDF) importée dans un devis ou au catalogue
  * ============================================================================
- * Demande d'Eric (2026-10-25). Lecture du PDF et écriture au catalogue : edge `supplier-offer-import`
+ * Demande d'Eric (2026-10-25), étendue aux devis et factures du fournisseur (2026-11-24). Lecture du PDF et écriture au catalogue : edge `supplier-offer-import`
  * (extract : tout membre ; apply : org_admin, via l'écrivain unique supplier_catalog_upsert). Rapprochement : lectures
  * sous RLS (lignes du fournisseur aux références de l'offre, articles candidats) ; le classement est fait par le
  * module pur src/lib/catalogue/offreRapprochement.js. Retour : toujours { data, error }, jamais throw au caller.
@@ -68,7 +68,7 @@ export const offresFournisseurService = {
    */
   async appliquer(orgId, supplierId, offre, lignes) {
     if (!orgId || !supplierId || !lignes?.length) return { data: null, error: new Error('[offresFournisseurService] fournisseur et lignes requis') };
-    return appel({ action: 'apply', org_id: orgId, supplier_id: supplierId, offre: { numero: offre?.numero ?? null, date: offre?.date ?? null }, lignes }, 'appliquer');
+    return appel({ action: 'apply', org_id: orgId, supplier_id: supplierId, offre: { type: offre?.type ?? null, numero: offre?.numero ?? null, date: offre?.date ?? null }, lignes }, 'appliquer');
   },
 
   /**

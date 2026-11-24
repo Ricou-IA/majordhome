@@ -82,3 +82,25 @@ export function libelleResultat(result) {
   if (n(result.desactives) > 0) parts.push(`${n(result.desactives)} désactivé${n(result.desactives) > 1 ? 's' : ''}`);
   return `Relevé${du} : ${parts.join(', ')}`;
 }
+
+/** Au-delà, un relevé de nuit est « en retard » (cron quotidien à 04:00 UTC, plus une marge pour un échec isolé). */
+export const RETARD_RELEVE_NUIT_HEURES = 36;
+
+/**
+ * État du relevé automatique, à côté de la coche « Relevé automatique chaque nuit » (Eric 2026-11-24 : « rien ne dit
+ * la dernière mise à jour »). Date ET heure (locales) du dernier relevé RÉUSSI ; `retard` quand la coche est posée et
+ * qu'aucun relevé n'a réussi depuis RETARD_RELEVE_NUIT_HEURES (le cron ne passe pas, ou échoue chaque nuit).
+ * @param {{ ok?: boolean, at?: string } | null | undefined} result dernier relevé réussi (catalog_sync_result)
+ * @param {{ autoSync?: boolean, maintenant?: Date }} [opts]
+ * @returns {{ texte: string, retard: boolean }}
+ */
+export function etatDerniereMiseAJour(result, { autoSync = false, maintenant = new Date() } = {}) {
+  const d = result && result.ok === true && result.at ? new Date(result.at) : null;
+  if (!d || Number.isNaN(d.getTime())) {
+    return { texte: 'Aucune mise à jour réussie pour l\'instant', retard: !!autoSync };
+  }
+  const p = (n) => String(n).padStart(2, '0');
+  const texte = `Dernière mise à jour le ${dateCourte(result.at)} à ${p(d.getHours())}:${p(d.getMinutes())}`;
+  const retard = !!autoSync && (maintenant.getTime() - d.getTime()) > RETARD_RELEVE_NUIT_HEURES * 3600 * 1000;
+  return { texte, retard };
+}

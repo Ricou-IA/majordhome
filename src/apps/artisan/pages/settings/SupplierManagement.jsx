@@ -42,6 +42,7 @@ import ProductDetailDrawer from './ProductDetailDrawer';
 import CatalogConnectorPanel from './suppliers/CatalogConnectorPanel';
 import CataloguePiecesPublicFields from './suppliers/CataloguePiecesPublicFields';
 import ImportOffreCatalogueModal from './suppliers/ImportOffreCatalogueModal';
+import AccesCompteFournisseur from './suppliers/AccesCompteFournisseur';
 import { useCatalogItemsResume } from '@hooks/useCatalogItems';
 import { photoDeLigne, autresFournisseurs } from '@/lib/catalogue/articleLigne.js';
 import { logger } from '@lib/logger';
@@ -60,7 +61,7 @@ const CONNECTOR_OPTIONS = [
 const SUITECOMMERCE_DEFAUTS = { sca_path: '/sca-lux-2019-2', site_id: '6376560' };
 
 function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
-  const { profile, user } = useAuth();
+  const { profile, user, organization, isOrgAdmin } = useAuth();
   const configPublique = configCataloguePieces(supplier?.connector_config);
   const [form, setForm] = useState({
     name: supplier?.name || '',
@@ -71,6 +72,7 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
     postalCode: supplier?.postal_code || '',
     city: supplier?.city || '',
     siret: supplier?.siret || '',
+    customerAccount: supplier?.customer_account || '',
     notes: supplier?.notes || '',
     connector: supplier?.connector || '',
     siteUrl: supplier?.site_url || '',
@@ -171,6 +173,14 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
               <TextInput value={form.siret} onChange={(v) => setField('siret', v)} placeholder="123 456 789 00012" />
             </FormField>
 
+            <SectionTitle>Notre compte chez ce fournisseur</SectionTitle>
+            <FormField label="N° de compte client">
+              <TextInput value={form.customerAccount} onChange={(v) => setField('customerAccount', v)} placeholder="Numéro de l'entreprise chez ce fournisseur" maxLength={60} />
+            </FormField>
+            {isOrgAdmin && (supplier
+              ? <AccesCompteFournisseur orgId={organization?.id} supplier={supplier} />
+              : <p className="text-xs text-secondary-400">Identifiant et mot de passe du compte en ligne : à renseigner une fois le fournisseur créé.</p>)}
+
             <FormField label="Notes">
               <TextArea value={form.notes} onChange={(v) => setField('notes', v)} rows={2} />
             </FormField>
@@ -199,7 +209,7 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
               </div>
             )}
             {form.connector && (
-              <p className="text-xs text-secondary-400">Les identifiants du compte, le relevé et la correspondance des rayons se règlent ensuite dans le catalogue du fournisseur (panneau « Connexion catalogue »).</p>
+              <p className="text-xs text-secondary-400">Le relevé utilise les accès au compte en ligne ci-dessus ; relevé et correspondance des rayons se règlent dans le catalogue du fournisseur (panneau « Connexion catalogue »).</p>
             )}
 
             {estWoo && <CataloguePiecesPublicFields form={form} setField={setField} accord={configPublique.accord} />}
@@ -693,6 +703,7 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
           <p className="text-sm text-secondary-500 truncate">
             {[
               `${totalCount} produit${totalCount !== 1 ? 's' : ''}`,
+              supplier.customer_account ? `compte client ${supplier.customer_account}` : null,
               supplier.contact_name,
               supplier.contact_phone,
               supplier.contact_email,
@@ -701,7 +712,7 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={onEditSupplier} className="btn-secondary btn-sm" title="Nom, contact, adresse, notes, connexion catalogue">
+          <button onClick={onEditSupplier} className="btn-secondary btn-sm" title="Nom, contact, adresse, compte client, accès au compte en ligne, connexion catalogue">
             <Pencil className="w-4 h-4 mr-1" />
             Fiche fournisseur
           </button>
@@ -721,9 +732,9 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
             {importing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
             Import Excel
           </button>
-          <button onClick={() => setImportOffre(true)} className="btn-secondary btn-sm" title="Créer les références et mettre à jour les prix d'achat depuis une offre de prix PDF">
+          <button onClick={() => setImportOffre(true)} className="btn-secondary btn-sm" title="Créer les références et mettre à jour les prix d'achat depuis le PDF d'une offre, d'un devis ou d'une facture du fournisseur">
             <FileUp className="w-4 h-4 mr-1" />
-            Importer une offre
+            Importer un devis ou une facture
           </button>
           <button onClick={() => { setEditProduct(null); setShowModal(true); }} className="btn-primary btn-sm">
             <Plus className="w-4 h-4 mr-1" />

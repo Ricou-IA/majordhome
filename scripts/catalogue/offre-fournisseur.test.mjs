@@ -292,3 +292,23 @@ test('chapitres : sans chapitre acceptable ⇒ un chapitre de secours en fin de 
   const vide = insererLignesOffre([], [{ line: { designation: 'UE' }, nature: 'main' }], { typeDe, titreSecours: 'FOURNITURES' });
   assert.deepEqual(vide.map((l) => l.designation), ['FOURNITURES', 'UE']);
 });
+
+test('type de document : offre par défaut, facture et devis reconnus, avoir lu mais bloqué (Eric 2026-11-24)', () => {
+  assert.ok(SCHEMA_OFFRE.properties.type_document.enum.includes('facture'));
+  assert.match(construirePromptOffre(), /facture/);
+  assert.equal(offre.type, 'offre', 'fixture sans type ⇒ offre');
+  assert.equal(lireOffre({ type_document: 'inconnu', lignes: [] }).type, 'offre');
+  const facture = lireOffre({ ...brut, type_document: 'facture', numero: 'FA-912' });
+  assert.equal(facture.type, 'facture');
+  assert.deepEqual(controlerOffre(facture).alertes.map((a) => a.code), []);
+  assert.equal(versionOffre(facture, 'TEREVA'), 'facture_tereva_fa-912_2026-10-19');
+  assert.equal(versionOffre({ ...facture, type: 'devis' }, 'TEREVA'), 'offre_tereva_fa-912_2026-10-19');
+  const { lignes } = lignesCatalogueDepuisOffre(facture, facture.lignes, { version: 'v' });
+  assert.equal(lignes[0].specs.canonical.derniere_offre.type, 'facture');
+  assert.equal(lignes[0].specs.canonical.derniere_facture, undefined, 'clé des factures Pennylane non touchée');
+  const avoir = lireOffre({ ...brut, type_document: 'avoir' });
+  assert.ok(controlerOffre(avoir).alertes.some((a) => a.code === 'avoir' && a.bloquante));
+  const r = lignesCatalogueDepuisOffre(avoir, avoir.lignes, { version: 'v' });
+  assert.equal(r.lignes.length, 0);
+  assert.equal(r.ecartees.length, 1);
+});

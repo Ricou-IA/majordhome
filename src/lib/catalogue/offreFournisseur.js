@@ -1,7 +1,9 @@
 // src/lib/catalogue/offreFournisseur.js
-// Import d'une offre de prix fournisseur (PDF lu par l'IA) — module PUR, copié pour l'edge supplier-offer-import par
-// `npm run sync:tournee-engine`, testé scripts/catalogue/offre-fournisseur.test.mjs. Demande d'Eric (2026-10-25) :
-// certains devis dépendent du dimensionnement fait par le fournisseur, on ne réécrit pas ses lignes.
+// Import d'une offre de prix, d'un devis ou d'une facture fournisseur (PDF lu par l'IA) — module PUR, copié pour l'edge
+// supplier-offer-import par `npm run sync:tournee-engine`, testé scripts/catalogue/offre-fournisseur.test.mjs. Demande
+// d'Eric (2026-10-25) : certains devis dépendent du dimensionnement fait par le fournisseur, on ne réécrit pas ses lignes ;
+// étendu aux factures le 2026-11-24 (le prix net facturé est le prix d'achat réel). Un AVOIR est lu mais refusé : il
+// ne donne pas de prix d'achat (même règle que les factures Pennylane, scripts/catalogue/achats.js).
 // Ici : le format de sortie STRICT demandé à l'IA (schéma JSON), le prompt, la lecture TOLÉRANTE de la réponse
 // (nombres « 2 093,03 », dates « 19/10/2026 », champs manquants), les contrôles (montant de chaque ligne, somme des
 // lignes contre le total imprimé — une ligne oubliée ou mal lue se voit) et les lignes au contrat de
@@ -12,6 +14,12 @@ import { calculerModelKey } from './modelKey.js';
 
 /** Natures qu'une ligne d'offre peut porter (supplier_products.product_kind). */
 const NATURES_OFFRE = Object.freeze(['main', 'accessory', 'consumable']);
+
+/** Types de document reconnus. Absent ou inconnu ⇒ « offre » (comportement d'avant). */
+export const TYPES_DOCUMENT = Object.freeze(['offre', 'devis', 'facture', 'avoir']);
+
+/** Libellé d'un type de document, pour l'écran (« Facture de TEREVA »). */
+export const LIBELLES_DOCUMENT = Object.freeze({ offre: 'Offre', devis: 'Devis', facture: 'Facture', avoir: 'Avoir' });
 
 const texteS = { type: 'string' };
 const nombreS = { type: 'number' };
@@ -24,8 +32,9 @@ const nombreS = { type: 'number' };
 export const SCHEMA_OFFRE = Object.freeze({
   type: 'object',
   additionalProperties: false,
-  required: ['fournisseur', 'numero', 'date', 'validite', 'lignes', 'total_ht', 'eco_total', 'remarque'],
+  required: ['type_document', 'fournisseur', 'numero', 'date', 'validite', 'lignes', 'total_ht', 'eco_total', 'remarque'],
   properties: {
+    type_document: { type: 'string', enum: [...TYPES_DOCUMENT] },
     fournisseur: {
       type: 'object',
       additionalProperties: false,
@@ -68,9 +77,13 @@ export const SCHEMA_OFFRE = Object.freeze({
 /** Prompt d'extraction (le PDF est joint en bloc document, avant ce texte). */
 export function construirePromptOffre() {
   return [
-    'Le document joint est une offre de prix (ou un devis) d\'un fournisseur de matériel de chauffage, climatisation,',
-    'plomberie ou photovoltaïque, adressée à un installateur. Recopie chaque ligne d\'article, dans l\'ordre du document,',
-    'sans en oublier ni en inventer. Recopie les nombres tels qu\'imprimés (ne recalcule rien).',
+    'Le document joint est une offre de prix, un devis ou une facture d\'un fournisseur de matériel de chauffage,',
+    'climatisation, plomberie ou photovoltaïque, adressé à un installateur. Recopie chaque ligne d\'article, dans l\'ordre du',
+    'document, sans en oublier ni en inventer. Recopie les nombres tels qu\'imprimés (ne recalcule rien).',
+    'type_document : « offre » (offre de prix, proposition, cotation), « devis », « facture », ou « avoir » (facture',
+    'd\'avoir, note de crédit, remboursement).',
+    'Sur une facture : une ligne par article facturé, même si la facture regroupe plusieurs bons de livraison (ignore les',
+    'en-têtes « BL n° … ») ; un même article livré deux fois fait deux lignes.',
     '',
     'Pour chaque ligne :',
     '- rang : le numéro de ligne imprimé (« 001 ») ;',
@@ -91,10 +104,13 @@ export function construirePromptOffre() {
     '  chaudière, poêle, ballon d\'eau chaude, batterie, onduleur, panneau), « accessory » pour le reste (accessoire, raccord,',
     '  tuyauterie, vanne, régulation, support, consommable).',
     '',
-    'N\'en fais pas des lignes : sous-totaux, totaux, frais de port, frais de gestion, mentions. « remarque » : une phrase',
-    'courte sur ce qui n\'est pas une ligne d\'article (frais de port, frais de gestion), sinon "".',
-    'En tête : fournisseur (nom et SIRET de l\'émetteur de l\'offre, pas du client), numero de l\'offre, date et validite au',
-    'format AAAA-MM-JJ. total_ht = le total HT des articles imprimé ; eco_total = la somme de TOUTES les éco-participations',
+    'N\'en fais pas des lignes : sous-totaux, totaux, frais de port, frais de gestion, mentions, et les lignes',
+    'd\'éco-participation imprimées à part (reporte leur montant unitaire dans eco_participation_unitaire de l\'article',
+    'qu\'elles accompagnent). « remarque » : une phrase courte sur ce qui n\'est pas une ligne d\'article (frais de port,',
+    'frais de gestion), sinon "".',
+    'En tête : fournisseur (nom et SIRET de l\'émetteur du document, pas du client), numero du document (n° d\'offre, de',
+    'devis ou de facture), date (date du document) et validite (offre ou devis seulement, sinon "") au format AAAA-MM-JJ.',
+    'total_ht = le total HT des articles imprimé ; eco_total = la somme de TOUTES les éco-participations',
     'imprimées (DEEE + PMCB + …, pas seulement la première). Une valeur absente du document s\'écrit "" pour un texte et 0',
     'pour un nombre.',
   ].join('\n');
@@ -167,13 +183,13 @@ const absentSiZero = (v) => { const n = nombreFr(v); return n ? n : null; };
  * nombre facultatif à 0 (prix brut, remise, montant, éco-participation, totaux) valent « absent ». La quantité et le
  * prix net restent tels quels : à 0, les contrôles le signalent.
  * @param {unknown} brut objet ou texte JSON
- * @returns {{ erreur?: string, fournisseur: { nom: string|null, siret: string|null }, numero: string|null,
+ * @returns {{ erreur?: string, type: string, fournisseur: { nom: string|null, siret: string|null }, numero: string|null,
  *   date: string|null, validite: string|null, lignes: Array<Record<string, any>>, total_ht: number|null,
  *   eco_total: number|null, remarque: string|null, ignorees: number }}
  */
 export function lireOffre(brut) {
   const o = objetJson(brut);
-  const vide = { fournisseur: { nom: null, siret: null }, numero: null, date: null, validite: null, lignes: [], total_ht: null, eco_total: null, remarque: null, ignorees: 0 };
+  const vide = { type: 'offre', fournisseur: { nom: null, siret: null }, numero: null, date: null, validite: null, lignes: [], total_ht: null, eco_total: null, remarque: null, ignorees: 0 };
   if (!o) return { ...vide, erreur: 'reponse_illisible' };
   const f = o.fournisseur && typeof o.fournisseur === 'object' ? o.fournisseur : { nom: o.fournisseur };
   const lignes = [];
@@ -198,7 +214,9 @@ export function lireOffre(brut) {
       nature,
     });
   });
+  const typeLu = String(o.type_document ?? o.type ?? '').trim().toLowerCase();
   return {
+    type: TYPES_DOCUMENT.includes(typeLu) ? typeLu : 'offre',
     fournisseur: { nom: texte(f?.nom, 120), siret: texte(f?.siret, 20) },
     numero: texte(o.numero, 60), date: dateIso(o.date), validite: dateIso(o.validite),
     lignes, total_ht: absentSiZero(o.total_ht), eco_total: absentSiZero(o.eco_total), remarque: texte(o.remarque, 500), ignorees,
@@ -220,7 +238,7 @@ export function montantLigne(l) {
 
 /**
  * Contrôles d'une offre lue. Chaque alerte est affichée telle quelle ; `bloquante` empêche l'import.
- *   - aucune ligne ; ligne sans prix, sans quantité, sans référence ;
+ *   - avoir (bloquant : pas un prix d'achat) ; aucune ligne ; ligne sans prix, sans quantité, sans référence ;
  *   - quantité × prix ≠ montant imprimé (au centime près, 0,5 % de tolérance pour les arrondis) ;
  *   - somme des lignes (+ éco-participations si le total les inclut) ≠ total imprimé : une ligne oubliée ou mal lue.
  * @param {ReturnType<typeof lireOffre>} offre
@@ -230,6 +248,7 @@ export function montantLigne(l) {
 export function controlerOffre(offre) {
   const alertes = [];
   const lignes = offre?.lignes || [];
+  if (offre?.type === 'avoir') alertes.push({ code: 'avoir', message: 'Ce document est un avoir : il ne donne pas de prix d\'achat, rien ne sera écrit.', bloquante: true });
   if (!lignes.length) alertes.push({ code: 'aucune_ligne', message: 'Aucune ligne d\'article lue dans le document.', bloquante: true });
   let somme = 0;
   for (const l of lignes) {
@@ -298,13 +317,14 @@ export function referenceLigne(l) {
  * vente n'est jamais écrit (0 = « à renseigner », appliqué par la RPC à la création seulement). Les clés de specs ne
  * remplacent pas celles des factures (source, historique) : l'offre est rangée sous `derniere_offre`.
  * Écartées et rapportées : sans référence, sans prix > 0, référence en double (la première est gardée).
- * @param {{ numero?: string|null, date?: string|null }} offre
+ * @param {{ type?: string|null, numero?: string|null, date?: string|null }} offre
  * @param {Array<Record<string, any>>} lignes lignes lues (lireOffre), éventuellement corrigées à l'écran
  * @param {{ version: string }} opts
  * @returns {{ lignes: Array<Record<string, any>>, ecartees: string[] }}
  */
 export function lignesCatalogueDepuisOffre(offre, lignes, { version }) {
   if (!version) throw new Error('version requise');
+  if (offre?.type === 'avoir') return { lignes: [], ecartees: ['avoir : aucun prix d\'achat écrit'] };
   const out = [];
   const ecartees = [];
   const vues = new Set();
@@ -322,7 +342,10 @@ export function lignesCatalogueDepuisOffre(offre, lignes, { version }) {
     const remise = nombreFr(l.remise_pct);
     const eco = nombreFr(l.eco_participation_unitaire);
     const canonical = {
+      // clé historique « derniere_offre » gardée pour tous les types (offre, devis, facture) : `type` les distingue ;
+      // `derniere_facture` appartient aux factures Pennylane (achats.js) et n'est jamais touchée ici
       derniere_offre: {
+        type: TYPES_DOCUMENT.includes(offre?.type) ? offre.type : 'offre',
         numero: offre?.numero ?? null, date: offre?.date ?? null, prix_unitaire_net: pu,
         quantite: nombreFr(l.quantite), unite_offre: texte(l.unite, 40),
       },
@@ -351,12 +374,13 @@ export function lignesCatalogueDepuisOffre(offre, lignes, { version }) {
 }
 
 /**
- * Version du relevé pour la RPC (« offre_<fournisseur>_<numéro>_<date> »), stable pour une même offre.
- * @param {{ numero?: string|null, date?: string|null }} offre
+ * Version du relevé pour la RPC (« offre_<fournisseur>_<numéro>_<date> », « facture_… » pour une facture), stable
+ * pour un même document. Un devis garde le préfixe « offre » (c'en est une, et les versions déjà écrites restent).
+ * @param {{ type?: string|null, numero?: string|null, date?: string|null }} offre
  * @param {string} [fournisseur]
  * @returns {string}
  */
 export function versionOffre(offre, fournisseur = '') {
   const morceau = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return ['offre', morceau(fournisseur), morceau(offre?.numero) || 'sans-numero', dateIso(offre?.date) || 'sans-date'].filter(Boolean).join('_');
+  return [offre?.type === 'facture' ? 'facture' : 'offre', morceau(fournisseur), morceau(offre?.numero) || 'sans-numero', dateIso(offre?.date) || 'sans-date'].filter(Boolean).join('_');
 }

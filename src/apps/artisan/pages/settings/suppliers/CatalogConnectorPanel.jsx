@@ -15,7 +15,7 @@ import { KeyRound, RefreshCw, Upload, Loader2, CheckCircle2, AlertTriangle, Tras
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useSuppliers, useSupplierConnector, useSupplierMutations } from '@hooks/useSuppliers';
-import { libelleResultat, libelleCodeErreur } from '@/lib/catalogue/syncResult.js';
+import { libelleResultat, libelleCodeErreur, etatDerniereMiseAJour, RETARD_RELEVE_NUIT_HEURES } from '@/lib/catalogue/syncResult.js';
 import { CIBLES, CLE_SANS_CATEGORIE, DEFAUTS_MAPPING, CLE_DEFAUT } from '@/lib/catalogue/mapping.js';
 import { configCataloguePieces } from '@/lib/catalogue/cataloguePieces.js';
 import { raisonRelevePublicBloque, compteRenduPieces, messageErreurFournisseur } from '@/lib/catalogue/reglagesCataloguePublic.js';
@@ -33,14 +33,14 @@ function CredentialsForm({ onSave, isSaving, onCancel }) {
   const [password, setPassword] = useState('');
   const submit = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password) { toast.error('E-mail et mot de passe requis'); return; }
+    if (!email.trim() || !password) { toast.error('Identifiant et mot de passe requis'); return; }
     await onSave({ email, password });
     setPassword('');
   };
   return (
     <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-      <FormField label="E-mail du compte fournisseur">
-        <TextInput value={email} onChange={setEmail} type="email" placeholder="compte@entreprise.fr" />
+      <FormField label="Identifiant du compte (e-mail ou n° client)">
+        <TextInput value={email} onChange={setEmail} placeholder="compte@entreprise.fr" />
       </FormField>
       <FormField label="Mot de passe">
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password"
@@ -53,6 +53,16 @@ function CredentialsForm({ onSave, isSaving, onCancel }) {
         {onCancel && <button type="button" onClick={onCancel} className="btn-secondary btn-sm">Annuler</button>}
       </div>
     </form>
+  );
+}
+
+/** Date et heure du dernier relevé réussi, à côté de la coche ; en ambre si le relevé de nuit ne passe plus. */
+function DerniereMiseAJour({ result, autoSync }) {
+  const { texte, retard } = etatDerniereMiseAJour(result, { autoSync });
+  return (
+    <span className={`basis-full text-right ${retard ? 'text-amber-700 font-medium' : 'text-secondary-500'}`}>
+      {texte}{retard ? ` — le relevé de nuit n'a pas réussi depuis plus de ${RETARD_RELEVE_NUIT_HEURES} h` : ''}
+    </span>
   );
 }
 
@@ -174,6 +184,7 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
               Relevé automatique chaque nuit
             </label>
           )}
+          {plateforme?.auto && <DerniereMiseAJour result={result} autoSync={!!frais.auto_sync} />}
           {raisonBloque && frais.auto_sync && <p className="basis-full text-amber-700">Le relevé de cette nuit sera refusé tant que l&apos;accord n&apos;est pas renseigné.</p>}
           {raisonBloque && <p className="basis-full text-amber-700 font-medium flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {raisonBloque}</p>}
         </div>
@@ -190,6 +201,7 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
               Relevé automatique chaque nuit
             </label>
           )}
+          {plateforme?.auto && <DerniereMiseAJour result={result} autoSync={!!frais.auto_sync} />}
         </div>
       ) : (
         <CredentialsForm onSave={handleSave} isSaving={isSaving} onCancel={status?.exists ? () => setReplacing(false) : null} />

@@ -159,6 +159,48 @@ export function useSupplierConnector(orgId, supplier) {
   };
 }
 
+/**
+ * Accès au compte fournisseur (fiche fournisseur, org_admin) : identifiant et mot de passe rangés dans le Vault, pour
+ * tout fournisseur, connecté ou non (même clé que la connexion catalogue). `reveler` relit la valeur à la demande —
+ * jamais mise en cache React Query ; l'appelant la garde le temps de l'afficher.
+ */
+export function useSupplierAccess(orgId, supplierId, { enabled = true } = {}) {
+  const queryClient = useQueryClient();
+  const statusQuery = useQuery({
+    queryKey: supplierKeys.connector(orgId, supplierId),
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getConnectorStatus(orgId, supplierId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: enabled && !!orgId && !!supplierId,
+    staleTime: 60_000,
+  });
+  const invalider = () => queryClient.invalidateQueries({ queryKey: supplierKeys.connector(orgId, supplierId) });
+  const saveMutation = useMutation({
+    mutationFn: (creds) => unwrapResult(suppliersService.setConnectorCredentials(orgId, supplierId, creds)),
+    onSuccess: invalider,
+  });
+  const deleteMutation = useMutation({
+    mutationFn: () => unwrapResult(suppliersService.deleteConnectorCredentials(orgId, supplierId)),
+    onSuccess: invalider,
+  });
+  const revealMutation = useMutation({
+    mutationFn: () => unwrapResult(suppliersService.revealCredentials(orgId, supplierId)),
+  });
+  return {
+    status: statusQuery.data ?? null,
+    statusError: statusQuery.error,
+    isLoadingStatus: statusQuery.isLoading,
+    enregistrer: saveMutation.mutateAsync,
+    supprimer: deleteMutation.mutateAsync,
+    reveler: revealMutation.mutateAsync,
+    isSaving: saveMutation.isPending,
+    isDeleting: deleteMutation.isPending,
+    isRevealing: revealMutation.isPending,
+  };
+}
+
 /** Gammes distinctes d'un fournisseur, toutes catégories (filtre Gamme de la liste produits). */
 export function useSupplierGammes(orgId, supplierId) {
   const { data, isLoading } = useQuery({

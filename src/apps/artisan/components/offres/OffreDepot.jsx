@@ -1,5 +1,5 @@
 /**
- * OffreDepot.jsx — Dépôt d'une offre de prix fournisseur (PDF) et lecture par l'IA
+ * OffreDepot.jsx — Dépôt d'une offre, d'un devis ou d'une facture fournisseur (PDF) et lecture par l'IA
  * ============================================================================
  * Partagé par l'import dans un devis et l'import au catalogue d'un fournisseur. Glisser-déposer ou parcourir ;
  * la lecture (edge supplier-offer-import, extract) n'écrit rien. `onLue({ offre, controle, modele, conso })`.
@@ -23,7 +23,7 @@ export default function OffreDepot({ orgId, onLue }) {
     try {
       onLue(await extraire(file));
     } catch (err) {
-      toast.error(err?.message || 'Lecture de l\'offre impossible');
+      toast.error(err?.message || 'Lecture du document impossible');
       setNom('');
     }
   };
@@ -41,12 +41,12 @@ export default function OffreDepot({ orgId, onLue }) {
         <div className="space-y-2 text-secondary-600">
           <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary-600" />
           <p className="text-sm font-medium">Lecture de « {nom} »…</p>
-          <p className="text-xs text-secondary-400">L&apos;IA recopie les lignes de l&apos;offre (une vingtaine de secondes).</p>
+          <p className="text-xs text-secondary-400">L&apos;IA recopie les lignes du document (une vingtaine de secondes).</p>
         </div>
       ) : (
         <div className="space-y-3">
           <FileUp className="w-8 h-8 mx-auto text-secondary-400" />
-          <p className="text-sm text-secondary-700">Déposez ici le PDF de l&apos;offre de prix du fournisseur</p>
+          <p className="text-sm text-secondary-700">Déposez ici le PDF de l&apos;offre, du devis ou de la facture du fournisseur</p>
           <button type="button" onClick={() => inputRef.current?.click()} className="btn-secondary btn-sm">Choisir le fichier</button>
           <p className="text-xs text-secondary-400">Les lignes sont lues puis vérifiées ; rien n&apos;est enregistré avant votre validation.</p>
         </div>
