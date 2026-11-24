@@ -7,6 +7,7 @@ import { AlertTriangle } from 'lucide-react';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildClimConfig } from '@/lib/clim/config.js';
 import { CLASSES_ISOLATION, EXPOSITIONS } from '@/lib/clim/dimensionnement.js';
+import { BarreEnregistrement } from '../BarreEnregistrement';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -171,9 +172,12 @@ export default function ClimTab() {
           </div>
         </div>
       </section>
-      <div className="flex justify-end">
-        <button type="button" onClick={handleSave} disabled={!isDirty || !isValid || isSaving} className="btn-primary">{isSaving ? 'Enregistrement…' : 'Enregistrer'}</button>
-      </div>
+      <BarreEnregistrement
+        modifie={isDirty} enCours={isSaving} onEnregistrer={handleSave}
+        raison={isDirty ? (isValid ? null : 'Corrigez les champs signalés en rouge') : null}
+        onAnnuler={() => setForm(initial)}
+        onRetablir={() => setForm(depuisSettings(null))}
+      />
     </div>
   );
 }

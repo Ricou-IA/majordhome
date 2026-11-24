@@ -4,14 +4,15 @@
 // ⚠️ La RPC org_update_settings merge au niveau 1 : on sauve TOUJOURS
 // l'objet thermique complet (les SEULES clés de DEFAULTS_THERMIQUE — jamais un sous-objet partiel).
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
-import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { TYPES_PIECE, buildThermiqueConfig } from '@apps/thermique/lib/thermiqueConfig';
 import { supprimeParoiBibliotheque } from '@apps/thermique/lib/composeurParois';
-import { Thermometer, Layers, Calculator, Library, Trash2, ChevronLeft, Loader2 } from 'lucide-react';
+import { Thermometer, Layers, Calculator, Library, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormField, SectionTitle, inputClass } from '../../components/FormFields';
+import SettingsPage from './SettingsPage';
+import { BarreEnregistrement } from './BarreEnregistrement';
+import { LignesSquelette } from '@/components/ui/squelette';
 
 const TABS = [
   { key: 'temperatures', label: 'Températures', icon: Thermometer },
@@ -305,8 +306,6 @@ function BibliothequeTab({ bibliotheque, onRename, onDelete, isSaving }) {
 // ---------------------------------------------------------------------------
 
 export default function ThermiqueSettings() {
-  const { isOrgAdmin } = useAuth();
-  const navigate = useNavigate();
   const { settings, isLoading, save, isSaving } = useOrgSettings();
   const [activeTab, setActiveTab] = useState('temperatures');
   const [form, setForm] = useState(null);
@@ -319,11 +318,6 @@ export default function ThermiqueSettings() {
     if (!isLoading && form === null) setForm(initial);
   }, [isLoading, initial, form]);
 
-  useEffect(() => {
-    if (!isOrgAdmin) toast.error("Accès réservé à l'administrateur de l'organisation");
-  }, [isOrgAdmin]);
-
-  if (!isOrgAdmin) return <Navigate to="/settings" replace />;
 
   const isDirty = form !== null && JSON.stringify(form) !== JSON.stringify(initial);
   const isValid = form !== null && validateThermiqueForm(form);
@@ -358,55 +352,11 @@ export default function ThermiqueSettings() {
   const supprimeBiblio = (id) => saveBiblio(supprimeParoiBibliotheque(config.parois_bibliotheque, id));
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <button
-            onClick={() => navigate('/settings')}
-            className="flex items-center gap-1 text-sm text-secondary-500 hover:text-secondary-700 mb-2"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Paramètres
-          </button>
-          <h1 className="text-2xl font-bold text-secondary-900">Thermique</h1>
-          <p className="text-secondary-600">
-            Paramètres de calcul des études de déperditions.
-          </p>
-        </div>
-        <button
-          onClick={handleSave}
-          disabled={!isDirty || !isValid || isSaving}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-          Enregistrer
-        </button>
-      </div>
-
+    <SettingsPage title="Thermique" description="Paramètres de calcul des études de déperditions." tabs={TABS} tab={activeTab} onTabChange={setActiveTab} disposition="menu">
       {isLoading || form === null ? (
-        <div className="flex items-center justify-center min-h-[200px]">
-          <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
-        </div>
+        <LignesSquelette nombre={6} libelle="Chargement des réglages" />
       ) : (
-        <div className="flex gap-6 flex-col lg:flex-row">
-          <nav className="lg:w-56 flex-shrink-0 flex lg:flex-col gap-1 overflow-x-auto">
-            {TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = tab.key === activeTab;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors whitespace-nowrap ${
-                    isActive ? 'bg-primary-50 text-primary-700' : 'text-secondary-600 hover:bg-secondary-50'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
+        <>
           <div className="flex-1 min-w-0">
             {activeTab === 'temperatures' && <TemperaturesTab form={form} patchTheta={patchTheta} />}
             {activeTab === 'ponts' && <PontsTab form={form} patchDelta={patchDelta} />}
@@ -420,8 +370,14 @@ export default function ThermiqueSettings() {
               />
             )}
           </div>
-        </div>
+          <BarreEnregistrement
+            modifie={isDirty} enCours={isSaving} onEnregistrer={handleSave}
+            raison={isDirty && !isValid ? 'Corrigez les champs signalés en rouge' : null}
+            onAnnuler={() => setForm(initial)}
+            onRetablir={() => setForm(pickThermiqueForm(buildThermiqueConfig({})))}
+          />
+        </>
       )}
-    </div>
+    </SettingsPage>
   );
 }

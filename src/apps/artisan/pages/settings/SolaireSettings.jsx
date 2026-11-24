@@ -5,14 +5,13 @@
 // l'objet pv complet (jamais un sous-objet partiel).
 import { Combobox } from '@/components/ui/combobox';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildPvConfig } from '@apps/solaire/lib/pvConfig';
 import { TECH_DOCS_BUCKET } from '@apps/solaire/lib/etudeExport';
 import { storageService } from '@services/storage.service';
 import {
-  Calculator, Grid3x3, Car, ChevronLeft, Plus, X, Loader2,
+  Calculator, Grid3x3, Car, Plus, X, Loader2,
   FileText, Upload, ExternalLink, Trash2, ClipboardList, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,6 +19,9 @@ import { FormField, SectionTitle, inputClass } from '../../components/FormFields
 import DemarchesTab from './solaire/DemarchesTab';
 import { validerDemarches } from '@apps/solaire/lib/demarches/parametres';
 import { logger } from '@lib/logger';
+import SettingsPage from './SettingsPage';
+import { BarreEnregistrement } from './BarreEnregistrement';
+import { LignesSquelette } from '@/components/ui/squelette';
 
 const TABS = [
   { key: 'calcul', label: 'Paramètres calcul', icon: Calculator },
@@ -402,8 +404,7 @@ function validatePvForm(form) {
 }
 
 export default function SolaireSettings() {
-  const { isOrgAdmin, organization } = useAuth();
-  const navigate = useNavigate();
+  const { organization } = useAuth();
   const { settings, isLoading, save, isSaving } = useOrgSettings();
   const [activeTab, setActiveTab] = useState('calcul');
   const [form, setForm] = useState(null);
@@ -415,11 +416,6 @@ export default function SolaireSettings() {
     if (!isLoading && form === null) setForm(initial);
   }, [isLoading, initial, form]);
 
-  useEffect(() => {
-    if (!isOrgAdmin) toast.error("Accès réservé à l'administrateur de l'organisation");
-  }, [isOrgAdmin]);
-
-  if (!isOrgAdmin) return <Navigate to="/settings" replace />;
 
   const isDirty = form !== null && JSON.stringify(form) !== JSON.stringify(initial);
   const isValid = form !== null && validatePvForm(form);
@@ -449,55 +445,11 @@ export default function SolaireSettings() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <button
-            onClick={() => navigate('/settings')}
-            className="flex items-center gap-1 text-sm text-secondary-500 hover:text-secondary-700 mb-2"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Paramètres
-          </button>
-          <h1 className="text-2xl font-bold text-secondary-900">Solaire</h1>
-          <p className="text-secondary-600">
-            Paramètres du calculateur photovoltaïque, grille de coûts et démarches administratives.
-          </p>
-        </div>
-        <button
-          onClick={handleSave}
-          disabled={!isDirty || !isValid || isSaving}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-          Enregistrer
-        </button>
-      </div>
-
+    <SettingsPage title="Solaire" description="Paramètres du calculateur photovoltaïque, grille de coûts et démarches administratives." tabs={TABS} tab={activeTab} onTabChange={setActiveTab} disposition="menu">
       {isLoading || form === null ? (
-        <div className="flex items-center justify-center min-h-[200px]">
-          <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
-        </div>
+        <LignesSquelette nombre={6} libelle="Chargement des réglages" />
       ) : (
-        <div className="flex gap-6 flex-col lg:flex-row">
-          <nav className="lg:w-56 flex-shrink-0 flex lg:flex-col gap-1 overflow-x-auto">
-            {TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = tab.key === activeTab;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors whitespace-nowrap ${
-                    isActive ? 'bg-primary-50 text-primary-700' : 'text-secondary-600 hover:bg-secondary-50'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
+        <>
           <div className="flex-1 min-w-0">
             {activeTab === 'calcul' && <CalculTab form={form} patch={patch} />}
             {activeTab === 'grille' && <GrilleTab form={form} patch={patch} />}
@@ -505,8 +457,14 @@ export default function SolaireSettings() {
             {activeTab === 'bibliotheque' && <BibliothequeTab form={form} patch={patch} orgId={organization?.id} />}
             {activeTab === 'demarches' && <DemarchesTab form={form} patch={patch} />}
           </div>
-        </div>
+          <BarreEnregistrement
+            modifie={isDirty} enCours={isSaving} onEnregistrer={handleSave}
+            raison={isDirty && !isValid ? 'Corrigez les champs signalés en rouge' : null}
+            onAnnuler={() => setForm(initial)}
+            onRetablir={() => setForm((f) => ({ ...buildPvConfig({}), tech_docs: f.tech_docs, demarches: f.demarches }))}
+          />
+        </>
       )}
-    </div>
+    </SettingsPage>
   );
 }

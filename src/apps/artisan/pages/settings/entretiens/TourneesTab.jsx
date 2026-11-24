@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { REGLAGES_DEFAUT } from '@/lib/tournee/reglages.js';
 import { CATALOGUE_SOUPLESSES, optionSouplesse, erreurSouplesses, erreurDemiJournee } from '@/lib/souplesse';
+import { BarreEnregistrement } from '../BarreEnregistrement';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -310,14 +311,14 @@ export default function TourneesTab() {
         </label>
       </section>
 
-      <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">
-        <button type="button" onClick={() => setForm(initial)} disabled={!isDirty || isSaving} className="px-4 py-2 text-sm text-secondary-600 hover:bg-secondary-50 rounded-md disabled:opacity-50">
-          Annuler
-        </button>
-        <button type="button" onClick={handleSave} disabled={!isDirty || !isValid || isSaving} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50">
-          {isSaving ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
-      </div>
+      {/* Rétablir garde les interrupteurs d'activation (prise de RDV par le client, figeage, SMS) :
+          seuls les chiffres reviennent aux défauts. */}
+      <BarreEnregistrement
+        modifie={isDirty} enCours={isSaving} onEnregistrer={handleSave}
+        raison={isDirty ? (isValid ? null : 'Corrigez les champs signalés en rouge') : null}
+        onAnnuler={() => setForm(initial)}
+        onRetablir={() => setForm((f) => ({ ...depuisSettings({}), auto_rdv: { ...depuisSettings({}).auto_rdv, enabled: f.auto_rdv?.enabled }, figer_journee_pleine: f.figer_journee_pleine, figer_sms: f.figer_sms }))}
+      />
     </div>
   );
 }

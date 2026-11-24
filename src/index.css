@@ -389,6 +389,12 @@ html[data-device-class="phone"] .mdh-kanban-repliee {
   }
 }
 
+/* Barre d'enregistrement des réglages (BarreEnregistrement) : au-dessus de la barre du bas
+   du téléphone, jamais dessous. */
+html[data-barre-bas] .mdh-barre-enregistrement {
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+}
+
 /* Les animations d'apparition sont décoratives : coupées si l'OS le demande. */
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,

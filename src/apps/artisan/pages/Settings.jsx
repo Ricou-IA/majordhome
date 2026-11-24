@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { ROLE_LABELS } from '@lib/permissions';
 import { modulesVisibles } from '@/lib/modules';
+import { filtrerReglages } from '@/lib/rechercheReglages';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useCanAccess } from '@hooks/usePermissions';
 import DemarrageCard from './settings/DemarrageCard';
@@ -10,6 +12,7 @@ import { Card, CardHeader } from '@/components/ui/card';
 import {
   Building2,
   ChevronRight,
+  Search,
   Users,
   Shield,
   Wrench,
@@ -50,7 +53,10 @@ export default function Settings() {
   // n'affiche pas son en-tête. Modules opt-in (Maintenance) seulement s'ils sont
   // activés ; une org sans CRM ne voit que les tuiles `horsCrm`. Une tuile `acces`
   // (Fournisseurs & catalogue → articles.edit) s'ouvre au rôle qui a ce droit.
-  const groupes = modulesVisibles(settings, { isOrgAdmin, can });
+  const tousLesGroupes = modulesVisibles(settings, { isOrgAdmin, can });
+  // Retrouver un réglage par son nom (brief UX P2-01) : filtre titres, descriptions et modules.
+  const [recherche, setRecherche] = useState('');
+  const groupes = filtrerReglages(tousLesGroupes, recherche);
 
   return (
     <div className="space-y-6">
@@ -80,6 +86,22 @@ export default function Settings() {
 
       {/* Ce qu'il reste à renseigner pour démarrer (administrateur) */}
       {isOrgAdmin && settings && <DemarrageCard settings={settings} />}
+
+      {/* Recherche de réglages */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" aria-hidden="true" />
+        <input
+          type="search"
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          placeholder="Rechercher un réglage (ex. Pennylane, SMS, tournées)"
+          aria-label="Rechercher un réglage"
+          className="w-full rounded-lg border border-secondary-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+        />
+      </div>
+      {recherche.trim() && groupes.length === 0 && (
+        <p className="text-sm text-secondary-500">Aucun réglage ne correspond à « {recherche.trim()} ».</p>
+      )}
 
       {/* Un groupe par module */}
       {groupes.map((m) => (

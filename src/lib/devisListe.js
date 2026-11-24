@@ -27,7 +27,7 @@ export function statutDevis(valeur) {
 }
 
 export function normaliserRecherche(texte) {
-  return String(texte ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return String(texte ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 function correspond(devis, terme) {

@@ -17,7 +17,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import PermissionsEditor from './PermissionsEditor';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgMembers } from '@hooks/usePermissions';
@@ -34,7 +34,6 @@ import {
 } from '@lib/permissions';
 import {
   Users,
-  ArrowLeft,
   Shield,
   Loader2,
   AlertCircle,
@@ -332,7 +331,6 @@ function MemberRow({ member, teamMember, orgRole, isCurrentUser, isCommercial, s
 // =============================================================================
 
 export default function TeamManagement() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') === 'droits' ? 'droits' : 'membres';
   const { organization, user, isOrgAdmin } = useAuth();
@@ -648,15 +646,16 @@ export default function TeamManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Fil d'Ariane, comme toutes les pages de réglages (brief UX P2-01 : plus de flèche isolée) */}
+      <div className="flex items-center gap-2 text-sm text-secondary-500">
+        <Link to="/settings" className="hover:text-secondary-700">Paramètres</Link>
+        <span>/</span>
+        <span className="text-secondary-900">Administration utilisateurs</span>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/settings')}
-            className="p-2 rounded-lg hover:bg-secondary-100 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-secondary-600" />
-          </button>
           <div>
             <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
               <Users className="w-7 h-7 text-secondary-400" />

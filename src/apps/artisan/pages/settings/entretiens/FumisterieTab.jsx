@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildFumisterieConfig } from '@/lib/fumisterie/config.js';
+import { BarreEnregistrement } from '../BarreEnregistrement';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -173,9 +174,12 @@ export default function FumisterieTab() {
           <Champ label="Un support mural tous les (m)" hint="De 1 à 4 m de conduit en façade" error={errors.supports_muraux_tous_les_m}><input type="number" step="0.5" min={1} max={4} value={form.supports_muraux_tous_les_m} onChange={set('supports_muraux_tous_les_m')} className={INPUT_CLASS} /></Champ>
         </div>
       </section>
-      <div className="flex justify-end">
-        <button type="button" onClick={handleSave} disabled={!isDirty || !isValid || isSaving} className="btn-primary">{isSaving ? 'Enregistrement…' : 'Enregistrer'}</button>
-      </div>
+      <BarreEnregistrement
+        modifie={isDirty} enCours={isSaving} onEnregistrer={handleSave}
+        raison={isDirty ? (isValid ? null : 'Corrigez les champs signalés en rouge') : null}
+        onAnnuler={() => setForm(initial)}
+        onRetablir={() => setForm(depuisSettings(null))}
+      />
     </div>
   );
 }
