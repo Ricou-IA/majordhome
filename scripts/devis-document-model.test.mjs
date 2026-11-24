@@ -25,7 +25,7 @@ test('buildDevisConfig : défauts = comportement historique', () => {
   const c = buildDevisConfig(null);
   assert.deepEqual(c.familles.map((f) => f.label), DEFAULT_FAMILLES.map((f) => f.label));
   // chapitres d'Eric (2026-10-25) : Équipement / Option / Sécurité et accessoire / Pose et mise en service
-  assert.deepEqual(sectionsParDefaut(c, 'Climatisation'), ['ÉQUIPEMENT', 'OPTIONS', 'SÉCURITÉ ET ACCESSOIRES', 'POSE ET MISE EN SERVICE']);
+  assert.deepEqual(sectionsParDefaut(c, 'Climatisation'), ['Équipement', 'Options', 'Sécurité et accessoires', 'Pose et mise en service']);
   assert.equal(c.document.conditions, DEFAULT_CONDITIONS);
   assert.equal(c.document.validite_jours, 30);
   assert.equal(c.paiement.afficher, false);
@@ -156,7 +156,7 @@ test('exempleDevis : chapitres de la première famille active, lignes d\'exemple
   assert.equal(ex.quote.subject, 'Clim — exemple');
   assert.equal(fmtDateLongue(ex.quote.validity_date), '5 novembre 2026');
   const d = exempleDevis(DEFAULTS_DEVIS);
-  assert.equal(d.lines[0].designation, 'POÊLE');
+  assert.equal(d.lines[0].designation, 'Poêle');
 });
 
 test('buildDevisDocumentModel : un chapitre sans ligne n\'apparaît pas dans le document (constat Eric 2026-10-25, « OPTIONS » vide)', () => {

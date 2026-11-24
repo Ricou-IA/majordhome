@@ -56,6 +56,8 @@ import { PlanningDayHeader, TexteDuJour } from '@/apps/artisan/components/planni
 import { RemplirJourneePanel } from '@/apps/artisan/components/tournees/RemplirJourneePanel';
 import { PageHeader } from '@/components/ui/page-header';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { joursMasques, lireJoursOuverture } from '@/lib/joursOuverture';
 
 // Vue Mois : une colonne est un jour de la SEMAINE, pas une date. Avec le format des
 // autres vues (jour + mois), le calendrier y écrivait une date de référence sans
@@ -74,6 +76,10 @@ export default function Planning() {
   // Sur appareil tenu en main (tablette, téléphone) : la journée en liste, pas la
   // semaine en grille (cf. VUES_MOBILE de CalendarToolbar).
   const { isMobileDevice } = useDeviceClass();
+  // Jours d'ouverture de l'entreprise (Paramètres → Entreprise → Coordonnées, Eric 2026-11-24) :
+  // le calendrier masque les jours fermés. Réglages pas encore lus ⇒ du lundi au vendredi.
+  const { settings: reglagesOrg } = useOrgSettings();
+  const joursFermes = useMemo(() => joursMasques(lireJoursOuverture(reglagesOrg)), [reglagesOrg]);
   // Vue et date reprises de l'URL (`?vue=mois&date=…`, brief UX P1-09) : F5 garde l'écran.
   const [vueUrl] = useState(() => new URLSearchParams(window.location.search).get('vue'));
   const vueInitiale = vueDepuisUrl(vueUrl, VUES_PERMISES[isMobileDevice ? 'mobile' : 'bureau'])
@@ -331,7 +337,7 @@ export default function Planning() {
             contentHeight={650}
             // Dates et heures
             firstDay={1}
-            weekends={false}
+            hiddenDays={joursFermes}
             slotMinTime={grille.slotMinTime}
             slotMaxTime={grille.slotMaxTime}
             slotDuration="00:30:00"

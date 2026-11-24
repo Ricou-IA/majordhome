@@ -24,14 +24,16 @@ export const getInitials = (name) => {
 // n'était lisible qu'au survol : Eric ne savait pas où indiquer qu'un
 // technicien est un sous-traitant ponctuel (2026-09-29). Le vocabulaire est
 // celui de l'usage, pas celui du moteur.
+// Libellés reformulés le 2026-11-24 (Eric) : ce réglage dit si les tournées proposent la
+// personne, pas son statut (un salarié peut être hors tournées).
 export const PLANIFICATION_OPTIONS = [
-  { value: 'machine', label: 'Par la machine' },
-  { value: 'main', label: 'À la main (sous-traitant ponctuel)' },
+  { value: 'machine', label: 'Inclus dans les tournées automatiques' },
+  { value: 'main', label: 'Hors tournées (planifié à la main, sous-traitant)' },
 ];
 
 export const PLANIFICATION_HELP = {
-  machine: 'Salarié : proposé par les tournées et l’auto-RDV.',
-  main: 'Jamais proposé par la machine ; assignable dans le Planning (installations).',
+  machine: 'Proposé par les tournées et la prise de RDV en ligne.',
+  main: 'Jamais proposé automatiquement ; assignable à la main dans le Planning.',
 };
 
 export const planificationDe = (includeInRouting) => ((includeInRouting ?? true) ? 'machine' : 'main');

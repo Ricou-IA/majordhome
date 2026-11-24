@@ -8,6 +8,7 @@ import { Globe, Phone } from 'lucide-react';
 import { useLiaisonHesiasun } from '@hooks/useLiaisonHesiasun';
 import { useSettingsForm } from './components/useSettingsForm';
 import { CLES_COORDONNEES, formatTelephone, prefixerHttps, validerSaisie } from '@/lib/organisation/identite';
+import { JOURS_SEMAINE, basculerJour, lireJoursOuverture } from '@/lib/joursOuverture';
 import { Field, INPUT_CLASS, SaveBar, SettingsLoading, SettingsSection, SettingsSurface } from './components/layout';
 
 const FIELDS = CLES_COORDONNEES;
@@ -17,6 +18,8 @@ function pickFields(settings) {
   FIELDS.forEach((f) => {
     out[f] = settings[f] ?? '';
   });
+  // Jours d'ouverture (Eric 2026-11-24) : le Planning masque les jours fermés.
+  out.jours_ouverture = lireJoursOuverture(settings);
   return out;
 }
 
@@ -87,6 +90,25 @@ export default function ContactTab() {
                 className={INPUT_CLASS}
               />
             </Field>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection title="Jours d’ouverture" description="Le planning n’affiche que ces jours.">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Jours d’ouverture">
+            {JOURS_SEMAINE.map(({ jour, libelle }) => {
+              const ouvert = form.jours_ouverture.includes(jour);
+              return (
+                <label key={jour} className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${ouvert ? 'border-primary-300 bg-primary-50 text-primary-800' : 'border-secondary-200 text-secondary-600'}`}>
+                  <input
+                    type="checkbox"
+                    checked={ouvert}
+                    onChange={() => set('jours_ouverture', basculerJour(form.jours_ouverture, jour))}
+                    className="rounded border-secondary-300"
+                  />
+                  {libelle}
+                </label>
+              );
+            })}
           </div>
         </SettingsSection>
 

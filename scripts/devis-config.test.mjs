@@ -23,7 +23,7 @@ test('famille Borne de recharge par défaut : catégorie borne_recharge seule, q
   assert.equal(f.label, 'Borne de recharge');
   assert.equal(f.actif, true);
   assert.deepEqual([...f.categories], ['borne_recharge']);
-  assert.deepEqual([...f.sections], ['ÉQUIPEMENT', 'OPTIONS', 'SÉCURITÉ ET ACCESSOIRES', 'POSE ET MISE EN SERVICE']);
+  assert.deepEqual([...f.sections], ['Équipement', 'Options', 'Sécurité et accessoires', 'Pose et mise en service']);
   assert.deepEqual(f.chapitres.map((c) => c.type), ['equipement', 'option', 'stock', 'main_oeuvre']);
   assert.equal(DEFAULT_FAMILLES[i - 1].key, 'photovoltaique');
   const config = buildDevisConfig(TOUT_ACTIF);
@@ -36,7 +36,7 @@ test('famille Photovoltaïque par défaut : deux catégories (photovoltaique + b
   const f = DEFAULT_FAMILLES[i];
   assert.equal(f.label, 'Photovoltaïque');
   assert.deepEqual([...f.categories], ['photovoltaique', 'batterie']);
-  assert.deepEqual([...f.sections], ['PANNEAUX', 'ONDULEUR ET MONITORING', 'FIXATION', 'COFFRETS ET CÂBLAGE', 'MAIN D\'ŒUVRE']);
+  assert.deepEqual([...f.sections], ['Panneaux', 'Onduleur et monitoring', 'Fixation', 'Coffrets et câblage', 'Main d\'œuvre']);
   assert.equal(DEFAULT_FAMILLES[i - 1].key, 'batterie');
   assert.deepEqual([...DEFAULT_FAMILLES[i - 1].categories], ['batterie', 'photovoltaique']);
 });
@@ -69,7 +69,7 @@ test('la famille Batterie par défaut : catégorie batterie, quatre chapitres d\
   assert.equal(f.label, 'Batterie');
   assert.equal(f.categories[0], 'batterie');
   assert.equal(f.actif, true);
-  assert.deepEqual([...f.sections], ['ÉQUIPEMENT', 'OPTIONS', 'SÉCURITÉ ET ACCESSOIRES', 'POSE ET MISE EN SERVICE']);
+  assert.deepEqual([...f.sections], ['Équipement', 'Options', 'Sécurité et accessoires', 'Pose et mise en service']);
   assert.equal(DEFAULT_FAMILLES[i - 1].key, 'chauffage_pac');
 });
 

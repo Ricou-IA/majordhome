@@ -38,10 +38,10 @@ const TVA_DEFAUT_PAR_FAMILLE = Object.freeze({ poele_granules: 5.5, poele_bois: 
 const TVA_DEFAUT = 10;
 
 const CHAPITRES_EQUIPEMENT = Object.freeze([
-  ['ÉQUIPEMENT', 'equipement'], ['OPTIONS', 'option'], ['SÉCURITÉ ET ACCESSOIRES', 'stock'], ['POSE ET MISE EN SERVICE', 'main_oeuvre'],
+  ['Équipement', 'equipement'], ['Options', 'option'], ['Sécurité et accessoires', 'stock'], ['Pose et mise en service', 'main_oeuvre'],
 ]);
 const CHAPITRES_POELE = Object.freeze([
-  ['POÊLE', 'equipement'], ['OPTIONS', 'option'], ['FUMISTERIE', 'fumisterie'], ['SÉCURITÉ ET ACCESSOIRES', 'stock'], ['POSE ET MISE EN SERVICE', 'main_oeuvre'],
+  ['Poêle', 'equipement'], ['Options', 'option'], ['Fumisterie', 'fumisterie'], ['Sécurité et accessoires', 'stock'], ['Pose et mise en service', 'main_oeuvre'],
 ]);
 
 /** Famille par défaut figée : `chapitres` typés, `sections` = leurs titres (lecteurs historiques). */
@@ -55,7 +55,8 @@ function familleDefaut(key, label, categories, chapitres) {
 }
 
 /**
- * Familles d'installation par défaut. `categories` = catégories produit des chapitres Équipement / Option (vide =
+ * Familles d'installation par défaut. Titres de chapitre en casse normale (Eric 2026-11-24) ; les réglages
+ * déjà enregistrés par une entreprise gardent leurs titres. `categories` = catégories produit des chapitres Équipement / Option (vide =
  * tout le catalogue) ; une famille peut en avoir plusieurs (2026-10-24 : un devis Photovoltaïque pioche aussi des
  * batteries). Chapitres d'Eric (2026-10-25) : Équipement / Option / Sécurité et accessoire / Pose et mise en service ;
  * les poêles gardent la fumisterie, le Photovoltaïque ses titres (dictés par Eric le 2026-10-24), typés.
@@ -68,17 +69,17 @@ export const DEFAULT_FAMILLES = Object.freeze([
   familleDefaut('chauffage_pac', 'Chauffage/PAC', ['chauffage'], CHAPITRES_EQUIPEMENT),
   familleDefaut('batterie', 'Batterie', ['batterie', 'photovoltaique'], CHAPITRES_EQUIPEMENT),
   familleDefaut('photovoltaique', 'Photovoltaïque', ['photovoltaique', 'batterie'], [
-    ['PANNEAUX', 'equipement'], ['ONDULEUR ET MONITORING', 'equipement'], ['FIXATION', 'equipement'],
-    ['COFFRETS ET CÂBLAGE', 'stock'], ['MAIN D\'ŒUVRE', 'main_oeuvre'],
+    ['Panneaux', 'equipement'], ['Onduleur et monitoring', 'equipement'], ['Fixation', 'equipement'],
+    ['Coffrets et câblage', 'stock'], ['Main d\'œuvre', 'main_oeuvre'],
   ]),
   familleDefaut('borne_recharge', 'Borne de recharge', ['borne_recharge'], CHAPITRES_EQUIPEMENT),
-  familleDefaut('electricite', 'Electricité', [], [['MATÉRIEL', 'stock'], ['POSE ET MISE EN SERVICE', 'main_oeuvre']]),
+  familleDefaut('electricite', 'Electricité', [], [['Matériel', 'stock'], ['Pose et mise en service', 'main_oeuvre']]),
   familleDefaut('vmc', 'VMC', [], CHAPITRES_EQUIPEMENT),
   // Devis hors pose (Eric 2026-11-11 : le devis est transversal) — pièces en saisie libre + tout le catalogue
-  familleDefaut('sav', 'Dépannage / SAV', [], [['PIÈCES', 'libre'], ['MAIN D\'ŒUVRE', 'main_oeuvre'], ['DÉPLACEMENT', 'main_oeuvre']]),
-  familleDefaut('entretien', 'Entretien / ramonage', [], [['PRESTATIONS', 'libre'], ['PIÈCES', 'libre']]),
-  familleDefaut('pieces', 'Pièces détachées', [], [['PIÈCES', 'libre']]),
-  familleDefaut('autre', 'Autre', [], [['PRESTATIONS', 'libre'], ['MAIN D\'ŒUVRE', 'main_oeuvre']]),
+  familleDefaut('sav', 'Dépannage / SAV', [], [['Pièces', 'libre'], ['Main d\'œuvre', 'main_oeuvre'], ['Déplacement', 'main_oeuvre']]),
+  familleDefaut('entretien', 'Entretien / ramonage', [], [['Prestations', 'libre'], ['Pièces', 'libre']]),
+  familleDefaut('pieces', 'Pièces détachées', [], [['Pièces', 'libre']]),
+  familleDefaut('autre', 'Autre', [], [['Prestations', 'libre'], ['Main d\'œuvre', 'main_oeuvre']]),
 ]);
 
 const CLES_CATALOGUE = new Set(DEFAULT_FAMILLES.map((f) => f.key));

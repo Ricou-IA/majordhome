@@ -163,7 +163,7 @@ export function buildDevisDocumentModel({ quote, lines, totals, company, config,
 export function exempleDevis(config, { aujourdhui = new Date() } = {}) {
   const cfg = config || DEFAULTS_DEVIS;
   const famille = famillesActives(cfg)[0] || cfg.familles?.[0];
-  const sections = famille?.sections?.length ? famille.sections : ['PRESTATIONS'];
+  const sections = famille?.sections?.length ? famille.sections : ['Prestations'];
   const validite = new Date(aujourdhui.getTime() + (cfg.document.validite_jours || 30) * 86400000);
   const lines = [];
   sections.forEach((titre, i) => {

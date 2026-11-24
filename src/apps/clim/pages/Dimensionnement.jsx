@@ -10,7 +10,7 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useProductsByCategory } from '@hooks/useSuppliers';
 import { useLead } from '@hooks/useLeads';
 import { buildDefaultSections } from '@services/devis.service';
-import { buildDevisConfig } from '@/lib/devisConfig.js';
+import { buildDevisConfig, typeChapitre } from '@/lib/devisConfig.js';
 import { buildClimConfig } from '@/lib/clim/config.js';
 import { dimensionner, lignesDevis } from '@/lib/clim/dimensionnement.js';
 import CreateDevisModal from '@apps/artisan/components/devis/CreateDevisModal';
@@ -25,12 +25,26 @@ function lignesInitiales(proposition, devisConfig) {
   const sections = buildDefaultSections(FAMILLE, devisConfig);
   const equipements = lignesDevis(proposition.postes.filter((p) => !p.article.liquide));
   const accessoires = lignesDevis(proposition.postes.filter((p) => p.article.liquide));
+  // Chapitres reconnus par leur TYPE (equipement, stock), pas par un titre écrit en dur : la casse
+  // et les libellés changent d'une entreprise à l'autre. Sans chapitre « stock », les liaisons
+  // rejoignent l'équipement — jamais perdues.
+  const typeDe = (titre) => typeChapitre(devisConfig, FAMILLE, titre);
+  const aUnStock = sections.some((s) => typeDe(s.designation) === 'stock');
   const out = [];
+  let equipementPose = false;
+  let accessoiresPoses = false;
   for (const s of sections) {
     out.push(s);
-    if (s.designation === 'ÉQUIPEMENT') out.push(...equipements);
-    if (s.designation === 'ACCESSOIRES') out.push(...accessoires);
+    const type = typeDe(s.designation);
+    if (type === 'equipement' && !equipementPose) {
+      out.push(...equipements, ...(aUnStock ? [] : accessoires));
+      equipementPose = true;
+      if (!aUnStock) accessoiresPoses = true;
+    }
+    if (type === 'stock' && !accessoiresPoses) { out.push(...accessoires); accessoiresPoses = true; }
   }
+  if (!equipementPose) out.push(...equipements);
+  if (!accessoiresPoses) out.push(...accessoires);
   return out;
 }
 
