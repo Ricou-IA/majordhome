@@ -28,21 +28,23 @@ export function SectionBlock({ blocIndex, sectionIndex, section, type, childLine
   return (
     <div className="border border-secondary-200 rounded-xl overflow-hidden bg-white">
       {/* En-tête du chapitre : la poignée déplace le chapitre avec ses lignes */}
-      <div className="flex items-center justify-between px-4 py-3 bg-secondary-50 border-b border-secondary-200">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 bg-secondary-50 border-b border-secondary-200">
+        <div className="flex flex-1 items-center gap-2 min-w-0">
           {poigneeChapitre && (
             <span {...poigneeChapitre} className="flex-shrink-0 cursor-grab active:cursor-grabbing text-secondary-300 hover:text-secondary-500" title="Glisser pour déplacer le chapitre">
               <GripVertical className="w-4 h-4" />
             </span>
           )}
-          <input
-            type="text"
+          {/* Titre lisible en entier : casse telle que saisie, retour à la ligne plutôt qu'une ellipse (brief UX P1-19) */}
+          <textarea
+            rows={1}
             value={section.designation}
-            onChange={(e) => onUpdate(sectionIndex, { ...section, designation: e.target.value })}
-            className="bg-transparent border-none outline-none text-sm font-semibold text-secondary-700 uppercase tracking-wider min-w-0"
-            placeholder="TITRE DU CHAPITRE"
+            onChange={(e) => onUpdate(sectionIndex, { ...section, designation: e.target.value.replace(/\n/g, ' ') })}
+            aria-label="Titre du chapitre"
+            className="min-w-0 flex-1 resize-none bg-transparent border-none outline-none text-sm font-semibold text-secondary-700 [field-sizing:content]"
+            placeholder="Titre du chapitre"
           />
-          <span className="text-[11px] px-1.5 py-0.5 rounded bg-white border border-secondary-200 text-secondary-500 whitespace-nowrap" title="Ce que propose le catalogue de ce chapitre">{TYPE_LABELS[type] || type}</span>
+          <span className="text-xs px-1.5 py-0.5 rounded bg-white border border-secondary-200 text-secondary-500 whitespace-nowrap" title="Ce que propose le catalogue de ce chapitre">{TYPE_LABELS[type] || type}</span>
           <label className="flex items-center gap-1.5 text-xs text-secondary-600 whitespace-nowrap cursor-pointer" title="Décochée : le document liste les lignes sans prix unitaire ni total, le sous-total du chapitre reste">
             <input
               type="checkbox"
@@ -92,7 +94,7 @@ export function SectionBlock({ blocIndex, sectionIndex, section, type, childLine
 
 function EnTeteLignes() {
   return (
-    <div className="flex items-center gap-1.5 px-3 ml-4 text-[11px] font-medium text-secondary-400 uppercase tracking-wider">
+    <div className="flex items-center gap-1.5 px-3 ml-4 text-xs font-medium text-secondary-500">
       <span className="w-3.5 flex-shrink-0" />
       <span className="flex-1">Désignation</span>
       <span className="w-10 text-center flex-shrink-0">Qté</span>
@@ -100,7 +102,7 @@ function EnTeteLignes() {
       <span className="w-12 text-right flex-shrink-0">Rem. %</span>
       <span className="w-14 text-center flex-shrink-0">TVA</span>
       <span className="w-[4.5rem] text-right flex-shrink-0">Total TTC</span>
-      <span className="w-[64px] flex-shrink-0" />
+      <span className="w-7 flex-shrink-0" />
     </div>
   );
 }

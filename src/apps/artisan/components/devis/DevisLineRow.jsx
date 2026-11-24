@@ -17,6 +17,7 @@ import { useAfficherMarges } from '@hooks/useAfficherMarges';
 import { TVA_RATES, computeLineTotals } from '@services/devis.service';
 import { formatEuro } from '@/lib/utils';
 import { GripVertical, Trash2, BookmarkPlus, Loader2, AlignLeft, Pencil } from 'lucide-react';
+import { MenuActions } from '@/components/ui/menu-actions';
 
 /**
  * @param {{ line: object, index: number, onUpdate: Function, onRemove: Function, poignee?: object,
@@ -34,7 +35,7 @@ export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee,
 
   return (
     <div className="flex items-center gap-1.5 px-3 py-1.5 ml-4 border border-secondary-200 rounded-lg bg-white">
-      <span {...(poignee || {})} className="flex-shrink-0 cursor-grab active:cursor-grabbing text-secondary-300 hover:text-secondary-500" title="Glisser pour déplacer la ligne">
+      <span {...(poignee || {})} aria-label="Déplacer la ligne" className="flex-shrink-0 cursor-grab active:cursor-grabbing text-secondary-300 hover:text-secondary-500" title="Glisser pour déplacer la ligne">
         <GripVertical className="w-3.5 h-3.5" />
       </span>
       {/* Désignation */}
@@ -89,11 +90,6 @@ export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee,
               <input type="checkbox" checked={line.show_specs === true} onChange={(e) => setLineField('show_specs', e.target.checked)} className="rounded border-secondary-300" />
               {nbCaracteristiques} caract.
             </label>
-            {onEditerArticle && (
-              <button type="button" onClick={onEditerArticle} className="p-0.5 hover:bg-secondary-100 rounded" title="Éditer l’article (libellé, prix de vente, caractéristiques)" aria-label="Éditer l’article">
-                <Pencil className="w-3 h-3" />
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -141,21 +137,19 @@ export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee,
       <span className="w-[4.5rem] text-right text-sm font-semibold text-secondary-900 flex-shrink-0 tabular-nums">
         {formatEuro(lineTotals.total_ttc)}
       </span>
-      {/* Actions */}
-      <div className="flex gap-0.5 flex-shrink-0 w-[64px] justify-end">
-        {!afficherDescription && (
-          <button type="button" onClick={() => setDescriptionOuverte(true)} className="p-0.5 hover:bg-secondary-100 rounded" title="Ajouter une description imprimée sous la ligne">
-            <AlignLeft className="w-3 h-3 text-secondary-400" />
-          </button>
-        )}
-        {onCreerArticle && (
-          <button type="button" onClick={onCreerArticle} disabled={creationEnCours} className="p-0.5 hover:bg-primary-50 rounded disabled:opacity-40" title="Créer l'article dans la base (ligne libre)">
-            {creationEnCours ? <Loader2 className="w-3 h-3 animate-spin text-primary-600" /> : <BookmarkPlus className="w-3 h-3 text-primary-600" />}
-          </button>
-        )}
-        <button type="button" onClick={() => onRemove(index)} className="p-0.5 hover:bg-red-50 rounded" title="Retirer la ligne">
-          <Trash2 className="w-3 h-3 text-red-400" />
-        </button>
+      {/* Actions de la ligne : un menu « … » avec des libellés (brief UX P1-19), plus de mini-icônes muettes */}
+      <div className="flex flex-shrink-0 justify-end">
+        <MenuActions
+          libelle={`Actions sur la ligne ${line.designation || index + 1}`}
+          className="h-7 w-7"
+          actions={[
+            !afficherDescription && { label: 'Ajouter une description', icon: AlignLeft, onClick: () => setDescriptionOuverte(true) },
+            onEditerArticle && { label: 'Modifier l’article', icon: Pencil, onClick: onEditerArticle },
+            onCreerArticle && { label: creationEnCours ? 'Création de l’article…' : 'Créer l’article dans la base', icon: creationEnCours ? Loader2 : BookmarkPlus, disabled: creationEnCours, onClick: onCreerArticle },
+            { separateur: true },
+            { label: 'Supprimer la ligne', icon: Trash2, danger: true, onClick: () => onRemove(index) },
+          ]}
+        />
       </div>
     </div>
   );

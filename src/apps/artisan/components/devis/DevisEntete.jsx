@@ -6,6 +6,8 @@
  */
 
 import { ListeChoix } from '@/components/ui/liste-choix';
+import { Link } from 'react-router-dom';
+import { useAuth } from '@contexts/AuthContext';
 import { AlertTriangle, User, Phone, Mail, MapPin, FileUp } from 'lucide-react';
 import { QUOTE_TEMPLATE_FAMILIES } from '@services/devis.service';
 
@@ -18,6 +20,9 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
   const clientName = [lead?.first_name, lead?.last_name].filter(Boolean).join(' ') || '—';
   const clientAddress = [lead?.address, lead?.postal_code, lead?.city].filter(Boolean).join(', ');
   const familyTemplates = selectedFamily ? templates.filter((t) => t.family === selectedFamily) : [];
+  // Des modèles existent pour la famille choisie (ou pour une famille, tant qu'aucune n'est choisie).
+  const aDesModeles = selectedFamily ? familyTemplates.length > 0 : (templates || []).length > 0;
+  const { isOrgAdmin } = useAuth();
 
   return (
     <div className="space-y-4">
@@ -59,19 +64,25 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
           />
           {erreurObjet && <p id="devis-objet-erreur" className="mt-1 text-xs text-st-alerte">{erreurObjet}</p>}
         </div>
-        <div>
-          <label className="block text-xs font-medium text-secondary-600 mb-1.5">Devis type</label>
-          <ListeChoix
-            libelle="Devis type"
-            value={selectedTemplateId || ''}
-            disabled={!selectedFamily}
-            onChange={(v) => onSelectTemplate(v || null)}
-            options={[
-              { value: '', label: selectedFamily ? '— Aucun (devis vierge) —' : '— Choisir une famille —' },
-              ...familyTemplates.map((t) => ({ value: t.id, label: `${t.name}${t.description ? ` — ${t.description}` : ''}` })),
-            ]}
-          />
-        </div>
+        {/* Liste « Devis type » seulement s'il y a des modèles ; sinon un lien vers leur création
+            pour l'administrateur, rien pour les autres (brief UX P1-20 : plus de liste à une option). */}
+        {aDesModeles ? (
+          <div>
+            <label className="block text-xs font-medium text-secondary-600 mb-1.5">Devis type</label>
+            <ListeChoix
+              libelle="Devis type"
+              value={selectedTemplateId || ''}
+              disabled={!selectedFamily}
+              onChange={(v) => onSelectTemplate(v || null)}
+              options={[
+                { value: '', label: selectedFamily ? '— Aucun (devis vierge) —' : '— Choisir une famille —' },
+                ...familyTemplates.map((t) => ({ value: t.id, label: `${t.name}${t.description ? ` — ${t.description}` : ''}` })),
+              ]}
+            />
+          </div>
+        ) : isOrgAdmin ? (
+          <Link to="/settings/devis" className="self-end pb-2 text-sm text-primary-700 underline">Créer un modèle de devis</Link>
+        ) : <span />}
         {onImportOffre && (
           <button type="button" onClick={onImportOffre} className="btn-secondary whitespace-nowrap" title="Reprendre les lignes d'une offre de prix fournisseur (PDF)">
             <FileUp className="w-4 h-4 mr-1.5" /> Importer une offre fournisseur
