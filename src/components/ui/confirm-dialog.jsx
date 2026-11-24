@@ -34,7 +34,7 @@ export function ConfirmDialog({
   title = 'Confirmation',
   description = 'Êtes-vous sûr de vouloir continuer ?',
   confirmLabel = 'Confirmer',
-  cancelLabel = 'Annuler',
+  cancelLabel = 'Annuler', // null : un seul bouton (simple information, ex. champ obligatoire du devis)
   variant = 'destructive', // 'destructive' | 'default'
   onConfirm,
   loading = false,
@@ -112,12 +112,14 @@ export function ConfirmDialog({
           )}
 
           <div className="mt-6 flex items-center justify-end gap-3">
-            <AlertDialogPrimitive.Cancel
-              className="px-4 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors focus:outline-none focus:ring-2 focus:ring-secondary-300 max-sm:flex-1 max-sm:py-3"
-              disabled={loading}
-            >
-              {cancelLabel}
-            </AlertDialogPrimitive.Cancel>
+            {cancelLabel && (
+              <AlertDialogPrimitive.Cancel
+                className="px-4 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors focus:outline-none focus:ring-2 focus:ring-secondary-300 max-sm:flex-1 max-sm:py-3"
+                disabled={loading}
+              >
+                {cancelLabel}
+              </AlertDialogPrimitive.Cancel>
+            )}
             <AlertDialogPrimitive.Action
               className={cn(
                 'px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2',

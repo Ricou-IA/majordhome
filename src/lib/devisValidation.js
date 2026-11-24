@@ -10,7 +10,7 @@
 import { computeLineTotals } from './devisCalculs.js';
 
 export const RAISONS_DEVIS = Object.freeze({
-  objet: 'Indiquez l’objet du devis',
+  objet: 'Ajoutez un objet au devis',
   ligne: 'Ajoutez une ligne avec une désignation et un montant',
 });
 

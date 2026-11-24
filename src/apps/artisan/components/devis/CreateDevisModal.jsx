@@ -327,12 +327,10 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
       <ConfirmDialog
         open={manqueOuvert}
         onOpenChange={(o) => { setManqueOuvert(o); if (!o) allerAuManque(); }}
-        title={manques.objet ? 'Renseigner le titre du devis' : 'Ajouter une ligne chiffrée'}
-        description={manques.objet
-          ? 'Le devis ne peut pas être créé sans objet : c’est son titre, celui que lit le client. Saisissez-le en haut de la fenêtre.'
-          : 'Le devis doit contenir au moins une ligne avec une désignation et un montant HT supérieur à 0.'}
-        confirmLabel={manques.objet ? 'Renseigner le titre' : 'Voir les lignes'}
-        cancelLabel="Fermer"
+        title={manques.raison || ''}
+        description={null}
+        confirmLabel="OK"
+        cancelLabel={null}
         variant="default"
         onConfirm={() => { setManqueOuvert(false); allerAuManque(); }}
       />
