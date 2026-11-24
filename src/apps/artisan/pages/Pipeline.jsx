@@ -27,8 +27,10 @@ import { PageHeader } from '@/components/ui/page-header';
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
+const ONGLETS_PIPELINE = ['dashboard', 'kanban', 'long-term'];
+
 export default function Pipeline() {
-  const { organization, loading: authLoading } = useAuth();
+  const { organization, user, loading: authLoading } = useAuth();
   const { can } = useCanAccess();
 
   // État modale lead
@@ -41,13 +43,25 @@ export default function Pipeline() {
 
   // Onglet actif (supporte ?tab=kanban depuis le dashboard)
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'dashboard');
+  // Dernier onglet ouvert retenu par utilisateur : revenir par le menu ne ramène plus sur Statistiques
+  // (recette 2026-11-24). L'adresse (?tab=) prime.
+  const cleOnglet = `mdh-pipeline-onglet:${user?.id || 'anonyme'}`;
+  const [activeTab, setActiveTab] = useState(() => {
+    const demande = searchParams.get('tab');
+    if (ONGLETS_PIPELINE.includes(demande)) return demande;
+    try {
+      const retenu = localStorage.getItem(cleOnglet);
+      if (ONGLETS_PIPELINE.includes(retenu)) return retenu;
+    } catch { /* stockage indisponible */ }
+    return 'dashboard';
+  });
   // Commercial sur lequel le Kanban s'ouvre quand on vient du bloc « À traiter » du Dashboard
   const [kanbanCommercialId, setKanbanCommercialId] = useState('');
 
   // L'onglet est écrit dans l'adresse (?tab=) : un retour sur la page rouvre le même (recette 2026-11-24).
   const ecrireOnglet = (tab) => {
     setActiveTab(tab);
+    try { localStorage.setItem(cleOnglet, tab); } catch { /* stockage indisponible */ }
     setSearchParams((prev) => {
       if (prev.get('tab') === tab) return prev;
       const p = new URLSearchParams(prev);

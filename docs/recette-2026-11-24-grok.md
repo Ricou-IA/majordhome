@@ -240,3 +240,25 @@ Termine par :
 - **E5. Enregistrer les jours d'ouverture** (par exemple ajouter le samedi) → le Planning montre six colonnes ; remettre lundi au vendredi.
 - **E6. Encaissé → Réalisé** : glisser une carte de la colonne « Encaissé » vers « Réalisé », puis « Annuler » au toast.
 - **E7. Fournisseur** : n° de compte client, identifiant du compte en ligne (« Afficher » pour l'administrateur seul) ; « Importer un devis ou une facture » sur une facture fournisseur. ⚠ L'edge `supplier-offer-import` n'a pas été redéployée avec la lecture du type de document : à faire avant ce test.
+
+---
+
+## Retour de Grok du 2026-11-24 et corrections (commit `2f7bf5a2`)
+
+Bilan de Grok : 25 OK, 4 KO, 6 À VOIR. Après vérification dans le code et en base :
+
+- **Corrigés, à refaire** : H17 (curseur dans Objet), H7 (vignettes étroites), H4 (heures « 8 h 00 », titre du mois à majuscule initiale), H22 (pastilles de Réalisé), H29 (« Boutique », recherche « iban »), remarques 1 (fiche d'un devis : menu « … » et Échap), 2 (corbeilles des fournisseurs), 4 (erreur brute du journal des invitations), 5 (onglet des Leads dans l'adresse).
+- **Pas un défaut** : H28 (le menu « … » n'existe que sur un chantier sans devis validé, la base refuse de supprimer les autres), H19 (« Modifier l'article » seulement sur une ligne liée à un article ; les capitales des chapitres sont les titres enregistrés dans les réglages de Mayer), H13 (une pastille à la fois, c'est recherche + pastille qui se cumulent), H20 (« Afficher les marges » est dans l'en-tête du devis ; « Afficher les suivants » au-delà de 100 résultats), H26 (la liste est dans Entretiens → Contrats), H33 (un seul lien en tête ; 708 seul seulement sans compte lu).
+- **Restent ouverts** : capitales des chapitres de Mayer (réécrire ses réglages : décision d'Eric), fiche d'un membre enregistrée sans bouton (décision d'Eric), lenteur de la recherche « granulés » (2,7 s vus par Grok, 84 ms mesurés en base à la livraison : à mesurer dans le navigateur).
+
+### Retest des corrections
+
+- [ ] **H36. Curseur après « Ajoutez un objet au devis » (retest H17).** Nouveau devis, objet vide, « Créer le devis », « OK ». Attendu : le curseur clignote dans le champ Objet.
+- [ ] **H37. Vignettes étroites (retest H7).** Planning, vue Semaine, jour à plusieurs personnes. Attendu : l'heure entière (« 14h30 »), les repères dessous si la place manque, le nom coupé entre deux syllabes avec un tiret ; infobulle complète au survol.
+- [ ] **H38. Heures et titre du planning (retest H4/H5).** Attendu : grille « 8 h 00, 9 h 00… » ; titre « Novembre 2026 » et « Janvier 2027 », même majuscule.
+- [ ] **H39. Pastilles d'une carte Réalisé (retest H22).** Entretiens → tableau, colonne Réalisé. Attendu : aucune pastille coupée ; dans une carte étroite, icônes seules, libellé au survol.
+- [ ] **H40. Paramètres (retest H29).** Attendu : groupe « Boutique » ; « iban » trouve la tuile Pennylane.
+- [ ] **H41. Fiche d'un devis.** Ouvre un devis depuis une fiche client ou `/devis`. Attendu : plus de corbeille à côté de « Générer PDF » ; menu « … » en bas à gauche avec Dupliquer, Enregistrer en devis type, Supprimer le devis (ne clique pas) ; Échap ferme la fenêtre.
+- [ ] **H42. Fournisseurs.** Paramètres → Fournisseurs & catalogue. Attendu : plus de corbeille rouge sur les lignes ; un menu « … » par fournisseur et par produit, avec « Supprimer » (ne clique pas). Ouvrir le menu n'ouvre pas la fiche du fournisseur.
+- [ ] **H43. Onglet des Leads.** Leads → onglet Pipeline, va sur une autre page, reviens par le menu, puis F5. Attendu : l'adresse contient `?tab=kanban` ; en revenant par le menu comme après F5, la page rouvre sur Pipeline (dernier onglet retenu pour toi).
+- [ ] **H44. Journal des invitations.** Entretiens → tableau de bord, journal des planifications. Attendu : la ligne du 30/09 dit « Erreur réseau : passage interrompu, repris au suivant », le détail au survol.
