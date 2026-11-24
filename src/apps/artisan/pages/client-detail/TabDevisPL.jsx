@@ -8,13 +8,13 @@
 
 import {
   FileText,
-  Loader2,
   AlertCircle,
   RefreshCw,
   FileDown,
 } from 'lucide-react';
 import { usePennylaneQuotes } from '@hooks/usePennylane';
 import { formatEuro } from '@/lib/utils';
+import { LignesSquelette } from '@/components/ui/squelette';
 
 // =============================================================================
 // STATUS CONFIG
@@ -92,12 +92,7 @@ export function TabDevisPL({ clientId, orgId }) {
 
   // Loading
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
-        <span className="ml-2 text-sm text-secondary-500">Chargement des devis Pennylane...</span>
-      </div>
-    );
+    return <LignesSquelette nombre={3} libelle="Chargement des devis Pennylane" className="py-2" />;
   }
 
   // Erreur

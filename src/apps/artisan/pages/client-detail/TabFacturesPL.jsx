@@ -11,7 +11,6 @@
 import { useState } from 'react';
 import {
   Receipt,
-  Loader2,
   AlertCircle,
   RefreshCw,
   FileDown,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react';
 import { usePennylaneInvoices } from '@hooks/usePennylane';
 import { formatEuro } from '@/lib/utils';
+import { LignesSquelette } from '@/components/ui/squelette';
 
 // =============================================================================
 // STATUS CONFIG
@@ -263,12 +263,7 @@ export function TabFacturesPL({ clientId, orgId }) {
   const { invoices, isLoading, error, refetch } = usePennylaneInvoices(clientId, orgId);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
-        <span className="ml-2 text-sm text-secondary-500">Chargement des factures Pennylane...</span>
-      </div>
-    );
+    return <LignesSquelette nombre={3} libelle="Chargement des factures Pennylane" className="py-2" />;
   }
 
   if (error) {

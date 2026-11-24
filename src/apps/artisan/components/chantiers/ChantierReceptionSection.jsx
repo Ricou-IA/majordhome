@@ -145,7 +145,7 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
         const libelles = {
           planification: 'Appros reçues : pose confirmée, chantier déplacé en « Planifié »',
           commande_recue: 'Chantier déplacé en « À planifier »',
-          commande_a_faire: 'Chantier repassé en « Commande à faire »',
+          commande_a_faire: 'Chantier repassé en « À commander »',
         };
         toast.success(libelles[res.newChantierStatus] || 'Statut du chantier mis à jour');
       }

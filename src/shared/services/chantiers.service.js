@@ -24,7 +24,7 @@ import { CAMPAGNE_AVIS_POSE } from '@/lib/chantierApresVente';
 // `hint` : ce que l'étape veut dire, affiché sous le titre de la colonne (Eric 2026-11-17).
 export const CHANTIER_STATUSES = [
   { value: 'gagne', label: 'Gagné', hint: 'Devis signé', color: '#10B981', display_order: 1 },
-  { value: 'commande_a_faire', label: 'Commande à faire', hint: 'Acompte versé, à commander', color: '#F59E0B', display_order: 2 },
+  { value: 'commande_a_faire', label: 'À commander', hint: 'Acompte versé, à commander', color: '#F59E0B', display_order: 2 },
   { value: 'commande_recue', label: 'À planifier', hint: 'Commandes reçues, pose à dater', color: '#3B82F6', display_order: 3 },
   { value: 'planification', label: 'Planifié', hint: 'Pose au planning', color: '#8B5CF6', display_order: 4 },
   { value: 'realise', label: 'Réceptionné', hint: 'Pose terminée et réceptionnée', color: '#6B7280', display_order: 5 },

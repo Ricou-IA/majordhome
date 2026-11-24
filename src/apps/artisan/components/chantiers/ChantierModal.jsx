@@ -42,6 +42,7 @@ import { GroupChantiersDialog } from './GroupChantiersDialog';
 import { PoserRdvModal } from '@apps/artisan/components/planning/PoserRdvModal';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { logger } from '@lib/logger';
+import { MenuActions } from '@/components/ui/menu-actions';
 
 export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, canEditAll = true }) {
   const { organization, user } = useAuth();
@@ -426,7 +427,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-secondary-300 text-secondary-500 bg-white transition-colors hover:shadow-sm hover:bg-secondary-100 disabled:opacity-50"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
-                    {config.label}
+                    Revenir à « {config.label} »
                   </button>
                 );
               })}
@@ -437,11 +438,13 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                   <Layers className="w-3.5 h-3.5" /> Grouper avec…
                 </button>
               )}
+              {/* Supprimer : menu « … », jamais à côté des boutons de statut (brief UX, règle 2) */}
               {canDelete && (
-                <button type="button" onClick={() => setShowDelete(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-red-600 hover:bg-red-50">
-                  <Trash2 className="w-3.5 h-3.5" /> Supprimer ce chantier
-                </button>
+                <MenuActions
+                  libelle="Autres actions sur le chantier"
+                  align="start"
+                  actions={[{ label: 'Supprimer ce chantier', icon: Trash2, danger: true, onClick: () => setShowDelete(true) }]}
+                />
               )}
 
               <div className="flex-1" />
@@ -464,7 +467,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                       backgroundColor: `${config.color}08`,
                     }}
                   >
-                    {config.label}
+                    Passer à « {config.label} »
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 );
