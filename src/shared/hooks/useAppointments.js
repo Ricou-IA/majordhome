@@ -552,6 +552,72 @@ export function useChantierAppointments(orgId, chantierId) {
   return { appointments: data || [], isLoading, error, refresh: refetch };
 }
 
+/**
+ * Jours de pose de TOUS les chantiers d'un lead, avec les chantiers (libellé, montant).
+ * Un lead peut porter plusieurs chantiers (un par devis validé) : la fenêtre d'un RDV
+ * d'installation les montre tous, sinon un jour d'un autre chantier reste introuvable
+ * depuis le RDV ouvert. Regroupement : `joursParChantier` (src/lib/joursIntervention.js).
+ * @returns {{ rdvs: object[]|undefined, chantiers: object[]|undefined, isLoading: boolean, error: Error|null }}
+ *   `undefined` tant que rien n'est lu (chargement ou échec) : jamais « aucun jour » supposé.
+ */
+export function usePosesDuLead(orgId, leadId) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: appointmentKeys.posesDuLead(orgId, leadId),
+    queryFn: async () => {
+      const mhOrg = await getMajordhomeOrgId(orgId);
+      const [rdvRes, chantierRes] = await Promise.all([
+        supabase
+          .from('majordhome_appointments')
+          .select('*')
+          .eq('org_id', mhOrg)
+          .eq('lead_id', leadId)
+          .eq('appointment_type', 'installation')
+          .not('status', 'in', '(cancelled,no_show)'),
+        supabase
+          .from('majordhome_chantiers')
+          .select('*')
+          .eq('org_id', orgId)
+          .eq('lead_id', leadId),
+      ]);
+      if (rdvRes.error) throw rdvRes.error;
+      if (chantierRes.error) throw chantierRes.error;
+      const rdvs = rdvRes.data || [];
+      if (rdvs.length === 0) return { rdvs, chantiers: chantierRes.data || [] };
+      // Personnes de chaque jour (vue miroir simple : 2ᵉ requête + merge)
+      const { data: liens, error: lienError } = await supabase
+        .from('majordhome_appointment_technicians')
+        .select('appointment_id, technician_id')
+        .in('appointment_id', rdvs.map((r) => r.id));
+      if (lienError) throw lienError;
+      const parRdv = new Map();
+      (liens || []).forEach((l) => parRdv.set(l.appointment_id, [...(parRdv.get(l.appointment_id) || []), l.technician_id]));
+      return {
+        rdvs: rdvs.map((r) => ({ ...r, technician_ids: parRdv.get(r.id) || [] })),
+        chantiers: chantierRes.data || [],
+      };
+    },
+    enabled: !!orgId && !!leadId,
+    staleTime: 15_000,
+  });
+  return { rdvs: data?.rdvs, chantiers: data?.chantiers, isLoading, error: error || null };
+}
+
+/**
+ * Supprimer un RDV autre que celui de la fenêtre ouverte (un jour de pose du bloc
+ * « Jours de pose »). Mêmes recharges que la suppression du planning. Rejette sur refus.
+ */
+export function useSupprimerRdv(orgId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (appointmentId) => unwrapResult(appointmentsService.deleteAppointment(appointmentId)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
+    },
+  });
+}
+
 // ============================================================================
 // EXPORTS
 // ============================================================================

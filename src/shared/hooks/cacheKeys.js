@@ -115,6 +115,8 @@ export const appointmentKeys = {
   // Coordonnées du lieu d'un RDV en cours de pose (client géocodé, sinon adresse saisie)
   rdvCoords: (orgId, cle) => [...appointmentKeys.all(orgId), 'rdv-coords', cle],
   chantier: (orgId, chantierId) => [...appointmentKeys.all(orgId), 'chantier', chantierId],
+  // Jours de pose de tous les chantiers d'un lead (bloc « Jours de pose » de la fenêtre du RDV)
+  posesDuLead: (orgId, leadId) => [...appointmentKeys.all(orgId), 'poses-lead', leadId],
   // Appros des chantiers des RDV d'installation affichés (pose provisoire hachurée)
   chantierOrders: (orgId, chantierIds) => [...appointmentKeys.all(orgId), 'chantier-orders', chantierIds],
   quotedLeads: (orgId, leadIds) => [...appointmentKeys.all(orgId), 'quoted-leads', leadIds],

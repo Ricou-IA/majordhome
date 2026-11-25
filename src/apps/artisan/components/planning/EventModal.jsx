@@ -57,6 +57,7 @@ import { ParcoursJournee } from './ParcoursJournee';
 import { useCoordonneesRdv } from '@hooks/useCoordonneesRdv';
 import { useAppointmentEntretien } from './useAppointmentEntretien';
 import { EventModalHeader, EventModalFooter } from './EventModalFrame';
+import { JoursDePoseSection } from './JoursDePoseSection';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -619,6 +620,17 @@ export function EventModal({
                       }
                       : null
                   }
+                />
+              )}
+
+              {/* Installation : tous les jours de pose du client, par chantier (Eric 2026-11-25 :
+                  « on n'a que la date du jour »). Les autres jours s'y suppriment. */}
+              {editIdle && appointment?.appointment_type === 'installation' && appointment?.lead_id && (
+                <JoursDePoseSection
+                  orgId={orgId}
+                  appointment={appointment}
+                  members={allTeamMembers}
+                  disabled={isCancelled}
                 />
               )}
 
