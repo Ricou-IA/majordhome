@@ -18,8 +18,8 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { GripVertical } from 'lucide-react';
 import { decouperMessage } from '@/lib/smsCampaigns';
-import { ecrire, lire, etiquette, etiquetteVoisine, suite, pointDeDepot, curseurApres } from './champMessageDom';
-import { plageDans, placerCurseur } from '@apps/artisan/components/mailing/editeur/editeurDom';
+import { ecrire, lire, etiquette, etiquetteVoisine, suite, pointDeDepot } from './champMessageDom';
+import { curseurApres, plageDans, placerCurseur } from '@apps/artisan/components/mailing/editeur/editeurDom';
 
 /** Ce que porte une étiquette qu'on glisse ; `text/plain` l'accompagne pour que le navigateur montre où elle tombera. */
 const MIME_ETIQUETTE = 'application/x-mdh-etiquette';

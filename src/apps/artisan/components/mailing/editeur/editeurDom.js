@@ -41,6 +41,16 @@ export function placerCurseur(n, ou) {
   sel.addRange(r);
 }
 
+/** Curseur juste après ce nœud (une étiquette qu'on vient de poser : le curseur ne doit jamais rester dedans). */
+export function curseurApres(n) {
+  const r = document.createRange();
+  r.setStartAfter(n);
+  r.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
 /** Bloc du texte (enfant direct de l'éditeur) qui contient ce point. */
 export function blocRacine(ed, n, offset = 0) {
   if (n === ed) return ed.childNodes[Math.min(offset, ed.childNodes.length - 1)] ?? null;

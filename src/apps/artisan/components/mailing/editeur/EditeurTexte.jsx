@@ -22,7 +22,7 @@ import { depuisEditeur, versEditeur } from '@lib/mailCorps';
 import BarreOutils from './BarreOutils';
 import FenetreLien from './FenetreLien';
 import {
-  basculerEncadre, blocRacine, elementDe, estBouton, estElement, estEtiquette, estFixe, estVariableBloc, garantirParagraphes,
+  basculerEncadre, blocRacine, curseurApres, elementDe, estBouton, estElement, estEtiquette, estFixe, estVariableBloc, garantirParagraphes,
   insererApres, nouveauParagraphe, placerCurseur, plageDans, rangerTexteRacine, reparerBoutons, sortirEncadreParEntree, texteDeCollage, voisin,
 } from './editeurDom';
 
@@ -170,15 +170,29 @@ export default function EditeurTexte({ valeur, version, onChange, variables = []
     el.className = v.bloc ? 'variable-bloc' : 'variable-mail';
     el.textContent = v.libelle;
     if (v.bloc) { poserBloc(el); return; }
-    // Le navigateur sérialise l'élément construit ci-dessus ; l'insertion reste annulable (Ctrl+Z).
-    executer('insertHTML', el.outerHTML);
-    // Une espace après l'étiquette, sauf s'il y en a déjà une : le curseur ne reste pas collé contre elle.
-    const plage = plageDans(ref.current);
-    const suite = plage && voisin(ref.current, plage, 1);
-    const car = suite?.nodeType === 3 ? suite.textContent[suite === plage.startContainer ? plage.startOffset : 0] : null;
-    if (!car || !/\s/.test(car)) document.execCommand('insertText', false, ' ');
+    // L'étiquette est posée directement dans le texte, pas par `insertHTML` : le navigateur traite un élément
+    // non modifiable comme un bloc. Mesuré dans Chrome le 2026-11-25 avec cet éditeur : en fin de paragraphe,
+    // de titre ou d'encadré il l'envoyait dans un paragraphe à elle ; dans une liste il n'en gardait que le
+    // libellé (du texte, plus une information) ; et il laissait le curseur DANS l'étiquette, où rien ne s'écrit,
+    // pas même une seconde étiquette. Contrepartie : Ctrl+Z ne la retire pas, Retour arrière l'efface d'un coup.
+    const ed = ref.current;
+    const plage = restaurer();
+    if (!plage) return;
+    plage.deleteContents();
+    // Ligne vide : son retour d'attente resterait devant l'étiquette, qui passerait à la ligne suivante.
+    const hote = plage.startContainer;
+    if (hote.nodeType === 1 && hote !== ed && hote.childNodes.length === 1 && hote.firstChild.nodeName === 'BR') hote.firstChild.remove();
+    plage.insertNode(el);
+    rangerTexteRacine(ed);
+    curseurApres(el);
+    // Une espace après l'étiquette, sauf devant une espace, une virgule ou un point : le curseur ne reste pas collé contre elle.
+    // Pas dans le libellé d'un bouton : l'espace tomberait hors du bouton, et la suite du libellé avec elle.
+    const ici = plageDans(ed);
+    const suite = ici && voisin(ed, ici, 1);
+    const car = suite?.nodeType === 3 ? suite.textContent[suite === ici.startContainer ? ici.startOffset : 0] : null;
+    if (!el.closest('a[data-bouton]') && (!car || !/[\s,.]/.test(car))) document.execCommand('insertText', false, ' ');
     apres();
-  }, [executer, poserBloc, apres]);
+  }, [restaurer, poserBloc, apres]);
 
   /** Fenêtre de lien sur le lien ou le bouton sous le curseur, ou pour en poser un. */
   const ouvrirFenetre = useCallback((mode) => {

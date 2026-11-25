@@ -90,16 +90,6 @@ export function suite(ed, plage) {
   return '';
 }
 
-/** Curseur juste après ce nœud. */
-export function curseurApres(n) {
-  const r = document.createRange();
-  r.setStartAfter(n);
-  r.collapse(true);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(r);
-}
-
 /** Point du texte sous la souris, au dépôt ; lâché sur une étiquette, le point est juste après elle. */
 export function pointDeDepot(ed, x, y) {
   let pos = document.caretRangeFromPoint?.(x, y) ?? null;
