@@ -623,9 +623,13 @@ export function EventModal({
                 />
               )}
 
-              {/* Installation : tous les jours de pose du client, par chantier (Eric 2026-11-25 :
-                  « on n'a que la date du jour »). Les autres jours s'y suppriment. */}
-              {editIdle && appointment?.appointment_type === 'installation' && appointment?.lead_id && (
+              {/* Autres jours du RDV (Eric 2026-11-25 : « on n'a que la date du jour ») :
+                  installation = jours de pose du client par chantier ; entretien / SAV = RDV
+                  de la même carte. Les autres jours s'y suppriment. */}
+              {editIdle && (
+                (appointment?.appointment_type === 'installation' && appointment?.lead_id)
+                || (['service', 'maintenance'].includes(appointment?.appointment_type) && appointment?.intervention_id)
+              ) && (
                 <JoursDePoseSection
                   orgId={orgId}
                   appointment={appointment}

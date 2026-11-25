@@ -1,7 +1,7 @@
 // Tests du module pur src/lib/joursIntervention.js — `node --test scripts/jours-intervention.test.mjs`
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { joursParChantier } from '../src/lib/joursIntervention.js';
+import { joursParChantier, joursDeLaCarte } from '../src/lib/joursIntervention.js';
 
 const rdv = (id, chantierId, date, extra = {}) => ({
   id, chantier_id: chantierId, scheduled_date: date, scheduled_start: '08:00:00',
@@ -46,4 +46,17 @@ test('installation sans chantier rattaché : groupe à part (chantierId null)', 
 
 test('listes absentes : aucun plantage', () => {
   assert.deepEqual(joursParChantier(undefined, undefined, null), []);
+});
+
+test('carte SAV : RDV actifs dans l\'ordre, annulés et absences écartés', () => {
+  const sav = (id, date, start, status = 'scheduled') => ({ id, scheduled_date: date, scheduled_start: start, status, appointment_type: 'service' });
+  const j = joursDeLaCarte([
+    sav('suite', '2026-12-03', '08:00:00'),
+    sav('annule', '2026-12-02', '08:00:00', 'cancelled'),
+    sav('aprem', '2026-12-01', '14:00:00'),
+    sav('matin', '2026-12-01', '08:00:00'),
+    sav('absent', '2026-12-04', '08:00:00', 'no_show'),
+  ]);
+  assert.deepEqual(j.map((r) => r.id), ['matin', 'aprem', 'suite']);
+  assert.deepEqual(joursDeLaCarte(undefined), []);
 });

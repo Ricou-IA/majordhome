@@ -6,6 +6,8 @@
  * invisibles depuis le RDV ouvert (vécu CONDOM 2026-11-25 : 16/12 et 24/12, deux cartes
  * « Devis »). Cette règle regroupe les RDV d'installation du lead par chantier, celui du
  * RDV ouvert en premier.
+ * Même besoin pour un SAV ou un entretien posé sur plusieurs jours (« Programmer une suite ») :
+ * `joursDeLaCarte` liste les RDV actifs d'une même carte.
  */
 
 const INACTIFS = new Set(['cancelled', 'no_show']);
@@ -44,4 +46,13 @@ export function joursParChantier(rdvs, chantiers, chantierCourantId) {
     if (a.courant !== b.courant) return a.courant ? -1 : 1;
     return (a.jours[0]?.scheduled_date || '').localeCompare(b.jours[0]?.scheduled_date || '');
   });
+}
+
+/**
+ * RDV actifs d'une carte Entretien / SAV (même `intervention_id`), dans l'ordre chronologique.
+ * @param {object[]} rdvs
+ * @returns {object[]}
+ */
+export function joursDeLaCarte(rdvs) {
+  return (rdvs || []).filter((r) => !INACTIFS.has(r.status)).sort(parDate);
 }

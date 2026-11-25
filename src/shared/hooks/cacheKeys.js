@@ -117,6 +117,8 @@ export const appointmentKeys = {
   chantier: (orgId, chantierId) => [...appointmentKeys.all(orgId), 'chantier', chantierId],
   // Jours de pose de tous les chantiers d'un lead (bloc « Jours de pose » de la fenêtre du RDV)
   posesDuLead: (orgId, leadId) => [...appointmentKeys.all(orgId), 'poses-lead', leadId],
+  // RDV d'une même carte Entretien / SAV (bloc « Jours d'intervention » de la fenêtre du RDV)
+  rdvsDeLaCarte: (orgId, interventionId) => [...appointmentKeys.all(orgId), 'rdvs-carte', interventionId],
   // Appros des chantiers des RDV d'installation affichés (pose provisoire hachurée)
   chantierOrders: (orgId, chantierIds) => [...appointmentKeys.all(orgId), 'chantier-orders', chantierIds],
   quotedLeads: (orgId, leadIds) => [...appointmentKeys.all(orgId), 'quoted-leads', leadIds],
