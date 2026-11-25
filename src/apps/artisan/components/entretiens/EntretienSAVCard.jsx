@@ -34,6 +34,7 @@ import { generateInvoicePdfBlob } from '../facturation/InvoicePDF';
 import CancelInvoiceDialog from '../facturation/CancelInvoiceDialog';
 import SendInvoiceEmailDialog from '../facturation/SendInvoiceEmailDialog';
 import FacturerEntretienDialog from './FacturerEntretienDialog';
+import FacturerSavDialog from './FacturerSavDialog';
 import { SAVUrgencyBadge } from './SAVUrgency';
 import { montantDevisSav, devisDeReference } from '@/lib/savDevis';
 import { mentionProjet } from '@/lib/savProjet';
@@ -127,10 +128,11 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
   // Anomalies relevées sur les certificats (racine + enfants), agrégées par la vue — la
   // source reste le certificat (spec 2026-10-10). Visibles sans ouvrir la fiche.
   const anomalies = anomaliesDeCarte(item);
-  // Push MDH → Pennylane (spec 2026-09-21) : entretiens seulement, org avec PL activé.
-  // Les SAV restent hors périmètre (montant issu d'un devis PL).
-  // Mode hub : Majord'home émet lui-même, l'intégration Pennylane n'est pas requise.
-  const canPushInvoice = (pennylaneEnabled || isHubMode) && type === 'entretien';
+  // Push MDH → Pennylane (spec 2026-09-21), org avec PL activé. Mode hub : Majord'home émet
+  // lui-même (entretiens seulement). SAV (Eric 2026-11-25) : fenêtre de facturation qui reprend
+  // le devis Majord'home de la carte, sinon des lignes à saisir — Pennylane seulement.
+  const canPushInvoice = (type === 'entretien' && (pennylaneEnabled || isHubMode))
+    || (type === 'sav' && pennylaneEnabled && !isHubMode);
   // Envoi de la facture par e-mail (module Communication, spec 2026-09-23) : renvoi depuis
   // la carte facturée, indépendant du mode hub/Pennylane.
   const canSendInvoiceEmail = moduleActif(settings, 'communication') && !!item.invoice_id && type === 'entretien';
@@ -498,13 +500,23 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
       {/* Fenêtres ouvertes depuis la carte : le portail Radix remonte les clics React jusqu'à la carte, on les arrête ici. */}
       {invoiceOpen && (
         <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-          <FacturerEntretienDialog
-            item={item}
-            orgId={orgId}
-            open={invoiceOpen}
-            onOpenChange={setInvoiceOpen}
-            onCreated={() => onRefresh?.()}
-          />
+          {type === 'sav' ? (
+            <FacturerSavDialog
+              item={item}
+              orgId={orgId}
+              open={invoiceOpen}
+              onOpenChange={setInvoiceOpen}
+              onCreated={() => onRefresh?.()}
+            />
+          ) : (
+            <FacturerEntretienDialog
+              item={item}
+              orgId={orgId}
+              open={invoiceOpen}
+              onOpenChange={setInvoiceOpen}
+              onCreated={() => onRefresh?.()}
+            />
+          )}
         </div>
       )}
       {cancelOpen && (
