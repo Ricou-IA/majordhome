@@ -45,10 +45,10 @@ export function zoneDeCarte(item) {
 /**
  * Colonne affichée d'une carte ; null = la carte n'est pas montrée dans le kanban.
  * Une demande SAV reliée à un projet (devis de remplacement, `item.projet` posé par
- * `etatProjet` de savProjet.js) suit ce projet tant qu'elle n'a pas été reprise en SAV :
- * devis en attente ou chantier créé → hors kanban (le projet se suit dans le pipeline,
- * Eric 2026-11-25) ; devis refusé → « Demande » ; projet pas encore lu → « Devis envoyé »
- * (jamais masquée sur une lecture inconnue).
+ * `etatProjet` de savProjet.js) suit ce projet : devis en attente ou chantier créé → hors
+ * kanban, même planifiée (le projet se suit dans Leads et Chantiers, Eric 2026-11-25/26),
+ * sauf réalisée ou facturée ; devis refusé → « Demande » si elle n'était pas planifiée ;
+ * projet pas encore lu → « Devis envoyé » (jamais masquée sur une lecture inconnue).
  *
  * @param {{ workflow_status?: (string|null), projet?: ({ etat?: string } | null) } | null | undefined} item
  * @param {'sav' | 'entretien' | null} [zone] kanban affiché (défaut : colonnes du SAV)
@@ -60,9 +60,11 @@ export function colonneDeCarte(item, zone = null) {
   if (statut === 'pieces_commandees') return 'a_planifier';
   const avantPlanification = ['demande', 'devis_envoye'].includes(statut);
   if (zone === 'entretien') return avantPlanification ? 'a_planifier' : statut;
+  const projet = item.projet?.etat;
+  // Passée en projet (devis en attente ou chantier) : suivie dans Leads / Chantiers, même
+  // planifiée (BOYER, Eric 2026-11-26). Seule une carte réalisée ou facturée reste ici.
+  if ((projet === 'chantier' || projet === 'en_cours') && !['realise', 'facture'].includes(statut)) return null;
   if (avantPlanification) {
-    const projet = item.projet?.etat;
-    if (projet === 'chantier' || projet === 'en_cours') return null;
     if (projet === 'perdu') return 'demande';
     if (projet === 'inconnu') return 'devis_envoye';
   }

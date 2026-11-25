@@ -72,7 +72,7 @@ test('etatProjet : chantier > perdu > en cours ; lead sorti du pipeline ⇒ abse
   assert.equal(etatProjet(carte(), { chantiers: [], cartes: [{ lead_id: 'autre', column_key: 'gagne' }] }).etat, 'absent');
 });
 
-test('colonneDeCarte : la demande suit son projet tant qu\'elle n\'est pas reprise en SAV', () => {
+test("colonneDeCarte : la demande suit son projet jusqu'à sa réalisation", () => {
   const avec = (etat, workflow_status = 'devis_envoye') => ({ intervention_type: 'sav', workflow_status, projet: { etat } });
   // Devis en attente : la demande est suivie dans le pipeline, elle quitte le SAV.
   assert.equal(colonneDeCarte(avec('en_cours'), 'sav'), null);
@@ -81,8 +81,12 @@ test('colonneDeCarte : la demande suit son projet tant qu\'elle n\'est pas repri
   assert.equal(colonneDeCarte(avec('perdu'), 'sav'), 'demande');
   assert.equal(colonneDeCarte(avec('chantier'), 'sav'), null);
   assert.equal(colonneDeCarte(avec('absent'), 'sav'), 'devis_envoye');
-  // Carte reprise en SAV (planifiée, réalisée) : son statut fait foi, même si un chantier existe.
-  assert.equal(colonneDeCarte(avec('chantier', 'planifie'), 'sav'), 'planifie');
+  // Projet en cours ou chantier : hors du SAV même planifiée ; réalisée ou facturée, elle reste (facturation).
+  assert.equal(colonneDeCarte(avec('chantier', 'planifie'), 'sav'), null); // BOYER
+  assert.equal(colonneDeCarte(avec('en_cours', 'a_planifier'), 'sav'), null);
+  assert.equal(colonneDeCarte(avec('chantier', 'realise'), 'sav'), 'realise');
+  assert.equal(colonneDeCarte(avec('chantier', 'facture'), 'sav'), 'facture');
+  assert.equal(colonneDeCarte(avec('perdu', 'planifie'), 'sav'), 'planifie');
   assert.equal(colonneDeCarte(avec('perdu', 'realise'), 'sav'), 'realise');
   // Côté Entretiens (entretien ajouté) : l'entretien reste à faire, le projet ne masque rien.
   assert.equal(colonneDeCarte(avec('chantier'), 'entretien'), 'a_planifier');
