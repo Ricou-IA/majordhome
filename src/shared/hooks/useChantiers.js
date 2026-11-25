@@ -88,6 +88,7 @@ export function useDemanderAvisPose() {
       campaign: CAMPAGNE_AVIS_POSE,
       clientId: chantier.client_id,
       clientFirstName: chantier.first_name,
+      clientName: chantier.last_name,
       clientPhone: chantier.phone,
       orgId,
     })),

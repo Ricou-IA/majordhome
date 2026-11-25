@@ -1192,7 +1192,7 @@ export const savService = {
   /**
    * Envoie une demande d'avis client (WhatsApp + fallback SMS) via N8N
    */
-  async sendAvisRequest({ interventionId = null, clientId, clientFirstName, clientPhone, clientPhoneSecondary, orgId, campaign = 'avis_j1' }) {
+  async sendAvisRequest({ interventionId = null, clientId, clientFirstName, clientName, clientPhone, clientPhoneSecondary, orgId, campaign = 'avis_j1' }) {
     // Normaliser pour dédupliquer (ex: "06 12..." et "0612...")
     const normalize = (phone) => String(phone || '').replace(/[\s.-]/g, '');
 
@@ -1227,7 +1227,7 @@ export const savService = {
         org_id: orgId,
         client_id: clientId,
         intervention_id: interventionId,
-        vars: { first_name: clientFirstName || '' },
+        vars: { first_name: clientFirstName || '', name: clientName || '' },
       });
 
       if (error) {
@@ -1267,6 +1267,7 @@ export const savService = {
       intervention_id: appointment.intervention_id || undefined,
       vars: buildRappelRdvVars({
         clientFirstName: appointment.client_first_name,
+        clientLastName: appointment.client_name,
         date: appointment.scheduled_date,
         startTime: appointment.scheduled_start,
         technicianName,

@@ -244,6 +244,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
       interventionId: item.id,
       clientId: item.client_id,
       clientFirstName: item.client_first_name,
+      clientName: item.client_last_name,
       clientPhone: item.client_phone,
       clientPhoneSecondary: item.client_phone_secondary,
       orgId,

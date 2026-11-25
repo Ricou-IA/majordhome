@@ -333,7 +333,7 @@ async function relances(admin: Admin, d: Donnees, dryRun: boolean, report: OrgRe
     if (dryRun) { report.relances.sms += 1; continue; }
     const res = await sendCampaignSms(admin, {
       orgId: d.coreOrgId, sms: sms!, campaign: SMS_CAMPAIGN, phone, clientId: String(inv.client_id),
-      vars: { first_name: capitaliserPrenom(String(cl?.first_name ?? "")), entreprise: brand },
+      vars: { first_name: capitaliserPrenom(String(cl?.first_name ?? "")), name: String(cl?.last_name ?? "").trim(), entreprise: brand },
     });
     if (res.ok) {
       report.relances.sms += 1;

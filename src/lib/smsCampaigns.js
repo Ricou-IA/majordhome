@@ -13,6 +13,12 @@
 // Les gabarits eux-mêmes vivent dans `core.organizations.settings.sms.templates`
 // (édités par l'org) et sont rendus par `_shared/sms.ts` ({{variable}} → valeur).
 //
+// Une variable = { name, tag, label } : `name` est la clé envoyée par l'émetteur, écrite
+// `{{name}}` dans le gabarit enregistré ; `tag` est l'étiquette que l'utilisateur glisse dans
+// le message (il ne tape jamais d'accolades) ; `label` la décrit au survol.
+// Le prénom seul est trop familier (Eric 2026-11-25) : toute campagne qui a le prénom a aussi
+// le nom, et les textes suggérés disent « Bonjour prénom nom ».
+//
 // ⚠ Ajouter une campagne = une entrée ici + le gabarit saisi dans l'onglet SMS.
 // Sans gabarit, l'envoi répond `campaign_template_missing` : l'appelant doit le
 // traiter comme une information (toast / compteur), jamais comme une erreur bloquante.
@@ -27,16 +33,17 @@ export const SMS_CAMPAIGNS = [
     label: 'Demande d’avis après entretien',
     trigger: 'Bouton « Avis » d’une carte SAV / entretien réalisée (onglet Entretiens).',
     variables: [
-      { name: 'first_name', label: 'Prénom du client' },
-      { name: 'short_link', label: 'Lien court vers la page d’avis (généré à l’envoi)' },
+      { name: 'first_name', tag: 'Prénom', label: 'Prénom du client' },
+      { name: 'name', tag: 'Nom', label: 'Nom du client' },
+      { name: 'short_link', tag: 'Lien d’avis', label: 'Lien court vers la page d’avis (généré à l’envoi)' },
     ],
-    sample: { first_name: 'Véronique' },
+    sample: { first_name: 'Véronique', name: 'DUPONT' },
     suggested: {
       whatsapp:
-        'Bonjour {{first_name}},\n\nMerci de nous avoir fait confiance pour votre entretien ! '
+        'Bonjour {{first_name}} {{name}},\n\nMerci de nous avoir fait confiance pour votre entretien ! '
         + 'Votre avis aide d’autres clients à nous choisir :\n{{short_link}}\n\nMerci et à bientôt !',
       sms:
-        'Bonjour {{first_name}}, merci de nous avoir fait confiance pour votre entretien ! '
+        'Bonjour {{first_name}} {{name}}, merci de nous avoir fait confiance pour votre entretien ! '
         + 'Un avis pour aider d\'autres clients : {{short_link}} Merci !',
       deburr: true,
     },
@@ -48,16 +55,17 @@ export const SMS_CAMPAIGNS = [
     label: 'Demande d’avis après une installation',
     trigger: 'Bouton « Avis » d’un chantier réceptionné (carte ou fiche, page Chantiers).',
     variables: [
-      { name: 'first_name', label: 'Prénom du client' },
-      { name: 'short_link', label: 'Lien court vers la page d’avis (généré à l’envoi)' },
+      { name: 'first_name', tag: 'Prénom', label: 'Prénom du client' },
+      { name: 'name', tag: 'Nom', label: 'Nom du client' },
+      { name: 'short_link', tag: 'Lien d’avis', label: 'Lien court vers la page d’avis (généré à l’envoi)' },
     ],
-    sample: { first_name: 'Véronique' },
+    sample: { first_name: 'Véronique', name: 'DUPONT' },
     suggested: {
       whatsapp:
-        'Bonjour {{first_name}},\n\nMerci de nous avoir confié votre installation ! '
+        'Bonjour {{first_name}} {{name}},\n\nMerci de nous avoir confié votre installation ! '
         + 'Votre avis aide d’autres clients à nous choisir :\n{{short_link}}\n\nMerci et à bientôt !',
       sms:
-        'Bonjour {{first_name}}, merci de nous avoir confié votre installation ! '
+        'Bonjour {{first_name}} {{name}}, merci de nous avoir confié votre installation ! '
         + 'Un avis pour aider d\'autres clients : {{short_link}} Merci !',
       deburr: true,
     },
@@ -67,9 +75,9 @@ export const SMS_CAMPAIGNS = [
     label: 'Rappel d’entretien annuel',
     trigger: 'Bulle SMS d’une ligne « à planifier » de l’onglet Programmation.',
     variables: [
-      { name: 'first_name', label: 'Prénom du client' },
-      { name: 'name', label: 'Nom du client' },
-      { name: 'full_name', label: 'Prénom + nom (en majuscules)' },
+      { name: 'first_name', tag: 'Prénom', label: 'Prénom du client' },
+      { name: 'name', tag: 'Nom', label: 'Nom du client' },
+      { name: 'full_name', tag: 'Prénom et nom', label: 'Prénom et nom, en majuscules' },
     ],
     sample: { first_name: 'VÉRONIQUE', name: 'DUPONT', full_name: 'VÉRONIQUE DUPONT' },
     suggested: {
@@ -85,19 +93,20 @@ export const SMS_CAMPAIGNS = [
     label: 'Rappel des rendez-vous d’entretien',
     trigger: 'Automatique (cron, réglage « Rappel des rendez-vous » ci-dessus) : un SMS par rendez-vous d’entretien planifié, la veille ou en début de semaine.',
     variables: [
-      { name: 'prenom', label: 'Prénom du client' },
-      { name: 'date', label: 'Date du rendez-vous (ex. « mardi 13 octobre »)' },
-      { name: 'heure', label: 'Heure d’arrivée prévue (ex. « 9h30 »)' },
-      { name: 'technicien', label: 'Prénom du technicien' },
+      { name: 'prenom', tag: 'Prénom', label: 'Prénom du client' },
+      { name: 'nom', tag: 'Nom', label: 'Nom du client' },
+      { name: 'date', tag: 'Date', label: 'Date du rendez-vous (ex. « mardi 13 octobre »)' },
+      { name: 'heure', tag: 'Heure', label: 'Heure d’arrivée prévue (ex. « 9h30 »)' },
+      { name: 'technicien', tag: 'Technicien', label: 'Prénom du technicien' },
     ],
-    sample: { prenom: 'Véronique', date: 'mercredi 16 septembre', heure: '12h30', technicien: 'Antoine' },
+    sample: { prenom: 'Véronique', nom: 'DUPONT', date: 'mercredi 16 septembre', heure: '12h30', technicien: 'Antoine' },
     suggested: {
       whatsapp:
-        'Bonjour {{prenom}},\n\nRappel : votre entretien est prévu le {{date}} à {{heure}}. '
+        'Bonjour {{prenom}} {{nom}},\n\nRappel : votre entretien est prévu le {{date}} à {{heure}}. '
         + '{{technicien}} sera votre technicien.\n\nEn cas d’empêchement, merci de nous prévenir. À bientôt !',
       sms:
-        'Bonjour {{prenom}}, rappel : votre entretien est prévu le {{date}} à {{heure}} '
-        + 'avec {{technicien}}. En cas d\'empêchement, merci de nous prévenir. À bientôt !',
+        'Bonjour {{prenom}} {{nom}}, rappel : votre entretien est prévu le {{date}} à {{heure}} '
+        + 'avec {{technicien}}. En cas d\'empêchement, merci de nous prévenir.',
       deburr: true,
     },
   },
@@ -108,20 +117,20 @@ export const SMS_CAMPAIGNS = [
     label: 'Heure de passage (journée figée)',
     trigger: 'Bouton « Figer la journée » (journée ouverte depuis sa puce dans le Planning) : l’heure définitive est envoyée à chaque client dont le rendez-vous était adaptable.',
     variables: [
-      { name: 'first_name', label: 'Prénom du client' },
-      { name: 'name', label: 'Nom du client' },
-      { name: 'date', label: 'Date du rendez-vous (ex. « 14 octobre 2026 »)' },
-      { name: 'heure', label: 'Heure de passage définitive (ex. « 10h30 »)' },
-      { name: 'technicien', label: 'Prénom du technicien' },
+      { name: 'first_name', tag: 'Prénom', label: 'Prénom du client' },
+      { name: 'name', tag: 'Nom', label: 'Nom du client' },
+      { name: 'date', tag: 'Date', label: 'Date du rendez-vous (ex. « 14 octobre 2026 »)' },
+      { name: 'heure', tag: 'Heure', label: 'Heure de passage définitive (ex. « 10h30 »)' },
+      { name: 'technicien', tag: 'Technicien', label: 'Prénom du technicien' },
     ],
     sample: { first_name: 'Véronique', name: 'DUPONT', date: '14 octobre 2026', heure: '10h30', technicien: 'Antoine' },
     suggested: {
       whatsapp:
-        'Bonjour {{first_name}},\n\nVotre technicien {{technicien}} passera le {{date}} vers {{heure}} '
+        'Bonjour {{first_name}} {{name}},\n\nVotre technicien {{technicien}} passera le {{date}} vers {{heure}} '
         + 'pour votre entretien.\n\nEn cas d’empêchement, merci de nous prévenir. À bientôt !',
       sms:
-        'Bonjour {{first_name}}, votre technicien {{technicien}} passera le {{date}} vers {{heure}} '
-        + 'pour votre entretien. En cas d\'empêchement, merci de nous prévenir. À bientôt !',
+        'Bonjour {{first_name}} {{name}}, votre technicien {{technicien}} passera le {{date}} vers {{heure}} '
+        + 'pour votre entretien. En cas d\'empêchement, merci de nous prévenir.',
       deburr: true,
     },
   },
@@ -132,17 +141,18 @@ export const SMS_CAMPAIGNS = [
     label: 'Relance auto-RDV (entretien à programmer)',
     trigger: 'Cron auto-rdv-cron, 7 jours (réglable) après le mail d’invitation, si le client n’a pas encore choisi sa demi-journée.',
     variables: [
-      { name: 'first_name', label: 'Prénom du client' },
-      { name: 'entreprise', label: 'Nom de l’entreprise' },
+      { name: 'first_name', tag: 'Prénom', label: 'Prénom du client' },
+      { name: 'name', tag: 'Nom', label: 'Nom du client' },
+      { name: 'entreprise', tag: 'Entreprise', label: 'Nom de l’entreprise' },
     ],
-    sample: { first_name: 'Véronique', entreprise: 'Mayer Énergie' },
+    sample: { first_name: 'Véronique', name: 'DUPONT', entreprise: 'Mayer Énergie' },
     suggested: {
       whatsapp:
-        'Bonjour {{first_name}},\n\nVotre entretien annuel approche : nous vous avons envoyé par e-mail les demi-journées '
+        'Bonjour {{first_name}} {{name}},\n\nVotre entretien annuel approche : nous vous avons envoyé par e-mail les demi-journées '
         + 'disponibles dans votre secteur. Un clic suffit pour réserver.\n\n{{entreprise}}',
       sms:
-        'Bonjour {{first_name}}, votre entretien annuel approche : consultez vos e-mails, nous vous avons envoyé les '
-        + 'demi-journées disponibles. Un clic suffit. {{entreprise}}',
+        'Bonjour {{first_name}} {{name}}, votre entretien annuel approche : consultez vos e-mails, nous vous avons envoyé les '
+        + 'demi-journées disponibles. {{entreprise}}',
       deburr: true,
     },
   },
@@ -190,12 +200,15 @@ export function capitaliserPrenom(s) {
 }
 
 /**
- * Variables du gabarit `rappel_rdv`. Toujours 4 clés, toujours des chaînes
+ * Variables du gabarit `rappel_rdv`. Toujours 5 clés, toujours des chaînes
  * (l'edge remplace une clé absente par du vide puis recolle la ponctuation).
+ * Le nom part tel qu'il est enregistré sur la fiche (« DUPONT »), comme `name`
+ * des autres campagnes.
  */
-export function buildRappelRdvVars({ clientFirstName, date, startTime, technicianName } = {}) {
+export function buildRappelRdvVars({ clientFirstName, clientLastName, date, startTime, technicianName } = {}) {
   return {
     prenom: capitaliserPrenom(clientFirstName),
+    nom: String(clientLastName ?? '').trim(),
     date: formatSmsDate(date),
     heure: formatSmsHour(startTime),
     technicien: String(technicianName ?? '').trim(),
@@ -403,6 +416,35 @@ export function findUnknownVariables(text, campaign) {
     if (!allowed.has(name) && !unknown.includes(name)) unknown.push(name);
   }
   return unknown;
+}
+
+/**
+ * Message découpé pour le champ à étiquettes de l'onglet SMS : du texte libre et les
+ * variables CONNUES de la campagne (une étiquette chacune, libellé `tag`). Un `{{…}}`
+ * inconnu reste du texte : il s'affiche tel quel et `findUnknownVariables` le signale.
+ * Recoller les morceaux (`{{name}}` pour une variable) rend le message ; seules les
+ * espaces dans les accolades d'une variable connue disparaissent.
+ */
+export function decouperMessage(text, variables) {
+  const connues = new Map((variables || []).map((v) => [v.name, v]));
+  const s = String(text ?? '');
+  const out = [];
+  const pousser = (texte) => {
+    if (!texte) return;
+    const dernier = out[out.length - 1];
+    if (dernier?.type === 'texte') dernier.texte += texte;
+    else out.push({ type: 'texte', texte });
+  };
+  let fin = 0;
+  for (const m of s.matchAll(/\{\{\s*([a-z0-9_]+)\s*\}\}/g)) {
+    pousser(s.slice(fin, m.index));
+    const v = connues.get(m[1]);
+    if (v) out.push({ type: 'variable', name: v.name, tag: v.tag || v.name });
+    else pousser(m[0]);
+    fin = m.index + m[0].length;
+  }
+  pousser(s.slice(fin));
+  return out;
 }
 
 /**

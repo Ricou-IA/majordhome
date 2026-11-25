@@ -215,12 +215,15 @@
      (`{{ACCENT_COLOR}}`, que le navigateur ignore) : la couleur principale de l'application
      en tient lieu ; le vrai rendu est l'aperçu. `pre-wrap` : une espace tapée après une
      étiquette reste visible et le curseur peut s'y poser. */
-  .mdh-editeur-mail {
+  .mdh-editeur-mail,
+  .mdh-champ-message {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  /* Focus du texte : même anneau que les champs de l'application (`inputClass`), sur le cadre entier. */
-  .mdh-editeur-cadre:has(.mdh-editeur-mail:focus) {
+  /* Focus du texte : même anneau que les champs de l'application (`inputClass`), sur le cadre entier.
+     `.mdh-champ-message` = message SMS / WhatsApp à étiquettes (`settings/communication/sms/ChampMessage`). */
+  .mdh-editeur-cadre:has(.mdh-editeur-mail:focus),
+  .mdh-editeur-cadre:has(.mdh-champ-message:focus) {
     @apply border-primary-500 ring-2 ring-primary-500;
   }
   .mdh-editeur-mail p { @apply mb-3; }
@@ -237,7 +240,8 @@
   .mdh-editeur-mail [data-encadre] {
     @apply my-4 rounded-r-md border-l-4 border-primary-600 bg-secondary-50 px-4 py-3;
   }
-  .mdh-editeur-mail .variable-mail {
+  .mdh-editeur-mail .variable-mail,
+  .mdh-champ-message .variable-mail {
     @apply mx-px inline-block whitespace-nowrap rounded-full bg-primary-50 px-2 align-baseline text-xs font-medium
            leading-5 text-primary-800 ring-1 ring-inset ring-primary-200;
     cursor: default;

@@ -58,6 +58,8 @@ interface Candidate {
   client_id: string | null;
   phone: string | null;
   first_name: string | null;
+  /** Rendu par `sms_rappel_rdv_candidates` depuis la migration 20261125_1 ; absent avant (étiquette vide). */
+  last_name?: string | null;
   scheduled_date: string;
   scheduled_start: string;
   technicians: Array<{ first_name?: string | null; display_name?: string | null }> | null;
@@ -230,6 +232,7 @@ Deno.serve(async (req: Request) => {
           .join(" et ");
         const vars = buildRappelRdvVars({
           clientFirstName: c.first_name,
+          clientLastName: c.last_name,
           date: c.scheduled_date,
           startTime: c.scheduled_start,
           technicianName,

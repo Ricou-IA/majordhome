@@ -26,18 +26,19 @@ import {
   normalizeSmsTemplates,
   findUnknownVariables,
   coutSmsMessage,
+  sampleVarsFor,
   buildRappelRdvConfig,
   decrireRappelRdv,
   JOURS_SEMAINE,
   RAPPEL_RDV_HEURE_MIN,
   RAPPEL_RDV_HEURE_MAX,
 } from '@/lib/smsCampaigns';
+import ChampMessage from './sms/ChampMessage';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const LABEL_CLASS = 'block text-xs font-medium text-secondary-600 mb-1';
 const HINT_CLASS = 'mt-1 text-xs text-secondary-500';
 const ERROR_CLASS = 'mt-1 text-xs text-red-600';
-const TEXTAREA_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
 
 const emptyTemplate = () => ({ whatsapp: '', sms: '', deburr: false });
 
@@ -147,8 +148,7 @@ function validate(form, rows) {
     ];
     if (unknown.length > 0) {
       const list = [...new Set(unknown)].map((v) => `{{${v}}}`).join(', ');
-      const available = row.variables.map((v) => `{{${v.name}}}`).join(', ');
-      errors[row.key] = `Variable inconnue : ${list} — elle partirait telle quelle chez le client. Disponibles : ${available}.`;
+      errors[row.key] = `Retirez ${list} : le client le recevrait tel quel. Utilisez une étiquette à la place.`;
     }
   });
   return errors;
@@ -234,6 +234,7 @@ function CoutSmsHint({ text, deburr, row, sms }) {
 
 function CampaignEditor({ row, value, error, whatsappActive, sms, onChange }) {
   const isEmpty = !value.whatsapp && !value.sms;
+  const exemples = useMemo(() => sampleVarsFor(row, sms), [row, sms]);
   const ids = { whatsapp: `sms-${row.key}-whatsapp`, sms: `sms-${row.key}-sms`, deburr: `sms-${row.key}-deburr` };
 
   return (
@@ -267,25 +268,15 @@ function CampaignEditor({ row, value, error, whatsappActive, sms, onChange }) {
         )}
       </div>
 
-      {row.variables.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {row.variables.map((v) => (
-            <span key={v.name} className="text-xs text-secondary-600">
-              <code className="px-1.5 py-0.5 rounded bg-secondary-100 text-secondary-800">{`{{${v.name}}}`}</code>
-              {' '}{v.label}
-            </span>
-          ))}
-        </div>
-      )}
-
       <div>
-        <label htmlFor={ids.whatsapp} className={LABEL_CLASS}>Message WhatsApp</label>
-        <textarea
-          id={ids.whatsapp}
+        <span id={ids.whatsapp} className={LABEL_CLASS}>Message WhatsApp</span>
+        <ChampMessage
+          labelId={ids.whatsapp}
           value={value.whatsapp}
-          onChange={(e) => onChange({ whatsapp: e.target.value })}
-          rows={4}
-          className={TEXTAREA_CLASS}
+          onChange={(texte) => onChange({ whatsapp: texte })}
+          variables={row.variables}
+          exemples={exemples}
+          hauteur="min-h-[6.5rem]"
           placeholder="Envoyé en priorité si l'organisation a un numéro WhatsApp"
         />
         {!whatsappActive && value.whatsapp && (
@@ -296,13 +287,13 @@ function CampaignEditor({ row, value, error, whatsappActive, sms, onChange }) {
       </div>
 
       <div>
-        <label htmlFor={ids.sms} className={LABEL_CLASS}>Message SMS</label>
-        <textarea
-          id={ids.sms}
+        <span id={ids.sms} className={LABEL_CLASS}>Message SMS</span>
+        <ChampMessage
+          labelId={ids.sms}
           value={value.sms}
-          onChange={(e) => onChange({ sms: e.target.value })}
-          rows={3}
-          className={TEXTAREA_CLASS}
+          onChange={(texte) => onChange({ sms: texte })}
+          variables={row.variables}
+          exemples={exemples}
           placeholder="Envoyé si WhatsApp est absent ou échoue"
         />
         <CoutSmsHint text={value.sms} deburr={value.deburr} row={row} sms={sms} />
@@ -360,7 +351,7 @@ export default function SmsTab() {
 
   const handleSave = async () => {
     if (!isValid) {
-      toast.error("Corrige les variables inconnues avant d'enregistrer.");
+      toast.error('Retirez les informations inconnues signalées en rouge.');
       return;
     }
     try {
@@ -391,9 +382,9 @@ export default function SmsTab() {
       <section>
         <h3 className={SECTION_TITLE}>Gabarits par campagne</h3>
         <p className="text-xs text-secondary-500 mb-4">
-          Les variables entre doubles accolades sont remplacées à l&apos;envoi ; une variable absente
-          est retirée et la ponctuation recollée. WhatsApp part en premier quand l&apos;organisation a un
-          numéro, le SMS sert de repli.
+          Glissez une étiquette dans le message, ou cliquez dessus : à l&apos;envoi, elle est remplacée
+          par le prénom, le nom, la date… du client. WhatsApp part en premier quand l&apos;organisation a
+          un numéro, le SMS sert de repli.
         </p>
         <div className="space-y-4">
           {rows.map((row) => (

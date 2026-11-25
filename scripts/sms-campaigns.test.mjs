@@ -20,6 +20,7 @@ import {
   listSmsCampaignsForEditor,
   estimateSmsSegments,
   findUnknownVariables,
+  decouperMessage,
   deburrSms,
   renderSmsTemplate,
   sampleVarsFor,
@@ -39,8 +40,65 @@ test('registre — les campagnes appelées par le code, variables de rappel_rdv 
     ['first_name', 'name', 'date', 'heure', 'technicien'],
   );
   const conf = getSmsCampaign('rappel_rdv');
-  assert.deepEqual(conf.variables.map((v) => v.name), ['prenom', 'date', 'heure', 'technicien']);
+  assert.deepEqual(conf.variables.map((v) => v.name), ['prenom', 'nom', 'date', 'heure', 'technicien']);
   assert.equal(getSmsCampaign('inconnue'), null);
+});
+
+test('registre — chaque variable a son étiquette, et le prénom ne va jamais sans le nom', () => {
+  for (const campaign of SMS_CAMPAIGNS) {
+    const tags = campaign.variables.map((v) => v.tag);
+    assert.ok(tags.every((t) => typeof t === 'string' && t.trim() && !/[{}]/.test(t)), `${campaign.key} : étiquette manquante`);
+    assert.equal(new Set(tags).size, tags.length, `${campaign.key} : deux étiquettes de même nom`);
+    const noms = campaign.variables.map((v) => v.name);
+    const prenom = noms.find((n) => n === 'prenom' || n === 'first_name');
+    if (!prenom) continue;
+    const nom = prenom === 'prenom' ? 'nom' : 'name';
+    assert.ok(noms.includes(nom), `${campaign.key} : le prénom sans le nom`);
+    assert.equal(typeof campaign.sample[nom], 'string', `${campaign.key} : pas d'exemple de nom`);
+    // Le texte proposé ne dit jamais « Bonjour prénom » seul.
+    for (const txt of Object.values(campaign.suggested).filter((v) => typeof v === 'string')) {
+      if (txt.includes(`{{${prenom}}}`)) assert.ok(txt.includes(`{{${prenom}}} {{${nom}}}`), `${campaign.key} : prénom seul dans le texte suggéré`);
+    }
+  }
+});
+
+test('registre — un SMS suggéré coûte 1 SMS sur son exemple, sauf le rappel annuel (texte long assumé)', () => {
+  for (const campaign of SMS_CAMPAIGNS) {
+    if (!campaign.suggested?.sms || campaign.key === 'rappel_entretien') continue;
+    const { sms } = coutSmsMessage(campaign.suggested.sms, { campaign, sms: {}, deburr: campaign.suggested.deburr === true });
+    assert.equal(sms, 1, `${campaign.key} : ${sms} SMS`);
+  }
+});
+
+test('decouperMessage — texte et étiquettes des variables connues, le reste demeure du texte', () => {
+  const vars = getSmsCampaign('rappel_rdv').variables;
+  assert.deepEqual(decouperMessage('Bonjour {{prenom}} {{ nom }}, le {{date}}.', vars), [
+    { type: 'texte', texte: 'Bonjour ' },
+    { type: 'variable', name: 'prenom', tag: 'Prénom' },
+    { type: 'texte', texte: ' ' },
+    { type: 'variable', name: 'nom', tag: 'Nom' },
+    { type: 'texte', texte: ', le ' },
+    { type: 'variable', name: 'date', tag: 'Date' },
+    { type: 'texte', texte: '.' },
+  ]);
+  // Inconnue, mal écrite ou d'une autre campagne : du texte, que findUnknownVariables signale.
+  assert.deepEqual(decouperMessage('A {{prénom}} {{Prenom}} {{first_name}} {{tech}} B', vars), [
+    { type: 'texte', texte: 'A {{prénom}} {{Prenom}} {{first_name}} {{tech}} B' },
+  ]);
+  assert.deepEqual(decouperMessage('{{heure}}{{technicien}}', vars).map((s) => s.type), ['variable', 'variable']);
+  assert.deepEqual(decouperMessage('Ligne 1\n\nLigne 2', vars), [{ type: 'texte', texte: 'Ligne 1\n\nLigne 2' }]);
+  assert.deepEqual(decouperMessage('', vars), []);
+  assert.deepEqual(decouperMessage(null, undefined), []);
+  assert.deepEqual(decouperMessage('{{date}}', []), [{ type: 'texte', texte: '{{date}}' }]);
+});
+
+test('decouperMessage — recoller les morceaux rend le message enregistré', () => {
+  const recoller = (segments) => segments.map((s) => (s.type === 'variable' ? `{{${s.name}}}` : s.texte)).join('');
+  for (const campaign of SMS_CAMPAIGNS) {
+    for (const txt of Object.values(campaign.suggested).filter((v) => typeof v === 'string')) {
+      assert.equal(recoller(decouperMessage(txt, campaign.variables)), txt, campaign.key);
+    }
+  }
 });
 
 test('registre — chaque texte suggéré n’utilise que les variables de sa campagne', () => {
@@ -56,7 +114,7 @@ test('registre — chaque texte suggéré n’utilise que les variables de sa ca
   }
   const conf = getSmsCampaign('rappel_rdv');
   const used = new Set([...conf.suggested.sms.matchAll(VAR_RE)].map((m) => m[1]));
-  assert.deepEqual([...used].sort(), ['date', 'heure', 'prenom', 'technicien']);
+  assert.deepEqual([...used].sort(), ['date', 'heure', 'nom', 'prenom', 'technicien']);
 });
 
 test('formatSmsDate — jour de semaine + jour + mois, sans année, « 1er »', () => {
@@ -77,15 +135,19 @@ test('formatSmsHour — 9h30 / 14h, tolère les secondes', () => {
   assert.equal(formatSmsHour('abc'), '');
 });
 
-test('buildRappelRdvVars — exactement les 4 variables, toujours des chaînes', () => {
+test('buildRappelRdvVars — exactement les 5 variables du registre, toujours des chaînes', () => {
   const vars = buildRappelRdvVars({
     clientFirstName: ' Jean ',
+    clientLastName: ' DUPONT ',
     date: '2026-10-13',
     startTime: '09:30',
     technicianName: 'Philippe',
   });
-  assert.deepEqual(vars, { prenom: 'Jean', date: 'mardi 13 octobre', heure: '9h30', technicien: 'Philippe' });
-  assert.deepEqual(buildRappelRdvVars({}), { prenom: '', date: '', heure: '', technicien: '' });
+  assert.deepEqual(vars, { prenom: 'Jean', nom: 'DUPONT', date: 'mardi 13 octobre', heure: '9h30', technicien: 'Philippe' });
+  assert.deepEqual(buildRappelRdvVars({}), { prenom: '', nom: '', date: '', heure: '', technicien: '' });
+  assert.deepEqual(Object.keys(vars), getSmsCampaign('rappel_rdv').variables.map((v) => v.name));
+  // Sans nom sur le RDV, le texte se recolle : « Bonjour Jean, … »
+  assert.equal(renderSmsTemplate('Bonjour {{prenom}} {{nom}}, à demain.', buildRappelRdvVars({ clientFirstName: 'JEAN' })), 'Bonjour Jean, à demain.');
 });
 
 test('smsNameForMember — prénom du technicien, repli nom complet', () => {
@@ -209,7 +271,7 @@ test('renderSmsTemplate — substitution {{…}}, variable absente effacée, pon
 
 test('sampleVarsFor — exemple rendu réaliste par campagne, lien court sur le domaine de l’org', () => {
   const rappel = sampleVarsFor(getSmsCampaign('rappel_rdv'), {});
-  assert.deepEqual(Object.keys(rappel).sort(), ['date', 'heure', 'prenom', 'short_code', 'short_link', 'technicien']);
+  assert.deepEqual(Object.keys(rappel).sort(), ['date', 'heure', 'nom', 'prenom', 'short_code', 'short_link', 'technicien']);
   assert.equal(rappel.date, 'mercredi 16 septembre');
   const avis = sampleVarsFor(getSmsCampaign('avis_j1'), { short_link_base: 'www.mayer-energie.fr/a' });
   assert.equal(avis.short_link, 'www.mayer-energie.fr/a/Ab3Kx9');
@@ -225,6 +287,6 @@ test('coutSmsMessage — coût en SMS d’un gabarit sur son exemple rendu, acce
   assert.equal(avecAccents.encoding, 'ucs2');
   assert.equal(sansAccents.sms, 1);
   assert.equal(sansAccents.encoding, 'gsm7');
-  assert.match(sansAccents.apercu, /^Bonjour Veronique, rappel : votre entretien est prevu le mercredi 16 septembre a 12h30 avec Antoine\./);
+  assert.match(sansAccents.apercu, /^Bonjour Veronique DUPONT, rappel : votre entretien est prevu le mercredi 16 septembre a 12h30 avec Antoine\./);
   assert.deepEqual(coutSmsMessage('', { campaign: getSmsCampaign('rappel_rdv'), sms: {}, deburr: false }), { sms: 0, encoding: 'gsm7', apercu: '' });
 });
