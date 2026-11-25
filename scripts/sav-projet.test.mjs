@@ -74,8 +74,9 @@ test('etatProjet : chantier > perdu > en cours ; lead sorti du pipeline ⇒ abse
 
 test('colonneDeCarte : la demande suit son projet tant qu\'elle n\'est pas reprise en SAV', () => {
   const avec = (etat, workflow_status = 'devis_envoye') => ({ intervention_type: 'sav', workflow_status, projet: { etat } });
-  assert.equal(colonneDeCarte(avec('en_cours'), 'sav'), 'devis_envoye');
-  assert.equal(colonneDeCarte(avec('en_cours', 'demande'), 'sav'), 'devis_envoye');
+  // Devis en attente : la demande est suivie dans le pipeline, elle quitte le SAV.
+  assert.equal(colonneDeCarte(avec('en_cours'), 'sav'), null);
+  assert.equal(colonneDeCarte(avec('en_cours', 'demande'), 'sav'), null);
   assert.equal(colonneDeCarte(avec('inconnu'), 'sav'), 'devis_envoye');
   assert.equal(colonneDeCarte(avec('perdu'), 'sav'), 'demande');
   assert.equal(colonneDeCarte(avec('chantier'), 'sav'), null);
@@ -87,11 +88,12 @@ test('colonneDeCarte : la demande suit son projet tant qu\'elle n\'est pas repri
   assert.equal(colonneDeCarte(avec('chantier'), 'entretien'), 'a_planifier');
 });
 
-test('resumeSav : une demande passée en chantier n\'attend plus, un devis refusé redevient une demande', () => {
+test('resumeSav : une demande passée en projet ou en chantier n\'attend plus, un devis refusé redevient une demande', () => {
   const items = [
     { intervention_type: 'sav', workflow_status: 'devis_envoye', projet: { etat: 'chantier' } },
     { intervention_type: 'sav', workflow_status: 'devis_envoye', projet: { etat: 'perdu' } },
     { intervention_type: 'sav', workflow_status: 'demande', projet: { etat: 'en_cours' } },
+    { intervention_type: 'sav', workflow_status: 'devis_envoye', projet: { etat: 'inconnu' } },
   ];
   assert.deepEqual(resumeSav(items), { demandes: 1, devis: 1, aPlanifier: 0, planifies: 0 });
 });

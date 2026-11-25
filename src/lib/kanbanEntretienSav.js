@@ -46,7 +46,9 @@ export function zoneDeCarte(item) {
  * Colonne affichée d'une carte ; null = la carte n'est pas montrée dans le kanban.
  * Une demande SAV reliée à un projet (devis de remplacement, `item.projet` posé par
  * `etatProjet` de savProjet.js) suit ce projet tant qu'elle n'a pas été reprise en SAV :
- * devis en attente → « Devis envoyé », devis refusé → « Demande », chantier créé → hors kanban.
+ * devis en attente ou chantier créé → hors kanban (le projet se suit dans le pipeline,
+ * Eric 2026-11-25) ; devis refusé → « Demande » ; projet pas encore lu → « Devis envoyé »
+ * (jamais masquée sur une lecture inconnue).
  *
  * @param {{ workflow_status?: (string|null), projet?: ({ etat?: string } | null) } | null | undefined} item
  * @param {'sav' | 'entretien' | null} [zone] kanban affiché (défaut : colonnes du SAV)
@@ -60,9 +62,9 @@ export function colonneDeCarte(item, zone = null) {
   if (zone === 'entretien') return avantPlanification ? 'a_planifier' : statut;
   if (avantPlanification) {
     const projet = item.projet?.etat;
-    if (projet === 'chantier') return null;
+    if (projet === 'chantier' || projet === 'en_cours') return null;
     if (projet === 'perdu') return 'demande';
-    if (projet === 'en_cours' || projet === 'inconnu') return 'devis_envoye';
+    if (projet === 'inconnu') return 'devis_envoye';
   }
   return statut;
 }
