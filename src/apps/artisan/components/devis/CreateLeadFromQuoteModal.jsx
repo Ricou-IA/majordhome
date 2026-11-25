@@ -83,7 +83,16 @@ function AttachToLead({ orgId, leadId, quotes, created, onDone }) {
   return <p className="text-sm text-secondary-500 p-4">Rattachement {n > 1 ? 'des devis' : 'du devis'}...</p>;
 }
 
-export function CreateLeadFromQuoteModal({ quote = null, quotes = null, onClose, onCreated }) {
+/**
+ * @param {Object} props
+ * @param {Object} [props.quote] un devis (ligne de l'explorateur)
+ * @param {Array<Object>} [props.quotes] plusieurs devis du même client
+ * @param {string} [props.clientId] client Majord'home déjà connu de l'appelant (fiche SAV) : prime
+ *   sur le pont Pennylane, souvent absent pour un client créé directement dans Pennylane
+ * @param {() => void} props.onClose
+ * @param {(leadId: string) => void} props.onCreated lead créé, ou carte existante choisie
+ */
+export function CreateLeadFromQuoteModal({ quote = null, quotes = null, clientId: clientIdConnu = null, onClose, onCreated }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
 
@@ -153,7 +162,7 @@ export function CreateLeadFromQuoteModal({ quote = null, quotes = null, onClose,
       address: address || null,
       postal_code: postalCode || null,
       city: city || null,
-      client_id: clientId || null,
+      client_id: clientIdConnu || clientId || null,
     };
     setContact(resolved);
     return resolved;
@@ -238,7 +247,7 @@ export function CreateLeadFromQuoteModal({ quote = null, quotes = null, onClose,
             leadId={attachTarget.leadId}
             quotes={list}
             created={attachTarget.created}
-            onDone={onCreated}
+            onDone={() => onCreated?.(attachTarget.leadId)}
           />
         ) : (
           <>

@@ -65,6 +65,7 @@ import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
 import { RapportSavDialog } from './RapportSavDialog';
 import { peutFaireRapportSav } from '@/lib/rapportSav';
 import { SAVLinkedQuotes } from './SAVLinkedQuotes';
+import { SAVProjet } from './SAVProjet';
 import { SAVModelPartsSection } from './SAVModelPartsSection';
 import { CertificatsSection } from './CertificatsSection';
 import { PhotoPlaqueAnomalie } from './PhotoPlaqueAnomalie';
@@ -709,7 +710,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                     onUpdated={onUpdated}
                     onCardSynced={setDevisStatus}
                     actions={canEditSAV && !clotureSeule ? (
-                      // Entretien fait pendant le passage SAV (début de saison) : la carte passe côté Entretiens
+                      <>
+                      {/* Entretien fait pendant le passage SAV (début de saison) : la carte passe côté Entretiens */}
                       <button
                         type="button"
                         onClick={handleToggleEntretien}
@@ -726,7 +728,10 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                         {includesEntretien ? <Check className="w-4 h-4" /> : <ClipboardCheck className="w-4 h-4" />}
                         {includesEntretien ? 'Entretien inclus' : 'Ajouter l’entretien'}
                       </button>
-                    ) : null}
+                      {/* Le SAV débouche sur un remplacement : la demande devient un projet (lead), puis un chantier */}
+                      <SAVProjet item={item} canEdit onUpdated={onUpdated} />
+                      </>
+                    ) : <SAVProjet item={item} canEdit={false} onUpdated={onUpdated} />}
                   />
                 </SAVDevisSection>
               )}

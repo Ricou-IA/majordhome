@@ -268,6 +268,8 @@ export const entretienSavKeys = {
   list: (orgId) => [...entretienSavKeys.lists(orgId)],
   stats: (orgId) => [...entretienSavKeys.all(orgId), 'stats'],
   children: (orgId, parentId) => [...entretienSavKeys.all(orgId), 'children', parentId],
+  // État du pipeline des leads reliés à des cartes SAV (devis de remplacement) ; `leadIds` triés
+  projets: (orgId, leadIds) => [...entretienSavKeys.all(orgId), 'projets', (leadIds || []).join(',')],
 };
 
 // --- Technical Visit ---
@@ -400,6 +402,8 @@ export const pennylaneKeys = {
   // l'historique. Compteur KPI Dashboard ET page /devis partagent CETTE key —
   // deux sources divergeraient sur les filtres.
   quotesExplorer: (orgId) => [...pennylaneKeys.all(orgId), 'quotes-explorer'],
+  // Customers Pennylane pontés à un client Majord'home (devis de remplacement d'une carte SAV)
+  clientCustomers: (orgId, clientId) => [...pennylaneKeys.all(orgId), 'client-customers', clientId],
   quoteDismissals: (orgId) => [...pennylaneKeys.all(orgId), 'quote-dismissals'],
   // Fiches customer PL en double (écrites par le cron pennylane-sync-cron, lues par le tableau de bord admin)
   customerDuplicates: (orgId) => [...pennylaneKeys.all(orgId), 'customer-duplicates'],

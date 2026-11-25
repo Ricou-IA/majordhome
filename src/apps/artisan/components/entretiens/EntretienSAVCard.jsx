@@ -36,6 +36,7 @@ import SendInvoiceEmailDialog from '../facturation/SendInvoiceEmailDialog';
 import FacturerEntretienDialog from './FacturerEntretienDialog';
 import { SAVUrgencyBadge } from './SAVUrgency';
 import { montantDevisSav, devisDeReference } from '@/lib/savDevis';
+import { mentionProjet } from '@/lib/savProjet';
 import { QUOTE_STATUSES } from '@services/devis.service';
 
 // ============================================================================
@@ -45,6 +46,14 @@ import { QUOTE_STATUSES } from '@services/devis.service';
 /** Hachures posées sur la bande de couleur : même motif à 45° que la pose provisoire du planning. */
 const HACHURE_PIECES = {
   backgroundImage: 'repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.35) 0 4px, transparent 4px 8px)',
+};
+
+/** Ton de la mention du projet relié à une demande SAV (mentionProjet de src/lib/savProjet.js). */
+const TON_PROJET = {
+  info: 'bg-st-info-bg text-st-info',
+  ok: 'bg-st-ok-bg text-st-ok',
+  alerte: 'bg-st-alerte-bg text-st-alerte',
+  neutre: 'bg-secondary-100 text-secondary-600',
 };
 
 const TYPE_CONFIG = {
@@ -282,6 +291,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
   const invitationLibelle = item.workflow_status === 'a_planifier' ? libelleInvitation(invitation) : null;
   // SAV dont les pièces ne sont pas reçues : bande hachurée, comme la pose provisoire d'un chantier.
   const attentePieces = piecesEnAttente(item);
+  const projetMention = mentionProjet(item.projet);
 
   return (
     <div
@@ -360,6 +370,15 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
             {type === 'sav' && item.includes_entretien && (
               <span className="text-caption font-semibold px-1.5 py-0.5 rounded bg-st-info-bg text-st-info shrink-0">
                 Entretien à faire
+              </span>
+            )}
+            {/* Demande reliée à un projet (devis de remplacement) : où il en est dans Leads */}
+            {projetMention && (
+              <span
+                className={`text-caption font-semibold px-1.5 py-0.5 rounded shrink-0 ${TON_PROJET[projetMention.ton]}`}
+                title="Devis de remplacement : la demande se suit dans Leads, le chantier se crée à l'acceptation"
+              >
+                {projetMention.texte}
               </span>
             )}
             {/* Anomalie relevée sur un certificat : une icône seulement, le détail en infobulle

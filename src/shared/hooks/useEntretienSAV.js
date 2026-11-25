@@ -25,6 +25,8 @@ import { unwrapResult } from '@/lib/serviceHelpers';
 import { entretienSavKeys, callAttemptKeys, appointmentKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 import { logger } from '@lib/logger';
+import { useEtatsProjets } from '@hooks/useSavProjet';
+import { etatProjet } from '@/lib/savProjet';
 
 // Re-export for backward compatibility
 export { entretienSavKeys } from '@hooks/cacheKeys';
@@ -64,14 +66,26 @@ export function useEntretienSAV(orgId) {
     return m;
   }, [callStats]);
 
+  // Demandes SAV reliées à un projet (devis de remplacement) : leur place dans le kanban se lit
+  // sur l'état du projet (src/lib/savProjet.js). Lecture inconnue ⇒ `projet.etat = 'inconnu'`.
+  const leadIds = useMemo(
+    () => (baseItems || []).filter((it) => it.intervention_type === 'sav' && it.lead_id).map((it) => it.lead_id),
+    [baseItems],
+  );
+  const { etats: etatsProjets } = useEtatsProjets(orgId, leadIds);
+
   const itemsWithCalls = useMemo(
     () => (baseItems || []).map((it) => {
       const s = statsByIntervention.get(it.id);
-      return s
-        ? { ...it, call_count: s.call_count, last_call_at: s.last_call_at, last_call_result: s.last_call_result }
-        : it;
+      const projet = etatProjet(it, etatsProjets);
+      if (!s && !projet) return it;
+      return {
+        ...it,
+        ...(s ? { call_count: s.call_count, last_call_at: s.last_call_at, last_call_result: s.last_call_result } : null),
+        ...(projet ? { projet } : null),
+      };
     }),
-    [baseItems, statsByIntervention],
+    [baseItems, statsByIntervention, etatsProjets],
   );
 
   return {

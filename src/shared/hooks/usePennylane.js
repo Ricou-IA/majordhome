@@ -340,6 +340,28 @@ export function useUnlinkedQuotes({ sinceDays = 60, limit = 100, enabled = true 
 }
 
 /**
+ * Miroir des devis Pennylane tel que lu en base (devis, rattachements, écartements) : la
+ * requête de l'explorateur, seule définition — partagée par la page /devis, le compteur du
+ * tableau de bord et les devis de remplacement d'une carte SAV (`useSavProjet`).
+ * @param {object} [opts]
+ * @param {boolean} [opts.enabled=true]
+ */
+export function useQuotesExplorerData({ enabled = true } = {}) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  return useQuery({
+    queryKey: pennylaneKeys.quotesExplorer(orgId),
+    queryFn: async () => {
+      const { data, error } = await pennylaneQuotesService.getAll(orgId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && enabled,
+    staleTime: 60_000,
+  });
+}
+
+/**
  * Explorateur de devis PL : source UNIQUE du compteur KPI Dashboard et de la
  * page /devis. Lit la table jumelle (alimentée toutes les 5 min par l'edge
  * pennylane-quotes-sweep) et NON plus Pennylane en direct : ouverture
@@ -352,22 +374,11 @@ export function useUnlinkedQuotes({ sinceDays = 60, limit = 100, enabled = true 
  * @param {boolean} [opts.enabled=true]
  */
 export function useQuotesExplorer({ enabled = true } = {}) {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
   // Seuil pipeline = réglage d'org (Settings → Facturation Pennylane, 2026-10-12).
   const { settings: orgSettings } = useOrgSettings();
   const minAmountHt = pennylanePipelineMinAmountHt(orgSettings);
 
-  const query = useQuery({
-    queryKey: pennylaneKeys.quotesExplorer(orgId),
-    queryFn: async () => {
-      const { data, error } = await pennylaneQuotesService.getAll(orgId);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgId && enabled,
-    staleTime: 60_000,
-  });
+  const query = useQuotesExplorerData({ enabled });
 
   // `sinceDays: Infinity` neutralise le filtre temporel du module pur sans le
   // modifier (cutoffMs devient -Infinity) : la table jumelle porte déjà tout
