@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   colonneDeCarte, piecesEnAttente, statutViseParDepot, zoneDeCarte, COLONNES_PAR_ZONE,
-  statutApresAjoutEntretien, planifiableAvecEntretien, resumeSav,
+  statutApresAjoutEntretien, statutApresPiecesRecues, planifiableAvecEntretien, resumeSav,
 } from '../src/lib/kanbanEntretienSav.js';
 
 test('colonneDeCarte : demande de contrat hors kanban, pièces commandées dans « À planifier »', () => {
@@ -55,6 +55,16 @@ test('statutApresAjoutEntretien : une demande devient « À planifier », le res
   assert.equal(statutApresAjoutEntretien({ workflow_status: 'devis_envoye' }), null);
   assert.equal(statutApresAjoutEntretien({ workflow_status: 'planifie' }), null);
   assert.equal(statutApresAjoutEntretien(null), null);
+});
+
+test('statutApresPiecesRecues : une carte planifiée ou réalisée ne revient jamais « À planifier »', () => {
+  assert.equal(statutApresPiecesRecues({ workflow_status: 'pieces_commandees' }), 'a_planifier');
+  assert.equal(statutApresPiecesRecues({ workflow_status: 'demande' }), 'a_planifier');
+  assert.equal(statutApresPiecesRecues({ workflow_status: 'devis_envoye' }), 'a_planifier');
+  assert.equal(statutApresPiecesRecues({ workflow_status: 'planifie' }), null);
+  assert.equal(statutApresPiecesRecues({ workflow_status: 'realise' }), null);
+  assert.equal(statutApresPiecesRecues({ workflow_status: 'facture' }), null);
+  assert.equal(statutApresPiecesRecues({ workflow_status: 'a_planifier' }), null);
 });
 
 test('planifiableAvecEntretien : seulement un SAV avec entretien dont le devis n\'est pas tranché', () => {

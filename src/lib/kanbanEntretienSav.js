@@ -44,7 +44,11 @@ export function zoneDeCarte(item) {
 
 /**
  * Colonne affichée d'une carte ; null = la carte n'est pas montrée dans le kanban.
- * @param {{ workflow_status?: (string|null) } | null | undefined} item
+ * Une demande SAV reliée à un projet (devis de remplacement, `item.projet` posé par
+ * `etatProjet` de savProjet.js) suit ce projet tant qu'elle n'a pas été reprise en SAV :
+ * devis en attente → « Devis envoyé », devis refusé → « Demande », chantier créé → hors kanban.
+ *
+ * @param {{ workflow_status?: (string|null), projet?: ({ etat?: string } | null) } | null | undefined} item
  * @param {'sav' | 'entretien' | null} [zone] kanban affiché (défaut : colonnes du SAV)
  * @returns {string | null}
  */
@@ -52,7 +56,14 @@ export function colonneDeCarte(item, zone = null) {
   const statut = item?.workflow_status;
   if (!statut || statut === 'demande_contrat') return null;
   if (statut === 'pieces_commandees') return 'a_planifier';
-  if (zone === 'entretien' && ['demande', 'devis_envoye'].includes(statut)) return 'a_planifier';
+  const avantPlanification = ['demande', 'devis_envoye'].includes(statut);
+  if (zone === 'entretien') return avantPlanification ? 'a_planifier' : statut;
+  if (avantPlanification) {
+    const projet = item.projet?.etat;
+    if (projet === 'chantier') return null;
+    if (projet === 'perdu') return 'demande';
+    if (projet === 'en_cours' || projet === 'inconnu') return 'devis_envoye';
+  }
   return statut;
 }
 
@@ -83,6 +94,18 @@ export function piecesEnAttente(item) {
 export function statutViseParDepot(item, colonne) {
   if (colonne === 'a_planifier' && item?.workflow_status === 'devis_envoye') return 'pieces_commandees';
   return colonne;
+}
+
+/**
+ * Statut d'une carte SAV quand ses pièces sont notées « Reçu » : une carte qui attendait
+ * (demande, devis envoyé, pièces commandées) devient « À planifier ». Une carte déjà planifiée,
+ * réalisée ou encaissée ne bouge pas — sinon le RDV posé resterait au planning avec une carte
+ * revenue « À planifier » (vécu LENDRIN, 2026-11-25).
+ * @param {{ workflow_status?: (string|null) } | null | undefined} item
+ * @returns {string | null} statut à écrire, null = rien à changer
+ */
+export function statutApresPiecesRecues(item) {
+  return ['demande', 'devis_envoye', 'pieces_commandees'].includes(item?.workflow_status) ? 'a_planifier' : null;
 }
 
 /**

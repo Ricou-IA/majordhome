@@ -69,7 +69,8 @@ import { SAVModelPartsSection } from './SAVModelPartsSection';
 import { CertificatsSection } from './CertificatsSection';
 import { PhotoPlaqueAnomalie } from './PhotoPlaqueAnomalie';
 import { logger } from '@lib/logger';
-import { statutApresAjoutEntretien } from '@/lib/kanbanEntretienSav';
+import { statutApresAjoutEntretien, statutApresPiecesRecues } from '@/lib/kanbanEntretienSav';
+import { effetDevisSurCarte } from '@/lib/savDevis';
 
 // ============================================================================
 // CONSTANTES
@@ -315,27 +316,28 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
       // Sauvegarder les champs (rejette sur refus → catch ci-dessous)
       await updateFields(item.id, fields);
 
-      // Auto-transitions basées sur le devis/pièces
+      // Auto-transitions basées sur le devis/pièces. La carte n'avance que depuis un statut
+      // d'attente : jamais de retour en arrière d'une carte déjà planifiée ou réalisée
+      // (vécu LENDRIN 2026-11-25 : « Reçu » renvoyait une carte planifiée en « À planifier »).
       let workflowChanged = false;
 
-      // Pièces "Reçu" → a_planifier
-      if (fields.parts_order_status === 'recu' && item.parts_order_status !== 'recu') {
-        await updateWorkflowStatus(item.id, 'a_planifier');
+      // Pièces "Reçu" → a_planifier (règle : statutApresPiecesRecues)
+      const apresPieces = fields.parts_order_status === 'recu' && item.parts_order_status !== 'recu'
+        ? statutApresPiecesRecues(item) : null;
+      if (apresPieces) {
+        await updateWorkflowStatus(item.id, apresPieces);
         toast.success('Enregistré — pièces reçues, carte en À planifier');
         workflowChanged = true;
       }
 
-      // Devis "Envoyé" → devis_envoye
-      if (fields.devis_status === 'envoye' && item.devis_status !== 'envoye') {
-        await updateWorkflowStatus(item.id, 'devis_envoye');
-        toast.success('Enregistré — devis envoyé');
-        workflowChanged = true;
-      }
-
-      // Devis "Accepté" → pieces_commandees
-      if (fields.devis_status === 'accepte' && item.devis_status !== 'accepte') {
-        await updateWorkflowStatus(item.id, 'pieces_commandees');
-        toast.success('Enregistré — devis accepté, carte en Pièces commandées');
+      // Devis "Envoyé" → devis_envoye, "Accepté" → pieces_commandees (règle : effetDevisSurCarte)
+      const apresDevis = fields.devis_status && fields.devis_status !== item.devis_status
+        ? effetDevisSurCarte(item, { status: fields.devis_status }).workflow : null;
+      if (apresDevis && !apresPieces) {
+        await updateWorkflowStatus(item.id, apresDevis);
+        toast.success(apresDevis === 'devis_envoye'
+          ? 'Enregistré — devis envoyé'
+          : 'Enregistré — devis accepté, pièces à commander');
         workflowChanged = true;
       }
 
