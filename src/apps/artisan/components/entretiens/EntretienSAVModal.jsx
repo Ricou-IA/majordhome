@@ -6,7 +6,7 @@
  * Features :
  * - Header avec tag type + statut + lien fiche client
  * - Infos client + date dernier entretien
- * - Toggle "Réaliser Entretien" (tag la carte SAV, pas de nouvelle carte)
+ * - « Ajouter l'entretien » (SAV) : enregistré au clic, la carte passe du kanban SAV au kanban Entretiens
  * - Description SAV (SAV uniquement)
  * - Commande pièces : Commandé / Reçu (Reçu → auto-transition a_planifier)
  * - Devis : Envoyé → devis_envoye, Accepté → pieces_commandees, Refusé → stocké
@@ -69,6 +69,7 @@ import { SAVModelPartsSection } from './SAVModelPartsSection';
 import { CertificatsSection } from './CertificatsSection';
 import { PhotoPlaqueAnomalie } from './PhotoPlaqueAnomalie';
 import { logger } from '@lib/logger';
+import { statutApresAjoutEntretien } from '@/lib/kanbanEntretienSav';
 
 // ============================================================================
 // CONSTANTES
@@ -187,10 +188,9 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
     if (partsOrder !== (item.parts_order_status || null)) return true;
     if (devisAmount !== (item.devis_amount || null)) return true;
     if (devisStatus !== (item.devis_status || null)) return true;
-    if (includesEntretien !== (item.includes_entretien || false)) return true;
     if (urgence !== urgenceDe(item)) return true;
     return false;
-  }, [notes, savDesc, partsOrder, devisAmount, devisStatus, includesEntretien, urgence, item]);
+  }, [notes, savDesc, partsOrder, devisAmount, devisStatus, urgence, item]);
 
 
   if (!item) return null;
@@ -307,9 +307,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
         if (devisStatus !== (item.devis_status || null)) {
           fields.devis_status = devisStatus;
         }
-        if (includesEntretien !== (item.includes_entretien || false)) {
-          fields.includes_entretien = includesEntretien;
-        }
         if (urgence !== urgenceDe(item)) {
           fields.sav_urgency = urgence;
         }
@@ -353,19 +350,32 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
     }
   };
 
-  // Toggle "Réaliser Entretien" — tag la carte + ajoute/retire montant contrat au devis
-  const handleToggleEntretien = () => {
-    const contractAmount = Number(item.contract_amount) || 0;
-    setIncludesEntretien((prev) => {
-      const willInclude = !prev;
-      if (contractAmount > 0) {
-        setDevisAmount((currentAmount) => {
-          const current = Number(currentAmount) || 0;
-          return willInclude ? current + contractAmount : Math.max(0, current - contractAmount);
+  // « Ajouter l'entretien » : enregistré tout de suite. La carte quitte le kanban du SAV et se
+  // suit côté Entretiens (Eric 2026-11-25) ; une demande pas encore traitée y arrive « À planifier ».
+  // Le montant du contrat n'est plus ajouté au devis : la carte l'additionne déjà à l'affichage.
+  const handleToggleEntretien = async () => {
+    const ajoute = !includesEntretien;
+    try {
+      await updateFields(item.id, { includes_entretien: ajoute });
+      const statut = ajoute ? statutApresAjoutEntretien(item) : null;
+      if (statut) await updateWorkflowStatus(item.id, statut);
+      setIncludesEntretien(ajoute);
+      onUpdated?.();
+      if (!ajoute) {
+        toast.success('Entretien retiré : la carte revient dans le SAV');
+      } else if (!contractId && item.client_id) {
+        toast.success('Entretien ajouté : la carte est passée dans Entretiens', {
+          description: 'Ce client n’a pas de contrat d’entretien.',
+          action: { label: 'Créer le contrat', onClick: () => navigate(`/clients/${item.client_id}?onglet=contrat`) },
+        });
+      } else {
+        toast.success('Entretien ajouté : la carte est passée dans Entretiens', {
+          action: { label: 'Voir', onClick: () => navigate('/entretiens') },
         });
       }
-      return willInclude;
-    });
+    } catch {
+      // Toast d'erreur déjà émis par la mutation (useEntretienSAVMutations)
+    }
   };
 
   // Ouvrir fiche client — confirme le draft si besoin puis navigue
@@ -697,16 +707,19 @@ export function EntretienSAVModal({ item, onClose, onUpdated, initialScheduling 
                     onUpdated={onUpdated}
                     onCardSynced={setDevisStatus}
                     actions={canEditSAV && !clotureSeule ? (
-                      // Entretien fait pendant le passage SAV (début de saison) : tag la carte, ajoute le montant du contrat
+                      // Entretien fait pendant le passage SAV (début de saison) : la carte passe côté Entretiens
                       <button
                         type="button"
                         onClick={handleToggleEntretien}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-all ${
+                        disabled={isSavingFields || isUpdatingStatus}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-all disabled:opacity-50 ${
                           includesEntretien
                             ? 'text-blue-700 bg-blue-100 border-blue-300'
                             : 'text-blue-700 bg-white border-blue-200 hover:bg-blue-50'
                         }`}
-                        title={includesEntretien ? 'Entretien inclus — cliquer pour retirer' : 'Faire l’entretien pendant le même passage'}
+                        title={includesEntretien
+                          ? 'Entretien inclus : la carte se suit dans Entretiens — cliquer pour la remettre dans le SAV'
+                          : 'Faire l’entretien pendant le même passage : la carte passe dans Entretiens'}
                       >
                         {includesEntretien ? <Check className="w-4 h-4" /> : <ClipboardCheck className="w-4 h-4" />}
                         {includesEntretien ? 'Entretien inclus' : 'Ajouter l’entretien'}

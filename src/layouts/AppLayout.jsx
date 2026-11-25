@@ -33,6 +33,7 @@ import {
   ClipboardList,
   FileSignature,
   Search,
+  LifeBuoy,
 } from 'lucide-react';
 import { chantierGaillacVisible } from '@apps/chantier-gaillac/config';
 
@@ -55,6 +56,8 @@ const navigation = [
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,         resource: 'chantiers', groupe: 'terrain' },
   { name: 'Contrats',   href: '/contrats',   icon: FileText,        resource: 'entretiens', module: 'entretiens', groupe: 'ventes' },
   { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens', module: 'entretiens', groupe: 'terrain' },
+  // SAV : son écran et son kanban, à part des entretiens (Eric 2026-11-25).
+  { name: 'SAV',        alias: 'Dépannage', href: '/sav',        icon: LifeBuoy,        resource: 'sav', module: 'entretiens', groupe: 'terrain' },
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants', module: 'cedants', groupe: 'developpement' },
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale', module: 'prospection', groupe: 'developpement' },
   { name: 'Visibilité locale', alias: 'GeoGrid', href: '/geogrid', icon: Grid3x3,     resource: 'settings', module: 'geogrid', groupe: 'outils' },

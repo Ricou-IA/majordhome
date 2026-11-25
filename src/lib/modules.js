@@ -223,7 +223,7 @@ const ROUTES_PAR_MODULE = {
     'settings/activite', 'settings/equipements', 'settings/pennylane', 'settings/plan-comptable', 'settings/devis', 'settings/projets', 'profile',
   ],
   entretiens: [
-    'contrats', 'entretiens', 'certificat/:interventionId', 'clients/:clientId/contrat/signer',
+    'contrats', 'entretiens', 'sav', 'certificat/:interventionId', 'clients/:clientId/contrat/signer',
     'settings/pricing', 'settings/tournees',
   ],
   communication: ['mailing', 'settings/communication', 'settings/emails', 'settings/sms'],

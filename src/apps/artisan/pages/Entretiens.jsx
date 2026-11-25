@@ -1,10 +1,11 @@
 /**
- * Entretiens.jsx - Page Entretiens & SAV
+ * Entretiens.jsx - Page Entretiens
  * ============================================================================
- * Module unifié Entretien (visites annuelles) & SAV (réparations).
+ * Entretiens (visites annuelles). Le SAV a sa propre page (/sav, Eric 2026-11-25) ;
+ * une carte SAV à laquelle on ajoute l'entretien se suit ici.
  *
  * 4 onglets (+ raccourci « Clos ») :
- *   - Suivi (défaut, valeur `kanban`) : board unifié EntretienSAVKanban
+ *   - Suivi (défaut, valeur `kanban`) : kanban des entretiens (EntretienSAVKanban zone="entretien")
  *   - Contrats : liste contrats existante
  *   - Programmation : vue secteurs avec CTA « Planifier »
  *   - Dashboard : KPIs contrats + SAV, tournées à surveiller, planification
@@ -13,8 +14,8 @@
  * une journée se fait depuis le Planning (puce d'état de la journée), ses
  * alertes vivent dans le Dashboard.
  *
- * Header : bande de repères (À planifier, SAV gérés, Planifiés,
- * Réalisés) basée sur useEntretienSAVStats.
+ * Header : bande de repères (À planifier, Planifiés, Réalisés) basée sur
+ * useEntretienSAVStats.
  *
  * @version 4.0.0 - Sprint 8 Entretien & SAV (Kanban unifié, KPIs SAV)
  * ============================================================================
@@ -386,7 +387,6 @@ export default function Entretiens() {
               ? `CA : ${Math.round(savStats.ca_a_faire).toLocaleString('fr-FR')} €${savStats.entretien_refuse > 0 ? ` · ${savStats.entretien_refuse} refus` : ''}`
               : null,
           },
-          { key: 'sav', label: 'SAV gérés', value: compteur(savStats?.sav_en_cours) },
           { key: 'planifies', label: 'Planifiés', value: compteur(savStats?.entretien_planifie) },
           {
             key: 'realises',
@@ -434,7 +434,7 @@ export default function Entretiens() {
 
         {/* TAB KANBAN */}
         <TabsContent value="kanban" className="mt-6">
-          <EntretienSAVKanban />
+          <EntretienSAVKanban zone="entretien" />
         </TabsContent>
 
         {/* TAB CONTRATS et TAB CLOS : même liste, statut actif ou clos (setActiveTab) */}

@@ -15,6 +15,7 @@ const ClientDetail = lazy(() => import('./pages/ClientDetail'));
 const ClientsImport = lazy(() => import('./pages/ClientsImport'));
 const Pipeline = lazy(() => import('./pages/Pipeline'));
 const Entretiens = lazy(() => import('./pages/Entretiens'));
+const Sav = lazy(() => import('./pages/Sav'));
 const InterventionDetail = lazy(() => import('./pages/InterventionDetail'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Profile = lazy(() => import('./pages/Profile'));
@@ -252,6 +253,17 @@ export const artisanRoutes = [
     element: (
       <SuspenseWrapper>
         <Entretiens />
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    // SAV : son écran et son kanban, à part des entretiens (Eric 2026-11-25)
+    path: 'sav',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="sav">
+          <Sav />
+        </RouteGuard>
       </SuspenseWrapper>
     ),
   },

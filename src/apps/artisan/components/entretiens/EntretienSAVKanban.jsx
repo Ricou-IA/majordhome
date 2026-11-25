@@ -1,10 +1,12 @@
 /**
  * EntretienSAVKanban.jsx - Majord'home Artisan
  * ============================================================================
- * Board kanban unifié Entretien & SAV avec drag & drop.
+ * Kanban du SAV (`zone="sav"`, page /sav) ou des entretiens (`zone="entretien"`,
+ * page /entretiens) : même composant, mêmes cartes, mêmes gestes — seules les
+ * colonnes et les cartes montrées changent (règles : src/lib/kanbanEntretienSav.js).
  * Utilise le composant générique KanbanBoard.
  *
- * @version 3.0.0 - Refactoring KanbanBoard
+ * @version 4.0.0 - Deux kanbans (Eric 2026-11-25)
  * ============================================================================
  */
 
@@ -31,15 +33,21 @@ import { construireReglages } from '@/lib/tournee/reglages.js';
 import { trierCartes } from '@/lib/savUrgency';
 import { peutCloturerSansPlanifier, colonnesTechnicien, carteVisibleParTechnicien, limiteALaCloture } from '@/lib/savCloture';
 import { SAVInterventionFaiteModal } from './SAVInterventionFaiteModal';
-import { colonneDeCarte, statutViseParDepot, COLONNES_SANS_COLONNE } from '@/lib/kanbanEntretienSav';
+import {
+  colonneDeCarte, statutViseParDepot, zoneDeCarte, planifiableAvecEntretien, COLONNES_PAR_ZONE,
+} from '@/lib/kanbanEntretienSav';
 // CertificatsEntretienModal retiré — section certificats intégrée dans EntretienSAVModal
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-
-export function EntretienSAVKanban() {
+/**
+ * @param {Object} props
+ * @param {'sav' | 'entretien'} [props.zone] kanban affiché (défaut : le SAV)
+ */
+export function EntretienSAVKanban({ zone = 'sav' }) {
+  const estSav = zone === 'sav';
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const { can, effectiveRole } = useCanAccess();
@@ -68,23 +76,26 @@ export function EntretienSAVKanban() {
 
   // Colonnes visibles selon le rôle
   const visibleColumns = useMemo(() => {
-    // « Demande de contrat » et « Pièces commandées » n'ont plus de colonne (Eric 2026-11-23) :
-    // règles dans src/lib/kanbanEntretienSav.js.
-    const affichees = KANBAN_COLUMNS.filter(c => !COLONNES_SANS_COLONNE.includes(c.value));
+    // Colonnes du kanban affiché (SAV ou Entretiens) : règles dans src/lib/kanbanEntretienSav.js.
+    // « Demande de contrat » et « Pièces commandées » n'ont pas de colonne (Eric 2026-11-23).
+    const affichees = COLONNES_PAR_ZONE[zone].map(valeur => KANBAN_COLUMNS.find(c => c.value === valeur));
     const cols = effectiveRole === 'technicien'
       ? affichees.filter(c => colonnesTechnicien().includes(c.value))
       : affichees;
-    return cols.map(c => ({
-      id: c.value,
+    const libelle = (c) => {
       // La colonne Encaissé ne montre que les cartes encaissées récemment : on le dit.
-      label: c.value === 'facture' ? `${c.label} · ${ENCAISSEES_DEPUIS_JOURS} j` : c.label,
-      color: c.color,
-    }));
-  }, [effectiveRole]);
+      if (c.value === 'facture') return `${c.label} · ${ENCAISSEES_DEPUIS_JOURS} j`;
+      // Dans le SAV, tout est du SAV : « Demande » suffit.
+      if (c.value === 'demande') return 'Demande';
+      return c.label;
+    };
+    return cols.map(c => ({ id: c.value, label: libelle(c), color: c.color }));
+  }, [effectiveRole, zone]);
 
-  // Filtrer par rôle avant de passer au KanbanBoard
+  // Cartes de ce kanban, filtrées par rôle avant de passer au KanbanBoard
   const roleFilteredItems = useMemo(() => {
-    let result = items;
+    // Un SAV se suit dans le SAV ; dès qu'on lui ajoute l'entretien, côté Entretiens.
+    let result = items.filter(i => zoneDeCarte(i) === zone);
     if (effectiveRole === 'technicien') {
       // Son planning, plus les demandes SAV en attente qu'il peut clôturer lui-même
       // (jamais les entretiens « À planifier » : la programmation reste au bureau).
@@ -97,9 +108,9 @@ export function EntretienSAVKanban() {
     // affichée sur la carte : next_rdv_date > scheduled_date > created_at (src/lib/savUrgency.js).
     // `colonne` = colonne affichée (une demande de contrat n'en a pas : hors kanban).
     return trierCartes(result)
-      .map(i => ({ ...i, colonne: colonneDeCarte(i) }))
+      .map(i => ({ ...i, colonne: colonneDeCarte(i, zone) }))
       .filter(i => i.colonne);
-  }, [items, effectiveRole, user?.id]);
+  }, [items, effectiveRole, user?.id, zone]);
 
   // =========================================================================
   // SEARCH FILTER
@@ -184,9 +195,10 @@ export function EntretienSAVKanban() {
       return;
     }
 
-    // Vérifier transition autorisée
+    // Vérifier transition autorisée (un SAV avec entretien se planifie même si son devis attend)
     const allowed = getTransitions(item.intervention_type, oldStatus);
-    if (!allowed.includes(newStatus)) {
+    const planifiable = newStatus === 'planifie' && planifiableAvecEntretien(item);
+    if (!allowed.includes(newStatus) && !planifiable) {
       toast.error('Transition non autorisée');
       return;
     }
@@ -270,13 +282,16 @@ export function EntretienSAVKanban() {
         toast.error('Erreur lors de la planification');
         return;
       }
-      toast.success('RDV planifié avec succès');
+      // Entretien ajouté à la planification d'un SAV : la carte quitte ce kanban, on le dit.
+      toast.success(estSav && includesEntretien
+        ? 'RDV planifié : la carte est passée dans Entretiens'
+        : 'RDV planifié avec succès');
       setPendingTransition(null);
       refresh();
     } catch {
       toast.error('Erreur lors de la planification');
     }
-  }, [pendingTransition, orgId, refresh]);
+  }, [pendingTransition, orgId, refresh, estSav]);
 
   // =========================================================================
   // RENDER
@@ -321,16 +336,16 @@ export function EntretienSAVKanban() {
       colonnesRepliables={['facture']}
       headerRight={
         <>
-          {/* Campagne d'appels = bureau : le technicien voit des SAV « À planifier », pas la file d'appels */}
-          {effectiveRole !== 'technicien' && (
+          {/* Campagne d'appels = entretiens à planifier, au bureau (jamais le technicien) */}
+          {!estSav && effectiveRole !== 'technicien' && (
             <LancerAppelButton
               items={roleFilteredItems.filter((i) => i.workflow_status === 'a_planifier')}
               orgId={orgId}
             />
           )}
-          {canCreateSAV && (
+          {estSav && canCreateSAV && (
             <Button
-              variant="secondary"
+              variant="primary"
               size="sm"
               onClick={() => { setCreateSAVPrefill(null); setCreateSAVOpen(true); }}
             >
