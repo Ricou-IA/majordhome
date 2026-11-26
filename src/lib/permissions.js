@@ -52,6 +52,7 @@ export const ACTIONS = [
   { key: 'edit_own', label: 'Modifier (les siens)' },
   { key: 'delete',   label: 'Supprimer' },
   { key: 'assign',   label: 'Assigner' },
+  { key: 'marges',   label: 'Voir les marges' },
 ];
 
 /** Labels FR pour les rôles effectifs */

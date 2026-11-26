@@ -30,6 +30,10 @@ assert(resolvePermission({}, 'commercial', 'pv_calculator', 'view') === true, 'c
 assert(resolvePermission({}, 'technicien', 'pv_calculator', 'view') === false, 'tech pv_calculator.view = false');
 assert(resolvePermission({}, 'team_leader', 'thermal_study', 'view') === true, 'TL thermal_study.view = true');
 assert(resolvePermission({}, 'technicien', 'maintenance', 'view') === true, 'tech maintenance.view = true');
+// Marges du devis : responsable oui, commercial et technicien non (Eric 2026-11-26)
+assert(resolvePermission({}, 'team_leader', 'devis', 'marges') === true, 'TL devis.marges = true');
+assert(resolvePermission({}, 'commercial', 'devis', 'marges') === false, 'com devis.marges = false');
+assert(resolvePermission({ 'commercial:devis:marges': true }, 'commercial', 'devis', 'marges') === true, 'surcharge com devis.marges');
 
 // 3. Override per-org prime sur le défaut
 assert(resolvePermission({ 'technicien:clients:create': true }, 'technicien', 'clients', 'create') === true,
