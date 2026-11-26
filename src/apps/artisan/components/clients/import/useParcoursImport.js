@@ -15,11 +15,11 @@
 
 import { useReducer, useMemo } from 'react';
 import { useExistingClientsForImport } from '@hooks/useClientImports';
-import { LIGNES_MAX, trouverEntete, tableau } from '@/lib/importClients/lireFichier';
+import { LIGNES_MAX, LIMITES_TEXTE, trouverEntete, tableau } from '@/lib/importClients/lireFichier';
 import {
   estFichierType, proposerCorrespondance, validerCorrespondance, appliquerCorrespondance,
 } from '@/lib/importClients/correspondance';
-import { classerLignes, bilan as bilanImport } from '@/lib/importClients/controles';
+import { classerLignes, bilan as bilanImport, choixPourTousLesDoublons } from '@/lib/importClients/controles';
 
 const choixVides = () => ({ importer: new Set(), ecarter: new Set() });
 
@@ -56,7 +56,7 @@ function reducteur(etat, action) {
     case 'fichier_lu': {
       const fichier = decouper(action.nom, action.matrice, trouverEntete(action.matrice), action.reparees || 0);
       if (fichier.lignes.length > LIGNES_MAX) {
-        return { ...etat, lecture: 'repos', refus: 'Plus de 10 000 lignes : découpez le fichier.' };
+        return { ...etat, lecture: 'repos', refus: `Plus de ${LIMITES_TEXTE.lignes} : découpez le fichier.` };
       }
       if (fichier.lignes.length === 0) {
         return { ...etat, lecture: 'repos', refus: 'Ce fichier ne contient aucune ligne de client.' };
@@ -100,6 +100,8 @@ function reducteur(etat, action) {
       return { ...etat, choix: { ...etat.choix, importer: basculer(etat.choix.importer, action.numero) } };
     case 'ecarter':
       return { ...etat, choix: { ...etat.choix, ecarter: basculer(etat.choix.ecarter, action.numero) } };
+    case 'tous_les_doublons':
+      return { ...etat, choix: choixPourTousLesDoublons(action.classees, etat.choix, action.reprendre) };
     case 'envoi':
       return { ...etat, etape: 'resultat', envoi: { classees: action.classees, choix: etat.choix }, avis: null };
     case 'retour_apercu':
@@ -152,6 +154,7 @@ export function useParcoursImport(orgId) {
     versFichier: () => dispatch({ type: 'vers_fichier' }),
     basculerImporter: (numero) => dispatch({ type: 'importer', numero }),
     basculerEcarter: (numero) => dispatch({ type: 'ecarter', numero }),
+    tousLesDoublons: (lignesClassees, reprendre) => dispatch({ type: 'tous_les_doublons', classees: lignesClassees, reprendre }),
     envoyer: (lignesClassees) => dispatch({ type: 'envoi', classees: lignesClassees }),
     retourApercu: () => dispatch({ type: 'retour_apercu' }),
     arreter: (message) => dispatch({ type: 'arret', message }),

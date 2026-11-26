@@ -23,7 +23,7 @@ function Compteur({ libelle, valeur }) {
 
 export default function EtapeApercu({
   classees, bilan, existants, choix, enCours, libelleRetour, avis, reparees,
-  onRelire, onImporter, onEcarter, onTelechargerEcartees, onRetour, onLancer,
+  onRelire, onImporter, onEcarter, onTousLesDoublons, onTelechargerEcartees, onRetour, onLancer,
 }) {
   const groupes = useMemo(() => {
     if (!classees) return null;
@@ -108,7 +108,7 @@ export default function EtapeApercu({
 
           <div className="space-y-3">
             <ListePretes lignes={groupes.pretes} />
-            <ListeDoublons lignes={groupes.doublons} choix={choix} onImporter={onImporter} onEcarter={onEcarter} />
+            <ListeDoublons lignes={groupes.doublons} choix={choix} onImporter={onImporter} onEcarter={onEcarter} onTous={onTousLesDoublons} />
             <ListeEcartees lignes={groupes.ecartees} />
           </div>
 

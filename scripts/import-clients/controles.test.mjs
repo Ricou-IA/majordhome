@@ -280,3 +280,19 @@ test('fiches sans code postal : lignes importées seulement', () => {
   assert.equal(fichesSansCodePostal(classees, choix), 2);
   assert.equal(fichesSansCodePostal([], aucun()), 0);
 });
+
+test('tous les doublons d\'un coup : importés puis écartés, les autres choix ne bougent pas', async () => {
+  const { choixPourTousLesDoublons } = await import('../../src/lib/importClients/controles.js');
+  const classees = [
+    { numero: 2, statut: 'prete' }, { numero: 3, statut: 'doublon_fort' }, { numero: 4, statut: 'doublon_faible' },
+    { numero: 5, statut: 'doublon_fichier' }, { numero: 6, statut: 'ecartee' },
+  ];
+  const tous = choixPourTousLesDoublons(classees, { importer: new Set([99]), ecarter: new Set([4, 98]) }, true);
+  assert.deepEqual([...tous.importer].sort(), [3, 5, 99]);
+  assert.deepEqual([...tous.ecarter], [98]);
+  assert.equal(bilan(classees, tous).importees, 4);
+  const aucun2 = choixPourTousLesDoublons(classees, tous, false);
+  assert.deepEqual([...aucun2.importer], [99]);
+  assert.deepEqual([...aucun2.ecarter].sort(), [4, 98]);
+  assert.equal(bilan(classees, aucun2).importees, 1);
+});

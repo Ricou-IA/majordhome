@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { CheckCircle2, Copy, XCircle } from 'lucide-react';
-import { raisonAffichee } from '@/lib/importClients/controles';
+import { raisonAffichee, aImporter } from '@/lib/importClients/controles';
 import { libellesRapprochement } from '@/lib/importClients/libelles';
 
 const PAS = 100;
@@ -136,15 +136,28 @@ function LigneDoublon({ ligne, choix, onImporter, onEcarter }) {
   );
 }
 
-export function ListeDoublons({ lignes, choix, onImporter, onEcarter }) {
+export function ListeDoublons({ lignes, choix, onImporter, onEcarter, onTous }) {
+  const repris = lignes.filter((l) => aImporter(l, choix)).length;
+  const bouton = 'px-3 py-1.5 text-sm bg-white text-secondary-700 border border-secondary-300 rounded-lg hover:bg-secondary-50 disabled:opacity-50 disabled:cursor-not-allowed';
   return (
     <Repliable titre="Doublons" icone={Copy} compte={lignes.length}>
       {(n) => (
+        <>
+        <div className="flex flex-wrap items-center gap-2 pb-1">
+          <span className="text-sm text-secondary-600 mr-auto">{repris} sur {lignes.length} importés</span>
+          <button type="button" onClick={() => onTous(true)} disabled={repris === lignes.length} className={bouton}>
+            Tout importer
+          </button>
+          <button type="button" onClick={() => onTous(false)} disabled={repris === 0} className={bouton}>
+            Tout écarter
+          </button>
+        </div>
         <ul className="space-y-2">
           {lignes.slice(0, n).map((l) => (
             <LigneDoublon key={l.numero} ligne={l} choix={choix} onImporter={onImporter} onEcarter={onEcarter} />
           ))}
         </ul>
+        </>
       )}
     </Repliable>
   );

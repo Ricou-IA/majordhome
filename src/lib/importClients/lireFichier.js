@@ -2,8 +2,14 @@
 // Module PUR : ni React, ni Supabase, ni ExcelJS. Le chargement du classeur est ailleurs ;
 // ce module ne voit que des valeurs de cellule déjà extraites.
 
-export const LIGNES_MAX = 10000;
-export const OCTETS_MAX = 10 * 1024 * 1024;
+// Relevées le 2026-11-26 : Cimaj (≈ 16 500 clients) a dû découper son fichier en deux sous 10 000 lignes.
+// L'écriture part par lots de 200 (≈ 0,7 s chacun) : 50 000 lignes ≈ 3 minutes.
+export const LIGNES_MAX = 50000;
+export const OCTETS_MAX = 20 * 1024 * 1024;
+
+const enClair = (n) => n.toLocaleString('fr-FR').replace(/\s/g, ' ');
+/** Limites telles qu'on les écrit à l'écran. */
+export const LIMITES_TEXTE = { lignes: `${enClair(LIGNES_MAX)} lignes`, octets: `${OCTETS_MAX / 1024 / 1024} Mo` };
 
 /**
  * Refuse un fichier avant toute lecture (format d'abord, taille ensuite).
@@ -14,7 +20,7 @@ export function refusFichier({ nom, taille }) {
   const n = String(nom || '').toLowerCase();
   if (n.endsWith('.xls')) return 'Ancien format Excel (.xls) : enregistrez-le en .xlsx ou .csv, puis déposez-le.';
   if (!n.endsWith('.xlsx') && !n.endsWith('.csv')) return 'Format non pris en charge : déposez un fichier .xlsx ou .csv.';
-  if (taille > OCTETS_MAX) return 'Fichier trop lourd (10 Mo au plus).';
+  if (taille > OCTETS_MAX) return `Fichier trop lourd (${LIMITES_TEXTE.octets} au plus).`;
   return null;
 }
 

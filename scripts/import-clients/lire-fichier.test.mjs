@@ -1,17 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  LIGNES_MAX, OCTETS_MAX, refusFichier, decoderTexte, lireCsv, celluleEnTexte, trouverEntete, tableau,
+  LIGNES_MAX, OCTETS_MAX, LIMITES_TEXTE, refusFichier, decoderTexte, lireCsv, celluleEnTexte, trouverEntete, tableau,
   reparerAccents, reparerMatrice,
 } from '../../src/lib/importClients/lireFichier.js';
 
 test('limites', () => {
-  assert.equal(LIGNES_MAX, 10000);
-  assert.equal(OCTETS_MAX, 10 * 1024 * 1024);
+  assert.equal(LIGNES_MAX, 50000);
+  assert.equal(OCTETS_MAX, 20 * 1024 * 1024);
+  assert.deepEqual(LIMITES_TEXTE, { lignes: '50 000 lignes', octets: '20 Mo' });
 });
 test('refus : .xls, trop lourd', () => {
   assert.equal(refusFichier({ nom: 'clients.xls', taille: 1000 }), 'Ancien format Excel (.xls) : enregistrez-le en .xlsx ou .csv, puis déposez-le.');
-  assert.equal(refusFichier({ nom: 'c.xlsx', taille: OCTETS_MAX + 1 }), 'Fichier trop lourd (10 Mo au plus).');
+  assert.equal(refusFichier({ nom: 'c.xlsx', taille: OCTETS_MAX + 1 }), 'Fichier trop lourd (20 Mo au plus).');
   assert.equal(refusFichier({ nom: 'c.pdf', taille: 10 }), 'Format non pris en charge : déposez un fichier .xlsx ou .csv.');
   assert.equal(refusFichier({ nom: 'Clients.CSV', taille: 10 }), null);
 });

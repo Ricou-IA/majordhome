@@ -188,6 +188,7 @@ export default function ClientsImport() {
             onRelire={relireExistants}
             onImporter={actions.basculerImporter}
             onEcarter={actions.basculerEcarter}
+            onTousLesDoublons={(reprendre) => actions.tousLesDoublons(classees, reprendre)}
             onTelechargerEcartees={() => telechargerEcartees(classees, choix)}
             onRetour={actions.versCorrespondance}
             onLancer={lancer}

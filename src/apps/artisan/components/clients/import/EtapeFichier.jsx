@@ -5,6 +5,7 @@
 
 import { useRef, useState } from 'react';
 import { Upload, Download, Loader2, AlertCircle } from 'lucide-react';
+import { LIMITES_TEXTE } from '@/lib/importClients/lireFichier';
 
 export default function EtapeFichier({ lecture, refus, sourceLabel, onSource, onFichier, onTelechargerType }) {
   const inputRef = useRef(null);
@@ -58,7 +59,7 @@ export default function EtapeFichier({ lecture, refus, sourceLabel, onSource, on
             <>
               <Upload className="w-8 h-8 text-secondary-400" aria-hidden="true" />
               <span className="text-sm font-medium text-secondary-700">Cliquez pour choisir un fichier, ou glissez-le ici</span>
-              <span className="text-xs text-secondary-500">.xlsx ou .csv, 10 Mo et 10 000 lignes au plus</span>
+              <span className="text-xs text-secondary-500">.xlsx ou .csv, {LIMITES_TEXTE.octets} et {LIMITES_TEXTE.lignes} au plus</span>
             </>
           )}
         </button>

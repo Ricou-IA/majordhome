@@ -227,6 +227,28 @@ export function aImporter(ligneClassee, choix) {
 }
 
 /**
+ * Même choix pour tous les doublons d'un coup (Cimaj, 2026-11-26 : cocher un par un ne tient pas sur des centaines de lignes).
+ * `reprendre` vrai = tous importés (doublons forts et du fichier repris, aucun faible écarté) ; faux = tous écartés.
+ * Les choix des autres lignes ne bougent pas.
+ * @param {Array<{ numero: number, statut: string }>} classees
+ * @param {{ importer: Set<number>, ecarter: Set<number> }} choix
+ * @param {boolean} reprendre
+ * @returns {{ importer: Set<number>, ecarter: Set<number> }}
+ */
+export function choixPourTousLesDoublons(classees, choix, reprendre) {
+  const importer = new Set(choix.importer);
+  const ecarter = new Set(choix.ecarter);
+  for (const { numero, statut } of classees) {
+    if (statut === 'doublon_fort' || statut === 'doublon_fichier') {
+      if (reprendre) importer.add(numero); else importer.delete(numero);
+    } else if (statut === 'doublon_faible') {
+      if (reprendre) ecarter.delete(numero); else ecarter.add(numero);
+    }
+  }
+  return { importer, ecarter };
+}
+
+/**
  * Bilan affiché à l'écran : importées + doublons écartés + écartées = lues, toujours.
  * @param {Array<{ numero: number, statut: string }>} classees
  * @param {{ importer: Set<number>, ecarter: Set<number> }} choix
