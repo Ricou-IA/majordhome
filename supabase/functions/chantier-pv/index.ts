@@ -8,7 +8,7 @@
 //
 // Bureau (JWT utilisateur ; membre de l'org + droit de modifier les chantiers ; le chantier
 // doit appartenir à l'org de l'appelant) :
-//   POST { action: "preparer", org_id, chantier_id, gabarit?, reponses }
+//   POST { action: "preparer", org_id, chantier_id, gabarit?, reponses, observation? }
 //        → déclaration de l'entreprise, point par point (oui | non | sans_objet). Le gabarit
 //          vient du TYPE du chantier, jamais du corps ; textes repris de pvPoints.js. Le
 //          `gabarit` de la fenêtre n'est que comparé : différent ⇒ 409 gabarit_different
@@ -62,6 +62,7 @@ import {
 } from "../_shared/pvReception.js";
 import {
   normaliserGabarit, pointsDuGabarit, figerDeclaration, figerPointsClient, GARANTIES_RECEPTION, LIBELLE_REPONSE,
+  normaliserObservation,
 } from "../_shared/pvPoints.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -92,7 +93,7 @@ interface LignePv {
   signed_at: string | null; signataire_nom: string | null; signature_png: string | null;
   reception_type: string | null; reserves_nature: string | null; reserves_travaux: string | null;
   info_recues: boolean | null; notices_recues: boolean | null; entretien_recues: boolean | null;
-  gabarit: string | null; points_entreprise: PointEntreprise[] | null;
+  gabarit: string | null; points_entreprise: PointEntreprise[] | null; observation: string | null;
   prepare_at: string | null; prepare_par: string | null;
   devis: Devis[] | null; points_client: PointClient[] | null;
   reserves_reponse: string | null; reserves_echeance: string | null;
@@ -305,9 +306,13 @@ async function actionPreparer(req: Request, body: Json): Promise<Response> {
   }
   const decl = figerDeclaration(gabarit, reponses as Record<string, string>);
   if (!decl.ok) return jsonResponse({ error: decl.code }, 400, req);
+  // Observation libre de l'installateur : remplacée à chaque préparation (absente = vide).
+  const obs = normaliserObservation(body.observation);
+  if (!obs.ok) return jsonResponse({ error: obs.code }, 400, req);
 
   const { data, error } = await getAdminClient().rpc("chantier_pv_preparer", {
     p_chantier_id: ctx.chantier_id, p_gabarit: gabarit, p_points: decl.points, p_user: userId,
+    p_observation: obs.observation,
   });
   const refus = refusRpc(req, data, error, "préparation");
   if (refus) return refus;
@@ -470,6 +475,8 @@ async function pourLaPage(ctx: ContextePv): Promise<Json> {
     declaration: (prepare ? pv!.points_entreprise! : []).map((p) => ({
       texte: p.texte, reponse: libelles[p.reponse] ?? p.reponse,
     })),
+    // Observation de l'installateur, lue par le client avec la déclaration.
+    observation: prepare ? pv!.observation ?? null : null,
     // Points à confirmer, du gabarit de la PRÉPARATION, tant que rien n'est signé.
     points_client: prepare && !signe
       ? pointsDuGabarit(pv!.gabarit).client.map((p) => ({ cle: p.cle, texte: p.texte }))
@@ -490,6 +497,7 @@ async function pourLaPage(ctx: ContextePv): Promise<Json> {
       reception_type: pv!.reception_type, reserves_nature: pv!.reserves_nature, reserves_travaux: pv!.reserves_travaux,
       points_client: Array.isArray(pv!.points_client) ? pv!.points_client : [],
       points_entreprise: Array.isArray(pv!.points_entreprise) ? pv!.points_entreprise : [],
+      observation: pv!.observation ?? null,
       devis: Array.isArray(pv!.devis) ? pv!.devis : [],
     } : null,
   };

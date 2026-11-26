@@ -136,8 +136,8 @@ export function useChantierPvMutations() {
     onSuccess: invalider,
   });
   const preparation = useMutation({
-    mutationFn: ({ chantierId, gabarit, reponses }) =>
-      unwrapResult(chantierPvService.preparer({ orgId, chantierId, gabarit, reponses })),
+    mutationFn: ({ chantierId, gabarit, reponses, observation }) =>
+      unwrapResult(chantierPvService.preparer({ orgId, chantierId, gabarit, reponses, observation })),
     onSuccess: invalider,
   });
   const reponseReserves = useMutation({

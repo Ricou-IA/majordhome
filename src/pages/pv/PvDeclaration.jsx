@@ -20,7 +20,7 @@ function Reponse({ reponse }) {
   );
 }
 
-export default function PvDeclaration({ numero, declaration }) {
+export default function PvDeclaration({ numero, declaration, observation }) {
   if (!declaration?.length) return null;
   return (
     <PageEtape numero={numero} titre="Ce que déclare votre installateur">
@@ -32,6 +32,12 @@ export default function PvDeclaration({ numero, declaration }) {
           </li>
         ))}
       </ul>
+      {observation && (
+        <div className="mt-4 rounded-2xl border border-secondary-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-semibold text-secondary-900">Observation de votre installateur</p>
+          <p className="mt-1 whitespace-pre-line text-base text-secondary-800">{observation}</p>
+        </div>
+      )}
     </PageEtape>
   );
 }

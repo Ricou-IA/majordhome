@@ -67,6 +67,7 @@ function PvReceptionDocument({ data, company, visuels }) {
     devis,
     pointsEntreprise,
     pointsClient,
+    observation,
   } = data;
   const pointsEnLigne = Boolean(pointsEntreprise?.length);
 
@@ -181,6 +182,12 @@ function PvReceptionDocument({ data, company, visuels }) {
                   <Text style={s.pointAnswer}>{p.reponse}</Text>
                 </View>
               ))}
+              {observation ? (
+                <View style={{ marginTop: 4 }} wrap={false}>
+                  <Text style={s.reservesLabel}>Observation de l’installateur :</Text>
+                  <Text style={s.reservesText}>{observation}</Text>
+                </View>
+              ) : null}
             </View>
             {pointsClient?.length ? (
               <View style={s.pointsBox}>

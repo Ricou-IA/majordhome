@@ -291,6 +291,7 @@ export function donneesPdfPv({ chantierId, client, objet, entreprise, signature 
       reponse: String(p.reponse ?? '').replace('_', ' '),
     })),
     pointsClient: (pointsClient || []).map((p) => ({ texte: p.texte, confirme: p.confirme === true })),
+    observation: typeof s.observation === 'string' && s.observation.trim() ? s.observation.trim() : null,
     signatureClientBase64: s.signature_png || null,
     signatureClientNom: s.signataire_nom || '',
     signatureTechBase64: null,

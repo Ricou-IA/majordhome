@@ -214,3 +214,10 @@ test('gabarit d’e-mail de levée : clé, lien et transactionnel', () => {
   assert.equal(DEFAULT_PV_LEVEE_EMAIL.is_transactional, true);
   for (const v of ['{{LIEN_PV}}', '{{PRENOM}}', '{{OBJET}}', '{{ACCENT_COLOR}}', '{{BRAND_NAME}}']) assert.ok(DEFAULT_PV_LEVEE_EMAIL.html_body.includes(v), v);
 });
+
+test('PDF : l\'observation de l\'installateur passe telle quelle, absente = null', () => {
+  const base = { chantierId: 'x', client: {}, objet: '', entreprise: '' };
+  assert.equal(donneesPdfPv({ ...base, signature: { observation: ' Prévoir un ramonage. ' } }).observation, 'Prévoir un ramonage.');
+  assert.equal(donneesPdfPv({ ...base, signature: { observation: '  ' } }).observation, null);
+  assert.equal(donneesPdfPv({ ...base, signature: {} }).observation, null);
+});

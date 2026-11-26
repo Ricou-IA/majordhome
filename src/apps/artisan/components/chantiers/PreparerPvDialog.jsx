@@ -13,6 +13,8 @@
  * - Renvoyer une déclaration identique à l'enregistrement (`memeDeclaration`) ne la prépare pas
  *   à nouveau : sa version changerait et la page déjà ouverte par le client refuserait de signer.
  * - Aucune réponse n'est présélectionnée : une case jamais touchée n'est pas un « oui ».
+ * - Observation : remarque libre de l'installateur (facultative), lue par le client avec la
+ *   déclaration et imprimée dans le PV ; elle fait partie de la déclaration (changer le texte la prépare à nouveau).
  * - Le détail du PV (reprise d'une préparation) est INCONNU tant qu'il charge ou en erreur :
  *   dans cet état les boutons restent fermés, on n'affiche jamais une déclaration vide.
  *
@@ -31,8 +33,8 @@ import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { moduleActif } from '@/lib/modules';
 import {
-  declarationComplete, LIBELLE_REPONSE, LIBELLES_GABARIT, memeDeclaration, normaliserGabarit, pointsDuGabarit,
-  REPONSES_ENTREPRISE,
+  declarationComplete, LIBELLE_REPONSE, LIBELLES_GABARIT, memeDeclaration, memeObservation, normaliserGabarit,
+  OBSERVATION_MAX, pointsDuGabarit, REPONSES_ENTREPRISE,
 } from '@/lib/pvPoints';
 import { messagePv } from '@/lib/pvReception';
 import { BOUTON_NEUTRE, BOUTON_PRINCIPAL } from './pvBoutons';
@@ -61,6 +63,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
   const [typeId, setTypeId] = useState(chantier.equipment_type_id || '');
   const [changerType, setChangerType] = useState(false);
   const [reponses, setReponses] = useState({});
+  const [observation, setObservation] = useState('');
   const [amorce, setAmorce] = useState(false);
   // Gabarit rendu par le serveur sur `gabarit_different`, pour cette ouverture seulement.
   const [gabaritServeur, setGabaritServeur] = useState(null);
@@ -88,6 +91,7 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
     setReponses(reponsesDuGabarit(precedent, normaliserGabarit(
       equipmentTypes.find((t) => t.id === chantier.equipment_type_id)?.reception_profile,
     )));
+    setObservation(pv?.observation || '');
     setAmorce(true);
   }, [open, amorce, donneesInconnues, pv, chantier.equipment_type_id, equipmentTypes]);
 
@@ -114,9 +118,10 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
     try {
       // Déclaration identique à l'enregistrement : la préparer à nouveau changerait sa version
       // (`prepare_at`) et ferait refuser la signature du client en `pv_modifie`.
-      const inchangee = pv?.gabarit === gabarit && memeDeclaration(gabarit, actives, pv?.points_entreprise);
+      const inchangee = pv?.gabarit === gabarit && memeDeclaration(gabarit, actives, pv?.points_entreprise)
+        && memeObservation(observation, pv?.observation);
       if (!inchangee) {
-        await preparerPv({ chantierId: chantier.id, gabarit, reponses: actives });
+        await preparerPv({ chantierId: chantier.id, gabarit, reponses: actives, observation });
         prepare = true;
       }
       if (mode === 'envoyer') {
@@ -258,7 +263,22 @@ export function PreparerPvDialog({ open, onOpenChange, chantier, canEdit, onUpda
                     </fieldset>
                   ))}
                 </div>
-                <p className="text-xs text-secondary-500">Le client verra ces réponses avant de signer.</p>
+                <div className="pt-2">
+                  <label htmlFor={`pv-observation-${chantier.id}`} className="block text-sm font-semibold text-secondary-900">
+                    Observation de l&apos;installateur <span className="font-normal text-secondary-500">(facultatif)</span>
+                  </label>
+                  <textarea
+                    id={`pv-observation-${chantier.id}`}
+                    rows={3}
+                    maxLength={OBSERVATION_MAX}
+                    value={observation}
+                    disabled={!canEdit || occupe}
+                    onChange={(e) => setObservation(e.target.value)}
+                    placeholder="Une remarque sur l'installation, un conseil d'utilisation, un point à surveiller…"
+                    className="mt-1 w-full rounded-lg border border-secondary-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                  />
+                </div>
+                <p className="text-xs text-secondary-500">Le client verra ces réponses et votre observation avant de signer. Elles figurent sur le PV.</p>
               </section>
             )}
           </div>

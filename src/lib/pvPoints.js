@@ -195,6 +195,32 @@ export function memeDeclaration(code, reponses, pointsEnregistres) {
   });
 }
 
+/** Longueur maximale de l'observation de l'installateur (même borne que les réserves du client). */
+export const OBSERVATION_MAX = 2000;
+
+/**
+ * Observation libre de l'installateur, jointe à sa déclaration (Eric 2026-11-26) : texte sans
+ * espaces de bord, `null` si vide ; trop long ⇒ `texte_trop_long`.
+ * @param {unknown} texte
+ * @returns {{ ok: true, observation: string | null } | { ok: false, code: 'texte_trop_long' }}
+ */
+export function normaliserObservation(texte) {
+  const t = typeof texte === 'string' ? texte.replace(/\r\n?/g, '\n').trim() : '';
+  if (t.length > OBSERVATION_MAX) return { ok: false, code: 'texte_trop_long' };
+  return { ok: true, observation: t || null };
+}
+
+/**
+ * Vrai si l'observation saisie est celle déjà enregistrée (vide = absente).
+ * @param {unknown} saisie
+ * @param {string | null | undefined} enregistree
+ * @returns {boolean}
+ */
+export function memeObservation(saisie, enregistree) {
+  const n = normaliserObservation(saisie);
+  return n.ok && n.observation === (enregistree || null);
+}
+
 /**
  * Fige les points du client : un point non coché est non confirmé.
  * @param {string | null | undefined} code

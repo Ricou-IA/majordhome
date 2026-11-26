@@ -104,10 +104,11 @@ export const chantierPvService = {
    * Enregistre les réponses du bureau aux points de contrôle (oui / non / sans objet). → `{ prepare_at }`
    * `gabarit` = celui que la fenêtre affiche ; le serveur le compare au sien et refuse
    * `gabarit_different` (`error.gabarit` = le sien) sans rien écrire.
+   * `observation` = remarque libre de l'installateur, remplacée à chaque préparation (vide = aucune).
    */
-  preparer: ({ orgId, chantierId, gabarit, reponses }) =>
+  preparer: ({ orgId, chantierId, gabarit, reponses, observation }) =>
     withErrorHandling(
-      () => invoquer({ action: 'preparer', org_id: orgId, chantier_id: chantierId, gabarit, reponses }),
+      () => invoquer({ action: 'preparer', org_id: orgId, chantier_id: chantierId, gabarit, reponses, observation: observation ?? '' }),
       'chantierPv.preparer',
     ),
 

@@ -11,6 +11,9 @@ import {
   figerDeclaration,
   figerPointsClient,
   memeDeclaration,
+  normaliserObservation,
+  memeObservation,
+  OBSERVATION_MAX,
 } from '../src/lib/pvPoints.js';
 
 // ASCII imprimable, Latin-1 (160 a 255), apostrophe typographique et oe : ce que Helvetica rend.
@@ -89,4 +92,23 @@ test('même déclaration : renvoyer sans rien changer ne prépare pas à nouveau
   assert.equal(memeDeclaration('generique', reponses, figerDeclaration('poele_granules', granules).points), false);
   // Texte enregistré qui n'est plus celui du module : le serveur l'écrirait autrement, donc différent.
   assert.equal(memeDeclaration('generique', reponses, enregistres.map((pt, i) => (i === 0 ? { ...pt, texte: 'ancien' } : pt))), false);
+});
+
+test('observation de l\'installateur : bords retirés, vide = null, trop long refusé', () => {
+  assert.deepEqual(normaliserObservation('  Conduit à ramoner avant l\'hiver.\r\n '), { ok: true, observation: 'Conduit à ramoner avant l\'hiver.' });
+  assert.deepEqual(normaliserObservation('   '), { ok: true, observation: null });
+  assert.deepEqual(normaliserObservation(undefined), { ok: true, observation: null });
+  assert.deepEqual(normaliserObservation(42), { ok: true, observation: null });
+  assert.deepEqual(normaliserObservation('a\r\nb'), { ok: true, observation: 'a\nb' });
+  assert.equal(normaliserObservation('x'.repeat(OBSERVATION_MAX)).ok, true);
+  assert.deepEqual(normaliserObservation('x'.repeat(OBSERVATION_MAX + 1)), { ok: false, code: 'texte_trop_long' });
+});
+
+test('observation : même texte que l\'enregistré, vide = absente', () => {
+  assert.equal(memeObservation(' Tout va bien ', 'Tout va bien'), true);
+  assert.equal(memeObservation('', null), true);
+  assert.equal(memeObservation('', undefined), true);
+  assert.equal(memeObservation('Nouveau', 'Ancien'), false);
+  assert.equal(memeObservation('', 'Ancien'), false);
+  assert.equal(memeObservation('x'.repeat(OBSERVATION_MAX + 1), null), false);
 });

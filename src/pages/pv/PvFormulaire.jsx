@@ -74,7 +74,7 @@ export default function PvFormulaire({ pv, reponse, maj, envoi, refus, onSigner 
         />
       </div>
 
-      <PvDeclaration numero={numeroDeclaration} declaration={pv.declaration} />
+      <PvDeclaration numero={numeroDeclaration} declaration={pv.declaration} observation={pv.observation} />
 
       <PageEtape numero={numeroDecision} titre="Votre décision">
         <fieldset disabled={envoi} className="space-y-3 disabled:opacity-60">
