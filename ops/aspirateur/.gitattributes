@@ -1,0 +1,2 @@
+# Service Linux (VPS) : fins de ligne LF quel que soit le poste qui le copie (systemd refuse un CR en fin de ligne).
+* text=auto eol=lf
