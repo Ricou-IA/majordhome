@@ -155,3 +155,37 @@ export function aConfirmerAvantAjout(resultat) {
   const alertes = (resultat?.alertes || []).filter((a) => a.niveau === 'warn' && a.code !== 'article_manquant' && a.code !== 'article_ambigu');
   return { sansPrix, aValider, alertes, vide: !sansPrix.length && !alertes.length };
 }
+
+/**
+ * Réserves d'une colonne de la comparaison des fabricants, en clair (recette du 2026-11-28 : « À chiffrer · ambiguës
+ * 0 · 0 », « Équivalence de gamme non validée »).
+ * @param {{ erreur?: string|null, aChiffrer: number, ambigus: number, validee: boolean, prixVerifies: boolean, nom: string }} c
+ * @returns {string[]}
+ */
+export function reservesFabricant(c) {
+  if (c.erreur) return ['Relevé à corriger'];
+  const pl = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
+  return [
+    c.aChiffrer > 0 && pl(c.aChiffrer, 'pièce sans prix', 'pièces sans prix'),
+    c.ambigus > 0 && pl(c.ambigus, 'pièce à départager', 'pièces à départager'),
+    !c.validee && 'Correspondance de gamme à confirmer',
+    !c.prixVerifies && `Tarifs ${c.nom} non vérifiés`,
+  ].filter(Boolean);
+}
+
+/**
+ * Phrase de synthèse : le moins cher et son écart avec le plus cher, seulement quand toutes les colonnes sont
+ * complètes (comparerFabricants le décide) ; sinon on le dit.
+ * @param {{ colonnes: any[], complete: boolean, moinsCher: string|null }} comparaison
+ * @returns {string}
+ */
+export function syntheseComparaison(comparaison) {
+  if (!comparaison.complete || !comparaison.moinsCher) {
+    return comparaison.colonnes.some((c) => c.erreur) ? 'Comparaison impossible tant que le relevé est à corriger.'
+      : 'Comparaison impossible tant que des pièces n’ont pas de prix ou sont à départager.';
+  }
+  const min = comparaison.colonnes.find((c) => c.supplierId === comparaison.moinsCher);
+  const max = Math.max(...comparaison.colonnes.map((c) => c.totaux.vente_ht));
+  const ecart = max > 0 ? Math.round(((max - min.totaux.vente_ht) / max) * 100) : 0;
+  return ecart > 0 ? `Le moins cher : ${min.nom} (−${ecart} %).` : 'Les fabricants sont au même prix.';
+}
