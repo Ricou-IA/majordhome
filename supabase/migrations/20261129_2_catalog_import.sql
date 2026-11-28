@@ -593,7 +593,7 @@ BEGIN
          OR ((v_four ->> 'supplier_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') IS NOT TRUE
          OR jsonb_typeof(v_four -> 'reference') IS DISTINCT FROM 'string' OR btrim(v_four ->> 'reference') = ''
          OR jsonb_typeof(v_four -> 'purchase_price_ht') IS DISTINCT FROM 'number'
-         OR ((v_four ->> 'purchase_price_ht')::numeric > 0 AND (v_four ->> 'purchase_price_ht')::numeric < 100000000) IS NOT TRUE THEN
+         OR ((v_four ->> 'purchase_price_ht')::numeric >= 0.005 AND (v_four ->> 'purchase_price_ht')::numeric < 100000000) IS NOT TRUE THEN
         RAISE EXCEPTION 'row_invalid' USING ERRCODE = '22023', DETAIL = format('ligne %s : fournisseur', v_line);
       END IF;
       -- Prix public : absent, null ou nombre de 0 à 100 millions (plus strict que lots.js, qui ne le contrôle pas)
@@ -622,7 +622,7 @@ BEGIN
 
     -- Ligne déjà écrite (lot renvoyé) : rien n'est recréé. Avant les contrôles de la base : au rejeu, la référence
     -- interne et la ligne fournisseur de la ligne existent déjà… parce que c'est elle qui les a écrites.
-    IF EXISTS (SELECT 1 FROM majordhome.catalog_items WHERE import_id = p_import_id AND import_line = v_line) THEN
+    IF EXISTS (SELECT 1 FROM majordhome.catalog_items WHERE import_id = p_import_id AND import_line = v_line AND org_id = v_org) THEN
       v_skipped := v_skipped + 1;
       CONTINUE;
     END IF;

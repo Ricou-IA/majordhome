@@ -17,6 +17,22 @@ const DATE_ISO = /^\d{4}-\d{2}-\d{2}$/;
 const EAN = /^[0-9]{8,14}$/;
 
 const nombre = (v) => typeof v === 'number' && Number.isFinite(v);
+// Plafond des prix : la ligne fournisseur est en numeric(10,2) (99 999 999,99 au plus).
+const PRIX_MAX = 100000000;
+// Plus petit prix d'achat qui ne s'arrondit pas à 0,00 en numeric(10,2).
+const ACHAT_MIN = 0.005;
+// Numéro de ligne : au plus 9 chiffres (même borne que la RPC).
+const LIGNE_MAX = 999999999;
+// Clés texte : chaîne, nombre ou vide ; tout autre type est refusé par la RPC (`catalog_import_texte`).
+const CLES_TEXTE = ['code', 'brand', 'model_key', 'modele_brut', 'category', 'gamme', 'unit', 'description', 'ancien_numero'];
+const texteAdmis = (v) => v === null || v === undefined || typeof v === 'string' || typeof v === 'number';
+// Date réelle au format aaaa-mm-jj (« 2026-02-30 » refusée, comme `catalog_import_date_valide`).
+const dateReelle = (v) => {
+  if (typeof v !== 'string' || !DATE_ISO.test(v)) return false;
+  const [a, m, j] = v.split('-').map(Number);
+  const d = new Date(Date.UTC(a, m - 1, j));
+  return d.getUTCFullYear() === a && d.getUTCMonth() === m - 1 && d.getUTCDate() === j;
+};
 
 /**
  * Clé d'une ligne que `catalog_items_import_batch` refuserait (`row_invalid`), ou null si la ligne passe.
@@ -26,21 +42,24 @@ const nombre = (v) => typeof v === 'number' && Number.isFinite(v);
  */
 export function verifierLigneArticle(row) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return 'import_line';
-  if (!Number.isInteger(row.import_line) || row.import_line < 1) return 'import_line';
+  if (!Number.isInteger(row.import_line) || row.import_line < 1 || row.import_line > LIGNE_MAX) return 'import_line';
   if (typeof row.name !== 'string' || !row.name.trim()) return 'name';
   if (!NATURES.includes(row.product_kind)) return 'product_kind';
   if (!TAUX_TVA.includes(row.default_tva_rate)) return 'default_tva_rate';
-  if (!nombre(row.selling_price_ht) || row.selling_price_ht < 0) return 'selling_price_ht';
+  if (!nombre(row.selling_price_ht) || row.selling_price_ht < 0 || row.selling_price_ht >= PRIX_MAX) return 'selling_price_ht';
   if (row.code_ean !== null && row.code_ean !== undefined && !(typeof row.code_ean === 'string' && EAN.test(row.code_ean))) return 'code_ean';
   const f = row.fournisseur;
   if (f !== null && f !== undefined) {
     if (typeof f !== 'object' || Array.isArray(f)) return 'fournisseur';
     if (typeof f.supplier_id !== 'string' || !UUID.test(f.supplier_id)) return 'fournisseur';
     if (typeof f.reference !== 'string' || !f.reference.trim()) return 'fournisseur';
-    if (!nombre(f.purchase_price_ht) || !(f.purchase_price_ht > 0)) return 'fournisseur';
+    if (!nombre(f.purchase_price_ht) || !(f.purchase_price_ht >= ACHAT_MIN) || f.purchase_price_ht >= PRIX_MAX) return 'fournisseur';
+    const p = f.tarif_public;
+    if (p !== null && p !== undefined && !(nombre(p) && p >= 0 && p < PRIX_MAX)) return 'fournisseur';
     const d = f.purchase_price_at;
-    if (d !== null && d !== undefined && !(typeof d === 'string' && DATE_ISO.test(d))) return 'fournisseur';
+    if (d !== null && d !== undefined && !dateReelle(d)) return 'fournisseur';
   }
+  for (const k of CLES_TEXTE) if (!texteAdmis(row[k])) return k;
   return null;
 }
 
@@ -56,6 +75,8 @@ const MESSAGES = {
   code_pris: 'Une référence interne du fichier est déjà prise par un autre article. Aucun article de ce lot n\'a été créé.',
   ligne_fournisseur_existante: "La ligne fournisseur d'un article existe déjà chez ce fournisseur. Aucun article de ce lot n'a été créé.",
   supplier_not_in_org: "Un fournisseur du fichier n'appartient pas à votre entreprise. Aucun article de ce lot n'a été créé.",
+  file_name_required: 'Le nom du fichier est manquant : déposez à nouveau le fichier.',
+  rattachement_incomplet: "Une ligne fournisseur n'a pas pu être rattachée à son article : aucun article de ce lot n'a été créé. Réessayez.",
 };
 
 const DELAI = 'La base a mis trop de temps à répondre. Réessayez dans un instant.';
@@ -66,7 +87,7 @@ const COLONNES = {
   import_line: 'Numéro de ligne', name: 'Désignation', code: 'Référence interne', brand: 'Marque', model_key: 'Modèle',
   code_ean: 'Code EAN', category: 'Catégorie', gamme: 'Gamme', product_kind: 'Nature', unit: 'Unité',
   default_tva_rate: 'Taux de TVA', selling_price_ht: 'Prix de vente HT', description: 'Description',
-  ancien_numero: 'Ancien numéro', fournisseur: 'Ligne fournisseur',
+  modele_brut: "Modèle (tel qu'écrit)", ancien_numero: 'Ancien numéro', fournisseur: 'Ligne fournisseur',
 };
 const libelleColonne = (colonne) => COLONNES[colonne] || colonne;
 const contient = (texte, code) => new RegExp(`\\b${code}\\b`).test(texte);

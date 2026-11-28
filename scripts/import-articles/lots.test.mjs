@@ -82,3 +82,43 @@ test('délais, doublon de lot, réseau, inconnu', () => {
   assert.equal(messageErreurImportArticles(null), 'Erreur inconnue');
   assert.equal(messageErreurImportArticles({ message: 'autre chose' }), 'autre chose');
 });
+
+test('revue 1 : règles alignées sur catalog_items_import_batch', () => {
+  const cas = [
+    // clés texte : ni chaîne ni nombre ⇒ refus de la clé
+    ...['code', 'brand', 'model_key', 'modele_brut', 'category', 'gamme', 'unit', 'description', 'ancien_numero']
+      .flatMap((k) => [[avec({ [k]: { a: 1 } }), k], [avec({ [k]: ['x'] }), k], [avec({ [k]: true }), k]]),
+    // prix au-delà de numeric(10,2)
+    [avec({ selling_price_ht: 100000000 }), 'selling_price_ht'],
+    [avec({ fournisseur: four({ purchase_price_ht: 100000000 }) }), 'fournisseur'],
+    [avec({ fournisseur: four({ tarif_public: 100000000 }) }), 'fournisseur'],
+    // prix d'achat qui s'arrondirait à 0,00
+    [avec({ fournisseur: four({ purchase_price_ht: 0.004 }) }), 'fournisseur'],
+    // prix public non numérique ou négatif
+    [avec({ fournisseur: four({ tarif_public: '12' }) }), 'fournisseur'],
+    [avec({ fournisseur: four({ tarif_public: -1 }) }), 'fournisseur'],
+    // date inexistante
+    [avec({ fournisseur: four({ purchase_price_at: '2026-02-30' }) }), 'fournisseur'],
+    [avec({ fournisseur: four({ purchase_price_at: '2026-13-01' }) }), 'fournisseur'],
+    // numéro de ligne au-delà de 9 chiffres
+    [avec({ import_line: 1000000000 }), 'import_line'],
+  ];
+  for (const [ligne, cle] of cas) assert.equal(verifierLigneArticle(ligne), cle, JSON.stringify(ligne));
+  // bornes admises
+  const passent = [
+    avec({ code: 1234, brand: 'X', unit: null, description: undefined }),
+    avec({ selling_price_ht: 99999999.99, import_line: 999999999 }),
+    avec({ fournisseur: four({ purchase_price_ht: 0.005, tarif_public: 0, purchase_price_at: '2024-02-29' }) }),
+    avec({ fournisseur: four({ purchase_price_ht: 99999999.99, tarif_public: 99999999.99 }) }),
+  ];
+  for (const l of passent) assert.equal(verifierLigneArticle(l), null, JSON.stringify(l));
+});
+
+test('revue 1 : file_name_required et rattachement_incomplet traduits', () => {
+  for (const code of ['file_name_required', 'rattachement_incomplet']) {
+    const m = messageErreurImportArticles({ message: code });
+    assert.notEqual(m, code);
+    assert.ok(!m.includes('_'), `${code} → ${m}`);
+  }
+  assert.match(messageErreurImportArticles({ message: 'row_invalid', details: 'ligne 4 : modele_brut' }), /Ligne 4 .*Modèle/);
+});

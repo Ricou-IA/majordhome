@@ -5,7 +5,7 @@ import { Unlink, Loader2 } from 'lucide-react';
 import { formatEuro } from '@/lib/utils';
 import { estFrais, libelleAge } from '@/lib/catalogue/ageDePrix.js';
 
-const LIEN_LABELS = { auto: 'auto', cle: 'clé modèle', ean: 'EAN', ia: 'IA', manuel: 'manuel' };
+const LIEN_LABELS = { auto: 'auto', cle: 'clé modèle', ean: 'EAN', ia: 'IA', manuel: 'manuel', import: 'Import' };
 
 function stockLabel(o) {
   if (o.stock_qty != null) return o.stock_qty > 0 ? `${o.stock_qty} en stock` : 'rupture';
