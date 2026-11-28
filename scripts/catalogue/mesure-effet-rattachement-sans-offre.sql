@@ -13,6 +13,9 @@
 -- le fournisseur commun des propositions (requête 1). Avant l'application de l'import, la production n'en porte aucune
 -- (la mesure ne change donc pas) ; la clause sert à rejouer la mesure après des imports.
 --
+-- Proposition seule (20261129_5, décision d'Eric 2026-11-28) : dans la version « nouveau », une paire dont l'un des
+-- deux articles porte une telle ligne d'import n'est jamais franche (elle est proposée, jamais fusionnée d'office).
+--
 -- Requête 2 — catalog_items_ensure : lignes actives à prix sans article (celles que le prochain passage traitera) qui
 -- se rattacheraient avec la nouvelle étape 2 alors que l'ancienne crée un article.
 
@@ -55,6 +58,8 @@ cles AS (
 -- t_four : les lignes d'import non encore reprises ne comptent pas comme « fournisseur commun » (version nouvelle seulement)
 four AS (SELECT DISTINCT version, item, supplier_id FROM cles
           WHERE supplier_id IS NOT NULL AND NOT (version = 'nouveau' AND importee)),
+-- articles qui portent une ligne d'import pas encore reprise (20261129_5 : jamais de fusion d'office)
+importes AS (SELECT DISTINCT version, item FROM cles WHERE importee AND version = 'nouveau'),
 prix AS (
   SELECT p.catalog_item_id AS item, min(p.purchase_price_ht) FILTER (WHERE p.purchase_price_ht > 0) AS prix
     FROM majordhome.supplier_products p WHERE p.is_active AND p.catalog_item_id IS NOT NULL GROUP BY 1
@@ -107,7 +112,8 @@ evaluees AS (
   SELECT t.version, t.org_id, t.a, t.b, t.motif,
          (NOT t.proche AND na.n = 1 AND nb.n = 1 AND ia.product_kind = ib.product_kind
           AND pa.prix IS NOT NULL AND pb.prix IS NOT NULL
-          AND greatest(pa.prix, pb.prix) <= 2 * least(pa.prix, pb.prix)) AS franche
+          AND greatest(pa.prix, pb.prix) <= 2 * least(pa.prix, pb.prix)
+          AND NOT EXISTS (SELECT 1 FROM importes ii WHERE ii.version = t.version AND ii.item IN (t.a, t.b))) AS franche
     FROM sans_commun t
     JOIN partenaires na ON na.version = t.version AND na.cle = t.cle AND na.item = t.a
     JOIN partenaires nb ON nb.version = t.version AND nb.cle = t.cle AND nb.item = t.b
