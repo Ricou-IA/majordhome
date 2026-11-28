@@ -72,8 +72,9 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
     : !edition ? null
     : metreEnregistreQ.isSuccess ? metreEnregistreQ.data?.resultat?.lignes ?? null
     : undefined; // pas encore lu, ou lecture en échec : on ne devine pas
-  // Brouillon du métré rangé par dossier : lead, sinon carte SAV, sinon devis modifié ; aucun ⇒ pas de brouillon.
-  const dossierMetre = lead?.id || (interventionId ? `intervention-${interventionId}` : null) || (edition ? `devis-${devisAModifier.quote.id}` : null);
+  // Brouillon du métré rangé par dossier : devis modifié, sinon lead, sinon carte SAV ; aucun ⇒ pas de brouillon.
+  // Le devis d'abord : un nouveau devis du même lead ne reprend pas le relevé d'un autre devis.
+  const dossierMetre = (edition ? `devis-${devisAModifier.quote.id}` : null) || lead?.id || (interventionId ? `intervention-${interventionId}` : null);
   const enregistrerMetre = async (quoteId, message) => {
     try {
       await saveMetre({ ...metre, quoteId, createdBy: user?.id });

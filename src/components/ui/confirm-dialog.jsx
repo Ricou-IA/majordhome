@@ -27,6 +27,7 @@ import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@lib/utils';
 import { saisieConforme, saisieDemandee } from '@lib/confirmationSaisie';
+import { Button } from './button';
 
 export function ConfirmDialog({
   open,
@@ -44,6 +45,11 @@ export function ConfirmDialog({
   // Appelé quand la fenêtre rend la main (après sa fermeture) : e.preventDefault() puis placer soi-même le focus
   // (ex. champ manquant). Un focus posé AVANT ce moment est repris par la fenêtre, qui le rend à l'élément d'avant.
   onCloseAutoFocus,
+  // Clic sur le bouton d'annulation seulement (Échap et clic hors fenêtre n'appellent que onOpenChange) : quand
+  // « Annuler » est un vrai choix (« Recommencer »), Échap reste le geste sans conséquence.
+  onCancel,
+  // Troisième issue, à gauche, en `danger` : { label, onClick } (ex. « Supprimer le brouillon »). Ferme la fenêtre.
+  actionSupplementaire = null,
   children,
 }) {
   const champId = useId();
@@ -115,9 +121,17 @@ export function ConfirmDialog({
             </div>
           )}
 
-          <div className="mt-6 flex items-center justify-end gap-3">
+          <div className="mt-6 flex items-center justify-end gap-3 max-sm:flex-wrap">
+            {actionSupplementaire && (
+              <AlertDialogPrimitive.Action asChild>
+                <Button variant="danger" className="mr-auto max-sm:w-full max-sm:order-last" disabled={loading} onClick={() => actionSupplementaire.onClick?.()}>
+                  {actionSupplementaire.label}
+                </Button>
+              </AlertDialogPrimitive.Action>
+            )}
             {cancelLabel && (
               <AlertDialogPrimitive.Cancel
+                onClick={() => onCancel?.()}
                 className="px-4 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors focus:outline-none focus:ring-2 focus:ring-secondary-300 max-sm:flex-1 max-sm:py-3"
                 disabled={loading}
               >

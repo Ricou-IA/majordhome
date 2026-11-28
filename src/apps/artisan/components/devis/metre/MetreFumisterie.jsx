@@ -3,7 +3,7 @@
 // Les lignes validées sont injectées dans la section FUMISTERIE du devis ; le métré (relevé +
 // résultat FIGÉ + engine_version) est rendu à l'appelant, qui l'enregistre après création du devis.
 import { useEffect, useMemo, useState } from 'react';
-import { X, ArrowLeft, Check, AlertTriangle, RotateCcw } from 'lucide-react';
+import { X, ArrowLeft, Check, AlertTriangle, RotateCcw, Trash2 } from 'lucide-react';
 import { CalqueModal } from '@/components/ui/calque-modal';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
@@ -18,7 +18,9 @@ import { logger } from '@lib/logger';
 import QualificationStep from './QualificationStep';
 import ReleveStep from './ReleveStep';
 import { useMetreDraft } from './useMetreDraft';
-import { releveInitial, versLignesDevis, resultatDeColonne, criteresDepuisFamille } from './metreModel';
+import { releveInitial, versLignesDevis, resultatDeColonne, criteresDepuisFamille, LIBELLES_COURTS } from './metreModel';
+import { nouveauBrouillon, clesModifiees, ajouterModifies, resumeBrouillon, titreReprise, contradictionFamille } from '@/lib/fumisterie/brouillon.js';
+import { MenuActions } from '@/components/ui/menu-actions';
 import { useFabricantPrefere } from './useFabricantPrefere';
 
 const EMPTY = [];
@@ -47,14 +49,16 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
   const [criteres, setCriteres] = useState(draft?.criteres ?? criteresDepuisFamille(family));
   const [configurationId, setConfigurationId] = useState(draft?.configurationId ?? null);
   const [releve, setReleveState] = useState(draft?.releve ?? null);
-  const setReleve = (r) => { setReleveState(r); setDraft({ etape, criteres, configurationId, releve: r }); };
-  // Un brouillon restauré se DIT (il peut rouvrir directement le relevé d'une autre configuration
-  // que celle qu'on attend) et se jette d'un geste. Contradiction famille ↔ brouillon = alerte.
-  const [brouillonRestaure, setBrouillonRestaure] = useState(!!draft);
+  // Champs touchés par l'utilisateur : le brouillon n'existe qu'après une première saisie (cliquer une carte ne
+  // l'écrit plus). Un brouillon d'avant ce format n'a pas la liste : il compte comme saisi.
+  const [modifies, setModifies] = useState(() => draft?.modifies ?? (draft ? ['*'] : []));
   const familleCriteres = criteresDepuisFamille(family);
-  const brouillonContradictoire = !!(draft?.criteres?.combustible && familleCriteres.combustible && draft.criteres.combustible !== familleCriteres.combustible);
+  // Un brouillon trouvé à l'ouverture se reprend sur demande (date, solution en clair, contradiction avec le devis).
+  const [brouillonInitial] = useState(draft);
+  const [reprise, setReprise] = useState(!!draft);
+  const [confirmationFermeture, setConfirmationFermeture] = useState(false);
   const repartirDeZero = () => {
-    clear(); setBrouillonRestaure(false); setEtape(0); setCriteres(familleCriteres); setConfigurationId(null); setReleveState(null);
+    clear(); setModifies([]); setEtape(0); setCriteres(familleCriteres); setConfigurationId(null); setReleveState(null);
   };
 
   const confsQ = useFumConfigurations(orgId);
@@ -63,6 +67,13 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
   const bundle = bundleQ.data;
   // Chaque fabricant de fumisterie de l'org : mapping, équivalences, articles au Ø du relevé.
   const fab = useFumFabricantsDuMetre(orgId, bundle, releve?.diametre);
+  const configLibelle = LIBELLES_COURTS[bundle?.configuration?.code] || bundle?.configuration?.titre || null;
+  const ecrireBrouillon = (etat) => setDraft(nouveauBrouillon({ etape, criteres, configurationId, configLibelle, releve, modifies, ...etat }));
+  const setReleve = (r) => {
+    const m = ajouterModifies(modifies, clesModifiees(releve, r));
+    setModifies(m); setReleveState(r);
+    if (m.length) ecrireBrouillon({ releve: r, modifies: m });
+  };
 
   // Une requête en erreur n'est JAMAIS présentée comme un catalogue vide.
   const erreurRequete = [confsQ, bundleQ].find((q) => q.isError)?.error || fab.error;
@@ -90,18 +101,22 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
     const r = releve || releveInitial(bundle.gabarit, reglages, criteres);
     setReleveState(r);
     setEtape(1);
-    setDraft({ etape: 1, criteres, configurationId, releve: r });
+    if (modifies.length) ecrireBrouillon({ etape: 1, releve: r });
   };
+  const changerDeSolution = () => { setEtape(0); if (modifies.length) ecrireBrouillon({ etape: 0 }); };
   // Cliquer une carte de configuration = la choisir ET ouvrir son relevé dès que son gabarit est chargé.
   const [versReleve, setVersReleve] = useState(false);
-  const choisirEtContinuer = (id) => { if (id !== configurationId) setReleveState(null); setConfigurationId(id); setVersReleve(true); };
+  // Une autre solution = un autre relevé : la saisie de la précédente n'est plus un brouillon.
+  const choisirEtContinuer = (id) => { if (id !== configurationId) { setReleveState(null); setModifies([]); clear(); } setConfigurationId(id); setVersReleve(true); };
   useEffect(() => {
     if (!versReleve || etape !== 0 || !bundle || bundle.configuration?.id !== configurationId) return;
     setVersReleve(false);
     allerAuReleve();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versReleve, bundle, configurationId, etape]);
-  const fermer = () => { if (dossier && (draft || releve)) toast.info('Métré mis de côté : la saisie reste en brouillon.'); onClose(); };
+  // Fermer sans rien avoir saisi : fermeture directe, rien n'est annoncé. Avec une saisie pas encore ajoutée au devis : on demande.
+  const fermer = () => { if (modifies.length) setConfirmationFermeture(true); else onClose(); };
+  const supprimerBrouillon = () => { repartirDeZero(); toast.success('Brouillon supprimé.'); };
   // Alertes de contrôle (zone, dévoiement, buse…) : on demande confirmation dans une modale de l'app,
   // pas dans le dialogue système du navigateur. Les lignes « à chiffrer » ne bloquent pas.
   const [confirmationAlertes, setConfirmationAlertes] = useState(false);
@@ -127,19 +142,14 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
     <CalqueModal onClose={fermer} titreId="metre-titre" fermerAuFond={false} className="bg-secondary-100 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-secondary-200">
         <div><p className="text-xs uppercase tracking-wide text-secondary-500">Métré assisté · fumisterie</p><h2 id="metre-titre" className="text-lg font-semibold text-secondary-900">{etape === 0 ? 'Qualifier le projet' : bundle?.configuration?.titre}</h2></div>
-        <button type="button" onClick={fermer} className="p-2 rounded hover:bg-secondary-100" aria-label="Fermer"><X className="w-5 h-5" /></button>
+        <div className="flex items-center gap-1">
+          {dossier && (draft || modifies.length > 0) && (
+            <MenuActions actions={[{ label: 'Supprimer le brouillon', icon: Trash2, onClick: supprimerBrouillon, danger: true }]} />
+          )}
+          <Button variant="ghost" size="icon" onClick={fermer} aria-label="Fermer"><X className="w-5 h-5" /></Button>
+        </div>
       </header>
       <main className="flex-1 overflow-y-auto p-4">
-        {brouillonRestaure && (
-          <div role="status" className={`flex items-center justify-between gap-3 mb-4 px-4 py-2.5 rounded-lg border text-sm ${brouillonContradictoire ? 'border-primary-300 bg-primary-50 text-primary-900' : 'border-secondary-200 bg-white text-secondary-700'}`}>
-            <span>
-              {brouillonContradictoire ? <AlertTriangle className="w-4 h-4 inline mr-1.5 -mt-0.5" /> : null}
-              Saisie précédente restaurée{bundle?.configuration ? ` : ${bundle.configuration.code} · ${bundle.configuration.titre}` : ''}.
-              {brouillonContradictoire && ` Ce métré est « ${draft.criteres.combustible === 'pellets' ? 'pellets' : 'bois bûches'} » alors que le devis est « ${family} ».`}
-            </span>
-            <button type="button" onClick={repartirDeZero} className="btn-secondary shrink-0">Repartir de zéro</button>
-          </div>
-        )}
         {erreurRequete ? <Blocage titre="Le catalogue n’a pas pu être chargé." message="Vérifiez la connexion puis réessayez."
               action={<Button variant="secondary" size="sm" onClick={reessayer}><RotateCcw className="w-4 h-4" />Réessayer</Button>} />
           : sansFournisseur ? <Blocage titre="Aucun fabricant de fumisterie configuré : importer un tarif et ses attributs" />
@@ -158,7 +168,7 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
       {/* À la qualification, la carte cliquée est l'action : pas de pied, une seule sortie (la croix). */}
       {etape === 1 && (
         <footer className="flex items-center justify-between px-4 py-3 bg-white border-t border-secondary-200">
-          <button type="button" onClick={() => setEtape(0)} className="btn-secondary"><ArrowLeft className="w-4 h-4 mr-1" />Changer de configuration</button>
+          <Button variant="secondary" onClick={changerDeSolution}><ArrowLeft className="w-4 h-4" />Changer de solution</Button>
           <button type="button" disabled={!injectable} title={raisonBouton} onClick={valider} className="btn-primary"><Check className="w-4 h-4 mr-1" /> Injecter dans le devis</button>
         </footer>
       )}
@@ -168,6 +178,17 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
           {alertesBloquantes.map((a, i) => <li key={`${a.code}-${i}`} className="flex gap-2"><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-primary-700" /><span>{a.message}</span></li>)}
         </ul>
       </ConfirmDialog>
+      {/* Brouillon trouvé à l'ouverture : on le reprend sur demande. Échap = reprendre (rien n'est perdu). */}
+      <ConfirmDialog open={reprise} onOpenChange={setReprise} variant="default" title={titreReprise(brouillonInitial)}
+        description={[resumeBrouillon(brouillonInitial), contradictionFamille(brouillonInitial, familleCriteres)].filter(Boolean).join('. ')}
+        confirmLabel="Reprendre" cancelLabel="Recommencer" onConfirm={() => setReprise(false)} onCancel={repartirDeZero} />
+      {/* Fermer avec une saisie pas encore ajoutée au devis : garder, supprimer ou continuer. Sans dossier, pas de brouillon possible. */}
+      <ConfirmDialog open={confirmationFermeture} onOpenChange={setConfirmationFermeture} variant="default"
+        title="Fermer le métré ?"
+        description={dossier ? 'La saisie n’est pas encore dans le devis.' : 'La saisie n’est pas encore dans le devis : elle sera perdue.'}
+        confirmLabel={dossier ? 'Garder en brouillon' : 'Fermer sans ajouter'} cancelLabel="Continuer le relevé"
+        onConfirm={() => { setConfirmationFermeture(false); onClose(); }}
+        actionSupplementaire={dossier ? { label: 'Supprimer le brouillon', onClick: () => { clear(); onClose(); } } : null} />
     </CalqueModal>
   );
 }
