@@ -51,7 +51,7 @@ function atelier({ minX, maxY, sc, k }) {
 }
 
 /** Libellé de la ligne d'exigence de hauteur (le rendu ajoute l'état : ✓ / ⚠ à l'écran, mots dans le PDF). */
-const libelleZone = (c) => (c.flat ? `Toit plat : +${c.reqAbove.toFixed(2).replace('.', ',')} m` : `Faîtage + ${Math.round(c.reqAbove * 100)} cm (zone 1)`);
+const libelleZone = (c) => c.exigence || (c.flat ? `Toit plat : +${c.reqAbove.toFixed(2).replace('.', ',')} m` : `Faîtage + ${Math.round(c.reqAbove * 100)} cm (zone 1)`);
 
 function sceneG1(c, i, k) {
   const tp = Math.tan(rad(Math.max(i.pente, 1)));

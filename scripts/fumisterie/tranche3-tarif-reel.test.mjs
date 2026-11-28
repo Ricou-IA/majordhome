@@ -51,11 +51,13 @@ test('CFG-31 conduit isolé existant Ø80 : les adaptateurs n°4 / n°2 sont sur
   assert.equal(r.totaux.lignes_a_chiffrer, 2); assert.equal(r.totaux.achat_ht, 312.62);
   assert.ok(refs(r).includes('2PLACO9080×1'));
 });
-test('CFG-29 ventouse Ø80 : terminal horizontal, rosace, PLA vertical + horizontal, 361,09 € ; zone 3 = validation technicien', () => {
+test('CFG-29 ventouse Ø80 : terminal horizontal, rosace, PLA vertical + horizontal, 361,09 € ; distances du terminal à vérifier sur place', () => {
   const r = calculerSurTarif(TARIF, 'CFG-29', 'G6', { diametre: 80, finition: 'noir', hBuse: 0.9, hSortie: 1.8, lHoriz: 0.6, epMur: 0.3 });
   assert.deepEqual(refs(r), ['2PLATHOF80×1', '2PLAROSA2P80×1', '2PLAELDR80500×1', '2PLAELDR80250×1', '2PLACO9080×1', '2PLAELDR801000×1', '2PLAMAFM80×1', '2PLAPPTR80×1']);
   assert.equal(r.totaux.achat_ht, 361.09);
-  assert.ok(r.alertes.some((a) => a.code === 'zone3_non_verifiee' && a.niveau === 'warn'));
+  // dtu-2026.11 : distances du terminal = points à vérifier (Cahier 3708 § 3.3.1.3) ; nomenclature et prix inchangés.
+  assert.ok(r.alertes.some((a) => a.code === 'terminal_ouvrant' && a.niveau === 'verifier'));
+  assert.ok(r.alertes.some((a) => a.code === 'ventouse_vertical' && a.niveau === 'warn'));
 });
 test('CFG-25 façade PTR Ø150 noir : 14 lignes, supports muraux au Ø extérieur (210), zone 1 vérifiée, 2 216,86 €', () => {
   const r = calculerSurTarif(TARIF, 'CFG-25', 'G3', { diametre: 150, finition: 'noir', hBuse: 1.05, hsp1: 2.5, hTraversee: 1.6, lHoriz: 0.6, epMur: 0.3, raccord: 'emaille_12', hMur: 5.5, pente: 35, dFaitage: 4, hSortie: 3.5 });

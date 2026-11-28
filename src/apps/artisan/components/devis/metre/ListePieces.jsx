@@ -1,10 +1,10 @@
 // src/apps/artisan/components/devis/metre/ListePieces.jsx
 // Liste de pièces chiffrée + contrôles du métré. Rendu pur des sorties de calculerMetre.
-import { CheckCircle2, AlertTriangle, Info } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Info, ClipboardCheck } from 'lucide-react';
 import { formatEuro } from '@/lib/utils';
 
 const STATUT = { catalogue: 'bg-secondary-100 text-secondary-700 border-secondary-300', implicite: 'bg-white text-secondary-600 border-secondary-200', provisoire: 'bg-primary-50 text-primary-800 border-primary-300' };
-const NIVEAU = { ok: ['Conforme', 'border-secondary-500 bg-secondary-50', CheckCircle2], warn: ['À vérifier', 'border-primary-500 bg-primary-50', AlertTriangle], info: ['Info', 'border-secondary-300 bg-white', Info] };
+const NIVEAU = { ok: ['Conforme', 'border-secondary-500 bg-secondary-50', CheckCircle2], warn: ['À vérifier', 'border-primary-500 bg-primary-50', AlertTriangle], info: ['Info', 'border-secondary-300 bg-white', Info], verifier: ['Sur place', 'border-secondary-400 bg-secondary-50', ClipboardCheck] };
 
 export function Alertes({ alertes }) {
   return (

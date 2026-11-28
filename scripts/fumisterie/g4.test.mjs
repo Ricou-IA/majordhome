@@ -44,9 +44,10 @@ test('arrondi du flexible : 6,5 m tombe juste, 6,51 monte à 7,5 ; réglages d\'
   const c2 = buildFumisterieConfig({ fumisterie: { flexible_marge_m: 1, flexible_arrondi_m: 1 } });
   assert.equal(geometrieG4({ ...PLAFOND, hConduit: 6.2 }, c2).Lflex, 8);
 });
-test('contrôles : info zone 1 non vérifiée toujours ; buse au plafond → warn ; mur en Ø180 → warn piquage', () => {
+test('contrôles : débouché à vérifier sur place toujours ; buse au plafond → warn ; mur en Ø180 → warn piquage', () => {
   const ok = controlesG4(geometrieG4(PLAFOND, cfg), PLAFOND, cfg);
-  assert.ok(ok.some((a) => a.code === 'zone1_non_verifiee' && a.niveau === 'info'));
+  // dtu-2026.11 : le débouché non vérifié est un point « à vérifier sur place » (imprimé sur la fiche chantier), plus une info.
+  assert.ok(ok.some((a) => a.code === 'zone1_non_verifiee' && a.niveau === 'verifier'));
   assert.ok(!ok.some((a) => a.niveau === 'warn'));
   const r1 = { ...PLAFOND, hBuse: 2.5 };
   assert.ok(controlesG4(geometrieG4(r1, cfg), r1, cfg).some((a) => a.code === 'buse' && a.niveau === 'warn'));

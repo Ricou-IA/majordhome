@@ -47,7 +47,10 @@ test('G6 : vertical buse → axe de sortie, horizontal jusqu\'au mur, contrôles
   assert.deepEqual(g.troncons.vertical.composition.elements, { 1000: 1, 500: 0, 250: 0 });
   assert.deepEqual(g.troncons.horizontal.composition.elements, { 1000: 0, 500: 1, 250: 1 });
   const a = controlesG6(g, r);
-  assert.ok(a.some((x) => x.code === 'zone3_non_verifiee' && x.niveau === 'warn'));
+  // dtu-2026.11 : l'avertissement global « zone 3 non vérifiée » est remplacé par les règles du Cahier CSTB 3708
+  // (vertical minimal avant le coude : 0,90 m < 1,50 m ici) et la liste des distances à vérifier sur place.
+  assert.ok(a.some((x) => x.code === 'ventouse_vertical' && x.niveau === 'warn'));
+  assert.ok(a.some((x) => x.code === 'ventouse_batiment' && x.niveau === 'verifier'));
   assert.ok(controlesG6(geometrieG6({ ...r, epMur: 0.1 }, cfg), { ...r, epMur: 0.1 }).some((x) => x.code === 'mur_mince'));
   assert.equal(validerReleve(lire('gabarit-g6.json'), r).ok, true);
 });

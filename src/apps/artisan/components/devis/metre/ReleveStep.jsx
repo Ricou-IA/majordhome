@@ -5,6 +5,7 @@
 import { sortieMinimale } from '@/lib/fumisterie/index.js';
 import CoupeCotee from './CoupeCotee';
 import ReleveForm from './ReleveForm';
+import ComplementsForm from './ComplementsForm';
 import ListePieces, { Alertes } from './ListePieces';
 
 export default function ReleveStep({ bundle, reglages, releve, setReleve, resultat }) {
@@ -21,9 +22,15 @@ export default function ReleveStep({ bundle, reglages, releve, setReleve, result
             ? <CoupeCotee gabaritCode={bundle.gabarit?.code} geometrie={resultat.geometrie} releve={releve} onFocusChamp={focusChamp} />
             : <p className="p-3 text-sm text-secondary-500">Pas de coupe dessinée pour le gabarit {bundle.gabarit?.code}.</p>}
         </div>
-        <div className="border border-secondary-200 rounded-xl bg-white p-4"><ReleveForm gabarit={bundle.gabarit} releve={releve} onChange={setReleve} onAjuster={ajuster} minSortie={minSortie} /></div>
+        <div className="border border-secondary-200 rounded-xl bg-white p-4">
+          <ReleveForm gabarit={bundle.gabarit} releve={releve} onChange={setReleve} onAjuster={ajuster} minSortie={minSortie} />
+          <ComplementsForm gabaritCode={bundle.gabarit?.code} releve={releve} onChange={setReleve} />
+        </div>
       </div>
-      <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="text-xs uppercase tracking-wide text-secondary-500 mb-2">Contrôles</h3><Alertes alertes={resultat.alertes} /></section>
+      <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="text-xs uppercase tracking-wide text-secondary-500 mb-2">Contrôles</h3><Alertes alertes={resultat.alertes.filter((a) => a.niveau !== 'verifier')} /></section>
+      {resultat.alertes.some((a) => a.niveau === 'verifier') && (
+        <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="text-xs uppercase tracking-wide text-secondary-500 mb-2">À vérifier sur place · imprimé sur la fiche chantier</h3><Alertes alertes={resultat.alertes.filter((a) => a.niveau === 'verifier')} /></section>
+      )}
       <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="text-xs uppercase tracking-wide text-secondary-500 mb-2">Liste de pièces chiffrée · {resultat.lignes.length} lignes · Ø{releve.diametre}</h3><ListePieces lignes={resultat.lignes} totaux={resultat.totaux} /></section>
     </div>
   );

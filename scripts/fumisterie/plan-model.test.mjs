@@ -90,3 +90,12 @@ test('texteSurPdf : rien hors cp1252', () => {
   assert.equal(texteSurPdf('Ø 150 — « noir »'), 'Ø 150 — « noir »');
   assert.equal(texteSurPdf(null), '');
 });
+
+test('fiche chantier : points « à vérifier sur place » repris du résultat figé', () => {
+  const m = buildPlanModel({ ...base, variante: 'chantier', metre: { ...metre, resultat: { ...metre.resultat, alertes: [
+    { niveau: 'verifier', code: 'plaque_signaletique', message: 'Plaque signalétique à poser et fiche d\'identification à remettre au client.' },
+    { niveau: 'warn', code: 'zone1', message: 'Sortie trop basse' },
+  ] } } });
+  assert.deepEqual(m.chantier.aVerifier, ['Plaque signalétique à poser et fiche d\'identification à remettre au client.']);
+  assert.deepEqual(m.chantier.alertes, ['Sortie trop basse']);
+});

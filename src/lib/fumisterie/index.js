@@ -6,10 +6,12 @@ import { geometrieG1, hauteurSortieMinimale } from './gabarits/g1.js';
 import { geometrieG4 } from './gabarits/g4.js';
 import { geometrieG3, hauteurSortieMinimaleG3 } from './gabarits/g3.js';
 import { geometrieG6 } from './gabarits/g6.js';
-import { controlesG1, controlesG3, controlesG4, controlesG5, controlesG6 } from './controles.js';
+import { controlesG1, controlesG3, controlesG4, controlesG5, controlesG6, controlesNomenclature, pointsAVerifier, natureInstallation } from './controles.js';
 import { construireNomenclature, totaliser } from './nomenclature.js';
 
-export const ENGINE_VERSION = 'g6-2026.09';
+// dtu-2026.11 : hauteur de sortie selon l'arrêté de 1969 (8 m, acrotère, obstacle, toit plat < 15°), règles
+// du NF DTU 24.1 / Cahier CSTB 3708 en alertes non bloquantes, points « à vérifier sur place ».
+export const ENGINE_VERSION = 'dtu-2026.11';
 
 const GABARITS = {
   G1: { geometrie: geometrieG1, controles: controlesG1, sortieMinimale: hauteurSortieMinimale },
@@ -17,11 +19,11 @@ const GABARITS = {
   G4: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false }, cfg), controles: controlesG4, sortieMinimale: null },
   G4R: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: true }, cfg), controles: controlesG4, sortieMinimale: null },
   // Flexible isolé POLYPERF : le bas de conduit (`bas`) décide de l'entrée ; sur un foyer, pas de tuyau de raccordement.
-  G4P: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false, entree: r.bas === 'mur' ? 'mur' : 'plafond', hsp1: r.bas === 'foyer' ? r.hBuse : r.hsp1 }, cfg), controles: (g, r, cfg) => controlesG4(g, r, cfg).filter((a) => !(a.code === 'buse' && r.bas === 'foyer')), sortieMinimale: null },
+  G4P: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false, entree: r.bas === 'mur' ? 'mur' : 'plafond', hsp1: r.bas === 'foyer' ? r.hBuse : r.hsp1 }, cfg), controles: (g, r, cfg, conf) => controlesG4(g, r, cfg, conf).filter((a) => !(a.code === 'buse' && r.bas === 'foyer')), sortieMinimale: null },
   // Kit rénovation PLA (adaptateurs haut/bas) : même géométrie qu'un tubage flexible.
   G4K: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false }, cfg), controles: controlesG4, sortieMinimale: null },
   // Foyer raccordé directement au flexible (Griffaflex) : pas de tuyau simple paroi.
-  G4F: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false, entree: 'plafond', hsp1: r.hBuse }, cfg), controles: (g, r, cfg) => controlesG4(g, r, cfg).filter((a) => a.code !== 'buse'), sortieMinimale: null },
+  G4F: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false, entree: 'plafond', hsp1: r.hBuse }, cfg), controles: (g, r, cfg, conf) => controlesG4(g, r, cfg, conf).filter((a) => a.code !== 'buse'), sortieMinimale: null },
   // Raccordement seul : pas de conduit métré (dessiné à titre indicatif).
   G5: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false, hConduit: 0 }, cfg), controles: controlesG5, sortieMinimale: null },
   G3: { geometrie: geometrieG3, controles: controlesG3, sortieMinimale: hauteurSortieMinimaleG3 },
@@ -84,10 +86,12 @@ export function calculerMetre({ configuration, gabarit, composants, mapping, art
   const validation = validerReleve(gabarit, releve);
   if (!validation.ok) throw new Error(`Relevé incomplet : ${validation.erreurs.join(' ; ')}`);
   const geometrie = moteur.geometrie(releve, reglages);
-  const alertes = moteur.controles(geometrie, releve, reglages);
+  const alertes = moteur.controles(geometrie, releve, reglages, configuration);
   const nomenclature = construireNomenclature({ composants, mapping, articles, geometrie, releve, reglages });
   const lignes = nomenclature.lignes;
-  return { engine_version: ENGINE_VERSION, geometrie, lignes, alertes: [...alertes, ...nomenclature.alertes], totaux: totaliser(lignes) };
+  return { engine_version: ENGINE_VERSION, geometrie, lignes,
+    alertes: [...alertes, ...nomenclature.alertes, ...controlesNomenclature(code, lignes, releve), ...pointsAVerifier(code, configuration)],
+    totaux: totaliser(lignes) };
 }
 
 /** Hauteur de sortie minimale conforme pour le gabarit de la configuration (bouton « Ajuster »). null si le gabarit n'a pas de sortie de toit (tubage). */
@@ -97,4 +101,4 @@ export function sortieMinimale({ configuration, gabarit, reglages, releve }) {
   return fn ? fn(releve, reglages) : null;
 }
 
-export { geometrieG1, geometrieG3, geometrieG4, geometrieG6, controlesG1, controlesG3, controlesG4, controlesG5, controlesG6, construireNomenclature, totaliser };
+export { geometrieG1, geometrieG3, geometrieG4, geometrieG6, controlesG1, controlesG3, controlesG4, controlesG5, controlesG6, controlesNomenclature, pointsAVerifier, natureInstallation, construireNomenclature, totaliser };

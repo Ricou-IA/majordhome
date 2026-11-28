@@ -104,7 +104,8 @@ export function buildPlanModel({ metre, configuration, gabarit, company, devis, 
       releveSaisi: params.map((pp) => ({ libelle: texteSurPdf(pp.libelle), valeur: texteSurPdf(valeurSaisie(pp, releve[pp.cle])) })),
       // Les alertes « à vérifier » présentes à l'injection : le résultat est figé à ce moment-là.
       alertes: (res.alertes || []).filter((a) => a.niveau === 'warn' && a.code !== 'article_manquant' && a.code !== 'article_ambigu').map((a) => texteSurPdf(a.message)),
-      aVerifier: (aVerifier || []).map(texteSurPdf),
+      // Points « à vérifier sur place » du résultat figé (moteur dtu-2026.11 et suivants), plus ceux fournis par l'appelant.
+      aVerifier: [...(res.alertes || []).filter((a) => a.niveau === 'verifier').map((a) => a.message), ...(aVerifier || [])].map(texteSurPdf),
       justification: justification ? texteSurPdf(justification) : null,
       bilan: bilan || null,
     };

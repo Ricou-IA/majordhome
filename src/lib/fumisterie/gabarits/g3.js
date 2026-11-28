@@ -4,6 +4,7 @@
 // jusqu'à `hMur + hSortie` (hMur = hauteur de l'égout de toit, hSortie = hauteur visée au-dessus de l'égout).
 // Zone 1 : comme G1, le sommet doit dépasser le faîtage de `zone1.pente_m` (ou l'égout de `plat_m` si toit plat).
 import { composer } from '../compose.js';
+import { exigenceDebouche } from '../debouche.js';
 
 const rad = (d) => (d * Math.PI) / 180;
 
@@ -19,10 +20,8 @@ export function geometrieG3(r, cfg) {
   const Lsp = Lsp_v + Lsp_h;
   const Ltrav = Number(r.epMur) + 0.2; // élément qui traverse le mur jusqu'au té (20 cm de débord)
   const yEgout = Number(r.hMur);
-  const flat = Number(r.pente) <= cfg.zone1.pente_plat_deg;
   const yRidge = yEgout + Number(r.dFaitage) * Math.tan(rad(Number(r.pente)));
-  const reqAbove = flat ? cfg.zone1.plat_m : cfg.zone1.pente_m;
-  const yReq = (flat ? yEgout : yRidge) + reqAbove;
+  const { flat, yReq, reqAbove, libelle: exigence, critere } = exigenceDebouche({ yToit: yEgout, dFaitage: r.dFaitage, pente: r.pente, releve: r, cfg });
   const Lfac = Math.max(0, yEgout + Number(r.hSortie) - yTe);
   const base = { longueurs: cfg.longueurs_elements_mm, reglable: cfg.reglable };
   const troncons = {
@@ -31,7 +30,7 @@ export function geometrieG3(r, cfg) {
     facade: { longueur_mm: Math.round(Lfac * 1000), composition: composer(Lfac * 1000, { ...base, avecReglable: cfg.reglable_exterieur }) },
   };
   const topAct = yTe + troncons.facade.composition.total / 1000;
-  return { mur: true, yTe, yEgout, yRidge, flat, reqAbove, yReq, Lsp_v, Lsp_h, Lsp, Ltrav, Lfac, troncons, topAct,
+  return { mur: true, yTe, yEgout, yRidge, flat, reqAbove, exigence, critere, yReq, Lsp_v, Lsp_h, Lsp, Ltrav, Lfac, troncons, topAct,
     hAct: topAct - yEgout, minSortie: yReq - yEgout, hLibre: Math.max(0, topAct - yEgout) };
 }
 

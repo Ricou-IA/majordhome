@@ -10,7 +10,7 @@
  *   colliers_par_emboitement: number,
  *   marge_combles_m: number,
  *   haubanage_m: number,
- *   zone1: { pente_m: number, plat_m: number, pente_plat_deg: number },
+ *   zone1: { pente_m: number, plat_m: number, pente_plat_deg: number, distance_m: number, acrotere_m: number, acrotere_seuil_m: number },
  *   flexible_marge_m: number,
  *   flexible_arrondi_m: number,
  *   longueurs_prh_mm: number[],
@@ -29,7 +29,8 @@ export const DEFAULTS_FUMISTERIE = Object.freeze({
   colliers_par_emboitement: 1,          // colliers de jonction extérieurs
   marge_combles_m: 0.10,                // marge sous toiture pour le dévoiement
   haubanage_m: 3,                       // conduit libre au-dessus du toit avant haubanage (catalogue p.33)
-  zone1: Object.freeze({ pente_m: 0.40, plat_m: 1.20, pente_plat_deg: 15 }), // catalogue p.23
+  // Débouché : arrêté du 22/10/1969 art. 18 (NF DTU 24.1 § 5.4.6). Toit plat = pente STRICTEMENT inférieure à pente_plat_deg.
+  zone1: Object.freeze({ pente_m: 0.40, plat_m: 1.20, pente_plat_deg: 15, distance_m: 8, acrotere_m: 1.00, acrotere_seuil_m: 0.20 }),
   // Tubage (G4) — règles PROVISOIRES à valider par Philippe
   flexible_marge_m: 0.50,               // débord du flexible (haut de souche + raccord bas) ajouté à la hauteur du conduit
   flexible_arrondi_m: 0.50,             // le flexible (vendu au ml) se commande au multiple supérieur

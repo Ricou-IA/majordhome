@@ -2,6 +2,7 @@
 // maquette maquette_metre_ptr30.html (compute()). Règles PROVISOIRES : l'encombrement des
 // coudes est ignoré (cf. MAQUETTE_metre_svg.md §5). Unités : mètres, degrés, mm pour les tronçons.
 import { composer } from '../compose.js';
+import { exigenceDebouche } from '../debouche.js';
 
 const rad = (d) => (d * Math.PI) / 180;
 
@@ -20,9 +21,7 @@ export function geometrieG1(r, cfg) {
   const dec = r.angle > 0 ? r.decal : 0;
   const yRoofTop = yC + r.hCombles + r.epToit;
   const yRidge = yRoofTop + r.dFaitage * Math.tan(rad(r.pente));
-  const flat = r.pente <= cfg.zone1.pente_plat_deg;
-  const reqAbove = flat ? cfg.zone1.plat_m : cfg.zone1.pente_m;
-  const yReq = (flat ? yRoofTop : yRidge) + reqAbove;
+  const { flat, yReq, reqAbove, libelle: exigence, critere } = exigenceDebouche({ yToit: yRoofTop, dFaitage: r.dFaitage, pente: r.pente, releve: r, cfg });
   const vg = r.angle > 0 ? dec / Math.tan(rad(r.angle)) : 0;
   const obl = r.angle > 0 ? dec / Math.sin(rad(r.angle)) : 0;
   const yDevS = yC + 0.30;
@@ -37,7 +36,7 @@ export function geometrieG1(r, cfg) {
     sortie_toit: { longueur_mm: Math.round(r.hSortie * 1000), composition: composer(r.hSortie * 1000, { ...base, avecReglable: cfg.reglable_exterieur }) },
   };
   const topAct = yRoofTop + troncons.sortie_toit.composition.total / 1000 + troncons.conduit_interieur.composition.surlongueur / 1000;
-  return { planchers, yC, dec, yRoofTop, yRidge, flat, yReq, reqAbove, vg, obl, yDevS, yDevE, devOK, Lsp, Lint, troncons,
+  return { planchers, yC, dec, yRoofTop, yRidge, flat, yReq, reqAbove, exigence, critere, vg, obl, yDevS, yDevE, devOK, Lsp, Lint, troncons,
     topAct, hAct: topAct - yRoofTop, minSortie: yReq - yRoofTop };
 }
 
