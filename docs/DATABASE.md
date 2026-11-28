@@ -150,6 +150,54 @@ projet `core.projects`, lue dans `pg_constraint` à l'exécution (`majordhome.cl
 `clients.project_id` et `majordhome.client_dpe` (supprimée en cascade). Une fiche qui a un contrat, un lead, un RDV, une
 intervention… est conservée.
 
+### majordhome.catalog_imports (2026-11-28, migration `20261129_2`, répétée par `assert-catalog-import.sql`)
+Un import de fichier d'articles venu d'un autre logiciel (spec `2026-11-28-import-articles-fichier-design.md`). Même
+posture que `client_imports` : une seule policy, SELECT pour un org_admin ACTIF de `org_id` ; aucune policy d'écriture,
+`authenticated` SELECT seul, `anon` rien, `service_role` SELECT. Vue `public.majordhome_catalog_imports`
+(`security_invoker`) : `id, org_id, created_by, created_by_name, created_at, file_name, counts, status, removed_at`.
+
+| Colonne | Type | Notes |
+|---------|------|-------|
+| `id` | uuid PK | |
+| `org_id` | uuid NOT NULL | FK → core.organizations |
+| `created_by` / `created_at` | uuid / timestamptz | auteur, date |
+| `file_name` | text NOT NULL | 255 car. max |
+| `mapping` | jsonb (objet ou tableau) | correspondance des colonnes et des valeurs validée à l'écran |
+| `counts` | jsonb (objet) | bilan écrit au départ puis par `finish` |
+| `status` | text | `en_cours` → `termine` ; `retire` (retrait, migration à venir) |
+| `fournisseurs_crees` | uuid[] NOT NULL | fournisseurs créés à l'ouverture (jamais supprimés par un retrait) |
+| `removed_at` / `removed_by` | timestamptz / uuid | retrait |
+
+**`catalog_items`** reçoit `import_id` (FK → `catalog_imports`, ON DELETE SET NULL) et `import_line` ; index unique
+partiel `catalog_items_import_line_key (import_id, import_line) WHERE import_id IS NOT NULL` (un lot renvoyé ne recrée
+rien ; un 23505 sur cet index = deux envois simultanés). La vue `majordhome_catalog_items` n'est pas modifiée ;
+`authenticated` n'a aucun droit UPDATE sur ces colonnes (droits par colonne de `20261028_4`).
+
+**Écriture = trois RPC SECURITY DEFINER** (`authenticated`, jamais anon ni PUBLIC ; org_admin actif, garde
+`majordhome.catalog_import_org_admin(import)`) :
+`catalog_items_import_start(p_org_id, p_file_name, p_mapping, p_counts, p_fournisseurs) → { import_id, fournisseurs:
+[{ nom, supplier_id, cree }] }` (`p_fournisseurs = [{ nom, supplier_id | null }]` : un id doit être un fournisseur de
+l'org, `supplier_not_in_org` sinon ; null crée le fournisseur au nom écrit, actif — un fournisseur qui porte déjà
+exactement ce nom est repris, `cree = false`) ; `catalog_items_import_batch(p_import_id, p_rows) → { created, skipped,
+lignes_fournisseur }` (1 à 500 lignes au format `CLES_ROW_ARTICLE`, tout ou rien, liste fermée de colonnes, aucune clé
+`org_id` lue ; contrôles miroir de `verifierLigneArticle` ; rejeu ⇒ `skipped` ; `code_pris` (référence interne déjà prise,
+casse ignorée, y compris dans le lot) ; pour une ligne avec `fournisseur` : `supplier_not_in_org`,
+`ligne_fournisseur_existante` si (fournisseur, référence) existe déjà, active ou non — jamais envoyée à l'écrivain ;
+article `origin = 'manuel'`, `specs.canonical = { modele_import, ancien_numero }` non vides ; puis un appel à
+`supplier_catalog_upsert` par fournisseur, `source_version = 'import-articles_<import_id>'`, `desactiver_absents =
+false`, `prix_sans_date = true`, chaque ligne insérée et rattachée à SON article, contrôlé) ; `catalog_items_import_finish
+(p_import_id, p_counts)`. Une ligne fournisseur d'un article `stock` / `main_oeuvre` prend la nature `main`.
+Codes : `unauthenticated`, `org_admin_required` (42501), `import_not_found` (P0002), `import_closed` (55000),
+`rows_invalid`, `row_invalid` (« ligne N : colonne »), `code_pris` et `ligne_fournisseur_existante` (23505, « ligne N »),
+`supplier_not_in_org` (42501), `file_name_required`, `rattachement_incomplet` (P0001, filet). Mesuré sur le harnais
+(27 000 articles, 31 000 lignes) : lot de 200 dont 100 avec fournisseur 141 à 212 ms.
+
+**`supplier_catalog_upsert` — deux clés facultatives** (sans effet quand elles manquent : relevés inchangés) :
+clé de ligne `catalog_item_id` (posée À L'INSERTION seulement, si l'article est de la même org, actif et non fusionné ;
+`catalog_item_link_source = 'import'`, valeur ajoutée au CHECK ; sinon ignorée et la ligne suit `catalog_items_ensure`) ;
+`p_meta.prix_sans_date` (vraie ⇒ une `purchase_price_at` absente reste NULL à l'insertion au lieu de `now()` ; la mise à
+jour d'une ligne existante garde `now()`, donc le relevé suivant date la ligne importée).
+
 ### majordhome.client_activities ⭐
 Timeline auto-alimentée. 3393 rows (1 event `client_created` par client migré). RLS activé (3 policies).
 
