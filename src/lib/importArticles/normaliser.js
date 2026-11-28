@@ -18,8 +18,10 @@ const ok = (valeur) => ({ valeur, illisible: false });
  * @param {string} texte
  * @returns {number|null} null si illisible
  */
-function lireNombre(texte) {
-  let s = texte.replace(ESPACES, '').replace(/[€%]/g, '');
+function lireNombre(texte, avecPourcent = false) {
+  let s = texte.replace(ESPACES, '').replace(avecPourcent ? /[€%]/g : /€/g, '');
+  // « 1,234.50 » (format anglo-saxon) : ni virgule décimale ni point de milliers, on ne devine pas.
+  if (/,.*\./.test(s)) return null;
   if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
   return /^\d+(\.\d+)?$/.test(s) ? Number(s) : null;
 }
@@ -31,7 +33,7 @@ function lirePrix(texte) {
 
 // 0,2 et 20 désignent le même taux : une valeur inférieure à 1 est une fraction.
 function lireTva(texte) {
-  const n = lireNombre(texte);
+  const n = lireNombre(texte, true);
   if (n === null) return ILLISIBLE;
   const taux = Math.round((n < 1 ? n * 100 : n) * 100) / 100;
   return TAUX_TVA_ADMIS.includes(taux) ? ok(taux) : ILLISIBLE;
@@ -51,7 +53,8 @@ const jourLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 
 // Une cellule date d'Excel arrive en AAAA-MM-JJ (voir `celluleEnTexte`) ; une saisie à la main en JJ/MM/AAAA.
 function lireDate(texte, maintenant) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texte);
+  // Une heure à la suite (2026-03-15T00:00:00, 2026-03-15 00:00:00) est ignorée : on garde la date.
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:[.,]\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.exec(texte);
   const iso = lireSaisieDate(m ? `${m[3]}/${m[2]}/${m[1]}` : texte, maintenant);
   if (!iso) return ILLISIBLE;
   return iso > jourLocal(maintenant) ? ILLISIBLE : ok(iso);

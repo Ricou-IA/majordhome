@@ -15,6 +15,8 @@ test('prix', () => {
   assert.deepEqual(lire('prix_vente', '12.50'), ok(12.5));
   assert.deepEqual(lire('prix_vente', '1 234'), ok(1234));
   assert.deepEqual(lire('prix_vente', '1 234 €'), ok(1234));
+  assert.deepEqual(lire('prix_vente', '1,234.50'), KO);
+  assert.deepEqual(lire('prix_vente', '12 %'), KO);
   assert.deepEqual(lire('prix_vente', 'abc'), KO);
   assert.deepEqual(lire('prix_vente', '-3'), KO);
   assert.deepEqual(lire('prix_vente', ''), VIDE);
@@ -45,6 +47,9 @@ test('EAN', () => {
 test('date', () => {
   assert.deepEqual(lire('date_prix', '2026-03-15'), ok('2026-03-15'));
   assert.deepEqual(lire('date_prix', '15/03/2026'), ok('2026-03-15'));
+  assert.deepEqual(lire('date_prix', '2026-03-15T00:00:00'), ok('2026-03-15'));
+  assert.deepEqual(lire('date_prix', '2026-03-15 00:00:00'), ok('2026-03-15'));
+  assert.deepEqual(lire('date_prix', '2026-03-15T00:00:00.000Z'), ok('2026-03-15'));
   assert.deepEqual(lire('date_prix', '2027-01-01'), KO);
   assert.deepEqual(lire('date_prix', '01/01/2027'), KO);
   assert.deepEqual(lire('date_prix', '32/13/2026'), KO);
