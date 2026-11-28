@@ -25,6 +25,7 @@ const GeoGrid = lazy(() => import('./pages/GeoGrid'));
 const TeamManagement = lazy(() => import('./pages/settings/TeamManagement'));
 const SupplierManagement = lazy(() => import('./pages/settings/SupplierManagement'));
 const ArticlesPage = lazy(() => import('./pages/settings/catalogue/ArticlesPage'));
+const ArticlesImport = lazy(() => import('./pages/settings/catalogue/ArticlesImport'));
 const HarmonisationPage = lazy(() => import('./pages/settings/catalogue/HarmonisationPage'));
 const PricingSettings = lazy(() => import('./pages/settings/PricingSettings'));
 const OrganizationSettings = lazy(() => import('./pages/settings/OrganizationSettings'));
@@ -348,6 +349,17 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="articles" action="edit">
           <ArticlesPage />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    // Import d'articles depuis un fichier : org_admin seul, tenu dans la page (et par chaque RPC).
+    path: 'settings/suppliers/articles/import',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="articles" action="edit">
+          <ArticlesImport />
         </RouteGuard>
       </SuspenseWrapper>
     ),

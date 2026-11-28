@@ -7,7 +7,8 @@
 import { Combobox } from '@/components/ui/combobox';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, Loader2, ChevronLeft, ChevronRight, Package, Boxes, Plus, Layers } from 'lucide-react';
+import { Search, Loader2, ChevronLeft, ChevronRight, Package, Boxes, Plus, Layers, Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useDebounce } from '@hooks/useDebounce';
@@ -27,7 +28,7 @@ const CATEGORIE_LABELS = Object.fromEntries(PRODUCT_CATEGORIES.map((c) => [c.val
 const NATURE_LABELS = { main: 'équipement', accessory: 'option', consumable: 'consommable', stock: 'matériel stocké', main_oeuvre: 'main d’œuvre' };
 
 export default function ArticlesPage() {
-  const { organization } = useAuth();
+  const { organization, isOrgAdmin } = useAuth();
   const { can } = useCanAccess();
   const peutCreer = can('articles', 'create');
   const peutCorriger = can('articles', 'edit');
@@ -71,9 +72,11 @@ export default function ArticlesPage() {
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Link to="/settings/suppliers" className="text-primary-700 hover:underline">← Fournisseurs</Link>
         {/* créer un article = articles.create (la base refuse aussi) ; le stock rattache aussi des lignes = articles.edit */}
-        {peutCreer && <span className="ml-auto flex flex-wrap gap-2">
-          {peutCorriger && <button type="button" onClick={() => setCreation('stock')} className="btn-secondary btn-sm"><Layers className="w-3.5 h-3.5 mr-1" /> Article de stock depuis mes achats</button>}
-          <button type="button" onClick={() => setCreation(creation === 'article' ? null : 'article')} className="btn-primary btn-sm"><Plus className="w-3.5 h-3.5 mr-1" /> Nouvel article</button>
+        {/* importer un fichier d'articles = org_admin seul (écran et RPC) */}
+        {(peutCreer || isOrgAdmin) && <span className="ml-auto flex flex-wrap gap-2">
+          {isOrgAdmin && <Button asChild variant="secondary" size="sm"><Link to="/settings/suppliers/articles/import"><Upload aria-hidden="true" /> Importer</Link></Button>}
+          {peutCreer && peutCorriger && <button type="button" onClick={() => setCreation('stock')} className="btn-secondary btn-sm"><Layers className="w-3.5 h-3.5 mr-1" /> Article de stock depuis mes achats</button>}
+          {peutCreer && <button type="button" onClick={() => setCreation(creation === 'article' ? null : 'article')} className="btn-primary btn-sm"><Plus className="w-3.5 h-3.5 mr-1" /> Nouvel article</button>}
         </span>}
       </div>
 
