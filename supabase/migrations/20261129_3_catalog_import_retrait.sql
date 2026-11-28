@@ -12,6 +12,15 @@
 -- elles-mêmes (clé étrangère vers supplier_products : devis, documents, équipements, pièces, fumisterie…). Une ligne
 -- reprise par un relevé (source_version réécrite) prouve que le fournisseur vend le produit : l'article est CONSERVÉ.
 -- Les fournisseurs créés par l'import ne sont jamais supprimés.
+-- Une ligne tolérée corrigée à la main (prix, libellé) reste tolérée : sa source_version ne change pas, seul un relevé
+-- la réécrit.
+-- Références SANS clé étrangère (relues en production le 2026-11-28) :
+--   - majordhome.catalogue_propositions.catalog_item_id (aspirateur, 20261129_1) : lue explicitement si la table
+--     existe ; un article cité par une proposition est conservé.
+--   - majordhome.sav_part_selections.supplier_product_id : sans clé étrangère par conception (la sélection garde une
+--     photo de la ligne) ; une ligne tolérée qu'elle cite part quand même, c'est voulu.
+-- L'aperçu calcule le point fixe (toutes les couches que les retraits successifs supprimeront : fusion dans le même
+-- import) ; un appel de retrait supprime la première couche, puis recompte quand elle est vide.
 --
 -- public.catalog_items_import_removal_preview(p_import_id) → { retirables, conservees }
 -- public.catalog_items_import_remove(p_import_id, p_limit DEFAULT 100) → { retirees, conservees, restantes }
@@ -34,7 +43,7 @@
 --
 -- Retour arrière : DROP INDEX majordhome.catalog_items_merged_into_idx, majordhome.catalog_items_source_product_idx,
 -- majordhome.supplier_products_variant_of_idx ; DROP FUNCTION public.catalog_items_import_remove(uuid, integer),
--- public.catalog_items_import_removal_preview(uuid), majordhome.catalog_import_retirables(uuid).
+-- public.catalog_items_import_removal_preview(uuid), majordhome.catalog_import_retirables(uuid, boolean).
 
 SET lock_timeout = '3s';
 
@@ -53,83 +62,117 @@ CREATE INDEX IF NOT EXISTS supplier_products_variant_of_idx ON majordhome.suppli
 -- ----------------------------------------------------------------------------
 -- 1. Fonction interne : articles retirables d'un import
 -- ----------------------------------------------------------------------------
-CREATE FUNCTION majordhome.catalog_import_retirables(p_import_id uuid)
+-- p_point_fixe = false : la première couche, celle qu'un appel de retrait peut supprimer d'un coup.
+-- p_point_fixe = true : tout ce que les retraits successifs finiront par supprimer (aperçu). Un article qui n'est retenu
+-- que par un article ou une ligne de l'import qui part (fusion dans le même import, `variant_of`, `source_product_id`)
+-- devient retirable à la couche suivante ; on itère tant qu'une couche en libère une autre.
+CREATE FUNCTION majordhome.catalog_import_retirables(p_import_id uuid, p_point_fixe boolean DEFAULT false)
 RETURNS uuid[]
 LANGUAGE plpgsql
 SET search_path = majordhome, public, pg_temp
 AS $$
 DECLARE
-  v_org        uuid;
-  v_version    text := 'import-articles_' || p_import_id::text;
-  v_candidats  uuid[];
-  v_lignes     uuid[];
-  v_retenus    uuid[] := '{}';
-  v_ids        uuid[];
-  v_jointure   text;
-  v_sql        text;
+  v_org       uuid;
+  v_version   text := 'import-articles_' || p_import_id::text;
+  v_restants  uuid[];
+  v_lignes    uuid[];
+  v_partis    uuid[] := '{}';
+  v_total     uuid[] := '{}';
+  v_couche    uuid[];
+  v_retenus   uuid[];
+  v_ids       uuid[];
+  v_interne   boolean;
+  v_jointure  text;
+  v_sql       text;
   r record;
 BEGIN
   SELECT org_id INTO v_org FROM majordhome.catalog_imports WHERE id = p_import_id;
   IF v_org IS NULL THEN
     RETURN '{}';
   END IF;
-  SELECT coalesce(array_agg(id), '{}') INTO v_candidats
+  SELECT coalesce(array_agg(id), '{}') INTO v_restants
     FROM majordhome.catalog_items WHERE import_id = p_import_id AND org_id = v_org;
-  IF cardinality(v_candidats) = 0 THEN
+  IF cardinality(v_restants) = 0 THEN
     RETURN '{}';
   END IF;
 
-  -- Lignes fournisseur créées par l'import et jamais reprises : les seules références tolérées
+  -- Lignes fournisseur créées par l'import et jamais reprises : les seules références tolérées (et seulement venant
+  -- de l'article qui les porte, ou d'un article déjà parti)
   SELECT coalesce(array_agg(p.id), '{}') INTO v_lignes
     FROM majordhome.supplier_products p
-   WHERE p.catalog_item_id = ANY (v_candidats) AND p.org_id = v_org
+   WHERE p.catalog_item_id = ANY (v_restants) AND p.org_id = v_org
      AND p.catalog_item_link_source = 'import' AND p.specs ->> 'source_version' = v_version;
 
-  FOR r IN
-    SELECT c.conrelid::regclass AS source, c.confrelid::regclass AS cible, c.conkey, c.confkey
-      FROM pg_constraint c
-     WHERE c.contype = 'f'
-       AND c.confrelid IN ('majordhome.catalog_items'::regclass, 'majordhome.supplier_products'::regclass)
   LOOP
-    SELECT string_agg(format('r.%I = t.%I', a.attname, b.attname), ' AND ' ORDER BY k.ord)
-      INTO v_jointure
-      FROM unnest(r.conkey, r.confkey) WITH ORDINALITY AS k(col_source, col_cible, ord)
-      JOIN pg_attribute a ON a.attrelid = r.source AND a.attnum = k.col_source
-      JOIN pg_attribute b ON b.attrelid = r.cible AND b.attnum = k.col_cible;
+    v_retenus := '{}';
+    v_interne := false;
+    -- $1 = articles encore en lice, $2 = lignes tolérées, $3 = articles déjà partis (couches précédentes)
+    FOR r IN
+      SELECT c.conrelid::regclass AS source, c.confrelid::regclass AS cible, c.conkey, c.confkey
+        FROM pg_constraint c
+       WHERE c.contype = 'f'
+         AND c.confrelid IN ('majordhome.catalog_items'::regclass, 'majordhome.supplier_products'::regclass)
+    LOOP
+      SELECT string_agg(format('r.%I = t.%I', a.attname, b.attname), ' AND ' ORDER BY k.ord)
+        INTO v_jointure
+        FROM unnest(r.conkey, r.confkey) WITH ORDINALITY AS k(col_source, col_cible, ord)
+        JOIN pg_attribute a ON a.attrelid = r.source AND a.attnum = k.col_source
+        JOIN pg_attribute b ON b.attrelid = r.cible AND b.attnum = k.col_cible;
 
-    IF r.cible = 'majordhome.catalog_items'::regclass THEN
-      -- Référence à l'article ; exceptions : ses lignes tolérées, et l'article lui-même (auto-référence)
-      v_sql := format(
-        'SELECT array_agg(DISTINCT t.id) FROM majordhome.catalog_items t WHERE t.id = ANY ($1) AND EXISTS (SELECT 1 FROM %s r WHERE %s%s)',
-        r.source, v_jointure,
-        CASE r.source
-          WHEN 'majordhome.supplier_products'::regclass THEN ' AND r.id <> ALL ($2)'
-          WHEN 'majordhome.catalog_items'::regclass THEN ' AND r.id <> t.id'
-          ELSE '' END);
-    ELSE
-      -- Référence à une ligne tolérée : l'article qui la porte est retenu (la ligne ne peut pas partir). Exceptions :
-      -- une autre ligne tolérée, et l'article qui porte la ligne (il part avec elle).
-      IF cardinality(v_lignes) = 0 THEN
-        CONTINUE;
+      IF r.cible = 'majordhome.catalog_items'::regclass THEN
+        -- Référence à l'article ; ne retient pas : ses propres lignes tolérées, une ligne tolérée d'un article parti,
+        -- l'article lui-même, un article parti.
+        v_sql := format(
+          'SELECT array_agg(DISTINCT t.id) FROM majordhome.catalog_items t WHERE t.id = ANY ($1) AND EXISTS (SELECT 1 FROM %s r WHERE %s%s)',
+          r.source, v_jointure,
+          CASE r.source
+            WHEN 'majordhome.supplier_products'::regclass
+              THEN ' AND NOT (r.id = ANY ($2) AND (r.catalog_item_id = t.id OR r.catalog_item_id = ANY ($3)))'
+            WHEN 'majordhome.catalog_items'::regclass THEN ' AND r.id <> t.id AND r.id <> ALL ($3)'
+            ELSE '' END);
+      ELSE
+        -- Référence à une ligne tolérée : l'article qui la porte est retenu (la ligne ne peut pas partir). Ne retient
+        -- pas : une ligne tolérée du même article ou d'un article parti, l'article qui porte la ligne, un article parti.
+        IF cardinality(v_lignes) = 0 THEN
+          CONTINUE;
+        END IF;
+        v_sql := format(
+          'SELECT array_agg(DISTINCT t.catalog_item_id) FROM majordhome.supplier_products t'
+          ' WHERE t.id = ANY ($2) AND t.catalog_item_id = ANY ($1) AND EXISTS (SELECT 1 FROM %s r WHERE %s%s)',
+          r.source, v_jointure,
+          CASE r.source
+            WHEN 'majordhome.supplier_products'::regclass
+              THEN ' AND NOT (r.id = ANY ($2) AND (r.catalog_item_id = t.catalog_item_id OR r.catalog_item_id = ANY ($3)))'
+            WHEN 'majordhome.catalog_items'::regclass THEN ' AND r.id <> t.catalog_item_id AND r.id <> ALL ($3)'
+            ELSE '' END);
       END IF;
-      v_sql := format(
-        'SELECT array_agg(DISTINCT t.catalog_item_id) FROM majordhome.supplier_products t WHERE t.id = ANY ($2) AND EXISTS (SELECT 1 FROM %s r WHERE %s%s)',
-        r.source, v_jointure,
-        CASE r.source
-          WHEN 'majordhome.supplier_products'::regclass THEN ' AND r.id <> ALL ($2)'
-          WHEN 'majordhome.catalog_items'::regclass THEN ' AND r.id <> t.catalog_item_id'
-          ELSE '' END);
+
+      EXECUTE v_sql INTO v_ids USING v_restants, v_lignes, v_partis;
+      IF cardinality(v_ids) > 0 AND r.source IN ('majordhome.catalog_items'::regclass, 'majordhome.supplier_products'::regclass) THEN
+        v_interne := true;  -- retenu par un article ou une ligne : peut se libérer à la couche suivante
+      END IF;
+      v_retenus := v_retenus || coalesce(v_ids, '{}');
+    END LOOP;
+
+    -- Référence SANS clé étrangère : propositions de l'aspirateur (20261129_1), lues si la table existe
+    IF to_regclass('majordhome.catalogue_propositions') IS NOT NULL THEN
+      EXECUTE 'SELECT array_agg(DISTINCT c.catalog_item_id) FROM majordhome.catalogue_propositions c WHERE c.catalog_item_id = ANY ($1)'
+        INTO v_ids USING v_restants;
+      v_retenus := v_retenus || coalesce(v_ids, '{}');
     END IF;
 
-    EXECUTE v_sql INTO v_ids USING v_candidats, v_lignes;
-    v_retenus := v_retenus || coalesce(v_ids, '{}');
+    v_couche := ARRAY(SELECT x FROM unnest(v_restants) AS x WHERE x <> ALL (v_retenus));
+    v_total := v_total || v_couche;
+    EXIT WHEN p_point_fixe IS NOT TRUE OR v_interne IS NOT TRUE OR cardinality(v_couche) = 0;
+    v_partis := v_partis || v_couche;
+    v_restants := ARRAY(SELECT x FROM unnest(v_restants) AS x WHERE x <> ALL (v_couche));
   END LOOP;
 
-  RETURN ARRAY(SELECT x FROM unnest(v_candidats) AS x WHERE x <> ALL (v_retenus) ORDER BY x);
+  RETURN ARRAY(SELECT x FROM unnest(v_total) AS x ORDER BY x);
 END;
 $$;
 
-REVOKE ALL ON FUNCTION majordhome.catalog_import_retirables(uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION majordhome.catalog_import_retirables(uuid, boolean) FROM PUBLIC, anon, authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
 -- 2. RPC publiques
@@ -153,7 +196,8 @@ BEGIN
   v_org := majordhome.catalog_import_org_admin(p_import_id);
 
   SELECT count(*) INTO v_total FROM majordhome.catalog_items WHERE import_id = p_import_id AND org_id = v_org;
-  v_ret := majordhome.catalog_import_retirables(p_import_id);
+  -- Point fixe : le même nombre que les appels de retrait successifs supprimeront au total
+  v_ret := majordhome.catalog_import_retirables(p_import_id, true);
   RETURN jsonb_build_object('retirables', cardinality(v_ret), 'conservees', v_total - cardinality(v_ret));
 END;
 $$;

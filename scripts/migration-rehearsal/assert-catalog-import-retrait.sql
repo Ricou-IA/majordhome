@@ -47,6 +47,14 @@ BEGIN
     ALTER TABLE majordhome.product_documents ADD CONSTRAINT product_documents_catalog_item_id_fkey FOREIGN KEY (catalog_item_id) REFERENCES majordhome.catalog_items(id) ON DELETE CASCADE;
   END IF;
 END $$;
+-- Propositions de l'aspirateur (20261129_1, hors snapshot) : recréées minimalement si absentes. Comme en production,
+-- catalog_item_id n'y porte AUCUNE clé étrangère.
+CREATE TABLE IF NOT EXISTS majordhome.catalogue_propositions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL,
+  reference text NOT NULL DEFAULT 'x',
+  catalog_item_id uuid NULL
+);
 CREATE UNIQUE INDEX IF NOT EXISTS catalog_items_code_org_unique ON majordhome.catalog_items USING btree (org_id, lower(code)) WHERE ((code IS NOT NULL) AND (merged_into IS NULL));
 CREATE INDEX IF NOT EXISTS catalog_items_org_key_idx ON majordhome.catalog_items USING btree (org_id, lower(brand), model_key) WHERE (model_key IS NOT NULL);
 CREATE INDEX IF NOT EXISTS catalog_items_org_ean_idx ON majordhome.catalog_items USING btree (org_id, code_ean) WHERE (code_ean IS NOT NULL);
@@ -78,7 +86,7 @@ BEGIN
       RAISE EXCEPTION '% : search_path « majordhome, public, pg_temp » attendu', f;
     END IF;
   END LOOP;
-  f := 'majordhome.catalog_import_retirables(uuid)';
+  f := 'majordhome.catalog_import_retirables(uuid, boolean)';
   IF to_regprocedure(f) IS NULL THEN RAISE EXCEPTION '% absente', f; END IF;
   IF has_function_privilege('anon', f, 'EXECUTE') OR has_function_privilege('authenticated', f, 'EXECUTE') OR has_function_privilege('service_role', f, 'EXECUTE') THEN
     RAISE EXCEPTION 'interne % exécutable hors du propriétaire', f;
@@ -144,6 +152,27 @@ BEGIN
   PERFORM set_config('test.snew', v_snew::text, false);
 END $$;
 
+-- Deuxième import, même fournisseur (v_sa) : ne doit pas bouger quand on retire le premier
+DO $$
+DECLARE
+  v_a     uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+  v_admin uuid := '8a4907a3-f382-4707-bc38-2ff4832f873a';
+  v_sa    uuid := current_setting('test.sa')::uuid;
+  v_imp2  uuid; r jsonb;
+BEGIN
+  PERFORM public.zz_identite(v_admin);
+  SET LOCAL ROLE authenticated;
+  r := public.catalog_items_import_start(v_a, 'autre-import.xlsx', '{}', '{}', '[]');
+  v_imp2 := (r ->> 'import_id')::uuid;
+  r := public.catalog_items_import_batch(v_imp2, jsonb_build_array(
+    jsonb_build_object('import_line', 2, 'name', 'Autre import 1', 'product_kind', 'main', 'default_tva_rate', 20, 'selling_price_ht', 1,
+      'fournisseur', jsonb_build_object('supplier_id', v_sa, 'reference', 'R-IMPORT-2', 'purchase_price_ht', 1, 'tarif_public', NULL, 'purchase_price_at', NULL)),
+    jsonb_build_object('import_line', 3, 'name', 'Autre import 2', 'product_kind', 'main', 'default_tva_rate', 20, 'selling_price_ht', 1)));
+  IF (r ->> 'created')::int <> 2 THEN RAISE EXCEPTION 'deuxième import : %', r; END IF;
+  SET LOCAL ROLE postgres;
+  PERFORM set_config('test.imp2', v_imp2::text, false);
+END $$;
+
 -- ── 2. Refus d'accès (rien n'est retiré) ─────────────────────────────────────
 DO $$
 DECLARE
@@ -200,9 +229,19 @@ DECLARE
   v_imp   uuid := current_setting('test.imp')::uuid;
   v_sa    uuid := current_setting('test.sa')::uuid;
   v_snew  uuid := current_setting('test.snew')::uuid;
-  r jsonb; r2 jsonb; r3 jsonb; i record; l record; v_autre jsonb;
+  v_imp2  uuid := current_setting('test.imp2')::uuid;
+  v_b     uuid := '62cd2073-96e0-4300-adae-4c1bb8934546';
+  r jsonb; r2 jsonb; r3 jsonb; i record; l record; v_autre jsonb; v_imp2_avant text; v_b_avant text;
 BEGIN
   SELECT to_jsonb(p) INTO v_autre FROM majordhome.supplier_products p WHERE supplier_id = v_sa AND reference = 'AUTRE-1';
+  -- Photos : deuxième import (import, articles, lignes) et toute l'org B (articles, lignes)
+  SELECT md5(coalesce((SELECT to_jsonb(x)::text FROM majordhome.catalog_imports x WHERE id = v_imp2), '')
+           || coalesce((SELECT string_agg(to_jsonb(c)::text, '|' ORDER BY c.id) FROM majordhome.catalog_items c WHERE c.import_id = v_imp2), '')
+           || coalesce((SELECT string_agg(to_jsonb(p)::text, '|' ORDER BY p.id) FROM majordhome.supplier_products p
+                         JOIN majordhome.catalog_items c ON c.id = p.catalog_item_id WHERE c.import_id = v_imp2), '')) INTO v_imp2_avant;
+  SELECT md5(coalesce((SELECT string_agg(to_jsonb(c)::text, '|' ORDER BY c.id) FROM majordhome.catalog_items c WHERE c.org_id = v_b), '')
+           || coalesce((SELECT string_agg(to_jsonb(p)::text, '|' ORDER BY p.id) FROM majordhome.supplier_products p WHERE p.org_id = v_b), '')) INTO v_b_avant;
+  IF (SELECT count(*) FROM majordhome.catalog_items WHERE import_id = v_imp2) <> 2 THEN RAISE EXCEPTION 'deuxième import : 2 articles attendus'; END IF;
   PERFORM public.zz_identite(v_admin);
   SET LOCAL ROLE authenticated;
   r := public.catalog_items_import_removal_preview(v_imp);
@@ -246,16 +285,28 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM majordhome.quote_lines WHERE designation = 'Ligne citant l''article' AND catalog_item_id IS NOT NULL) THEN
     RAISE EXCEPTION 'ligne de devis détachée';
   END IF;
-  RAISE NOTICE '§3 aperçu et retrait : OK';
+  -- Isolation : le deuxième import du même fournisseur et l'org B n'ont pas bougé
+  IF md5(coalesce((SELECT to_jsonb(x)::text FROM majordhome.catalog_imports x WHERE id = v_imp2), '')
+       || coalesce((SELECT string_agg(to_jsonb(c)::text, '|' ORDER BY c.id) FROM majordhome.catalog_items c WHERE c.import_id = v_imp2), '')
+       || coalesce((SELECT string_agg(to_jsonb(p)::text, '|' ORDER BY p.id) FROM majordhome.supplier_products p
+                     JOIN majordhome.catalog_items c ON c.id = p.catalog_item_id WHERE c.import_id = v_imp2), '')) IS DISTINCT FROM v_imp2_avant THEN
+    RAISE EXCEPTION 'le deuxième import (même fournisseur) a été touché';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM majordhome.supplier_products WHERE supplier_id = v_sa AND reference = 'R-IMPORT-2') THEN RAISE EXCEPTION 'ligne du deuxième import supprimée'; END IF;
+  IF md5(coalesce((SELECT string_agg(to_jsonb(c)::text, '|' ORDER BY c.id) FROM majordhome.catalog_items c WHERE c.org_id = v_b), '')
+       || coalesce((SELECT string_agg(to_jsonb(p)::text, '|' ORDER BY p.id) FROM majordhome.supplier_products p WHERE p.org_id = v_b), '')) IS DISTINCT FROM v_b_avant THEN
+    RAISE EXCEPTION 'l''org B a été touchée';
+  END IF;
+  RAISE NOTICE '§3 aperçu et retrait, isolation : OK';
 END $$;
 
--- ── 4. Fusion dans le même import ; ligne fournisseur citée par un devis ─────
+-- ── 4. Fusion dans le même import (aperçu = point fixe) ; ligne citée par un devis ; article cité par l'aspirateur ──
 DO $$
 DECLARE
   v_a     uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
   v_admin uuid := '8a4907a3-f382-4707-bc38-2ff4832f873a';
   v_sa    uuid := current_setting('test.sa')::uuid;
-  v_imp   uuid; v_x uuid; v_y uuid; v_quote uuid; r jsonb; r2 jsonb; r3 jsonb;
+  v_imp   uuid; v_x uuid; v_y uuid; v_quote uuid; v_asp uuid; r jsonb; r2 jsonb; r3 jsonb;
 BEGIN
   PERFORM public.zz_identite(v_admin);
   SET LOCAL ROLE authenticated;
@@ -265,8 +316,21 @@ BEGIN
     jsonb_build_object('import_line', 2, 'name', 'Absorbé', 'product_kind', 'main', 'default_tva_rate', 20, 'selling_price_ht', 1),
     jsonb_build_object('import_line', 3, 'name', 'Survivant', 'product_kind', 'main', 'default_tva_rate', 20, 'selling_price_ht', 1),
     jsonb_build_object('import_line', 4, 'name', 'Ligne citée', 'product_kind', 'main', 'default_tva_rate', 20, 'selling_price_ht', 1,
-      'fournisseur', jsonb_build_object('supplier_id', v_sa, 'reference', 'R-LIGNE-CITEE', 'purchase_price_ht', 1, 'tarif_public', NULL, 'purchase_price_at', NULL))));
+      'fournisseur', jsonb_build_object('supplier_id', v_sa, 'reference', 'R-LIGNE-CITEE', 'purchase_price_ht', 1, 'tarif_public', NULL, 'purchase_price_at', NULL)),
+    jsonb_build_object('import_line', 5, 'name', 'Proposé', 'product_kind', 'main', 'default_tva_rate', 20, 'selling_price_ht', 1)));
   SET LOCAL ROLE postgres;
+  -- Proposition de l'aspirateur qui cite l'article (colonne sans clé étrangère) : l'article est conservé
+  IF to_regclass('majordhome.aspirations') IS NOT NULL THEN
+    -- Vraie table (20261129_1 dans la chaîne) : une aspiration, puis une proposition complète
+    EXECUTE format('INSERT INTO majordhome.aspirations (org_id, supplier_id, domaine, genre, plafond_usd) VALUES (%L, %L, %L, %L, 1) RETURNING id',
+                   v_a, v_sa, 'exemple.fr', 'aspiration') INTO v_asp;
+    EXECUTE format('INSERT INTO majordhome.catalogue_propositions (org_id, supplier_id, aspiration_id, reference, catalog_item_id, genre, provenance)'
+                   ' SELECT %L, %L, %L, %L, id, %L, %L FROM majordhome.catalog_items WHERE import_id = %L AND import_line = 5',
+                   v_a, v_sa, v_asp, 'R-PROPOSE', 'caracteristique', 'public', v_imp);
+  ELSE
+    EXECUTE format('INSERT INTO majordhome.catalogue_propositions (org_id, reference, catalog_item_id) SELECT %L, %L, id FROM majordhome.catalog_items WHERE import_id = %L AND import_line = 5',
+                   v_a, 'R-PROPOSE', v_imp);
+  END IF;
   SELECT id INTO v_x FROM majordhome.catalog_items WHERE import_id = v_imp AND import_line = 2;
   SELECT id INTO v_y FROM majordhome.catalog_items WHERE import_id = v_imp AND import_line = 3;
   UPDATE majordhome.catalog_items SET merged_into = v_y, is_active = false WHERE id = v_x;
@@ -278,20 +342,25 @@ BEGIN
   PERFORM public.zz_identite(v_admin);
   SET LOCAL ROLE authenticated;
   r := public.catalog_items_import_removal_preview(v_imp);
-  IF r IS DISTINCT FROM '{"retirables": 1, "conservees": 2}'::jsonb THEN RAISE EXCEPTION 'aperçu fusion : %', r; END IF;
-  -- Premier appel : l'absorbé part ; le survivant, libéré, est recompté (restantes 1, pas encore « retire »)
+  -- Point fixe : l'absorbé, puis le survivant qu'il libère ; conservés : la ligne citée et l'article proposé
+  IF r IS DISTINCT FROM '{"retirables": 2, "conservees": 2}'::jsonb THEN RAISE EXCEPTION 'aperçu fusion (point fixe) : %', r; END IF;
+  -- Premier appel : l'absorbé part ; le survivant, libéré, est recompté (restantes 1)
   r := public.catalog_items_import_remove(v_imp, 100);
   r2 := public.catalog_items_import_remove(v_imp, 100);
   SET LOCAL ROLE postgres;
-  IF r IS DISTINCT FROM '{"retirees": 1, "conservees": 1, "restantes": 1}'::jsonb THEN RAISE EXCEPTION 'fusion retrait 1 : %', r; END IF;
-  IF r2 IS DISTINCT FROM '{"retirees": 1, "conservees": 1, "restantes": 0}'::jsonb THEN RAISE EXCEPTION 'fusion retrait 2 : %', r2; END IF;
+  IF r IS DISTINCT FROM '{"retirees": 1, "conservees": 2, "restantes": 1}'::jsonb THEN RAISE EXCEPTION 'fusion retrait 1 : %', r; END IF;
+  IF r2 IS DISTINCT FROM '{"retirees": 1, "conservees": 2, "restantes": 0}'::jsonb THEN RAISE EXCEPTION 'fusion retrait 2 : %', r2; END IF;
+  -- L'aperçu annonçait exactement ce qui a été retiré
+  IF (r ->> 'retirees')::int + (r2 ->> 'retirees')::int <> 2 THEN RAISE EXCEPTION 'aperçu ≠ retiré'; END IF;
   IF (SELECT status FROM majordhome.catalog_imports WHERE id = v_imp) <> 'en_cours' THEN RAISE EXCEPTION 'import fusion (un article conservé) : statut changé'; END IF;
-  IF (SELECT string_agg(name, ',') FROM majordhome.catalog_items WHERE import_id = v_imp) IS DISTINCT FROM 'Ligne citée' THEN RAISE EXCEPTION 'article à ligne citée retiré'; END IF;
+  IF (SELECT string_agg(name, ',' ORDER BY import_line) FROM majordhome.catalog_items WHERE import_id = v_imp) IS DISTINCT FROM 'Ligne citée,Proposé' THEN
+    RAISE EXCEPTION 'articles restants : %', (SELECT string_agg(name, ',' ORDER BY import_line) FROM majordhome.catalog_items WHERE import_id = v_imp);
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM majordhome.supplier_products WHERE supplier_id = v_sa AND reference = 'R-LIGNE-CITEE' AND catalog_item_id IS NOT NULL) THEN
     RAISE EXCEPTION 'ligne citée par un devis supprimée ou détachée';
   END IF;
   IF (SELECT supplier_product_id FROM majordhome.quote_lines WHERE designation = 'Ligne citant la ligne fournisseur') IS NULL THEN RAISE EXCEPTION 'devis détaché de la ligne'; END IF;
-  RAISE NOTICE '§4 fusion et ligne citée : OK';
+  RAISE NOTICE '§4 fusion (point fixe), ligne citée, proposition de l''aspirateur : OK';
 END $$;
 
 -- ── 5. Tout est retirable : l'import passe à « retire » ───────────────────────
