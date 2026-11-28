@@ -14,9 +14,10 @@ Restart=always
 RestartSec=5
 # Code 1 au démarrage = configuration incomplète : inutile de relancer en boucle, il faut corriger le fichier env.
 RestartPreventExitStatus=1
-# Même constat que pour le relais d'Hermes : en unité utilisateur, seul NoNewPrivileges s'applique réellement.
+# NoNewPrivileges seulement. PAS de PrivateTmp (ni ProtectSystem / ProtectHome) : dans une unité utilisateur, systemd
+# les obtient par un espace de noms, et Chromium ne peut alors plus créer le sien — « No usable sandbox », vécu le
+# 2026-11-28 au premier lancement réel. Le bac à sable de Chromium et le filtrage sortant tiennent le confinement.
 NoNewPrivileges=yes
-PrivateTmp=yes
 
 [Install]
 WantedBy=default.target
