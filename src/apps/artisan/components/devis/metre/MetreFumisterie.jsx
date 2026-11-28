@@ -145,9 +145,12 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
   };
 
   return (
-    <CalqueModal onClose={fermer} titreId="metre-titre" fermerAuFond={false} className="bg-secondary-100 flex flex-col">
-      <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-secondary-200">
-        <div><p className="text-xs uppercase tracking-wide text-secondary-500">Métré assisté · fumisterie</p><h2 id="metre-titre" className="text-lg font-semibold text-secondary-900">{etape === 0 ? 'Qualifier le projet' : etape === 2 ? 'Récapitulatif' : bundle?.configuration?.titre}</h2></div>
+    // Fenêtre centrée sur ordinateur et tablette (rendue en 1024 px), plein écran au-dessous. Pas de fermeture au
+    // clic sur le fond : on ne perd pas un relevé d'un geste.
+    <CalqueModal onClose={fermer} titreId="metre-titre" fermerAuFond={false} className="flex items-stretch justify-center lg:items-center lg:bg-black/40 lg:p-4">
+      <div className="flex flex-col w-full h-full bg-secondary-50 overflow-hidden lg:w-[min(1280px,96vw)] lg:h-[92vh] lg:rounded-xl lg:shadow-modal">
+      <header className="flex items-center justify-between gap-3 px-4 py-3 bg-white border-b border-secondary-200">
+        <div className="min-w-0"><p className="text-caption text-secondary-600">Métré assisté{family ? ` · ${family}` : ''}</p><h2 id="metre-titre" className="font-display text-section text-secondary-900 truncate">{etape === 0 ? 'Qualifier le projet' : etape === 2 ? 'Récapitulatif' : bundle?.configuration?.titre}</h2></div>
         <div className="flex items-center gap-1">
           {dossier && (draft || modifies.length > 0) && (
             <MenuActions actions={[{ label: 'Supprimer le brouillon', icon: Trash2, onClick: supprimerBrouillon, danger: true }]} />
@@ -158,7 +161,7 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
       <main className="flex-1 overflow-y-auto p-4">
         {erreurRequete ? <Blocage titre="Le catalogue n’a pas pu être chargé." message="Vérifiez la connexion puis réessayez."
               action={<Button variant="secondary" size="sm" onClick={reessayer}><RotateCcw className="w-4 h-4" />Réessayer</Button>} />
-          : sansFournisseur ? <Blocage titre="Aucun fabricant de fumisterie configuré : importer un tarif et ses attributs" />
+          : sansFournisseur ? <Blocage titre="Aucun fabricant n’est configuré." message="Importez le tarif d’un fabricant de conduits dans Réglages → Fumisterie." />
           : etape === 0 ? (confsQ.isLoading ? <Chargement libelle="Chargement des configurations" /> : <QualificationStep configurations={configurations} criteres={criteres} setCriteres={setCriteres} selectedId={configurationId} onContinue={choisirEtContinuer} />)
           : (!bundle || !releve || fab.isLoading || !resultat) ? <Chargement libelle="Calcul du métré" />
           : etape === 2 ? (
@@ -176,13 +179,13 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
       {/* À la qualification, la carte cliquée est l'action : pas de pied, une seule sortie (la croix). */}
       {/* Relevé : « Continuer » mène au récapitulatif, qui n'écrit rien. Seul le récapitulatif ajoute au devis. */}
       {etape === 1 && (
-        <footer className="flex items-center justify-between px-4 py-3 bg-white border-t border-secondary-200">
+        <footer className="flex items-center justify-between px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white border-t border-secondary-200">
           <Button variant="secondary" onClick={changerDeSolution}><ArrowLeft className="w-4 h-4" />Changer de solution</Button>
           <Button variant="primary" disabled={!injectable} title={raisonBouton} onClick={() => setEtape(2)}>Continuer</Button>
         </footer>
       )}
       {etape === 2 && (
-        <footer className="flex items-center justify-between px-4 py-3 bg-white border-t border-secondary-200">
+        <footer className="flex items-center justify-between px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white border-t border-secondary-200">
           <Button variant="secondary" onClick={() => setEtape(1)}><ArrowLeft className="w-4 h-4" />Retour au relevé</Button>
           <Button variant="primary" disabled={!injectable} onClick={valider}><Check className="w-4 h-4" />Ajouter au devis</Button>
         </footer>
@@ -194,6 +197,7 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
           {aConfirmer.alertes.map((a, i) => <li key={`${a.code}-${i}`} className="flex gap-2"><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-st-attente" /><span>{a.message}</span></li>)}
         </ul>
       </ConfirmDialog>
+      </div>
       {/* Brouillon trouvé à l'ouverture : on le reprend sur demande. Échap = reprendre (rien n'est perdu). */}
       <ConfirmDialog open={reprise} onOpenChange={setReprise} variant="default" title={titreReprise(brouillonInitial)}
         description={[resumeBrouillon(brouillonInitial), contradictionFamille(brouillonInitial, familleCriteres)].filter(Boolean).join('. ')}

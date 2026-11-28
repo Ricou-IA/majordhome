@@ -5,16 +5,16 @@
 import { Svg, G, Rect, Polygon, Polyline, Line, Circle, Text } from '@react-pdf/renderer';
 import { construireScene } from '@/lib/fumisterie/scene.js';
 import { texteSurPdf } from '@/lib/fumisterie/planModel.js';
+import { COULEURS_PDF as P } from './couleursPdf';
 
 // Palette « pierre chaude » de l'application (tailwind.config.js), cuivre pour les repères.
-const P = { s100: '#F0EDE7', s300: '#DDD7CD', s400: '#A39A8E', s500: '#736A5F', s600: '#5E564C', s700: '#443E36', s800: '#2C2823', s900: '#1C1915', p400: '#DE8257', p500: '#D4693C', blanc: '#FFFFFF' };
 
 /** Clé de ton de la scène → { fill, stroke } (même lecture que les classes Tailwind de l'écran). */
 const COULEUR = {
   sol: { fill: P.s300 }, maison: { fill: P.s100, stroke: P.s300 }, toit: { fill: P.s400 }, traitToit: { stroke: P.s500 },
-  appareil: { fill: P.s800 }, foyer: { fill: P.p400 }, raccord: { stroke: P.s800 }, conduit: { stroke: P.s500 }, ame: { stroke: P.blanc },
+  appareil: { fill: P.s800 }, foyer: { fill: P.s700 }, raccord: { stroke: P.s800 }, conduit: { stroke: P.s500 }, ame: { stroke: P.blanc },
   conduitInox: { stroke: P.s500 }, conduitNoir: { stroke: P.s900 }, piece: { fill: P.s600 }, finitionInox: { fill: P.s500 }, finitionNoir: { fill: P.s900 },
-  faitage: { stroke: P.s400 }, zoneOk: { stroke: P.s600 }, zoneKo: { stroke: P.p500 }, mur: { fill: P.s300, stroke: P.s400 },
+  faitage: { stroke: P.s400 }, zoneOk: { stroke: P.s600 }, zoneKo: { stroke: P.alerte }, mur: { fill: P.s300, stroke: P.s400 },
   boisseau: { fill: P.s100, stroke: P.s400 }, tubage: { stroke: P.s700 }, legende: { fill: P.s500 }, zoneTexte: { fill: P.s900 },
 };
 
@@ -57,7 +57,7 @@ export function CoupePdf({ gabaritCode, geometrie, releve, largeur, hauteur, pol
       {s.reperes.map((r) => (
         <G key={`r${r.n}`}>
           <Line x1={r.ligne.x1} y1={r.ligne.y1} x2={r.ligne.x2} y2={r.ligne.y2} stroke={P.s900} strokeWidth={1 / echelle * 0.6} />
-          <Circle cx={r.cx} cy={r.cy} r={r.r} fill={P.p400} stroke={P.s900} strokeWidth={1 / echelle * 0.7} />
+          <Circle cx={r.cx} cy={r.cy} r={r.r} fill={P.blanc} stroke={P.s700} strokeWidth={1 / echelle * 0.7} />
           <Text x={r.cx} y={r.cy + r.r * 0.42} textAnchor="middle" fill={P.s900} style={{ fontSize: r.r * 1.15, fontFamily: 'Helvetica-Bold' }}>{String(r.n)}</Text>
         </G>
       ))}

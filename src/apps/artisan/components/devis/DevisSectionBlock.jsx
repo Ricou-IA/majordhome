@@ -11,6 +11,7 @@ import { Droppable, Draggable } from '@hello-pangea/dnd';
 import DevisLineRow from './DevisLineRow';
 import { formatEuro } from '@/lib/utils';
 import { Ruler, PenLine, BookOpen, GripVertical } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const TYPE_LABELS = {
   equipement: 'Équipement', option: 'Options', stock: 'Matériel stocké', main_oeuvre: 'Main d’œuvre', libre: 'Libre', fumisterie: 'Fumisterie',
@@ -62,7 +63,7 @@ export function SectionBlock({ blocIndex, sectionIndex, section, type, childLine
             </span>
           )}
           {type === 'fumisterie' && onMetre && (
-            <button type="button" onClick={() => onMetre(sectionIndex)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-secondary-900 bg-primary-400 hover:bg-primary-500 rounded-lg" title="Métré assisté sur coupe cotée"><Ruler className="w-4 h-4" /> Métré assisté</button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => onMetre(sectionIndex)} title="Métré assisté sur coupe cotée"><Ruler className="w-4 h-4" />Métré assisté</Button>
           )}
         </div>
       </div>

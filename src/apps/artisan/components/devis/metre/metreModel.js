@@ -14,7 +14,7 @@ export const CRITERES = {
   projet: [['creation_interieur', 'Création de conduit intérieur'], ['creation_exterieur', 'Création de conduit extérieur'], ['tubage', 'Tubage d\'un conduit existant'], ['raccordement', 'Raccordement seul']],
   appareil: [['poele_cuisiniere', 'Poêle ou cuisinière'], ['foyer_insert', 'Foyer ou insert'], ['chaudiere', 'Chaudière']],
   combustible: [['bois_buches', 'Bois bûches'], ['pellets', 'Pellets / granulés']],
-  zone: [['zone_1', 'Zone 1 (au-dessus du faîtage)'], ['zone_2', 'Zone 2 (entre gouttière et faîtage)'], ['zone_3', 'Zone 3 (façade / ventouse)']],
+  zone: [['zone_1', 'Au-dessus du faîtage'], ['zone_2', 'Entre gouttière et faîtage'], ['zone_3', 'En façade (ventouse)']],
   prise_air: [['dans_piece', 'Air pris dans la pièce'], ['dans_conduit', 'Air pris dans le conduit (appareil étanche)']],
 };
 

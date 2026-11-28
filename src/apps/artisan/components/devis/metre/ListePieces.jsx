@@ -2,17 +2,22 @@
 // Liste de pièces chiffrée + contrôles du métré. Rendu pur des sorties de calculerMetre.
 import { CheckCircle2, AlertTriangle, Info, ClipboardCheck } from 'lucide-react';
 import { formatEuro } from '@/lib/utils';
+import { StatusPill } from '@/components/ui/status-pill';
 
 const STATUT = { catalogue: 'bg-secondary-100 text-secondary-700 border-secondary-300', implicite: 'bg-white text-secondary-600 border-secondary-200', provisoire: 'bg-primary-50 text-primary-800 border-primary-300' };
-const NIVEAU = { ok: ['Conforme', 'border-secondary-500 bg-secondary-50', CheckCircle2], warn: ['À vérifier', 'border-primary-500 bg-primary-50', AlertTriangle], info: ['Info', 'border-secondary-300 bg-white', Info], verifier: ['Sur place', 'border-secondary-400 bg-secondary-50', ClipboardCheck] };
+// Niveau d'une alerte → mot + ton de statut (jamais le cuivre, réservé à l'action) + icône.
+const NIVEAU = { ok: ['Conforme', 'ok', CheckCircle2], warn: ['À vérifier', 'attente', AlertTriangle], info: ['Info', 'info', Info], verifier: ['Sur place', 'neutre', ClipboardCheck] };
 
 export function Alertes({ alertes }) {
   return (
     <div className="space-y-2">
       {alertes.map((a, i) => {
-        const [tag, cls, Icon] = NIVEAU[a.niveau] || NIVEAU.info;
+        const [tag, ton, Icon] = NIVEAU[a.niveau] || NIVEAU.info;
         return (
-          <div key={`${a.code}-${i}`} className={`flex gap-2 items-start border-l-4 px-3 py-2 text-sm ${cls}`}><Icon className="w-4 h-4 mt-0.5 shrink-0" /><span><b className="font-mono text-[11px] uppercase mr-2">{tag}</b>{a.message}{a.source ? <span className="text-xs text-secondary-500"> — {a.source}</span> : null}</span></div>
+          <div key={`${a.code}-${i}`} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-1.5 text-body-sm text-secondary-800">
+            <StatusPill tone={ton} taille="compacte" icone={<Icon className="w-3.5 h-3.5" aria-hidden="true" />} className="shrink-0 mt-0.5">{tag}</StatusPill>
+            <span className="min-w-0 flex-1">{a.message}{a.source ? <span className="block text-caption text-secondary-600">{a.source}</span> : null}</span>
+          </div>
         );
       })}
     </div>

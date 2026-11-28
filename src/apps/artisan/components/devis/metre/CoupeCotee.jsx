@@ -12,7 +12,7 @@ const CLASSES = {
   toit: 'fill-secondary-400',
   traitToit: 'stroke-secondary-500',
   appareil: 'fill-secondary-800',
-  foyer: 'fill-primary-400',
+  foyer: 'fill-secondary-700',
   raccord: 'stroke-secondary-800',
   conduit: 'stroke-secondary-500',
   ame: 'stroke-white',
@@ -23,7 +23,7 @@ const CLASSES = {
   finitionNoir: 'fill-secondary-900',
   faitage: 'stroke-secondary-400',
   zoneOk: 'stroke-secondary-600',
-  zoneKo: 'stroke-primary-500',
+  zoneKo: 'stroke-st-alerte',
   mur: 'fill-secondary-300 stroke-secondary-400',
   boisseau: 'fill-secondary-100 stroke-secondary-400',
   tubage: 'stroke-secondary-700',
@@ -45,12 +45,12 @@ function Forme({ f }) {
 function Cote({ c, onFocusChamp }) {
   const go = () => onFocusChamp?.(c.cle);
   return (
-    <g role="button" tabIndex={0} aria-label={`Modifier ${c.libelle}`} className="cursor-pointer outline-none [&:focus_rect]:stroke-primary-500 [&:hover_text]:fill-secondary-700" onClick={go} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }}>
+    <g role="button" tabIndex={0} aria-label={`Modifier ${c.libelle}`} className="cursor-pointer outline-none [&:focus_rect]:stroke-primary-600 [&:hover_text]:fill-secondary-700" onClick={go} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }}>
       <title>{c.libelle}</title>
       <line x1={c.ligne.x1} y1={c.ligne.y1} x2={c.ligne.x2} y2={c.ligne.y2} className="stroke-secondary-500" strokeWidth={1} />
       {c.ticks.map((t, idx) => <line key={`t${idx}`} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} className="stroke-secondary-500" strokeWidth={1} />)}
       <rect x={c.boite.x} y={c.boite.y} width={c.boite.w} height={c.boite.h} rx={3} className="fill-white stroke-transparent" strokeWidth={1.5} />
-      <text x={c.texteX} y={c.texteY} textAnchor="middle" className="fill-secondary-900 font-mono text-[13px] font-semibold">{c.texte}</text>
+      <text x={c.texteX} y={c.texteY} textAnchor="middle" className="fill-secondary-900 tabular-nums text-[13px] font-semibold">{c.texte}</text>
     </g>
   );
 }
@@ -58,7 +58,7 @@ function Cote({ c, onFocusChamp }) {
 function Repere({ r }) {
   return (
     <g><line x1={r.ligne.x1} y1={r.ligne.y1} x2={r.ligne.x2} y2={r.ligne.y2} className="stroke-secondary-900" strokeWidth={1} />
-      <circle cx={r.cx} cy={r.cy} r={r.r} className="fill-primary-400 stroke-secondary-900" strokeWidth={1.2} />
+      <circle cx={r.cx} cy={r.cy} r={r.r} className="fill-white stroke-secondary-700" strokeWidth={1.4} />
       <text x={r.cx} y={r.cy} textAnchor="middle" dominantBaseline="central" className="fill-secondary-900 text-[15px] font-bold">{r.n}</text></g>
   );
 }

@@ -5,8 +5,8 @@
 // A4 paysage : coupe cotée à gauche, liste des pièces à droite, cartouche en bas à droite.
 import { Document, Page, View, Text, Image, StyleSheet, pdf } from '@react-pdf/renderer';
 import { CoupePdf } from './CoupePdf';
+import { COULEURS_PDF as P } from './couleursPdf';
 
-const P = { s100: '#F0EDE7', s200: '#E8E4DC', s300: '#DDD7CD', s500: '#736A5F', s700: '#443E36', s900: '#1C1915', p400: '#DE8257', p600: '#C2532B' };
 const LARGEUR_PAGE = 842; const HAUTEUR_PAGE = 595; const MARGE = 24;
 const LARGEUR_DROITE = 300;
 // Pagination à la hauteur estimée d'une ligne (désignation + précision sur au plus deux lignes de ~60 caractères).
@@ -36,7 +36,7 @@ const s = StyleSheet.create({
   tdDetail: { fontSize: 7, lineHeight: 1.2, color: P.s500 },
   rangee: { flexDirection: 'row', paddingVertical: 2.5, borderBottomWidth: 0.4, borderBottomColor: P.s200 },
   colRep: { width: 22 }, colQte: { width: 40, textAlign: 'right' }, colRef: { width: 92, fontSize: 6.5, lineHeight: 1.25 },
-  pastille: { width: 13, height: 13, borderRadius: 6.5, backgroundColor: P.p400, borderWidth: 0.6, borderColor: P.s900, alignItems: 'center', justifyContent: 'center' },
+  pastille: { width: 13, height: 13, borderRadius: 6.5, backgroundColor: P.blanc, borderWidth: 0.6, borderColor: P.s700, alignItems: 'center', justifyContent: 'center' },
   pastilleTxt: { fontSize: 7, lineHeight: 1, fontFamily: 'Helvetica-Bold' },
   cartouche: { position: 'absolute', right: MARGE, bottom: MARGE, width: LARGEUR_DROITE, borderWidth: 0.8, borderColor: P.s700 },
   cartCase: { padding: 4, borderBottomWidth: 0.5, borderBottomColor: P.s300 },
@@ -46,7 +46,7 @@ const s = StyleSheet.create({
   logo: { maxHeight: 26, maxWidth: 90, objectFit: 'contain', marginRight: 6 },
   mentions: { fontSize: 7, lineHeight: 1.2, color: P.s500, padding: 4 },
   section: { marginBottom: 10 },
-  sectionTitre: { fontSize: 10, lineHeight: 1.2, fontFamily: 'Helvetica-Bold', color: P.p600, marginBottom: 4 },
+  sectionTitre: { fontSize: 10, lineHeight: 1.2, fontFamily: 'Helvetica-Bold', color: P.s900, marginBottom: 4 },
   puce: { fontSize: 8.5, lineHeight: 1.35, marginBottom: 1.5 },
   paire: { flexDirection: 'row', fontSize: 8.5, lineHeight: 1.35 },
 });

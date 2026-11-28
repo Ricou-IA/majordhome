@@ -35,7 +35,7 @@ export default function ReleveStep({ bundle, reglages, releve, setReleve, result
       )}
       <div className="grid lg:grid-cols-[1.45fr_1fr] gap-5 items-start">
         <div className="border border-secondary-200 rounded-xl bg-white p-2 lg:sticky lg:top-2">
-          <p className="px-2 py-1 text-xs uppercase tracking-wide text-secondary-500">Coupe cotée · cliquez une cote pour la modifier</p>
+          <p className="px-2 py-1 text-label text-secondary-800">Coupe cotée <span className="font-normal text-secondary-600">· cliquez une cote pour la modifier</span></p>
           {resultat.geometrie
             ? <CoupeCotee gabaritCode={bundle.gabarit?.code} geometrie={resultat.geometrie} releve={releve} onFocusChamp={focusChamp} />
             : <p className="p-3 text-sm text-secondary-600">{resultat.erreur ? 'La coupe s’affiche quand le relevé est complet.' : `Pas de coupe dessinée pour le gabarit ${bundle.gabarit?.code}.`}</p>}
@@ -46,13 +46,13 @@ export default function ReleveStep({ bundle, reglages, releve, setReleve, result
         </div>
       </div>
       {resultat.alertes.some((a) => a.niveau !== 'verifier') && (
-        <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="text-xs uppercase tracking-wide text-secondary-500 mb-2">Contrôles</h3><Alertes alertes={resultat.alertes.filter((a) => a.niveau !== 'verifier')} /></section>
+        <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="font-display text-section text-secondary-900 mb-2">À traiter avant d’ajouter</h3><Alertes alertes={resultat.alertes.filter((a) => a.niveau !== 'verifier')} /></section>
       )}
       {resultat.alertes.some((a) => a.niveau === 'verifier') && (
-        <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="text-xs uppercase tracking-wide text-secondary-500 mb-2">À vérifier sur place · imprimé sur la fiche chantier</h3><Alertes alertes={resultat.alertes.filter((a) => a.niveau === 'verifier')} /></section>
+        <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="font-display text-section text-secondary-900 mb-2">À vérifier sur place <span className="text-sm font-sans font-normal text-secondary-600">· imprimé sur la fiche chantier</span></h3><Alertes alertes={resultat.alertes.filter((a) => a.niveau === 'verifier')} /></section>
       )}
       <ComparaisonFabricants comparaison={comparaison} choisi={fabricantChoisi} onChoisir={onChoisirFabricant} />
-      {!resultat.erreur && <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="text-xs uppercase tracking-wide text-secondary-500 mb-2">Liste de pièces chiffrée · {resultat.lignes.length} lignes · Ø{releve.diametre}</h3><ListePieces lignes={resultat.lignes} totaux={resultat.totaux} /></section>}
+      {!resultat.erreur && <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="font-display text-section text-secondary-900 mb-2">Liste de pièces <span className="text-sm font-sans font-normal text-secondary-600 tabular-nums">· {resultat.lignes.length} pièces · Ø{releve.diametre}</span></h3><ListePieces lignes={resultat.lignes} totaux={resultat.totaux} /></section>}
     </div>
   );
 }
