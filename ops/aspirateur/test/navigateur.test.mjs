@@ -69,9 +69,7 @@ test('le texte d’une page ne révèle pas l’identifiant', async () => {
   const nav = await ouvrir();
   try {
     await nav.aller(`${site.url}/login`);
-    await nav.remplir('#email', IDENTIFIANT);
-    await nav.remplir('#password', 'faux');
-    await nav.cliquer('button[type=submit]');
+    assert.equal(await nav.seConnecter({ champ_identifiant: '#email', champ_mot_de_passe: '#password', bouton: 'button[type=submit]', preuve: '.mon-compte' }, { identifiant: IDENTIFIANT, motDePasse: 'faux' }), 'refuse');
     const p = await nav.lirePage();
     assert.match(p.texte, /Utilisateur \*\*\* inconnu/);
     assert.ok(!p.texte.includes(IDENTIFIANT));
@@ -82,9 +80,7 @@ test('session : connexion puis page réservée ; sansSession ne porte pas le coo
   const nav = await ouvrir();
   try {
     await nav.aller(`${site.url}/login`);
-    await nav.remplir('#email', IDENTIFIANT);
-    await nav.remplir('#password', MOT_DE_PASSE);
-    await nav.cliquer('button[type=submit]');
+    assert.equal(await nav.seConnecter({ champ_identifiant: '#email', champ_mot_de_passe: '#password', bouton: 'button[type=submit]', preuve: '.mon-compte' }, { identifiant: IDENTIFIANT, motDePasse: MOT_DE_PASSE }), 'connecte');
     assert.equal(await nav.texte('.mon-compte'), 'Bonjour');
     const r = await nav.aller(`${site.url}/produit/3`);
     assert.equal(r.statut, 200);
@@ -96,5 +92,50 @@ test('session : connexion puis page réservée ; sansSession ne porte pas le coo
     const pdf = await nav.telecharger(`${site.url}/docs/fiche-1.pdf`);
     assert.equal(pdf.octets.subarray(0, 5).toString(), '%PDF-');
     await assert.rejects(nav.telecharger('https://evil.example/x.pdf'), /hors du site/);
+  } finally { await nav.fermer(); }
+});
+
+test('relecture I4 : le masquage couvre les formes encodées du secret', () => {
+  assert.equal(masquerSecrets('voir /compte?u=demo%40exemple.fr', [IDENTIFIANT]), 'voir /compte?u=***');
+  assert.equal(masquerSecrets('{"u":"Mot\\"De"}', ['Mot"De']), '{"u":"***"}');
+});
+
+const ACCES = { identifiant: IDENTIFIANT, motDePasse: MOT_DE_PASSE };
+const CHAMPS_CONNEXION = { champ_identifiant: '#email', champ_mot_de_passe: '#password', bouton: 'button[type=submit]', preuve: '.mon-compte' };
+
+test('relecture C1 : seConnecter remplit un vrai formulaire de connexion du site et rend l’état', async () => {
+  const nav = await ouvrir();
+  try {
+    await nav.aller(`${site.url}/login`);
+    assert.equal(await nav.seConnecter(CHAMPS_CONNEXION, ACCES), 'connecte');
+  } finally { await nav.fermer(); }
+});
+
+test('relecture C1 : aucun accès tapé dans un formulaire qui envoie ailleurs, sans champ mot de passe, ou éclaté', async () => {
+  for (const chemin of ['/login-piege', '/login-texte', '/login-deux-formulaires']) {
+    const nav = await ouvrir();
+    try {
+      await nav.aller(`${site.url}${chemin}`);
+      await assert.rejects(nav.seConnecter(CHAMPS_CONNEXION, ACCES), /formulaire de connexion/, chemin);
+    } finally { await nav.fermer(); }
+  }
+});
+
+test('relecture C1/I3 : une redirection vers un autre hôte interrompt la page et le téléchargement', async () => {
+  const nav = await ouvrir();
+  try {
+    await assert.rejects(nav.aller(`${site.url}/redir`), /hors du site/);
+    await assert.rejects(nav.telecharger(`${site.url}/docs/redir.pdf`), /hors du site/);
+  } finally { await nav.fermer(); }
+});
+
+test('relecture I9 : sans session, robots.txt est respecté', async () => {
+  const nav = await ouvrir();
+  try {
+    const anonyme = await nav.sansSession();
+    try {
+      await assert.rejects(anonyme.aller(`${site.url}/prive/x`), /robots/);
+      assert.equal((await anonyme.aller(`${site.url}/produit/1`)).statut, 200);
+    } finally { await anonyme.fermer(); }
   } finally { await nav.fermer(); }
 });

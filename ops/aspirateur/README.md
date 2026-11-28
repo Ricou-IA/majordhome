@@ -24,6 +24,16 @@ Plan : `docs/superpowers/plans/2026-11-28-aspirateur-tranche-1.md`.
 - **Captcha ou page de défi** : arrêt `site_protege`, jamais de contournement.
 - **Hermes n'est pas touché** : autre utilisateur Unix, autre unité, autre port. Ne rien modifier au profil, au relais ni
   aux services d'Hermes.
+- **Connexion** : les accès ne sont tapés que par `seConnecter`, dans un vrai formulaire de connexion de l'hôte EXACT
+  du site (champ mot de passe, même formulaire, envoi vers ce même hôte, preuve invisible avant connexion).
+- **Bac à sable de Chromium** : activé par défaut. Si l'AppArmor d'Ubuntu 24.04 empêche son démarrage pour un
+  utilisateur non privilégié, `ASPIRATEUR_SANS_BAC_A_SABLE=1` le coupe — à éviter : le filtrage sortant ci-dessous
+  devient alors le seul verrou système.
+- **Filtrage sortant (recommandé à l'installation, relecture I3)** : l'utilisateur `aspirateur` ne doit joindre que
+  HTTPS sortant et jamais le réseau privé, par exemple :
+  `iptables -A OUTPUT -m owner --uid-owner aspirateur -d 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,169.254.0.0/16 -j REJECT`
+  puis `iptables -A OUTPUT -m owner --uid-owner aspirateur -p tcp ! --dport 443 -j REJECT` (DNS sortant à autoriser
+  avant). Le bornage du navigateur reste le premier verrou ; celui-ci tient si une page piégée le contourne.
 
 ## Installation (sur le oui d'Eric)
 

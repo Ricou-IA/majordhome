@@ -75,7 +75,7 @@ BEGIN
   EXCEPTION WHEN lock_not_available THEN v_ok := (SQLERRM = 'deja_en_cours'); END;
   IF NOT v_ok THEN RAISE EXCEPTION '(2) deux travaux simultanés sur un même domaine'; END IF;
 
-  UPDATE majordhome.aspirations SET lance_le = now() - interval '4 hours' WHERE id = v_a1;
+  UPDATE majordhome.aspirations SET lance_le = now() - interval '9 hours' WHERE id = v_a1;
   v_a2 := public.aspiration_ouvrir(v_mayer, v_sup, 'pro.exemple-test.fr', 'apprentissage', v_admin, 3);
   IF (SELECT statut || '/' || coalesce(code_erreur, '') FROM majordhome.aspirations WHERE id = v_a1) IS DISTINCT FROM 'echec/service_indisponible' THEN
     RAISE EXCEPTION '(2) travail périmé non libéré';
@@ -86,6 +86,11 @@ BEGIN
   IF (v_j->>'depasse')::boolean IS DISTINCT FROM false OR (v_j->>'cout_usd')::numeric <> 1.25 THEN RAISE EXCEPTION '(3) cumul inattendu : %', v_j; END IF;
   v_j := public.aspiration_cout_ajouter(v_a2, 2);
   IF (v_j->>'depasse')::boolean IS DISTINCT FROM true THEN RAISE EXCEPTION '(3) plafond non signalé : %', v_j; END IF;
+  -- relecture I6 : régularisation négative (réservation rendue), cumul jamais sous zéro
+  v_j := public.aspiration_cout_ajouter(v_a2, -2);
+  IF (v_j->>'cout_usd')::numeric <> 1.25 OR (v_j->>'depasse')::boolean IS DISTINCT FROM false THEN RAISE EXCEPTION '(3) régularisation inattendue : %', v_j; END IF;
+  v_j := public.aspiration_cout_ajouter(v_a2, -50);
+  IF (v_j->>'cout_usd')::numeric <> 0 THEN RAISE EXCEPTION '(3) cumul sous zéro : %', v_j; END IF;
 
   -- ── 4. recette : secret refusé (sans casse) ; sinon version 1 en essai liée au travail ───────────────────
   v_ok := false;
@@ -99,6 +104,11 @@ BEGIN
 
   -- ── 5. essai puis confirmation : aspiration liée à la recette en essai, propositions, promotion ────────────
   PERFORM public.aspiration_essai(v_a2, '[{"nom":"Châtel"}]');
+  -- relecture I6 : un travail en attente de confirmation ne dépense plus rien
+  v_ok := false;
+  BEGIN PERFORM public.aspiration_cout_ajouter(v_a2, 0);
+  EXCEPTION WHEN no_data_found THEN v_ok := (SQLERRM = 'travail_inconnu'); END;
+  IF NOT v_ok THEN RAISE EXCEPTION '(5) relais encore ouvert pendant l''attente de confirmation'; END IF;
   IF (SELECT statut FROM majordhome.aspirations WHERE id = v_a2) IS DISTINCT FROM 'attente_confirmation' THEN RAISE EXCEPTION '(5) pas en attente de confirmation'; END IF;
   PERFORM public.aspiration_clore(v_a2, 'termine', NULL, NULL, NULL);
   v_a3 := public.aspiration_ouvrir(v_mayer, v_sup, 'pro.exemple-test.fr', 'aspiration', v_admin, 20, v_rec);

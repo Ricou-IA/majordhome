@@ -14,7 +14,8 @@ export const CODES_ASPIRATEUR = Object.freeze({
   recette_contient_secret: 'La recette contenait un identifiant : elle a été refusée',
   plafond_atteint: 'Plafond de dépense atteint : travail arrêté',
   quota_atteint: 'Trop d’aspirations aujourd’hui : réessayez demain',
-  deja_en_cours: 'Une aspiration de ce site est déjà en cours',
+  // Neutre : ne dit pas si c'est une autre entreprise qui aspire ce fournisseur (relecture I7).
+  deja_en_cours: 'Service d’aspiration occupé sur ce site : réessayez dans quelques minutes',
   service_indisponible: 'Service d’aspiration indisponible : réessayez plus tard',
   travail_inconnu: 'Travail d’aspiration introuvable',
   non_autorise: 'Réservé à un administrateur',

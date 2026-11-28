@@ -56,11 +56,16 @@ export async function rejouer({ recette, acces, champs, modele, navigateur: nav,
     const c = recette.connexion;
     await nav.aller(c.url);
     await protege();
-    await nav.remplir(c.champ_identifiant, acces.identifiant);
-    await nav.remplir(c.champ_mot_de_passe, acces.motDePasse);
-    await nav.cliquer(c.bouton);
+    let etatConnexion;
+    try {
+      // seConnecter refuse un formulaire qui n'est pas un vrai formulaire de connexion du site (relecture C1)
+      etatConnexion = await nav.seConnecter(c, acces);
+    } catch (e) {
+      if (/formulaire de connexion/.test(String(e?.message))) { journal.erreur('connexion refusée par le contrôle', { raison: String(e.message) }); throw new CodeErreur('recette_obsolete'); }
+      throw e;
+    }
     await protege();
-    if (!(await nav.texte(c.preuve))) throw new CodeErreur('acces_refuses');
+    if (etatConnexion !== 'connecte') throw new CodeErreur('acces_refuses');
     journal.info('connecté');
   }
 
@@ -68,21 +73,23 @@ export async function rejouer({ recette, acces, champs, modele, navigateur: nav,
   const urls = [];
   const vus = new Set();
   const limite = Number.isFinite(essai) && essai > 0 ? essai : Infinity;
+  let tronquees = false;
   for (const depart of recette.listes.departs) {
     let page = depart;
     const pagesVues = new Set();
-    while (page && !pagesVues.has(page) && urls.length < limite && nav.pagesVues < limitePages) {
+    while (page && !pagesVues.has(page) && urls.length < limite) {
+      if (nav.pagesVues >= limitePages) { tronquees = true; break; }
       pagesVues.add(page);
       const r = await nav.aller(page);
       await protege();
-      if (r.statut >= 400) break;
+      if (r.statut >= 400) { tronquees = true; break; }
       const nouveaux = (await nav.attributs(recette.listes.lien_produit, 'href')).filter((u) => !vus.has(u));
       if (!nouveaux.length) break; // page vide ou répétée : fin de la liste
       for (const u of nouveaux) { vus.add(u); if (urls.length < limite) urls.push(u); }
       page = recette.listes.suivant ? (await nav.attributs(recette.listes.suivant, 'href'))[0] : null;
     }
   }
-  const compteurs = { trouves: urls.length, lus: 0, echecs: 0, documents: 0 };
+  const compteurs = { trouves: urls.length, lus: 0, echecs: 0, documents: 0, listes_tronquees: tronquees };
   const echecs = [];
   if (!urls.length) throw new CodeErreur('recette_obsolete');
 
@@ -95,15 +102,20 @@ export async function rejouer({ recette, acces, champs, modele, navigateur: nav,
     for (const url of urls) {
       if (nav.pagesVues >= limitePages) { echecs.push({ url, raison: 'plafond_pages' }); compteurs.echecs += 1; continue; }
       try {
-        let provenance = 'public';
-        if (anonyme) {
-          const r = await anonyme.aller(url);
-          provenance = r.statut === 200 && new URL(r.url).pathname === new URL(url).pathname ? 'public' : 'compte';
-        }
         await nav.aller(url);
         await protege();
         const titre = (await nav.lirePage()).titre;
         const reference = p.reference ? await nav.texte(p.reference) : null;
+        // Provenance MESURÉE (relecture I8) : « public » seulement si, sans session, la même page montre la même référence.
+        let provenance = 'public';
+        if (anonyme) {
+          provenance = 'compte';
+          try {
+            const r = await anonyme.aller(url);
+            const memeChemin = r.statut === 200 && new URL(r.url).pathname === new URL(url).pathname;
+            if (memeChemin && reference && p.reference && (await anonyme.texte(p.reference)) === reference) provenance = 'public';
+          } catch { provenance = 'compte'; } // robots.txt, page hors du site : rien de public
+        }
         const zone = (p.zone_caracteristiques && await nav.texte(p.zone_caracteristiques)) || (await nav.lirePage()).texte;
 
         const lire = async (texte, source) => {
@@ -133,10 +145,16 @@ export async function rejouer({ recette, acces, champs, modele, navigateur: nav,
         }
 
         const ref = reference || refLue || null;
-        if (!ref) sansReference += 1;
+        if (!ref) {
+          // Jamais rattachée par le nom : la fiche est un échec compté et listé (relecture I2).
+          sansReference += 1;
+          echecs.push({ url, raison: 'reference_introuvable' });
+          compteurs.echecs += 1;
+          continue;
+        }
         lot.push({
           url, reference_fabricant: ref, nom: (p.nom && await nav.texte(p.nom)) || titre,
-          marque: p.marque ? await nav.texte(p.marque) : null, ean: p.ean ? await nav.texte(p.ean) : null,
+          marque: (p.marque ? await nav.texte(p.marque) : null) || lecturePage.marque || null, ean: p.ean ? await nav.texte(p.ean) : null,
           prix: p.prix ? prixDepuisTexte(await nav.texte(p.prix)) : null,
           photo_url: p.photo ? (await nav.attributs(p.photo, 'src'))[0] || null : null,
           documents, valeurs, provenance, lu_le: new Date().toISOString(),
@@ -155,6 +173,6 @@ export async function rejouer({ recette, acces, champs, modele, navigateur: nav,
     if (anonyme) await anonyme.fermer();
   }
 
-  if (compteurs.lus > 0 && sansReference > compteurs.lus / 2) throw new CodeErreur('recette_obsolete');
+  if (sansReference > (compteurs.lus + sansReference) / 2) throw new CodeErreur('recette_obsolete');
   return { compteurs, echecs };
 }

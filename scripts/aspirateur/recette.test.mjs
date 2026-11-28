@@ -58,3 +58,21 @@ test('chaque code a un message ; code inconnu ou nul : message de repli', () => 
   assert.equal(messageAspirateur('n_existe_pas'), 'Erreur inattendue de l’aspirateur');
   assert.equal(messageAspirateur(null), 'Erreur inattendue de l’aspirateur');
 });
+
+test('relecture I4 : variantes encodées d’un secret (URL, formulaire, JSON, entités HTML)', async () => {
+  const { variantesSecret } = await import('../../src/lib/aspirateur/recette.js');
+  const v = variantesSecret('jean x@a"b.fr');
+  for (const attendu of ['jean x@a"b.fr', 'jean%20x%40a%22b.fr', 'jean+x%40a%22b.fr', 'jean x@a\\"b.fr', 'jean x&#64;a&quot;b.fr']) {
+    assert.ok(v.includes(attendu), `variante absente : ${attendu}`);
+  }
+  assert.deepEqual(variantesSecret('ab'), []);
+  assert.equal(recetteContientSecret({ ...ok, produit: { ...ok.produit, nom: 'a[href*="jean%40mayer.fr"]' } }, ['jean@mayer.fr']), true);
+  assert.equal(recetteContientSecret({ ...ok, produit: { ...ok.produit, nom: 'p"x' } }, ['p"x']), true);
+});
+
+test('relecture I5 : une adresse de recette ne porte ni session ni jeton', () => {
+  for (const u of ['https://pro.invicta-group.fr/poeles;jsessionid=AB12', 'https://pro.invicta-group.fr/poeles?sid=1', 'https://pro.invicta-group.fr/poeles?PHPSESSID=x', 'https://pro.invicta-group.fr/p?token=abc', 'https://pro.invicta-group.fr/p?a=1&auth=z']) {
+    assert.equal(validerRecette({ ...ok, listes: { ...ok.listes, departs: [u] } }).ok, false, u);
+  }
+  assert.equal(validerRecette({ ...ok, listes: { ...ok.listes, departs: ['https://pro.invicta-group.fr/poeles?page=2&marque=deville'] } }).ok, true);
+});

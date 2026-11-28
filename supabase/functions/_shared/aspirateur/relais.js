@@ -77,3 +77,14 @@ export function parametresModele(usage, demande, surcharges) {
   }
   return p;
 }
+
+/**
+ * Coût MAXIMAL d'un appel, réservé contre le plafond avant de le faire (relecture I6) : entrée estimée à un token pour
+ * trois caractères (arrondi au-dessus), sortie comptée à `max_tokens`. Le relais régularise ensuite avec le coût réel.
+ * @param {{ model: string, max_tokens: number, system?: unknown, messages?: unknown, tools?: unknown }} params
+ * @returns {number}
+ */
+export function coutMaximalUsd(params) {
+  const entree = Math.ceil(JSON.stringify({ system: params.system, messages: params.messages, tools: params.tools ?? null }).length / 3);
+  return coutUsd(params.model, { input_tokens: entree, output_tokens: params.max_tokens });
+}

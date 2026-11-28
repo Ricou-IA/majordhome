@@ -11,6 +11,9 @@ export const SCHEMA_RECETTE = 1;
 const TYPES_DOCUMENT = ['fiche_technique', 'notice', 'declaration_performance', 'etiquette_energie'];
 const SELECTEUR_MAX = 300;
 const DELAI_MIN_MS = 1000;
+// Session ou jeton dans une adresse : une recette commune rejouée par une autre entreprise ne doit rien emporter de la
+// session de celle qui l'a apprise (relecture I5).
+const SESSION = /;jsessionid=|[?&](sid|sessionid|session|phpsessid|jsessionid|token|access_token|auth|key|apikey|api_key|signature)=/i;
 
 /** @param {unknown} v */
 const estObjet = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -41,6 +44,7 @@ export function validerRecette(r) {
   if (!domaine) erreurs.push('domaine requis');
   const url = (/** @type {unknown} */ u, /** @type {string} */ nom) => {
     if (!domaine || !urlAutorisee(u, domaine)) erreurs.push(`${nom} : adresse hors du site`);
+    else if (SESSION.test(String(u))) erreurs.push(`${nom} : l’adresse porte une session ou un jeton (à retirer)`);
   };
 
   if (rec.connexion !== undefined) {
@@ -84,14 +88,36 @@ export function validerRecette(r) {
   return { ok: erreurs.length === 0, erreurs };
 }
 
+const ENTITES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '@': '&#64;' };
+
 /**
- * Vrai si la recette contient l'un des secrets (identifiant, mot de passe, numéro de compte client), sans casse.
- * Les secrets de moins de 3 caractères sont ignorés (trop de faux positifs).
+ * Formes sous lesquelles un secret peut apparaître dans une page, une adresse ou un JSON : brute, encodée pour une URL
+ * ou un formulaire, échappée en JSON, en entités HTML (relecture I4). Vide pour un secret de moins de 3 caractères.
+ * @param {unknown} secret
+ * @returns {string[]}
+ */
+export function variantesSecret(secret) {
+  if (typeof secret !== 'string' || secret.trim().length < 3) return [];
+  const s = secret.trim();
+  const v = new Set([
+    s,
+    encodeURIComponent(s),
+    encodeURI(s),
+    encodeURIComponent(s).replace(/%20/g, '+'),
+    JSON.stringify(s).slice(1, -1),
+    s.replace(/[&<>"'@]/g, (c) => ENTITES[/** @type {keyof typeof ENTITES} */ (c)]),
+  ]);
+  return [...v].filter((x) => x.length >= 3);
+}
+
+/**
+ * Vrai si la recette contient l'un des secrets (identifiant, mot de passe, numéro de compte client) sous l'une de ses
+ * formes (variantesSecret), sans casse.
  * @param {unknown} r
  * @param {Array<string | null | undefined>} secrets
  * @returns {boolean}
  */
 export function recetteContientSecret(r, secrets) {
   const texte = JSON.stringify(r ?? null).toLowerCase();
-  return (secrets || []).some((s) => typeof s === 'string' && s.trim().length >= 3 && texte.includes(s.trim().toLowerCase()));
+  return (secrets || []).some((s) => variantesSecret(s).some((v) => texte.includes(v.toLowerCase())));
 }

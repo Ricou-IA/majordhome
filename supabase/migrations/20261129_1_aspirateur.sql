@@ -115,7 +115,8 @@ GRANT SELECT ON public.majordhome_catalogue_propositions TO authenticated, servi
 -- ---------------------------------------------------------------------------------------------------------------
 
 -- Ouvre un travail. Un seul travail en cours par domaine, toutes entreprises confondues (politesse envers le site) ;
--- un travail resté « en cours » plus de 3 h (service tombé) est clos en échec d'abord, pour ne pas bloquer le site.
+-- un travail resté « en cours » plus de 8 h (service tombé) est clos en échec d'abord, pour ne pas bloquer le site.
+-- Un lot arrivé après cette libération est refusé (travail_inconnu) et le service arrête le travail (relecture I1).
 CREATE OR REPLACE FUNCTION public.aspiration_ouvrir(
   p_org_id uuid, p_supplier_id uuid, p_domaine text, p_genre text, p_lance_par uuid, p_plafond_usd numeric,
   p_recette_id uuid DEFAULT NULL
@@ -132,7 +133,7 @@ BEGIN
   END IF;
   PERFORM pg_advisory_xact_lock(hashtext('aspiration:' || v_domaine));
   UPDATE majordhome.aspirations SET statut = 'echec', code_erreur = 'service_indisponible', termine_le = now()
-   WHERE domaine = v_domaine AND statut = 'en_cours' AND lance_le < now() - interval '3 hours';
+   WHERE domaine = v_domaine AND statut = 'en_cours' AND lance_le < now() - interval '8 hours';
   IF EXISTS (SELECT 1 FROM majordhome.aspirations WHERE domaine = v_domaine AND statut = 'en_cours') THEN
     RAISE EXCEPTION 'deja_en_cours' USING ERRCODE = '55P03';
   END IF;
@@ -154,15 +155,17 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.aspiration_quota(uuid, int) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.aspiration_quota(uuid, int) TO service_role;
 
--- Ajoute un coût d'IA au travail ; rend le cumul et si le plafond est atteint (appelé avec 0 pour lire l'état).
+-- Ajoute un coût d'IA au travail EN COURS ; rend le cumul et si le plafond est atteint. Le relais RÉSERVE le coût maximal
+-- d'un appel avant de le faire, puis régularise (montant négatif) : des appels simultanés ne dépassent pas le plafond
+-- (relecture I6). Le cumul ne descend jamais sous zéro. Un travail en attente de confirmation ne dépense plus rien.
 CREATE OR REPLACE FUNCTION public.aspiration_cout_ajouter(p_aspiration_id uuid, p_usd numeric) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = majordhome, public AS $$
 DECLARE
   v_row majordhome.aspirations%ROWTYPE;
 BEGIN
-  IF p_usd IS NULL OR p_usd < 0 THEN RAISE EXCEPTION 'requete_invalide' USING ERRCODE = '22023'; END IF;
-  UPDATE majordhome.aspirations SET cout_usd = cout_usd + p_usd
-   WHERE id = p_aspiration_id AND statut IN ('en_cours', 'attente_confirmation')
+  IF p_usd IS NULL THEN RAISE EXCEPTION 'requete_invalide' USING ERRCODE = '22023'; END IF;
+  UPDATE majordhome.aspirations SET cout_usd = greatest(cout_usd + p_usd, 0)
+   WHERE id = p_aspiration_id AND statut = 'en_cours'
   RETURNING * INTO v_row;
   IF NOT FOUND THEN RAISE EXCEPTION 'travail_inconnu' USING ERRCODE = 'P0002'; END IF;
   RETURN jsonb_build_object('cout_usd', v_row.cout_usd, 'depasse', v_row.cout_usd >= v_row.plafond_usd);

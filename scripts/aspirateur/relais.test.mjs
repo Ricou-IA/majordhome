@@ -42,3 +42,12 @@ test('paramètres : modèle fixé par l’usage, effort, plafond de tokens, repl
   assert.equal(parametresModele('apprendre', { system: 's', messages: [] }, { apprendre: 'claude-opus-5-5' }).model, 'claude-opus-5-5');
   assert.equal(parametresModele('autre', { system: 's', messages: [] }, {}), null);
 });
+
+test('relecture I6 : coût maximal réservé avant un appel (entrée estimée + max_tokens en sortie)', async () => {
+  const { coutMaximalUsd } = await import('../../src/lib/aspirateur/relais.js');
+  const p = { model: 'claude-haiku-5-5', max_tokens: 4000, system: 'x'.repeat(2_999), messages: [] };
+  // ≈ 1 000 tokens d'entrée (3 caractères par token, arrondi au-dessus) + 4 000 de sortie au tarif Haiku 5.5
+  const attendu = (Math.ceil(JSON.stringify({ system: p.system, messages: p.messages, tools: p.tools ?? null }).length / 3) * 0.1 + 4000 * 0.5) / 1_000_000;
+  assert.ok(Math.abs(coutMaximalUsd(p) - attendu) <= 1e-6); // coutUsd arrondit au millionième de dollar
+  assert.ok(coutMaximalUsd({ ...p, model: 'claude-inconnu' }) > coutMaximalUsd(p));
+});

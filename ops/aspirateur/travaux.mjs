@@ -7,6 +7,10 @@
 import { CodeErreur } from './erreurs.mjs';
 import { creerJournal } from './journal.mjs';
 import { filtrerParMarques } from './lib/propositions.js';
+import { domaineEnregistrable } from './lib/domaine.js';
+
+/** Un travail à la fois par DOMAINE (www. et pro. d'un même fournisseur sont un seul site, relecture I9). */
+const cleSite = (t) => domaineEnregistrable(t.hote_site);
 
 const ENVOI_MAX_OCTETS = 4 * 1024 * 1024; // corps d'un envoi vers l'edge (PDF en base64 compris)
 
@@ -19,13 +23,13 @@ export function creerFile({ executer, maxTotal = 2 }) {
   let enCours = 0;
   const pomper = () => {
     while (enCours < maxTotal) {
-      const i = attente.findIndex((t) => !sitesOccupes.has(t.hote_site));
+      const i = attente.findIndex((t) => !sitesOccupes.has(cleSite(t)));
       if (i < 0) return;
       const [t] = attente.splice(i, 1);
-      sitesOccupes.add(t.hote_site);
+      sitesOccupes.add(cleSite(t));
       enCours += 1;
       Promise.resolve().then(() => executer(t)).catch(() => null).finally(() => {
-        sitesOccupes.delete(t.hote_site);
+        sitesOccupes.delete(cleSite(t));
         enCours -= 1;
         pomper();
       });
@@ -73,21 +77,24 @@ export async function executerTravail(travail, deps) {
     if (travail.genre === 'apprentissage') {
       const { recette, essai } = await deps.apprendre({
         hoteSite: travail.hote_site, urlDepart: travail.url_depart, acces, compteClient: travail.compte_client, champs: travail.champs,
-        marques: travail.marques, modele, navigateur: nav, journal, recetteDepart: travail.recette, plafonds: deps.plafonds || { pages: 60, minutes: 15 },
+        modele, navigateur: nav, journal, recetteDepart: travail.recette, plafonds: deps.plafonds || { pages: 60, minutes: 15 },
       });
       await deps.envoyerRetour({ action: 'recette', aspiration_id: id, recette, essai: essai.map(sansContenu) });
       journal.info('apprentissage terminé', { aspiration: id });
       return;
     }
+    let horsMarques = 0;
     const { compteurs, echecs } = await deps.rejouer({
       recette: travail.recette, acces, champs: travail.champs, modele, navigateur: nav, journal, limitePages: deps.plafonds?.pages ?? 2000,
       surLot: async (lot) => {
-        for (const morceau of decouperLot(filtrerParMarques(lot, travail.marques))) {
+        const gardes = filtrerParMarques(lot, travail.marques);
+        horsMarques += lot.length - gardes.length; // comptées, jamais écartées en silence (relecture I2)
+        for (const morceau of decouperLot(gardes)) {
           if (morceau.length) await deps.envoyerRetour({ action: 'lot', aspiration_id: id, produits: morceau });
         }
       },
     });
-    await deps.envoyerRetour({ action: 'fin', aspiration_id: id, statut: 'termine', code: null, compteurs, echecs });
+    await deps.envoyerRetour({ action: 'fin', aspiration_id: id, statut: 'termine', code: null, compteurs: { ...compteurs, hors_marques: horsMarques }, echecs });
     journal.info('aspiration terminée', { aspiration: id, ...compteurs });
   } catch (e) {
     const code = e instanceof CodeErreur ? e.code : 'service_indisponible';

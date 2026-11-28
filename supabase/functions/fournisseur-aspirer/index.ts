@@ -19,6 +19,7 @@ import { requireOrgMembership, jsonResponse, buildCorsHeaders, getAdminClient } 
 import { champsPropres, telecharger, PHOTO_MAX, TYPES_IMAGE } from "../_shared/telechargement.ts";
 import { normaliserDomaine } from "../_shared/aspirateur/domaine.js";
 import { libelleDocument } from "../_shared/aspirateur/propositions.js";
+import { champsSurs } from "../_shared/aspirateur/lecture.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -114,7 +115,7 @@ Deno.serve(async (req: Request) => {
       const domaine = normaliserDomaine(fournisseur.site_url);
       if (!domaine) return erreur("site_absent", req);
       if (!NATURES_PRIX.includes(fournisseur.connector_config?.aspirateur?.nature_prix)) return erreur("nature_prix_absente", req);
-      const champs = champsPropres(corps.champs);
+      const champs = champsSurs(champsPropres(corps.champs)); // nettoyés : ils entrent dans la consigne de l’agent
       const { data: quota } = await admin.rpc("aspiration_quota", { p_org_id: orgId, p_limite: nombreEnv("ASPIRATEUR_LANCEMENTS_PAR_JOUR", 3) });
       if (quota !== true) return erreur("quota_atteint", req);
       const { data: etat, error: errE } = await user.rpc("aspiration_recette_etat", { p_org_id: orgId, p_domaine: domaine });
@@ -147,7 +148,7 @@ Deno.serve(async (req: Request) => {
       if (!fournisseur) return erreur("non_autorise", req);
       const { data: r } = await admin.rpc("aspiration_recette_a_utiliser", { p_aspiration_id: id });
       if (!r?.recette_id) return erreur("recette_obsolete", req);
-      const champs = champsPropres(corps.champs);
+      const champs = champsSurs(champsPropres(corps.champs)); // nettoyés : ils entrent dans la consigne de l’agent
       const lance = await demarrer(fournisseur, travail.domaine, "aspiration", champs, r.recette_id);
       if (lance.code) return erreur(lance.code, req);
       await admin.rpc("aspiration_clore", { p_aspiration_id: id, p_statut: "termine", p_code: null, p_compteurs: null, p_echecs: null });

@@ -15,6 +15,7 @@
 
 import { requireSharedSecret, jsonResponse, getAdminClient } from "../_shared/auth.ts";
 import { construirePropositions, typeDocument } from "../_shared/aspirateur/propositions.js";
+import { variantesSecret } from "../_shared/aspirateur/recette.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMPREINTE = /^[0-9a-f]{64}$/;
@@ -134,6 +135,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (corps.action === "recette") {
+      if (travail.genre !== "apprentissage" || travail.statut !== "en_cours") return erreur("travail_inconnu", req);
       if (!corps.recette || typeof corps.recette !== "object") return erreur("requete_invalide", req);
       // Secrets interdits relus ici (jamais reçus du service) : accès du compte et numéro de compte client.
       const interdits: string[] = [];
@@ -146,7 +148,9 @@ Deno.serve(async (req: Request) => {
       const { data: f } = await admin.from("majordhome_suppliers").select("customer_account").eq("id", supplierId).eq("org_id", orgId).maybeSingle();
       if (f?.customer_account) interdits.push(String(f.customer_account));
 
-      const { error: errR } = await admin.rpc("aspiration_recette_enregistrer", { p_aspiration_id: id, p_contenu: corps.recette, p_interdits: interdits });
+      // Toutes les formes de chaque secret (encodée pour une URL, échappée en JSON…) : la base compare au texte du JSON.
+      const formes = interdits.flatMap((s) => variantesSecret(s));
+      const { error: errR } = await admin.rpc("aspiration_recette_enregistrer", { p_aspiration_id: id, p_contenu: corps.recette, p_interdits: formes });
       if (errR) {
         const code = codeRpc(errR);
         await admin.rpc("aspiration_clore", { p_aspiration_id: id, p_statut: "echec", p_code: code === "recette_contient_secret" ? code : "recette_refusee", p_compteurs: null, p_echecs: null });

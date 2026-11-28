@@ -126,3 +126,31 @@ export function lireReponse(brut, champs) {
 export function fusionnerLectures(page, pdf) {
   return { ...(page || {}), ...(pdf || {}) };
 }
+
+const CHAMPS_MAX = 60;
+const LIBELLE_MAX = 40;
+const TYPES_CHAMP = ['number', 'boolean', 'enum', 'text'];
+/** Garde lettres, chiffres, espaces et une ponctuation de libellé ; le reste disparaît (pas de saut de ligne). */
+const propre = (/** @type {unknown} */ s, /** @type {number} */ max) => String(s ?? '')
+  .replace(/[^\p{L}\p{N} %()°²³/.,'’+-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, max);
+
+/**
+ * Champs reçus de l'écran, nettoyés avant d'entrer dans une consigne (relecture C1) : clé `[a-z0-9_]`, libellé et
+ * options sans caractère de commande ni saut de ligne et courts, type connu (sinon « text »), 60 champs au plus.
+ * @param {unknown} champs
+ * @returns {Champ[]}
+ */
+export function champsSurs(champs) {
+  if (!Array.isArray(champs)) return [];
+  const sortie = [];
+  for (const c of champs) {
+    if (!c || typeof c !== 'object' || !/^[a-z0-9_]{1,40}$/.test(String(c.key))) continue;
+    const champ = { key: c.key, label: propre(c.label, LIBELLE_MAX) || c.key, unit: c.unit ? propre(c.unit, 12) || null : null, type: TYPES_CHAMP.includes(c.type) ? c.type : 'text' };
+    if (Array.isArray(c.options) && c.options.length) {
+      champ.options = c.options.slice(0, 30).map((o) => propre(o && typeof o === 'object' ? o.value : o, LIBELLE_MAX)).filter(Boolean);
+    }
+    sortie.push(champ);
+    if (sortie.length >= CHAMPS_MAX) break;
+  }
+  return sortie;
+}

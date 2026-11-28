@@ -10,6 +10,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { creerFile, executerTravail } from './travaux.mjs';
+import { CodeErreur } from './erreurs.mjs';
 import { ouvrirNavigateur } from './navigateur.mjs';
 import { creerModele } from './modele.mjs';
 import { apprendre } from './apprentissage.mjs';
@@ -71,11 +72,23 @@ export function creerServeur({ cle, file }) {
   });
 }
 
-/** Envoi d'un résultat vers l'edge de retour (secret partagé). */
-function creerEnvoi(url, cle) {
+/**
+ * Envoi d'un résultat vers l'edge de retour (secret partagé). L'edge répond HTTP 200 avec `{ error: code }` quand elle
+ * refuse : ce refus est LU et devient une CodeErreur, qui arrête le travail (relecture I1 : un lot perdu en silence
+ * laisserait annoncer « terminé »).
+ * @param {string} url @param {string} cle @param {typeof fetch} [fetchImpl]
+ */
+export function creerEnvoi(url, cle, fetchImpl = fetch) {
   return async (corps) => {
-    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${cle}` }, body: JSON.stringify(corps), signal: AbortSignal.timeout(120_000) });
-    if (!r.ok) throw new Error(`retour refusé (${r.status})`);
+    let r;
+    try {
+      r = await fetchImpl(url, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${cle}` }, body: JSON.stringify(corps), signal: AbortSignal.timeout(120_000) });
+    } catch { throw new CodeErreur('service_indisponible'); }
+    let reponse = null;
+    try { reponse = await r.json(); } catch { reponse = null; }
+    if (!r.ok || !reponse) throw new CodeErreur('service_indisponible');
+    if (reponse.error) throw new CodeErreur(/^[a-z_]{1,40}$/.test(String(reponse.error)) ? String(reponse.error) : 'service_indisponible');
+    return reponse.data ?? null;
   };
 }
 

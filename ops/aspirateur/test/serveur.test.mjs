@@ -92,7 +92,7 @@ test('aspiration : lots filtrés par marque, puis fin « termine » ; journal sa
   assert.deepEqual(retours.map((r) => r.action), ['lot', 'fin']);
   assert.deepEqual(retours[0].produits.map((p) => p.url), ['u2']);
   assert.equal(retours[1].statut, 'termine');
-  assert.deepEqual(retours[1].compteurs, { trouves: 2, lus: 2, echecs: 0, documents: 0 });
+  assert.deepEqual(retours[1].compteurs, { trouves: 2, lus: 2, echecs: 0, documents: 0, hors_marques: 1 });
   assert.ok(lignes.join('\n').length > 0 && !lignes.join('\n').includes('MotDePasse-123'));
 });
 
@@ -114,4 +114,42 @@ test('échec : fin « echec » avec le code, ou service_indisponible pour une er
   const c = deps({ ouvrirNavigateur: async () => { throw new Error('chromium absent'); } });
   await executerTravail(travail(), c.d);
   assert.equal(c.retours.at(-1).statut, 'echec');
+});
+
+test('relecture I1 : un refus de l’edge de retour (HTTP 200 + error) devient une erreur codée', async () => {
+  const { creerEnvoi } = await import('../serveur.mjs');
+  const envoi = creerEnvoi('https://retour.test/', CLE, async () => new Response(JSON.stringify({ data: null, error: 'travail_inconnu' }), { status: 200 }));
+  await assert.rejects(envoi({ action: 'lot' }), (e) => e.code === 'travail_inconnu');
+  const panne = creerEnvoi('https://retour.test/', CLE, async () => new Response('oups', { status: 502 }));
+  await assert.rejects(panne({ action: 'lot' }), (e) => e.code === 'service_indisponible');
+  const bon = creerEnvoi('https://retour.test/', CLE, async () => new Response(JSON.stringify({ data: { ok: 1 }, error: null }), { status: 200 }));
+  assert.deepEqual(await bon({ action: 'lot' }), { ok: 1 });
+});
+
+test('relecture I1 : un lot refusé arrête l’aspiration en échec avec le code', async () => {
+  const { d, retours } = deps({
+    rejouer: async ({ surLot }) => { await surLot([{ url: 'u1', marque: 'Invicta', documents: [] }]); return { compteurs: { lus: 1 }, echecs: [] }; },
+  });
+  d.envoyerRetour = async (corps) => { retours.push(corps); if (corps.action === 'lot') throw new CodeErreur('travail_inconnu'); };
+  await executerTravail(travail(), d);
+  assert.deepEqual(retours.map((r) => [r.action, r.statut ?? null, r.code ?? null]), [['lot', null, null], ['fin', 'echec', 'travail_inconnu']]);
+});
+
+test('relecture I2 : fiches écartées par le filtre de marques comptées', async () => {
+  const { d, retours } = deps();
+  await executerTravail(travail({ marques: ['Deville'] }), d);
+  assert.equal(retours.at(-1).compteurs.hors_marques, 1);
+});
+
+test('relecture I9 : un même domaine (www. et pro.) n’a qu’un travail à la fois', async () => {
+  const fins = new Map();
+  const debuts = [];
+  const file = creerFile({ maxTotal: 2, executer: async (t) => { debuts.push(t.aspiration_id); const dd = differe(); fins.set(t.aspiration_id, dd); await dd.promesse; } });
+  file.soumettre(travail({ aspiration_id: 'a', hote_site: 'www.invicta-group.fr' }));
+  file.soumettre(travail({ aspiration_id: 'b', hote_site: 'pro.invicta-group.fr' }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(debuts, ['a']);
+  fins.get('a').resoudre();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(debuts, ['a', 'b']);
 });

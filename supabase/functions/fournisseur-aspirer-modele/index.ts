@@ -14,7 +14,7 @@
 
 import Anthropic from "npm:@anthropic-ai/sdk@1.3.0";
 import { requireSharedSecret, jsonResponse, getAdminClient } from "../_shared/auth.ts";
-import { coutUsd, outilsValides, parametresModele } from "../_shared/aspirateur/relais.js";
+import { coutUsd, coutMaximalUsd, outilsValides, parametresModele } from "../_shared/aspirateur/relais.js";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -41,10 +41,13 @@ Deno.serve(async (req: Request) => {
   if (!ANTHROPIC_API_KEY) return erreur("service_indisponible", req);
 
   const admin = getAdminClient();
-  // État du plafond avant l'appel (ajout de 0) ; travail clos ou inconnu ⇒ refus.
-  const { data: etat, error: errEtat } = await admin.rpc("aspiration_cout_ajouter", { p_aspiration_id: aspirationId, p_usd: 0 });
+  // RÉSERVATION du coût maximal de l'appel avant de le faire (relecture I6) : des appels simultanés ne peuvent pas
+  // dépasser le plafond. Travail clos, en attente de confirmation ou inconnu ⇒ refus. Régularisé après l'appel.
+  const reserve = coutMaximalUsd(params as { model: string; max_tokens: number });
+  const { data: etat, error: errEtat } = await admin.rpc("aspiration_cout_ajouter", { p_aspiration_id: aspirationId, p_usd: reserve });
   if (errEtat) return erreur(errEtat.message === "travail_inconnu" ? "travail_inconnu" : "service_indisponible", req);
-  if (etat?.depasse === true) return erreur("plafond_atteint", req);
+  const rendre = (usd: number) => admin.rpc("aspiration_cout_ajouter", { p_aspiration_id: aspirationId, p_usd: usd });
+  if (etat?.depasse === true) { await rendre(-reserve); return erreur("plafond_atteint", req); }
 
   const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
   const ctrl = new AbortController();
@@ -56,13 +59,14 @@ Deno.serve(async (req: Request) => {
     reponse = await client.beta.messages.create(params as any, { signal: ctrl.signal });
   } catch (e) {
     console.error("[fournisseur-aspirer-modele] appel refusé", aspirationId, (e as { status?: number })?.status ?? "réseau");
+    await rendre(-reserve);
     return erreur("service_indisponible", req);
   } finally {
     clearTimeout(minuterie);
   }
 
   const usd = coutUsd(reponse?.model || String(params.model), reponse?.usage);
-  const { data: apres, error: errCout } = await admin.rpc("aspiration_cout_ajouter", { p_aspiration_id: aspirationId, p_usd: usd });
+  const { data: apres, error: errCout } = await rendre(usd - reserve);
   if (errCout) return erreur("service_indisponible", req);
   console.log("[fournisseur-aspirer-modele]", aspirationId, corps.usage, reponse?.model, reponse?.stop_reason, usd);
 

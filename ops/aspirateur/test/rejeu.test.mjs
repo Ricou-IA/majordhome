@@ -19,7 +19,7 @@ const modele = {
     const texte = String(messages[0].content);
     this.appels.push(texte);
     const m = texte.match(/Etas (\d+)/);
-    return { content: [{ type: 'text', text: JSON.stringify({ valeurs: { etas_pct: m ? Number(m[1]) : null } }) }], stop_reason: 'end_turn' };
+    return { content: [{ type: 'text', text: JSON.stringify({ valeurs: { etas_pct: m ? Number(m[1]) : null }, marque: 'Invicta (lue)' }) }], stop_reason: 'end_turn' };
   },
 };
 const recette = (over = {}) => ({
@@ -50,7 +50,7 @@ test('prixDepuisTexte : formats français', () => {
 
 test('rejeu complet : connexion, pagination arrêtée sur page répétée, provenance mesurée, PDF prioritaire', async () => {
   const { r, produits } = await lancer({});
-  assert.deepEqual(r.compteurs, { trouves: 3, lus: 3, echecs: 0, documents: 3 });
+  assert.deepEqual(r.compteurs, { trouves: 3, lus: 3, echecs: 0, documents: 3, listes_tronquees: false });
   const parRef = Object.fromEntries(produits.map((p) => [p.reference_fabricant, p]));
   assert.equal(parRef.P613744.provenance, 'public');
   assert.equal(parRef.P700100.provenance, 'public');
@@ -93,4 +93,37 @@ test('plus de la moitié des produits sans référence : recette_obsolete', asyn
 
 test('aucun produit trouvé : recette_obsolete', async () => {
   await assert.rejects(lancer({ recette: recette({ listes: { departs: [`${site.url}/compte`], lien_produit: 'a.p' } }) }), (e) => e.code === 'recette_obsolete');
+});
+
+test('relecture I2 : une fiche sans référence est un échec compté, pas un produit lu', async () => {
+  const { r, produits } = await lancer({ recette: recette({ listes: { departs: [`${site.url}/liste-une-sans-ref`], lien_produit: 'a.p' } }) });
+  assert.equal(r.compteurs.lus, 2);
+  assert.equal(r.compteurs.echecs, 1);
+  assert.deepEqual(r.echecs, [{ url: `${site.url}/produit/4`, raison: 'reference_introuvable' }]);
+  assert.equal(produits.length, 2);
+});
+
+test('relecture I2 : liste coupée par le plafond de pages signalée', async () => {
+  const { r } = await lancer({ limitePages: 3 });
+  assert.equal(r.compteurs.listes_tronquees, true);
+});
+
+test('relecture I2 : sans sélecteur de marque, la marque lue par le modèle est gardée', async () => {
+  const sansMarque = recette();
+  delete sansMarque.produit.marque;
+  const { produits } = await lancer({ recette: sansMarque });
+  assert.equal(produits[0].marque, 'Invicta (lue)');
+});
+
+test('relecture I8 : une page servie sans session mais sans la fiche reste « compte »', async () => {
+  const { produits } = await lancer({ recette: recette({ listes: { departs: [`${site.url}/liste-6`], lien_produit: 'a.p' } }) });
+  const parRef = Object.fromEntries(produits.map((p) => [p.reference_fabricant, p.provenance]));
+  assert.deepEqual(parRef, { P606060: 'compte', P613744: 'public' });
+});
+
+test('relecture C1 : un formulaire de connexion qui envoie hors du site rend la recette obsolète, sans rien taper', async () => {
+  const piege = recette();
+  piege.connexion = { ...piege.connexion, url: `${site.url}/login-piege` };
+  await assert.rejects(lancer({ recette: piege }), (e) => e.code === 'recette_obsolete');
+  assert.ok(!site.demandes.some((d) => d.startsWith('POST') && d.includes('vol')));
 });
