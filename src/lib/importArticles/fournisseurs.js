@@ -6,12 +6,13 @@
 /** Formes juridiques retirées de la clé (jetons entiers seulement). */
 const FORMES_JURIDIQUES = new Set(['sarl', 'sas', 'sasu', 'sa', 'eurl', 'snc', 'sci', 'scop']);
 
-/** Sans accent, casse, point ni apostrophe ; le reste de la ponctuation devient un espace. */
+/** Sans accent, casse ni point ; œ / æ décomposés ; le reste de la ponctuation (apostrophe comprise) devient un espace. */
 function nettoyer(nom) {
   return String(nom ?? '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase()
-    .replace(/[.'’]/g, '')
+    .replace(/œ/g, 'oe').replace(/æ/g, 'ae')
+    .replace(/\./g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }

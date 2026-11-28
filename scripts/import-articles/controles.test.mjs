@@ -151,22 +151,61 @@ const EXISTANT = {
   lignes: [{ supplier_id: 's1', reference: 'EXI' }],
 };
 
-test('invariant : lues = importées + doublons + écartées, quel que soit le choix', () => {
+test('invariant : lues = importées + doublons + écartées, comptés directement', () => {
   const o = opt({ avecFournisseur: true, fournisseursResolus: { invicta: 's1' } });
+  const n = JEU().length;
   const r = classerArticles(JEU(), EXISTANT, o);
+  assert.equal(r.length, n);
+  assert.deepEqual(r.map((c) => c.numero), JEU().map((c) => c.numero)); // aucune ligne perdue ni doublée
   const tousOui = Object.fromEntries(r.map((c) => [c.numero, true]));
   const tousNon = Object.fromEntries(r.map((c) => [c.numero, false]));
-  for (const choix of [{}, tousOui, tousNon, choixPourTousLesDoublons(r, {}, true), choixPourTousLesDoublons(r, tousOui, false)]) {
+  const attendus = [
+    [{}, { importees: 5, doublons: 5, ecartees: 2 }],
+    [tousOui, { importees: 8, doublons: 2, ecartees: 2 }],
+    [tousNon, { importees: 4, doublons: 6, ecartees: 2 }],
+  ];
+  for (const [choix, att] of attendus) {
     const b = bilan(r, choix);
-    assert.equal(b.lues, 12);
-    assert.equal(b.lues, b.importees + b.doublons + b.ecartees);
-    assert.equal(b.ecartees, 2);
+    assert.equal(b.lues, n);
+    assert.deepEqual({ importees: b.importees, doublons: b.doublons, ecartees: b.ecartees }, att);
+    assert.equal(b.importees + b.doublons + b.ecartees, n);
     assert.equal(lignesPourEcriture(r, choix, o.fournisseursResolus).length, b.importees);
   }
-  // Par défaut : 2, 6, 10 (doublon faible, repris), 12 et 13 sont importées.
-  assert.equal(bilan(r, {}).importees, 5);
-  // Lignes fournisseur créées : la ligne 2 seulement (12 sans prix, 11 existante).
+  for (const choix of [choixPourTousLesDoublons(r, {}, true), choixPourTousLesDoublons(r, tousOui, false)]) {
+    const b = bilan(r, choix);
+    assert.equal(b.importees + b.doublons + b.ecartees, n);
+  }
+  // Par défaut : 2, 6, 10 (doublon faible, repris), 12 et 13. Ligne fournisseur créée : la ligne 2 seulement.
   assert.equal(bilan(r, {}).lignesFournisseur, 1);
+  // Une ligne perdue ou comptée deux fois dans le classement romprait l'égalité avec le nombre de lignes lues du fichier.
+  const perdue = bilan(r.slice(1), {});
+  assert.notEqual(perdue.importees + perdue.doublons + perdue.ecartees, n);
+});
+
+test('liste des articles existants inconnue : le classement refuse', () => {
+  assert.throws(() => classerArticles(JEU(), null, opt()), /inconnue/);
+  assert.throws(() => classerArticles(JEU(), undefined, opt()), /inconnue/);
+  assert.throws(() => classerArticles(JEU(), { articles: [] }, opt()), /inconnue/);
+});
+
+test('ligne fournisseur existante : jamais renvoyée, quel que soit le motif du doublon', () => {
+  const existant = {
+    articles: [{ id: 'a2', code: null, code_ean: '3760123456789', brand: null, model_key: null, name: 'Zzz', product_kind: 'main' }],
+    lignes: [{ supplier_id: 's1', reference: 'R1' }, { supplier_id: 's1', reference: 'R2' }],
+  };
+  const o = opt({ avecFournisseur: true, fournisseursResolus: { invicta: 's1' } });
+  const r = classerArticles([
+    cand(2, { designation: 'a', ean: '3760123456789', fournisseur: 'Invicta', ref_fournisseur: 'R1', prix_achat: '5' }),
+    cand(3, { designation: 'b', marque: 'Invicta', modele: 'ORA-80-X1', fournisseur: 'Invicta', ref_fournisseur: 'R2', prix_achat: '5' }),
+    cand(4, { designation: 'c', marque: 'Invicta', modele: 'ORA-80-X1', fournisseur: 'Invicta', ref_fournisseur: 'R2', prix_achat: '5' }),
+  ], existant, o);
+  assert.equal(r[0].doublon.motif, 'ean'); assert.equal(r[0].ligneExistante, true);
+  assert.equal(r[2].doublon.motif, 'fichier'); assert.equal(r[2].ligneExistante, true);
+  const choix = choixPourTousLesDoublons(r, {}, true);
+  const l = lignesPourEcriture(r, choix, o.fournisseursResolus);
+  assert.equal(l.length, 3);
+  assert.ok(l.every((x) => x.fournisseur === null));
+  assert.equal(bilan(r, choix).lignesFournisseur, 0);
 });
 
 test('choixPourTousLesDoublons ne touche pas aux non recochables', () => {

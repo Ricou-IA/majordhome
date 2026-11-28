@@ -10,6 +10,9 @@ test('cleFournisseur : sans accent, casse, ponctuation ni forme juridique', () =
   assert.equal(cleFournisseur('  Soditelem   SARL '), 'soditelem');
   assert.equal(cleFournisseur('SAS'), 'sas'); // jamais de clé vide pour un nom non vide
   assert.equal(cleFournisseur(''), '');
+  assert.equal(cleFournisseur('Cœur de Bois'), cleFournisseur('Coeur de Bois'));
+  assert.equal(cleFournisseur("L'Atelier"), cleFournisseur('L Atelier'));
+  assert.equal(cleFournisseur('L’Atelier SARL'), 'l atelier');
 });
 
 test('rapprocherFournisseurs : une entrée par clé, existant reconnu, sinon à créer', () => {

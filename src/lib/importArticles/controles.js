@@ -127,13 +127,16 @@ function indexerExistants(existant) {
  * @returns {Array<{ numero: number, fiche: object|null, raison: string|null, corrections: string[], ligneFournisseur: string, doublon: null | { force: 'fort'|'faible', motif: string, articleId?: string }, recochable: boolean }>}
  */
 export function classerArticles(candidats, existant, options = {}) {
+  if (!existant || !Array.isArray(existant.articles) || !Array.isArray(existant.lignes)) {
+    throw new Error('Liste des articles existants inconnue : classement impossible.');
+  }
   const index = indexerExistants(existant);
   const resolus = options.fournisseursResolus || {};
   const dansFichier = { designation: new Set(), code: new Set(), ean: new Set(), modele: new Set(), ligne: new Set() };
   return candidats.map(({ numero, valeurs }) => {
     const c = controlerArticle(valeurs, options);
     const base = { numero, fiche: c.fiche, raison: c.raison, corrections: c.corrections, ligneFournisseur: c.ligneFournisseur };
-    const pas = { ...base, doublon: null, recochable: false };
+    const pas = { ...base, ligneExistante: false, doublon: null, recochable: false };
     if (!c.fiche) return pas;
     const f = c.fiche;
     const kCode = cle(f.code);
@@ -141,6 +144,9 @@ export function classerArticles(candidats, existant, options = {}) {
     const kModele = cleMarque(f.brand) && f.model_key ? `${cleMarque(f.brand)}|${f.model_key}` : '';
     const supplierId = f.fournisseur ? resolus[cleFournisseur(f.fournisseur.nom)] : null;
     const kLigne = f.fournisseur ? `${supplierId || `nom:${cleFournisseur(f.fournisseur.nom)}`}|${cle(f.fournisseur.reference)}` : '';
+
+    // La ligne fournisseur existe-t-elle déjà en base ? Indépendant du motif de doublon retenu plus bas.
+    const ligneExistante = Boolean(supplierId && f.fournisseur && index.lignes.has(`${supplierId}|${cle(f.fournisseur.reference)}`));
 
     // Doublon dans le fichier : testé avant la base (la première ligne gagne).
     let doublon = null; let recochable = true;
@@ -153,7 +159,7 @@ export function classerArticles(candidats, existant, options = {}) {
       doublon = { force: 'fort', motif: 'ean', articleId: index.ean.get(f.code_ean) };
     } else if (kModele && index.modele.has(kModele)) {
       doublon = { force: 'fort', motif: 'marque_modele', articleId: index.modele.get(kModele) };
-    } else if (supplierId && index.lignes.has(`${supplierId}|${cle(f.fournisseur.reference)}`)) {
+    } else if (ligneExistante) {
       doublon = { force: 'fort', motif: 'ligne_fournisseur' };
     } else {
       // Même désignation et même nature : fort si la marque est identique (ou absente des deux côtés), sinon faible.
@@ -168,7 +174,7 @@ export function classerArticles(candidats, existant, options = {}) {
     if (f.code_ean) dansFichier.ean.add(f.code_ean);
     if (kModele) dansFichier.modele.add(kModele);
     if (kLigne) dansFichier.ligne.add(kLigne);
-    return { ...base, doublon, recochable: doublon ? recochable : false };
+    return { ...base, ligneExistante, doublon, recochable: doublon ? recochable : false };
   });
 }
 
@@ -202,7 +208,7 @@ export function choixPourTousLesDoublons(classees, choix, reprendre) {
 }
 
 /** Faut-il envoyer la ligne fournisseur de cette ligne ? (jamais pour une ligne fournisseur déjà en base) */
-const aLigneFournisseur = (c) => c.ligneFournisseur === 'oui' && c.doublon?.motif !== 'ligne_fournisseur';
+const aLigneFournisseur = (c) => c.ligneFournisseur === 'oui' && !c.ligneExistante;
 
 /**
  * Bilan affiché à l'écran : importées + doublons écartés + écartées = lues, toujours.
@@ -215,11 +221,13 @@ export function bilan(classees, choix) {
   const lues = classees.length;
   const ecartees = classees.filter((c) => !c.fiche).length;
   const retenues = classees.filter((c) => aImporter(c, choix));
+  // Comptés directement (jamais par différence) : une ligne perdue ou comptée deux fois rompt l'égalité.
+  const doublons = classees.filter((c) => c.fiche && c.doublon && !aImporter(c, choix)).length;
   return {
     lues,
     importees: retenues.length,
     ecartees,
-    doublons: lues - retenues.length - ecartees,
+    doublons,
     lignesFournisseur: retenues.filter(aLigneFournisseur).length,
   };
 }
