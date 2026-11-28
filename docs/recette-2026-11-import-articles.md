@@ -59,7 +59,7 @@
   Attendu : les 4 articles sont des doublons forts, écartés par défaut ; « RECETTE-00x » non recochable (référence déjà prise) ; aucun fournisseur à créer ; 0 à importer.
   Vérification : aucun article nouveau en base si l'import n'est pas lancé.
 
-- [x] **C207. Retirer l'import.** 2026-11-28 — retour d'Eric : « tout est ok » (Grok). Vérifié en base : import passé à `retire` à 17:25 UTC avec 4 retirés et 0 conservé ; aucun article `RECETTE-%` ni `ESSAIMARQUE`, aucune ligne `FER-%`, aucun article portant un `import_id` ; Cimaj revenu à 10 274 articles vivants ; « Fournisseur Essai Recette » toujours présent, comme prévu.
+- [x] **C207. Retirer l'import.** 2026-11-28 — retour d'Eric : « tout est ok » (Grok). Vérifié en base : import passé à `retire` à 17:25 UTC avec 4 retirés et 0 conservé ; aucun article `RECETTE-%` ni `ESSAIMARQUE`, aucune ligne `FER-%`, aucun article portant un `import_id` ; Cimaj revenu à 10 274 articles vivants ; « Fournisseur Essai Recette » toujours présent, comme prévu, puis supprimé à la main sur l'accord d'Eric le 2026-11-28 (aucune ligne rattachée ; Cimaj revenu à 4 fournisseurs).
   Où : page d'import → Imports précédents → l'import du fichier d'essai.
   Saisir : « Retirer cet import », lire le texte, saisir le nom du fichier pour confirmer.
   Attendu : 4 articles retirés, 0 conservé ; l'import passe à « Retiré ».
