@@ -39,6 +39,9 @@ function consigne({ hoteSite, urlDepart, champs }) {
       + ' "produit":{"nom","reference" (référence fabricant),"marque","ean","prix","photo","zone_caracteristiques" (tous facultatifs sauf nom et reference),'
       + ' "documents":[{"type":"fiche_technique"|"notice"|"declaration_performance"|"etiquette_energie","selecteur"}]},"politesse":{"delai_ms":1000}}.',
     'Méthode : trouve les listes de produits, ouvre quelques fiches, repère les sélecteurs, essaie la recette avec essayer_recette, corrige, puis propose-la avec proposer_recette.',
+    'essayer_recette rejoue la recette dans un navigateur NEUF, sans ta session : si les fiches exigent d’être connecté, la recette doit contenir le bloc connexion, sinon l’essai ne lit rien.',
+    'Sur chaque fiche, vise des éléments présents sans clic : la marque, chaque lien vers un PDF (fiche technique, notice, déclaration de performance) et la zone des caractéristiques techniques (rendement, émissions, puissance, sortie des fumées).',
+    'Le sélecteur du prix vise l’élément qui ne contient QUE le prix, jamais un bloc qui porte aussi la référence ou d’autres nombres. Un produit vu deux fois à l’essai signale un sélecteur de liens trop large.',
   ].join('\n');
   const utilisateur = [
     `Site : ${hoteSite}. Point de départ : ${urlDepart}.`,
@@ -85,7 +88,12 @@ export async function apprendre({ hoteSite, urlDepart, acces, compteClient = nul
   const essayer = async (recette) => {
     const produits = [];
     const r = { ...recette, schema: SCHEMA_RECETTE, domaine: hoteSite };
-    await rejouer({ recette: r, acces, champs, modele, navigateur: nav, journal, essai: 5, limitePages: plafonds.pages, surLot: async (lot) => { produits.push(...lot); } });
+    // L'essai part d'un contexte NEUF, comme l'aspiration qui rejouera la recette : sans la session de l'agent, une
+    // recette qui oublie la connexion ne lit rien (vécu Invicta 2026-11-28 : essai réussi, recette inutilisable).
+    const frais = await nav.contexteNeuf();
+    try {
+      await rejouer({ recette: r, acces, champs, modele, navigateur: frais, journal, essai: 5, limitePages: plafonds.pages, surLot: async (lot) => { produits.push(...lot); } });
+    } finally { await frais.fermer(); }
     dernierEssai = { cle: JSON.stringify(r), produits };
     return produits;
   };

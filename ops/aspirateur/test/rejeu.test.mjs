@@ -46,6 +46,11 @@ test('prixDepuisTexte : formats français', () => {
   assert.equal(prixDepuisTexte('980.5'), 980.5);
   assert.equal(prixDepuisTexte('Sur devis'), null);
   assert.equal(prixDepuisTexte(null), null);
+  // vécu Invicta 2026-11-28 : un bloc qui porte la référence avant le prix ne colle plus les nombres entre eux
+  assert.equal(prixDepuisTexte('Réf. C07768-06 Prix public indicatif 5 016,90 € HT'), 5016.9);
+  assert.equal(prixDepuisTexte('8 kW 696 mm 1 706,64 €'), 1706.64);
+  assert.equal(prixDepuisTexte('€ 2 150,97'), 2150.97);
+  assert.equal(prixDepuisTexte('12 500 €'), 12500);
 });
 
 test('rejeu complet : connexion, pagination arrêtée sur page répétée, provenance mesurée, PDF prioritaire', async () => {
@@ -71,6 +76,11 @@ test('aucun lot ni appel au modèle ne contient le mot de passe ou l’identifia
   const tout = JSON.stringify(lots) + JSON.stringify(modele.appels);
   assert.ok(!tout.includes(MOT_DE_PASSE));
   assert.ok(!tout.toLowerCase().includes(IDENTIFIANT));
+});
+
+test('une fiche liée plusieurs fois dans une liste (photo, titre, ancre) n’est lue qu’une fois', async () => {
+  const { produits } = await lancer({ recette: recette({ listes: { departs: [`${site.url}/liste-double`], lien_produit: 'a.p' } }) });
+  assert.deepEqual(produits.map((p) => p.reference_fabricant).sort(), ['P613744', 'P700100']);
 });
 
 test('essai : s’arrête au nombre demandé', async () => {

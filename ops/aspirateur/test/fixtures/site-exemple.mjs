@@ -60,6 +60,9 @@ export async function demarrerSite() {
     if (u.pathname === '/liste-une-sans-ref') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/1">1</a><a class="p" href="/produit/2">2</a><a class="p" href="/produit/4">4</a>'));
     // Fiche servie en 200 sans session, mais qui n'est qu'une invitation à se connecter (pas la fiche) : provenance « compte ».
     if (u.pathname === '/produit/6') return connecte ? envoyer(200, 'text/html', produit(6, 'P606060', 'Bûcheron', '700,00 €')) : envoyer(200, 'text/html', page('Connexion requise', '<p>Connectez-vous</p>'));
+    // Catalogue réservé au compte (comme Invicta) ; chaque fiche y est liée deux fois (photo et titre).
+    if (u.pathname === '/liste-compte') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/3">photo</a><a class="p" href="/produit/3">Toron</a>'));
+    if (u.pathname === '/liste-double') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/1">photo</a><a class="p" href="/produit/1">Châtel</a><a class="p" href="/produit/2#avis">Pierre</a><a class="p" href="/produit/2">Pierre</a>'));
     if (u.pathname === '/liste-6') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/6">6</a><a class="p" href="/produit/1">1</a>'));
     if (u.pathname === '/liste-sans-ref') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/4">4</a><a class="p" href="/produit/5">5</a><a class="p" href="/produit/1">1</a>'));
     if (u.pathname.startsWith('/docs/')) return envoyer(200, 'application/pdf', PDF);

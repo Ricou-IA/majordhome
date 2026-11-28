@@ -93,6 +93,24 @@ test('lire_page montre à l’agent les champs du formulaire de connexion', asyn
   assert.match(res, /#password/);
 });
 
+test('l’essai se rejoue sans la session de l’agent : une recette qui oublie la connexion ne lit rien', async () => {
+  const sansConnexion = { ...recetteBonne(), listes: { departs: [`${site.url}/liste-compte`], lien_produit: 'a.p' } };
+  delete sansConnexion.connexion;
+  const avecConnexion = { ...recetteBonne(), listes: { departs: [`${site.url}/liste-compte`], lien_produit: 'a.p' } };
+  const modele = modeleScenario([
+    tour(outil('t1', 'aller', { url: `${site.url}/login` })),
+    tour(outil('t2', 'se_connecter', { champ_identifiant: '#email', champ_mot_de_passe: '#password', bouton: 'button[type=submit]', preuve: '.mon-compte' })),
+    tour(outil('t3', 'essayer_recette', { recette: sansConnexion })),
+    tour(outil('t4', 'essayer_recette', { recette: avecConnexion })),
+    tour(outil('t5', 'proposer_recette', { recette: avecConnexion })),
+  ]);
+  const { essai } = await lancer(modele);
+  const t3 = modele.recu.find((r) => r.includes('"tool_use_id":"t3"'));
+  assert.ok(!t3.includes('C07768-06'), 'la fiche réservée a été lue avec la session de l’agent');
+  // avec la connexion dans la recette : une seule fiche, malgré deux liens vers elle
+  assert.deepEqual(essai.map((p) => [p.reference_fabricant, p.provenance]), [['C07768-06', 'compte']]);
+});
+
 test('les prix lus à l’essai ne sont pas montrés au modèle', async () => {
   const modele = modeleScenario([
     tour(outil('t1', 'essayer_recette', { recette: recetteBonne() })),

@@ -266,6 +266,11 @@ async function creer(navigateur, cfg, avecSession, proprietaire, horloge) {
       return creer(navigateur, cfg, false, false, horloge);
     },
 
+    /** Contexte neuf, vide de tout cookie, qui se comporte comme celui d'une aspiration (essai d'une recette). */
+    async contexteNeuf() {
+      return creer(navigateur, cfg, true, false, horloge);
+    },
+
     async fermer() {
       await contexte.close().catch(() => null);
       if (proprietaire) await navigateur.close().catch(() => null);

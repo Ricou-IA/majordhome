@@ -10,13 +10,19 @@ import { texteDe } from './modele.mjs';
 import { construirePromptLecture, lireReponse, fusionnerLectures } from './lib/lecture.js';
 
 const LOT = 20;
+// Un nombre : groupes de trois chiffres séparés par une espace (« 5 016,90 »), sinon chiffres, points et virgules.
+const NOMBRE = String.raw`\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d[\d.,]*`;
 
 /** Prix lu sur une page (« 1 200,00 € », « 1.200,50 € HT », « 980.5 ») ; null si illisible. @param {string | null} texte */
 export function prixDepuisTexte(texte) {
   if (typeof texte !== 'string') return null;
-  const m = texte.replace(/[\s\u00a0\u202f]/g, '').match(/\d[\d.,]*/);
-  if (!m) return null;
-  let s = m[0];
+  // Le nombre coll\u00e9 au symbole \u20ac d'abord ; seuls les espaces ENTRE groupes de trois chiffres sont des s\u00e9parateurs de
+  // milliers (v\u00e9cu Invicta 2026-11-28 : \u00ab C07768-06 \u2026 5 016,90 \u20ac \u00bb donnait 501 690 en retirant tous les espaces).
+  const brut = texte.match(new RegExp(`(${NOMBRE})\\s*\u20ac`))?.[1]
+    ?? texte.match(new RegExp(`\u20ac\\s*(${NOMBRE})`))?.[1]
+    ?? texte.match(new RegExp(NOMBRE))?.[0];
+  if (!brut) return null;
+  let s = brut.replace(/[\s\u00a0\u202f]/g, '');
   if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
   else if ((s.match(/\./g) || []).length > 1) s = s.replace(/\./g, '');
   const n = Number(s);
@@ -83,7 +89,8 @@ export async function rejouer({ recette, acces, champs, modele, navigateur: nav,
       const r = await nav.aller(page);
       await protege();
       if (r.statut >= 400) { tronquees = true; break; }
-      const nouveaux = (await nav.attributs(recette.listes.lien_produit, 'href')).filter((u) => !vus.has(u));
+      // Une fiche est souvent liée deux fois (photo et titre), parfois avec une ancre : une seule lecture par adresse.
+      const nouveaux = [...new Set((await nav.attributs(recette.listes.lien_produit, 'href')).map((u) => u.split('#')[0]))].filter((u) => !vus.has(u));
       if (!nouveaux.length) break; // page vide ou répétée : fin de la liste
       for (const u of nouveaux) { vus.add(u); if (urls.length < limite) urls.push(u); }
       page = recette.listes.suivant ? (await nav.attributs(recette.listes.suivant, 'href'))[0] : null;
