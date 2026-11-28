@@ -114,8 +114,8 @@ test('relecture C1 : seConnecter remplit un vrai formulaire de connexion du site
 test('lirePage rend les champs de formulaire (id, type, libellé, sélecteur) sans jamais leur valeur', async () => {
   const nav = await ouvrir();
   try {
+    // aller rend la main quand l'application a fini ses échanges : le formulaire est déjà dessiné (vécu Invicta)
     await nav.aller(`${site.url}/login-js`);
-    await new Promise((r) => setTimeout(r, 2000));
     const p = await nav.lirePage();
     const email = p.champs.find((c) => c.id === 'email');
     assert.deepEqual({ type: email.type, selecteur: email.selecteur, libelle: email.libelle, formulaire: email.formulaire },

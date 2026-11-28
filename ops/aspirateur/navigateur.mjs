@@ -17,6 +17,7 @@ const LIENS_MAX = 300;
 const CHAMPS_MAX = 60;
 // Une application JavaScript (Angular chez Invicta) dessine le formulaire après le chargement de la page.
 const ATTENTE_FORMULAIRE_MS = 10_000;
+const APAISEMENT_MS = 8_000;
 const PDF_MAX = 20 * 1024 * 1024;
 const DELAI_PAGE_MS = 30_000;
 const REDIRECTIONS_MAX = 3;
@@ -99,6 +100,11 @@ async function creer(navigateur, cfg, avecSession, proprietaire, horloge) {
     return cheminAutorise(etat.robots, `${u.pathname}${u.search}`);
   };
 
+  // Une application JavaScript (Angular chez Invicta) dessine la page après ses appels réseau : au « load », la page
+  // est encore vide (vécu le 2026-11-28 : texte vide, aucun champ, l'agent devinait). On attend la fin des échanges,
+  // borné : un site qui ne se tait jamais rend la main au bout du délai.
+  const apaiser = () => page.waitForLoadState('networkidle', { timeout: APAISEMENT_MS }).catch(() => null);
+
   const nav = {
     get pagesVues() { return etat.pagesVues; },
     get bloquees() { return etat.bloquees; },
@@ -118,6 +124,7 @@ async function creer(navigateur, cfg, avecSession, proprietaire, horloge) {
         if (etat.horsSite) { await verifierPage(); }
         throw e;
       }
+      await apaiser();
       await verifierPage();
       etat.pagesVues += 1;
       return { statut: r ? r.status() : 0, url: page.url() };
@@ -190,6 +197,7 @@ async function creer(navigateur, cfg, avecSession, proprietaire, horloge) {
       await page.click(selecteur, { timeout: 10_000 });
       await navigation;
       await page.waitForLoadState('domcontentloaded').catch(() => null);
+      await apaiser();
       await verifierPage();
     },
 
