@@ -14,7 +14,7 @@ export const CHAMPS_ARTICLE = [
   { cle: 'designation', libelle: 'Désignation', type: 'texte',
     synonymes: ['Libellé', 'Nom de l\'article', 'Nom article', 'Article', 'Produit', 'Intitulé'], exemple: 'Poêle à granulés 8 kW', aide: 'Nom de l\'article, tel qu\'il apparaîtra sur un devis.' },
   { cle: 'code', libelle: 'Référence interne', type: 'texte',
-    synonymes: ['Réf. interne', 'Code article', 'Code interne', 'Réf. article', 'Référence article'], exemple: 'POE-008', aide: 'Votre propre référence, unique par article.' },
+    synonymes: ['Réf', 'Réf. interne', 'Code article', 'Code interne', 'Réf. article', 'Référence article'], exemple: 'POE-008', aide: 'Votre propre référence, unique par article.' },
   { cle: 'marque', libelle: 'Marque', type: 'texte',
     synonymes: ['Fabricant', 'Constructeur'], exemple: 'Invicta', aide: 'Marque de l\'article.' },
   { cle: 'modele', libelle: 'Référence fabricant', type: 'texte',

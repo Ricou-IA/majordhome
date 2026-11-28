@@ -18,7 +18,7 @@ export const NATURES_FICHE = Object.freeze([
 ]);
 
 const NATURE_PAR_CHAPITRE = Object.freeze({ equipement: 'main', option: 'accessory', stock: 'stock', main_oeuvre: 'main_oeuvre' });
-const UNITES_ARTICLE = Object.freeze(['pièce', 'ml', 'm²', 'forfait', 'h']);
+export const UNITES_ARTICLE = Object.freeze(['pièce', 'ml', 'm²', 'forfait', 'h']);
 
 /**
  * Nature d'un article créé depuis un chapitre de devis (type du chapitre, devisConfig) ; défaut : équipement.
