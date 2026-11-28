@@ -1,0 +1,22 @@
+# Unité systemd UTILISATEUR (utilisateur « aspirateur », jamais « hermes » ni « root ») : service de l'aspirateur de
+# sites fournisseurs. Installation : README.md. Emplacement : ~/.config/systemd/user/aspirateur-majordhome.service
+[Unit]
+Description=Aspirateur de sites fournisseurs (Majordhome)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/aspirateur
+ExecStart=/usr/bin/node %h/aspirateur/serveur.mjs
+# MDH_ASPIRATEUR_KEY, ASPIRATEUR_URL_RETOUR, ASPIRATEUR_URL_MODELE, ASPIRATEUR_PORT, ASPIRATEUR_ECOUTE (fichier en mode 600).
+EnvironmentFile=%h/.config/aspirateur/env
+Restart=always
+RestartSec=5
+# Code 1 au démarrage = configuration incomplète : inutile de relancer en boucle, il faut corriger le fichier env.
+RestartPreventExitStatus=1
+# Même constat que pour le relais d'Hermes : en unité utilisateur, seul NoNewPrivileges s'applique réellement.
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target

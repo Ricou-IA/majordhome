@@ -1,0 +1,16 @@
+# Route Traefik de l'aspirateur — à poser dans /root/traefik-dynamic/aspirateur-majordhome.yml.
+# Recopier entryPoints et certResolver du fichier voisin hermes-majordhome.yml (mêmes valeurs) avant de l'activer.
+# Deux chemins seulement sont exposés : /sante et /travaux ; tout le reste répond 404 au niveau de Traefik.
+http:
+  routers:
+    aspirateur-majordhome:
+      rule: "Host(`aspirateur.srv1102213.hstgr.cloud`) && (Path(`/sante`) || Path(`/travaux`))"
+      entryPoints: ["websecure"]       # à aligner sur hermes-majordhome.yml
+      service: aspirateur-majordhome
+      tls:
+        certResolver: letsencrypt      # à aligner sur hermes-majordhome.yml
+  services:
+    aspirateur-majordhome:
+      loadBalancer:
+        servers:
+          - url: "http://172.18.0.1:8645"
