@@ -17,7 +17,10 @@
 // (1..6, même numérotation MODINOX pour les kits de couronnement et les plaques ventilées), {BOI4}
 // la même section en 4 chiffres (références PLA « 2020 », « 3050 »), {ML} longueur entière en mètres
 // d'un kit (gaine isolée vendue par kit de N ml), {D2} le diamètre en deux chiffres (Ø/10 : 150 → « 15 »,
-// 80 → « 08 », codage des références DINAK), {=D} rien dans la référence mais filtre sur le Ø du relevé.
+// 80 → « 08 », codage des références DINAK), {=D} rien dans la référence mais filtre sur le Ø du relevé,
+// {=D+n}/{=D-n} rien dans la référence mais l'article doit porter le Ø du relevé ± n (coquille isolante GBI
+// cotée au Ø extérieur du conduit : PTR150 → 210), {D:130|150} la pièce ne vaut que pour ces Ø du relevé
+// (fourreau isolant n°2 « PTR130/150 », sans Ø au tarif).
 // Valeur inconnue → `\d+`.
 
 /**
@@ -32,7 +35,8 @@ function compilerMotif(motif, c) {
     .replace(/\{D([+-])(\d+)\}/g, (_, s, n) => (c.diametre == null ? '\\d+' : String(c.diametre + (s === '+' ? 1 : -1) * Number(n))))
     .replace(/\{D\}/g, val(c.diametre))
     .replace(/\{D2\}/g, c.diametre == null ? '\\d{2}' : String(Math.round(c.diametre / 10)).padStart(2, '0'))
-    .replace(/\{=D\}/g, '')
+    .replace(/\{=D([+-]\d+)?\}/g, '')
+    .replace(/\{D:([\d|]+)\}/g, (_, liste) => (liste.split('|').map(Number).includes(Number(c.diametre)) ? '' : '(?!)'))
     .replace(/\{LG\}/g, val(c.longueur))
     .replace(/\{A\}/g, val(c.angle))
     .replace(/\{BOI\}/g, val(c.boisseau))
@@ -53,6 +57,12 @@ const BOISSEAU_4CHIFFRES = Object.freeze({ 1: '2020', 2: '2525', 3: '3030', 4: '
 export function motifDependDuDiametre(motif) {
   // {=D} : « même Ø que le relevé, mais la référence ne le porte pas » (capuchon DINAFLEX Ø150 codé 20).
   return /\{(D2?|=D)\}/.test(String(motif || ''));
+}
+
+/** Décalage n de `{=D+n}` / `{=D-n}` : l'article doit porter le Ø du relevé ± n. null sans ce placeholder. */
+function decalageDiametre(motif) {
+  const m = String(motif || '').match(/\{=D([+-]\d+)\}/);
+  return m ? Number(m[1]) : null;
 }
 
 /**
@@ -96,7 +106,9 @@ export function resoudreArticle(articles, mappings, c) {
     // exacte, l'article est rejeté et la ligne sort « à chiffrer », jamais un mauvais article.
     // Critères de la pièce (hors gamme/type) : s'appliquent aussi au repli par motif — un repli
     // qui ignorerait la pente ramènerait un solin hors plage.
+    const decal = decalageDiametre(m.motif_code);
     const criteresOk = (a) => a.is_active !== false && !a.sur_mesure && !a.hors_perimetre
+      && (decal == null || c.diametre == null || a.diametre_int === c.diametre + decal)
       && (c.longueur == null || a.longueur_mm === c.longueur)
       && (c.angle == null || a.angle === c.angle)
       // Élément réglable : la longueur réglée doit tomber dans la plage de l'article quand il en porte une

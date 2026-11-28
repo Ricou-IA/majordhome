@@ -37,6 +37,13 @@
 - **CFG-45** : en Ø80/100 le tuyau court DEKO pellets fait 200 mm (285 en bois) ; rosace à sceller (entrée par le mur) absente en bois.
 - **CFG-37 / CFG-39** (gaine isolée POLYPERF vendue en kit) et **CFG-40** (conduit MFI) : aucune correspondance DINAK préparée. La gamme DINAFLEX ISOLÉ (15 articles, extraite) n’a pas encore été étudiée.
 
+## Supports et coquille isolante (règles du 2026-11-28)
+
+- **Support au plancher**, un par plancher traversé (NF DTU 24.1 § 5.4.3), sur les configurations à conduit intérieur (CFG-24, 28, 32, 40, 42, 48). MODINOX : support au plancher galva, coté au Ø extérieur du conduit. DINAK : collier à dalle renforcé 180° (galva : la gamme DW BOIS BLACK n’en a pas).
+- **Support de toiture** : c’est le « collier universel sous toiture » déjà présent sur CFG-24, ajouté à CFG-28, 40 et 48. Il est désormais pris au Ø extérieur du PTR (PTR150 → D 210) : avant, le collier D 150 du PLA100 / simple paroi 150 était retenu. Pas d’ajout sur CFG-32 / 42 : la souche Polytoit a son propre collier de fixation. DINAK : support au toit avec profil.
+- **Coquille isolante (option du relevé, décochée par défaut)** : coquille + protection écart au feu, une de chaque par plancher traversé (quantité à confirmer). MODINOX : coquille GBI laine de roche au Ø extérieur, fourreau isolant n°1 à 4 selon le Ø. MFI : pas de coquille GBI à son Ø extérieur → à chiffrer. **DINAK : ni coquille ni fourreau au tarif → les deux lignes sortent à chiffrer.**
+- **Rosaces** : la rosace de finition (CFG-45, entrée par le plafond) et la rosace plate 2 parties (CFG-29) sortent du métré. Restent la rosace à sceller (traversée de mur) et la plaque de propreté RT2012 (kit RT2012). Chez DINAK, la plaque de propreté RT2012 correspond à une « rosace de finition » (validé le 2026-11-28 sur CFG-24) : à revoir si elle doit être technique.
+
 ## Correspondance pièce par pièce
 
 `{D2}` = Ø sur deux chiffres (150 → 15) ; `{=D}` = même Ø que le relevé, la référence ne le porte pas. Priorité basse = essayée en premier ; une ligne de priorité plus haute est un repli.
@@ -49,9 +56,6 @@
 | tuyau_acier_peint | ACIER PEINT | — | DEKO PELLETS 1,2 mm | element_droit | `^059G{D2}02[045]P2N/41$` | 200 | Tuyau DEKO pellets 1,2 mm noir (950 / 450 / 200) |
 | coude_90_raccord | ÉMAILLÉ | — | DEKO BOIS 1,2 mm | coude | `^039A{D2}433D1N$` | 100 | Coude 90° |
 | coude_90_raccord | ÉMAILLÉ | — | DEKO PELLETS 1,2 mm | coude | `^059G{D2}433P2N/41$` | 200 | Coude 90° |
-| rosace_plafond | ÉMAILLÉ | — | DEKO BOIS 1,2 mm | rosace | `^039A{D2}113D1N$` | 90 | Rosace de finition |
-| rosace_plafond | ÉMAILLÉ | — | DEKO BOIS | rosace | `^039A{D2}113DENI$` | 100 | Rosace de finition |
-| rosace_plafond | ÉMAILLÉ | — | DEKO PELLETS 1,2 mm | rosace | `^059G{D2}113P2N/41$` | 200 | Rosace de finition |
 | rosace_sceller | ÉMAILLÉ | — | DEKO PELLETS | rosace_special | `^039A{D2}114PENI$` | 100 | Rosace traversée murale (pellets seulement) |
 | tuyau_emaille | ÉMAILLÉ | — | DEKO BOIS 1,2 mm | element_droit | `^039A{D2}02[045]D1N$` | 100 | Tuyau DEKO acier 1,2 mm noir, série D1N (950 / 450 / 285) |
 | tuyau_emaille | ÉMAILLÉ | — | DEKO PELLETS 1,2 mm | element_droit | `^059G{D2}02[045]P2N/41$` | 200 | Tuyau DEKO pellets 1,2 mm noir (950 / 450 / 200) |
@@ -59,6 +63,7 @@
 | tuyau_emaille_07 | ÉMAILLÉ | — | DEKO PELLETS | element_droit | `^039A{D2}02[045]PENI$` | 200 | Tuyau DEKO pellets (paroi fine, 945 / 445 / 275) |
 | tuyau_emaille_12 | ÉMAILLÉ | — | DEKO BOIS 1,2 mm | element_droit | `^039A{D2}02[045]D1N$` | 100 | Tuyau DEKO acier 1,2 mm noir, série D1N (950 / 450 / 285) |
 | tuyau_emaille_12 | ÉMAILLÉ | — | DEKO PELLETS 1,2 mm | element_droit | `^059G{D2}02[045]P2N/41$` | 200 | Tuyau DEKO pellets 1,2 mm noir (950 / 450 / 200) |
+| collier_sous_toiture | PLA | — | DIFLUX PELLETS | collier_sous_toiture | `{=D}^0392\d{2}824SW$` | 100 | Support de toiture : support au toit avec profil |
 | pla_adapt_bas | PLA | — | DIFLUX PELLETS | plaque_autre | `^0301{D2}675EP$` | 100 | Plaque de départ Dinaflex |
 | pla_adapt_bas_isole | PLA | — | DIFLUX PELLETS | plaque_autre | `^0301{D2}675EP$` | 100 | Plaque de départ Dinaflex |
 | pla_adapt_chapeau | PLA | — | DIFLUX PELLETS | plaque_autre | `^0301{D2}85GEP$` | 100 | Plaque de finition haute boisseau Flex - Diflux |
@@ -75,9 +80,9 @@
 | pla_element_vertical | PLA | — | DIFLUX PELLETS | element_droit | `^0301{D2}02[0345]EV$` | 100 | Élément droit DIFLUX (930 / 430 / 265) |
 | pla_plaque_proprete | PLA | — | DIFLUX PELLETS | rosace | — | 100 | Rosace de finition |
 | pla_raccord_air | PLA | — | DIFLUX PELLETS | te_special | `^0301{D2}33GEP$` | 100 | Té 90° piquage M pour amenée d'air |
-| pla_rosace_mur | PLA | — | DIFLUX PELLETS | rosace | — | 100 | Rosace de finition |
 | pla_terminal_horizontal | PLA | — | DIFLUX PELLETS | terminal | `^0301{D2}11REV$` | 100 | Sortie horizontale courte |
 | solin_pla | PLA | — | DIFLUX PELLETS | solin | — | 100 | Solin de toit inox en pente |
+| support_plancher | PLA | — | DIFLUX PELLETS | collier_mural | `^0309{D2}903EV$` | 100 | Collier à dalle renforcé 180° |
 | chapeau_gaine_plat | POLYLISSE XT | — | DINAFLEX INOX | chapeau_pare_pluie | `{=D}^0390\d{2}010SW$` | 100 | Capuchon pare-pluie |
 | chapeau_gaine_plat | POLYLISSE XT | — | DINAFLEX INOX | chapeau_pare_pluie | `{=D}^039F\d{2}010SW$` | 200 | Capuchon pare-pluie (série F) |
 | chapeau_gaine_standard | POLYLISSE XT | — | DINAFLEX INOX | chapeau_anti_refouleur | `{=D}^0390\d{2}012SW$` | 100 | Capuchon antivent |
@@ -109,8 +114,8 @@
 | collier_jonction_exterieur | PTR30 | inox | DW BOIS 316L / 304 | collier_jonction | — | 100 |  |
 | collier_jonction_exterieur | PTR30 | noir | DW PELLETS BLACK | collier_jonction | — | 200 |  |
 | collier_jonction_exterieur | PTR30 | inox | DW PELLETS | collier_jonction | — | 200 |  |
-| collier_sous_toiture | PTR30 | — | DW BOIS 316L / 304 | collier_sous_toiture | — | 100 | Support au toit avec profil (le renforcé est écarté) |
-| collier_sous_toiture | PTR30 | — | DW PELLETS | collier_sous_toiture | — | 200 | Support au toit avec profil (le renforcé est écarté) |
+| collier_sous_toiture | PTR30 | — | DW BOIS 316L / 304 | collier_sous_toiture | — | 100 | Support de toiture : support au toit avec profil (le renforcé est écarté) |
+| collier_sous_toiture | PTR30 | — | DW PELLETS | collier_sous_toiture | — | 200 | Support de toiture : support au toit avec profil (le renforcé est écarté) |
 | coude_devoiement | PTR30 | — | DW BOIS 316L / 304 | coude | — | 100 |  |
 | coude_devoiement | PTR30 | — | DW PELLETS | coude | — | 200 |  |
 | couronne_coupe_feu | PTR30 | — | DW BOIS 316L / 304 | plaque_ecart_feu_ventilee | — | 100 | Plaque d'écart au feu ventilée — validée par Eric le 2026-11-28 (CFG-24) |
@@ -134,5 +139,7 @@
 | support_mural_depart | PTR30 | — | DW PELLETS | support | `^0601{D2}853DW$` | 200 | Support de base avec manchon |
 | support_mural_intermediaire | PTR30 | — | DW BOIS 316L / 304 | collier_mural | `^0309{D2}080(DW)?$` | 100 | Collier mural |
 | support_mural_intermediaire | PTR30 | — | DW PELLETS | collier_mural | `^0309{D2}080(DW)?$` | 200 | Collier mural |
+| support_plancher | PTR30 | — | DW BOIS 304 / GALVA | collier_mural | `^0309{D2}903(DW)?$` | 100 | Collier à dalle renforcé 180° |
+| support_plancher | PTR30 | — | DW PELLETS | collier_mural | `^0309{D2}903DW$` | 200 | Collier à dalle renforcé 180° (Ø80/100) |
 | te_90_ptr | PTR30 | — | DW BOIS 316L / 304 | te | `^0301{D2}031DW$` | 100 | Té 90° |
 | te_90_ptr | PTR30 | — | DW PELLETS | te | `^0301{D2}031DW$` | 200 | Té 90° |

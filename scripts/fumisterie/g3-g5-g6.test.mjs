@@ -59,7 +59,8 @@ test('G5 : raccordement seul — pas de conduit, info « conduit non métré »,
   const base = { configuration: { code: 'CFG-45', gabarit_code: 'G5' }, gabarit, composants, mapping: [], articles: [], reglages: cfg };
   const plafond = calculerMetre({ ...base, releve: { diametre: 150, finition: 'noir', hBuse: 1.05, entree: 'plafond', hsp1: 2.5, raccord: 'emaille_12', kit_air: 0 } });
   assert.ok(plafond.alertes.some((a) => a.code === 'conduit_non_metre'));
-  assert.deepEqual(plafond.lignes.map((l) => l.composant_code), ['tuyau_emaille_12', 'tuyau_emaille_12', 'rosace_plafond']);
+  // La rosace de finition (décorative) n'est plus au métré (Eric 2026-11-28) ; la rosace à sceller du mur, technique, reste.
+  assert.deepEqual(plafond.lignes.map((l) => l.composant_code), ['tuyau_emaille_12', 'tuyau_emaille_12']);
   const mur = calculerMetre({ ...base, releve: { diametre: 150, finition: 'noir', hBuse: 1.05, entree: 'mur', hsp1: 2.5, hEntree: 1.5, lHoriz: 0.4, raccord: 'acier_peint', kit_air: 1 } });
   assert.deepEqual(mur.lignes.map((l) => l.composant_code), ['coude_90_raccord', 'tuyau_acier_peint', 'rosace_sceller', 'kit_entree_air']);
   assert.equal(plafond.geometrie.troncons.conduit_existant.ml, 0.5); // 0 m de conduit + débord : jamais consommé (pas de composant)

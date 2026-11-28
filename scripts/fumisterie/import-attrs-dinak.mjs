@@ -11,6 +11,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parserDinak } from './lib/dinak-designation.js';
 
+// Composants retirés des nomenclatures : leurs lignes de mapping DINAK partent aussi (la base suit le dépôt).
+const COMPOSANTS_RETIRES = JSON.parse(readFileSync(new URL('./data/composants-retires.json', import.meta.url), 'utf8'));
+
 const racine = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
@@ -59,7 +62,7 @@ const sql = [
   `ON CONFLICT (supplier_product_id) DO UPDATE SET gamme_tarif = EXCLUDED.gamme_tarif, type_piece = EXCLUDED.type_piece, diametre_int = EXCLUDED.diametre_int, diametre_ext = EXCLUDED.diametre_ext,
   longueur_mm = EXCLUDED.longueur_mm, longueur_max_mm = EXCLUDED.longueur_max_mm, angle = EXCLUDED.angle, pente_min = EXCLUDED.pente_min, pente_max = EXCLUDED.pente_max,
   couleur = EXCLUDED.couleur, parse_confidence = EXCLUDED.parse_confidence, parse_notes = EXCLUDED.parse_notes, source_version = EXCLUDED.source_version, updated_at = now();`,
-  `DELETE FROM majordhome.fum_composant_mapping WHERE org_id = ${q(ORG)} AND supplier_id = ${q(SUP)} AND (composant_code, gamme_catalogue) IN (${MAPPING.map((m) => `(${q(m.composant_code)}, ${q(m.gamme_catalogue)})`).join(', ')});`,
+  `DELETE FROM majordhome.fum_composant_mapping WHERE org_id = ${q(ORG)} AND supplier_id = ${q(SUP)} AND ((composant_code, gamme_catalogue) IN (${MAPPING.map((m) => `(${q(m.composant_code)}, ${q(m.gamme_catalogue)})`).join(', ')}) OR composant_code IN (${COMPOSANTS_RETIRES.map(q).join(', ')}));`,
   'INSERT INTO majordhome.fum_composant_mapping (org_id, supplier_id, composant_code, gamme_catalogue, finition, gamme_tarif, type_piece, motif_code, priorite, statut, notes) VALUES',
   MAPPING.map((m) => `(${q(ORG)}, ${q(SUP)}, ${q(m.composant_code)}, ${q(m.gamme_catalogue)}, ${q(m.finition)}, ${q(m.gamme_tarif)}, ${q(m.type_piece)}, ${q(m.motif_code)}, ${n(m.priorite ?? 100)}, ${q(m.statut || 'catalogue')}, ${q(m.notes)})`).join(',\n') + ';',
   `DELETE FROM majordhome.fum_gamme_equivalences WHERE org_id = ${q(ORG)} AND supplier_id = ${q(SUP)} AND configuration_code IN (${[...new Set(EQUIVALENCES.map((e) => e.configuration_code))].map(q).join(', ')}) AND validee_le IS NULL;`,

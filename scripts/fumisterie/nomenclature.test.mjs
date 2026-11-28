@@ -1,7 +1,7 @@
 // scripts/fumisterie/nomenclature.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculerMetre, construireNomenclature, geometrieG1, ENGINE_VERSION } from '../../src/lib/fumisterie/index.js';
+import { calculerMetre, construireNomenclature, geometrieG1, ENGINE_VERSION, validerReleve } from '../../src/lib/fumisterie/index.js';
 import { resoudreArticle } from '../../src/lib/fumisterie/articles.js';
 import { buildFumisterieConfig } from '../../src/lib/fumisterie/config.js';
 import { ARTICLES, COMPOSANTS, MAPPING, GABARIT, CONFIGURATION, RELEVE } from './fixtures/g1-o150.mjs';
@@ -9,18 +9,20 @@ import { ARTICLES, COMPOSANTS, MAPPING, GABARIT, CONFIGURATION, RELEVE } from '.
 const base = { configuration: CONFIGURATION, gabarit: GABARIT, composants: COMPOSANTS, mapping: MAPPING, articles: ARTICLES, reglages: buildFumisterieConfig(null) };
 const refs = (lignes) => lignes.map((l) => `${l.reference}×${l.quantite}`);
 
-test('cas de la maquette Ø150 noir : 14 lignes, 1 480,90 € HT d\'achat, tout résolu', () => {
+// Maquette d'origine : 14 lignes, 1 480,90 € HT. Règles d'Eric du 2026-11-28 : support au plancher par plancher traversé
+// (2DIVSUPLR210 × 2) et support de toiture au Ø extérieur du PTR150 (2DIVCTOS210) → 15 lignes, 1 565,22 €.
+test('cas de la maquette Ø150 noir : 15 lignes, 1 565,22 € HT d\'achat, tout résolu', () => {
   const r = calculerMetre({ ...base, releve: RELEVE });
   assert.equal(r.engine_version, ENGINE_VERSION);
-  assert.equal(r.lignes.length, 14);
+  assert.equal(r.lignes.length, 15);
   assert.deepEqual(refs(r.lignes), [
     '2PTICHARN150NO×1', '2PTIELDR1501000NO×1', '2PTIELDR150500NO×1', '2PTIELDR150250NO×1', '2PTICOJO150NO×3',
-    '2DIVS2535IN230KEI×1', '2DIVCTOS150×1', '2PTICO30150×2', '2PTIELDR1501000×5',
+    '2DIVS2535IN230KEI×1', '2DIVCTOS210×1', '2PTICO30150×2', '2PTIELDR1501000×5', '2DIVSUPLR210×2',
     '2PTIPPDR150×2', '2PTGCOCF150×2', '2PTIRASR150148×1', '2LEPTUYA1501000NO×1', '2LEPTUYA150500NO×1',
   ]);
-  assert.equal(r.totaux.achat_ht, 1480.9);
+  assert.equal(r.totaux.achat_ht, 1565.22);
   // vente = Σ tarif_public réel (remises fournisseur différentes par famille : PTR 50 %, solin/émaillé 60 %, collier 47 %)
-  assert.equal(r.totaux.vente_ht, 3023.7);
+  assert.equal(r.totaux.vente_ht, 3196.3);
   assert.equal(r.totaux.lignes_a_chiffrer, 0);
   assert.ok(r.lignes.every((l) => l.repere >= 1 && l.repere <= 6));
   assert.equal(r.lignes.find((l) => l.composant_code === 'collier_jonction_exterieur').statut, 'provisoire');
@@ -77,6 +79,26 @@ test('plusieurs articles possibles → ligne à chiffrer + alerte article_ambigu
   assert.ok(!r.alertes.some((x) => x.code === 'article_manquant'));
   // avec le motif, la pièce galva est écartée
   assert.ok(refs(calculerMetre({ ...base, articles: [...ARTICLES, galva], releve: RELEVE }).lignes).includes('2PTICOJO150NO×3'));
+});
+test('option coquille : absente ou décochée → rien (relevé valide) ; cochée → coquille + fourreau par plancher', () => {
+  assert.equal(validerReleve(GABARIT, RELEVE).ok, true); // brouillon antérieur à l'option : jamais refusé
+  const sans = calculerMetre({ ...base, releve: { ...RELEVE, coquille: 0 } });
+  assert.ok(!sans.lignes.some((l) => /coquille|protection/.test(l.composant_code)));
+  const avec = calculerMetre({ ...base, releve: { ...RELEVE, coquille: 1 } });
+  assert.deepEqual(refs(avec.lignes).slice(-2), ['2LAINERO030×2', '2DIVFOUR2×2']);
+  assert.equal(avec.totaux.lignes_a_chiffrer, 0);
+  assert.equal(validerReleve(GABARIT, { ...RELEVE, coquille: 2 }).ok, false); // une valeur hors choix reste refusée
+});
+test('motif : {=D+n} filtre le Ø de l\'article sans le citer, {D:a|b} limite aux Ø listés, {=D} au Ø du relevé', () => {
+  const art = (reference, diametre_int) => ({ id: reference, reference, diametre_int, gamme_tarif: 'G', type_piece: null, is_active: true });
+  const m = (motif_code) => [{ composant_code: 'c', gamme_catalogue: 'X', finition: null, gamme_tarif: 'G', type_piece: 'piece', motif_code }];
+  const c = (diametre) => ({ composant_code: 'c', gamme_catalogue: 'X', diametre });
+  const coquilles = [art('2LAINERO030', 210), art('2LAINERO029', 200), art('2LAINERO0112', 210)];
+  assert.equal(resoudreArticle(coquilles, m('{=D+60}^2LAINERO\\d{3}$'), c(150)).article.reference, '2LAINERO030');
+  assert.equal(resoudreArticle(coquilles, m('{=D+60}^2LAINERO\\d{3}$'), c(130)).article, null); // 190 : rien, jamais le 200
+  const fourreaux = [art('2DIVFOUR2', null)];
+  assert.equal(resoudreArticle(fourreaux, m('{D:130|150}^2DIVFOUR2$'), c(150)).article.reference, '2DIVFOUR2');
+  assert.equal(resoudreArticle(fourreaux, m('{D:130|150}^2DIVFOUR2$'), c(180)).article, null);
 });
 test('motif : placeholders {LG} inconnu → toute longueur, {D-n} arithmétique', () => {
   const m = [{ composant_code: 'r', gamme_catalogue: 'PTR30', finition: null, gamme_tarif: 'PTR30+ I', type_piece: 'raccord_simple_paroi', motif_code: '^2PTIRASR{D}{D-2}$' }];

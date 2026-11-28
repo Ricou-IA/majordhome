@@ -12,10 +12,11 @@ const refs = (r) => r.lignes.map((l) => `${l.reference}×${l.quantite}`);
 const catalogue = (r) => r.alertes.filter((a) => a.code === 'article_ambigu' || a.code === 'article_manquant');
 const G1 = { hBuse: 1.05, hsp1: 2.5, epPl: 0.25, nbEtages: 1, hsp2: 2.5, hCombles: 1.4, pente: 35, epToit: 0.3, dFaitage: 1.6, angle: 30, decal: 0.4, hSortie: 1.6 };
 
-test('CFG-45 raccordement seul Ø150 plafond : tuyaux + rosace + kit d\'air, 132,15 €', () => {
+// Rosace de finition retirée du métré (Eric 2026-11-28 : élément de déco, ailleurs dans le devis) : 132,15 → 116,15 €.
+test('CFG-45 raccordement seul Ø150 plafond : tuyaux + kit d\'air, sans rosace décorative, 116,15 €', () => {
   const r = calculerSurTarif(TARIF, 'CFG-45', 'G5', { diametre: 150, finition: 'noir', hBuse: 1.05, entree: 'plafond', hsp1: 2.5, raccord: 'emaille_12', kit_air: 1 });
-  assert.deepEqual(refs(r), ['2LEPTUYA1501000NO×1', '2LEPTUYA150500NO×1', '2LEPROSA150NO×1', '2KITEAIR033×1']);
-  assert.equal(r.totaux.achat_ht, 132.15); assert.deepEqual(catalogue(r), []);
+  assert.deepEqual(refs(r), ['2LEPTUYA1501000NO×1', '2LEPTUYA150500NO×1', '2KITEAIR033×1']);
+  assert.equal(r.totaux.achat_ht, 116.15); assert.deepEqual(catalogue(r), []);
   assert.ok(r.alertes.some((a) => a.code === 'conduit_non_metre'));
 });
 test('CFG-45 Ø80 pellets par le mur : coude + tuyau + rosace à sceller (replis EMAIL PEL), 71 €', () => {
@@ -51,10 +52,11 @@ test('CFG-31 conduit isolé existant Ø80 : les adaptateurs n°4 / n°2 sont sur
   assert.equal(r.totaux.lignes_a_chiffrer, 2); assert.equal(r.totaux.achat_ht, 312.62);
   assert.ok(refs(r).includes('2PLACO9080×1'));
 });
-test('CFG-29 ventouse Ø80 : terminal horizontal, rosace, PLA vertical + horizontal, 361,09 € ; distances du terminal à vérifier sur place', () => {
+// Rosace plate 2 parties retirée (décorative) : 361,09 → 330,03 €.
+test('CFG-29 ventouse Ø80 : terminal horizontal, PLA vertical + horizontal, sans rosace, 330,03 € ; distances du terminal à vérifier sur place', () => {
   const r = calculerSurTarif(TARIF, 'CFG-29', 'G6', { diametre: 80, finition: 'noir', hBuse: 0.9, hSortie: 1.8, lHoriz: 0.6, epMur: 0.3 });
-  assert.deepEqual(refs(r), ['2PLATHOF80×1', '2PLAROSA2P80×1', '2PLAELDR80500×1', '2PLAELDR80250×1', '2PLACO9080×1', '2PLAELDR801000×1', '2PLAMAFM80×1', '2PLAPPTR80×1']);
-  assert.equal(r.totaux.achat_ht, 361.09);
+  assert.deepEqual(refs(r), ['2PLATHOF80×1', '2PLAELDR80500×1', '2PLAELDR80250×1', '2PLACO9080×1', '2PLAELDR801000×1', '2PLAMAFM80×1', '2PLAPPTR80×1']);
+  assert.equal(r.totaux.achat_ht, 330.03);
   // dtu-2026.11 : distances du terminal = points à vérifier (Cahier 3708 § 3.3.1.3) ; nomenclature et prix inchangés.
   assert.ok(r.alertes.some((a) => a.code === 'terminal_ouvrant' && a.niveau === 'verifier'));
   assert.ok(r.alertes.some((a) => a.code === 'ventouse_vertical' && a.niveau === 'warn'));
@@ -71,29 +73,48 @@ test('CFG-33 façade PLA + PTR Ø80 inox : support de départ Ø80 absent du tar
   assert.equal(r.totaux.lignes_a_chiffrer, 1); assert.equal(r.totaux.achat_ht, 1414.24);
   assert.ok(refs(r).includes('2DIVSUMIR140IN×4') && refs(r).includes('2PLAELDR801000×1'));
 });
-test('CFG-32 création PTR + souche Polytoit Ø150 : souche choisie par la pente (32-38°), 1 731,48 €', () => {
+// Supports (Eric 2026-11-28, NF DTU 24.1 § 5.4.3) : un support au plancher par plancher traversé. La souche Polytoit
+// garde son collier de fixation, sans support de toiture en plus.
+test('CFG-32 création PTR + souche Polytoit Ø150 : souche choisie par la pente (32-38°), supports au plancher, 1 817,78 €', () => {
   const r = calculerSurTarif(TARIF, 'CFG-32', 'G1', { ...G1, diametre: 150, finition: 'noir' });
-  assert.deepEqual(refs(r), ['2SOU109L3238PTG150×1', '2PTIRAPO150×1', '6POLCOLBA210×1', '2PTICO30150×2', '2PTIELDR1501000×5', '2PTIPPDR150×2', '2PTGCOCF150×2', '2PTIRASR150148×1', '2LEPTUYA1501000NO×1', '2LEPTUYA150500NO×1']);
-  assert.equal(r.totaux.achat_ht, 1731.48);
+  assert.deepEqual(refs(r), ['2SOU109L3238PTG150×1', '2PTIRAPO150×1', '6POLCOLBA210×1', '2PTICO30150×2', '2PTIELDR1501000×5', '2DIVSUPLR210×2', '2PTIPPDR150×2', '2PTGCOCF150×2', '2PTIRASR150148×1', '2LEPTUYA1501000NO×1', '2LEPTUYA150500NO×1']);
+  assert.equal(r.totaux.achat_ht, 1817.78);
+  // Coquille cochée : coquille GBI D 210 et fourreau n°2 sur chaque plancher.
+  const coq = refs(calculerSurTarif(TARIF, 'CFG-32', 'G1', { ...G1, diametre: 150, finition: 'noir', coquille: 1 }));
+  assert.ok(coq.includes('2LAINERO030×2') && coq.includes('2DIVFOUR2×2'), coq.join(' '));
   assert.ok(refs(calculerSurTarif(TARIF, 'CFG-32', 'G1', { ...G1, diametre: 150, finition: 'noir', pente: 20 })).includes('2SOU107L1623PTG150×1'));
 });
-test('CFG-42 foyer via combles, souche Polytoit, PRH dans la hotte Ø150 : 1 697,09 €', () => {
+test('CFG-42 foyer via combles, souche Polytoit, PRH dans la hotte Ø150, supports au plancher : 1 783,39 €', () => {
   const r = calculerSurTarif(TARIF, 'CFG-42', 'G1', { ...G1, diametre: 150, finition: 'noir', angle: 0 });
-  assert.equal(r.totaux.achat_ht, 1697.09); assert.deepEqual(catalogue(r), []);
+  assert.equal(r.totaux.achat_ht, 1783.39); assert.deepEqual(catalogue(r), []);
+  assert.ok(refs(r).includes('2DIVSUPLR210×2'));
   assert.ok(refs(r).includes('2PR6TUYA1501000×1') && refs(r).includes('2PR6MRAC150×1'));
 });
-test('CFG-28 création PLA Ø80 étanche : collerette de solin PLA (sans plage de pente) acceptée, 983,31 €', () => {
+test('CFG-28 création PLA Ø80 étanche : collerette de solin PLA (sans plage de pente) acceptée, supports au plancher (D 130) et de toiture (D 125), 1 105,10 €', () => {
   const r = calculerSurTarif(TARIF, 'CFG-28', 'G1', { ...G1, diametre: 80, finition: 'inox' });
-  assert.equal(r.totaux.achat_ht, 983.31); assert.deepEqual(catalogue(r), []);
+  assert.equal(r.totaux.achat_ht, 1105.1); assert.deepEqual(catalogue(r), []);
+  assert.ok(refs(r).includes('2DIVSUPLR130×2') && refs(r).includes('2DIVCTOS125×1'));
+  // Coquille cochée : coquille GBI « pour PLA 80 » (D 125) et fourreau n°1, un par plancher.
+  const coq = calculerSurTarif(TARIF, 'CFG-28', 'G1', { ...G1, diametre: 80, finition: 'inox', coquille: 1 });
+  assert.deepEqual(catalogue(coq), []);
+  assert.ok(refs(coq).includes('2LAINERO027×2') && refs(coq).includes('2DIVFOUR1×2'));
+  // PLA100 : coquille D 150 (la « V2 » 2LAINERO0112 est écartée), support de toiture D 150.
+  const d100 = refs(calculerSurTarif(TARIF, 'CFG-28', 'G1', { ...G1, diametre: 100, finition: 'inox', coquille: 1 }));
+  assert.ok(d100.includes('2LAINERO011×2') && d100.includes('2DIVCTOS150×1') && d100.includes('2DIVSUPLR150×2'), d100.join(' '));
   assert.ok(refs(r).includes('2PLACSOL80RT×1') && refs(r).includes('2PLACO3080×2'));
 });
-test('CFG-48 chaudière PLA Ø100 : solin Ø100 absent → à chiffrer, 953,21 €', () => {
+test('CFG-48 chaudière PLA Ø100 : solin Ø100 absent → à chiffrer, supports compris, 1 075 €', () => {
   const r = calculerSurTarif(TARIF, 'CFG-48', 'G1', { ...G1, diametre: 100, finition: 'inox', angle: 0 });
-  assert.equal(r.totaux.lignes_a_chiffrer, 1); assert.equal(r.totaux.achat_ht, 953.21);
+  assert.equal(r.totaux.lignes_a_chiffrer, 1); assert.equal(r.totaux.achat_ht, 1075);
 });
-test('CFG-40 MFI Ø150 : solin inox au Ø extérieur (250) par la pente, kit de raccordement ambigu par construction (1 par appareil), 2 376,42 €', () => {
+test('CFG-40 MFI Ø150 : solin inox au Ø extérieur (250) par la pente, kit de raccordement ambigu par construction (1 par appareil), supports au Ø extérieur (250), 2 674,42 €', () => {
   const r = calculerSurTarif(TARIF, 'CFG-40', 'G1', { ...G1, diametre: 150, finition: 'inox' });
-  assert.equal(r.totaux.achat_ht, 2376.42); assert.equal(r.totaux.lignes_a_chiffrer, 1);
+  assert.equal(r.totaux.achat_ht, 2674.42); assert.equal(r.totaux.lignes_a_chiffrer, 1);
+  assert.ok(refs(r).includes('2DIVSUPLR250×2') && refs(r).includes('2DIVCTOS250×1'));
+  // Pas de coquille GBI au Ø extérieur du MFI : à chiffrer, jamais une autre coquille ; le fourreau n°3 existe.
+  const coq = calculerSurTarif(TARIF, 'CFG-40', 'G1', { ...G1, diametre: 150, finition: 'inox', coquille: 1 });
+  assert.equal(coq.totaux.lignes_a_chiffrer, 2);
+  assert.ok(coq.lignes.some((l) => l.composant_code === 'coquille_isolante' && l.article_id == null) && refs(coq).includes('2DIVFOUR3×2'));
   assert.ok(refs(r).includes('2DIVS2535IN250KEI×1') && refs(r).includes('2MFIT135150AF100×1'));
   const kit = r.alertes.find((a) => a.code === 'article_ambigu');
   assert.ok(kit && /au total/.test(kit.message));

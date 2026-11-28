@@ -17,7 +17,9 @@ import { bilanConduitExistant, justificationDimensionnement } from './bilanExist
 // justification du dimensionnement figés dans le résultat.
 // fab-2026.11b : flexible vendu en couronnes, motif {=D}, repli par motif sur le même type de pièce, doublon de
 // référence au tarif sans ambiguïté, rigide composé dans les longueurs du fabricant.
-export const ENGINE_VERSION = 'fab-2026.11b';
+// fab-2026.11c : supports au plancher et de toiture (NF DTU 24.1 § 5.4.3), coquille isolante en option (+ fourreau
+// écart au feu), rosaces décoratives retirées, motifs {=D+n} et {D:a|b}, option absente du relevé = « non ».
+export const ENGINE_VERSION = 'fab-2026.11c';
 
 const GABARITS = {
   G1: { geometrie: geometrieG1, controles: controlesG1, sortieMinimale: hauteurSortieMinimale },
@@ -67,6 +69,9 @@ export function validerReleve(gabarit, releve) {
     for (const p of t.parametres || []) {
       if (!parametreVisible(p, r)) continue;
       const v = r[p.cle];
+      // Une option (tronçon « options » : kit d'air, coquille isolante) n'est jamais obligatoire : absente, elle
+      // vaut « non » (brouillon ou métré antérieur à l'option) et la nomenclature ne retient pas ses pièces.
+      if (t.type === 'options' && v == null) continue;
       if (p.choix) {
         if (!p.choix.includes(v)) erreurs.push(`${p.libelle} (valeur attendue parmi ${p.choix.map(fmt).join(', ')})`);
         continue;

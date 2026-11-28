@@ -34,27 +34,47 @@ ws.eachRow((row, idx) => {
   TARIF.push({ id: reference, reference, name, unit: String(cell(row, 8) ?? 'PC') === 'ML' ? 'ml' : 'pièce', is_active: !attrs.hors_perimetre,
     tarif_public: Number(cell(row, 10)), purchase_price_ht: Number(cell(row, 14)), ...attrs });
 });
-/** Comme fumisterieService.getArticles : actifs, gammes du mapping, au Ø du relevé. */
+/** Comme fumisterieService.getArticles : actifs, gammes du mapping, au Ø du relevé ou sans Ø, plus les gammes
+ *  dont le motif ne dépend pas du Ø (supports et colliers cotés au Ø extérieur, fourreau isolant). */
 const articlesPour = (diametre) => {
   const gammes = new Set(MAPPING.map((m) => m.gamme_tarif));
-  return TARIF.filter((a) => a.is_active && gammes.has(a.gamme_tarif) && a.diametre_int === diametre);
+  const sansD = new Set(MAPPING.filter((m) => !motifDependDuDiametre(m.motif_code)).map((m) => m.gamme_tarif));
+  return TARIF.filter((a) => a.is_active && gammes.has(a.gamme_tarif) && (a.diametre_int === diametre || a.diametre_int == null || sansD.has(a.gamme_tarif)));
 };
 const calculer = (releve) => calculerMetre({ configuration: CONFIGURATION, gabarit: GABARIT, composants: COMPOSANTS, mapping: MAPPING,
   articles: articlesPour(releve.diametre), reglages: buildFumisterieConfig(null), releve });
 const refs = (lignes) => lignes.map((l) => `${l.reference}×${l.quantite}`);
 const alertesCatalogue = (r) => r.alertes.filter((a) => a.code === 'article_ambigu' || a.code === 'article_manquant');
 
-test('tarif réel — cas maquette Ø150 noir : les 14 bonnes références, 1 480,90 € HT d\'achat', () => {
+// Maquette d'origine : 14 références, 1 480,90 € HT d'achat. Règles d'Eric du 2026-11-28 : un support au plancher par
+// plancher traversé (2DIVSUPLR210 × 2) et le support de toiture au Ø EXTÉRIEUR du PTR150 (2DIVCTOS210, au lieu du
+// 2DIVCTOS150 du PLA100 / simple paroi 150) → 15 références, 1 565,22 €.
+test('tarif réel — cas maquette Ø150 noir : 15 références (supports compris), 1 565,22 € HT d\'achat', () => {
   assert.ok(TARIF.length > 1000, `tarif lu : ${TARIF.length} lignes`);
   const r = calculer(RELEVE);
   assert.deepEqual(alertesCatalogue(r), []);
   assert.deepEqual(refs(r.lignes), [
     '2PTICHARN150NO×1', '2PTIELDR1501000NO×1', '2PTIELDR150500NO×1', '2PTIELDR150250NO×1', '2PTICOJO150NO×3',
-    '2DIVS2535IN230KEI×1', '2DIVCTOS150×1', '2PTICO30150×2', '2PTIELDR1501000×5',
+    '2DIVS2535IN230KEI×1', '2DIVCTOS210×1', '2PTICO30150×2', '2PTIELDR1501000×5', '2DIVSUPLR210×2',
     '2PTIPPDR150×2', '2PTGCOCF150×2', '2PTIRASR150148×1', '2LEPTUYA1501000NO×1', '2LEPTUYA150500NO×1',
   ]);
-  assert.equal(r.totaux.achat_ht, 1480.9);
+  assert.equal(r.totaux.achat_ht, 1565.22);
   assert.equal(r.totaux.lignes_a_chiffrer, 0);
+});
+
+test('tarif réel — coquille isolante en option : décochée rien, cochée coquille GBI + fourreau isolant par plancher', () => {
+  const sans = refs(calculer(RELEVE).lignes);
+  assert.ok(!sans.some((x) => /LAINERO|DIVFOUR/.test(x)), sans.join(' '));
+  const avec = calculer({ ...RELEVE, coquille: 1 });
+  assert.deepEqual(alertesCatalogue(avec), []);
+  assert.deepEqual(refs(avec.lignes).slice(-2), ['2LAINERO030×2', '2DIVFOUR2×2']); // PTR150 → coquille D 210, fourreau n°2
+  const d180 = refs(calculer({ ...RELEVE, diametre: 180, finition: 'inox', coquille: 1 }).lignes);
+  assert.ok(d180.includes('2LAINERO043×2') && d180.includes('2DIVFOUR3×2') && d180.includes('2DIVSUPLR240×2'), d180.join(' '));
+  // PTR130 : la coquille « PTR 130 et PLA 130 » est en D 200 (Ø + 70, repli du Ø + 60).
+  const d130 = refs(calculer({ ...RELEVE, diametre: 130, finition: 'inox', coquille: 1 }).lignes);
+  assert.ok(d130.includes('2LAINERO029×2') && d130.includes('2DIVCOS190×1'.replace('COS', 'CTOS')), d130.join(' '));
+  // Sans étage : un seul plancher traversé, une seule coquille.
+  assert.ok(refs(calculer({ ...RELEVE, nbEtages: 0, coquille: 1 }).lignes).includes('2LAINERO030×1'));
 });
 
 test('tarif réel — Ø180 inox : tout se résout, raccord simple paroi droit (pas de réduit émaillé en Ø180)', () => {

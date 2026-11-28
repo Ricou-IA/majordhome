@@ -48,11 +48,12 @@ test('maquette G1 Ø150 : la nomenclature DINAK est complète, en noir et en ino
     assert.equal(d.prixVerifies, false);
     // Découpage propre au fabricant : raccordement DEKO série D1N (950 mm en tête).
     assert.ok(d.resultat.lignes.some((l) => l.reference === '039A15020D1N'), d.resultat.lignes.map((l) => l.reference).join(','));
-    // MODINOX a trois solins possibles à 35° en Ø150 (2DIVS2535IN230/250/280KEI) : la comparaison est incomplète,
-    // aucun fabricant n'est désigné « moins cher ».
-    assert.equal(cmp.colonnes.find((c) => c.supplierId === 'modinox').ambigus, 1);
-    assert.equal(cmp.complete, false);
-    assert.equal(cmp.moinsCher, null);
+    // Le solin MODINOX est filtré au Ø du relevé ({=D}, 2026-11-28) : avant, les solins Ø150 / 180 / 200 à 35°
+    // étaient tous candidats et la comparaison restait incomplète. Les deux nomenclatures sont désormais complètes.
+    assert.equal(cmp.colonnes.find((c) => c.supplierId === 'modinox').ambigus, 0);
+    assert.ok(cmp.colonnes.find((c) => c.supplierId === 'modinox').resultat.lignes.some((l) => l.reference === '2DIVS2535IN230KEI'));
+    assert.equal(cmp.complete, true);
+    assert.ok(cmp.moinsCher);
   }
 });
 
@@ -163,6 +164,26 @@ test('couverture DINAK de chaque configuration : seules les pièces que DINAK ne
       assert.ok(!col.resultat.alertes.some((a) => a.code === 'article_ambigu'), `${cas} : ambiguïté`);
     }
   }
+});
+
+test('supports et coquille chez DINAK : collier à dalle par plancher, support au toit ; coquille sans équivalent → à chiffrer', () => {
+  const gabarit = lireData(GABARIT_FICHIER.G1);
+  const calc = (cfg, d, extra) => comparerFabricants({ configuration: { code: cfg, gabarit_code: 'G1' }, gabarit, composants: lireData(`cfg${cfg.slice(4)}-composants.json`), reglages,
+    releve: { ...RELEVE, diametre: d, ...extra } }, [{ supplierId: 'dinak', nom: 'DINAK', mapping: MAPPING_DINAK, articles: dinakPour(d), equivalences: TOUTES_EQUIVALENCES.filter((e) => e.configuration_code === cfg) }]).colonnes[0];
+  const ptr = calc('CFG-24', 150, {});
+  const ligne = (col, code) => col.resultat.lignes.find((l) => l.composant_code === code);
+  assert.equal(ligne(ptr, 'support_plancher').reference, '030915903');
+  assert.equal(ligne(ptr, 'support_plancher').quantite, 2);
+  assert.ok(ligne(ptr, 'collier_sous_toiture').article_id);
+  const pla = calc('CFG-28', 80, {});
+  assert.equal(ligne(pla, 'support_plancher').reference, '030908903EV');
+  assert.equal(ligne(pla, 'collier_sous_toiture').reference, '039212824SW'); // DIFLUX 80/125 : la référence porte le Ø extérieur
+  const coq = calc('CFG-24', 150, { coquille: 1 });
+  for (const code of ['coquille_isolante', 'protection_ecart_feu']) {
+    assert.equal(ligne(coq, code).article_id, null, code);
+    assert.equal(ligne(coq, code).quantite, 2, code);
+  }
+  assert.equal(coq.aChiffrer, 2);
 });
 
 test('fabricant sans mapping pour la configuration : pas de colonne ; un seul fabricant : pas de gagnant', async () => {

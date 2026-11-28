@@ -96,7 +96,9 @@ for (const [ligne, cols] of Object.entries(biblio.guide_de_choix_gammes.lignes))
 }
 
 // Mapping (fournisseur MODINOX) : les composants présents dans les fichiers sont remplacés en bloc
-sql.push(`  DELETE FROM majordhome.fum_composant_mapping WHERE org_id = v_org AND supplier_id = v_sup AND composant_code IN (${[...new Set(MAPPING.map((m) => q(m.composant_code)))].join(',')});`);
+// Composants retirés des nomenclatures (data/composants-retires.json) : leurs lignes de mapping partent aussi.
+const COMPOSANTS_RETIRES = data('composants-retires.json');
+sql.push(`  DELETE FROM majordhome.fum_composant_mapping WHERE org_id = v_org AND supplier_id = v_sup AND composant_code IN (${[...new Set([...MAPPING.map((m) => m.composant_code), ...COMPOSANTS_RETIRES])].map(q).join(',')});`);
 for (const m of MAPPING) {
   sql.push(`  INSERT INTO majordhome.fum_composant_mapping (org_id, supplier_id, composant_code, gamme_catalogue, finition, gamme_tarif, type_piece, quantite_par_unite, motif_code, priorite, statut, notes)
   VALUES (v_org, v_sup, ${q(m.composant_code)}, ${q(m.gamme_catalogue)}, ${q(m.finition)}, ${q(m.gamme_tarif)}, ${q(m.type_piece)}, ${m.quantite_par_unite ?? 1}, ${q(m.motif_code)}, ${m.priorite ?? 100}, ${q(m.statut || 'catalogue')}, ${q(m.notes)});`);

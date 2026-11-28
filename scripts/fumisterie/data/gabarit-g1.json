@@ -22,6 +22,8 @@
       { "cle": "decal", "libelle": "Décalage horizontal", "unite": "m", "min": 0.05, "max": 2, "pas": 0.05, "defaut": 0.4, "optionnel": true, "si": { "angle": ">0" } } ] },
     { "type": "sortie_toit", "libelle": "Sortie de toit", "parametres": [
       { "cle": "hSortie", "libelle": "Hauteur visée au-dessus du toit", "unite": "m", "min": 0.3, "max": 5, "pas": 0.05, "defaut": 1.6 },
-      { "cle": "finition", "libelle": "Finition extérieure", "choix": ["noir", "inox"], "defaut": "noir" } ] }
+      { "cle": "finition", "libelle": "Finition extérieure", "choix": ["noir", "inox"], "defaut": "noir" } ] },
+    { "type": "options", "libelle": "Options", "parametres": [
+      { "cle": "coquille", "libelle": "Ajouter une coquille isolante (avec protection écart au feu)", "choix": [0, 1], "libelles": { "0": "Non", "1": "Oui" }, "defaut": 0 } ] }
   ]
 }

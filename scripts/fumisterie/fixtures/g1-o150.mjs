@@ -21,7 +21,11 @@ export const ARTICLES = [
   A('2PTIPPDR150', 'PTR30+ I - PLAQUE DE PROPRETE RT2012 - 560 X 560 - D 150 - INOX', 97.9, 48.95, { ...ptrI, type_piece: 'plaque_proprete' }),
   A('2PTGCOCF150', 'PTR30+ G - COURONNE COUPE FEU - D 150 ( D EXT 210 )', 33.6, 16.8, { gamme_tarif: 'PTR30+ G', couleur: 'galva', diametre_int: 150, type_piece: 'couronne_coupe_feu' }),
   A('2PTIRASR150148', 'PTR30+ I - RACCORD SIMPLE PAROI REDUIT - D 150 / D 148', 110.3, 55.15, { ...ptrI, type_piece: 'raccord_simple_paroi' }),
-  A('2DIVCTOS150', 'COLLIER UNIVERSEL (SOUS TOIT) - D 150 - GALVA', 66, 34.98, { gamme_tarif: 'COLLIER UNIVERSEL (SOUS TOIT)', couleur: 'galva', diametre_int: 150, type_piece: 'collier_sous_toiture' }),
+  // Supports et accessoires de traversée : cotés au Ø EXTÉRIEUR du PTR150 (210).
+  A('2DIVCTOS210', 'COLLIER UNIVERSEL (SOUS TOIT.) - D 210 (PTR150) - GALVA', 66, 33, { gamme_tarif: 'COLLIER UNIVERSEL (SOUS TOIT)', couleur: 'galva', diametre_int: 210, type_piece: 'collier_sous_toiture' }),
+  A('2DIVSUPLR210', 'SUPPORT AU PLANCHER - D 210 ( PTR150 ) - GALVA', 86.3, 43.15, { gamme_tarif: 'SUPPORT AU PLANCHER', couleur: 'galva', diametre_int: 210, type_piece: 'support' }),
+  A('2LAINERO030', 'COQUILLE ISOLANTE GBI - D 210 - LDR 80 MM - POUR PTR 150 - REF.CLR21080A', 229.7, 114.85, { gamme_tarif: 'COQUILLE ISOLANTE GBI', diametre_int: 210, type_piece: null }),
+  A('2DIVFOUR2', 'FOURREAU ISOLANT N°2 ( PLA130 & GIDI153/180 & PTR130/150 & MFI130)', 159, 79.5, { gamme_tarif: 'FOURREAU ISOLANT N°2 ( PLA130 & GIDI153/180 & PTR130/150 & MFI130)', diametre_int: null, type_piece: null }),
   A('2DIVS1525IN230KEI', 'SOLIN 15 A 25° INOX - PTR D 150', 180.1, 72.04, { gamme_tarif: 'SOLIN INOX', couleur: 'inox', diametre_int: 150, type_piece: 'solin', pente_min: 15, pente_max: 25 }),
   A('2DIVS2535IN230KEI', 'SOLIN 25 A 35° INOX - PTR D 150', 218.1, 87.24, { gamme_tarif: 'SOLIN INOX', couleur: 'inox', diametre_int: 150, type_piece: 'solin', pente_min: 25, pente_max: 35 }),
   A('2DIVS3040IN230KEI', 'SOLIN 30 A 40° INOX - PTR D 150', 218.1, 87.24, { gamme_tarif: 'SOLIN INOX', couleur: 'inox', diametre_int: 150, type_piece: 'solin', pente_min: 30, pente_max: 40 }),
