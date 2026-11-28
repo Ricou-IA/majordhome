@@ -33,9 +33,11 @@ function libelleEtat(imp) {
 function resume(imp) {
   const c = imp.counts || {};
   const parties = [];
-  const prevus = imp.status === 'en_cours' ? ' prévus' : '';
-  if (nombre(c.importees) !== null) parties.push(`${pluriel(c.importees, 'article', 'articles')}${prevus}`);
-  if (nombre(c.lignes_fournisseur) !== null && c.lignes_fournisseur > 0) parties.push(`${pluriel(c.lignes_fournisseur, 'ligne fournisseur', 'lignes fournisseur')}${prevus}`);
+  const enCours = imp.status === 'en_cours';
+  if (nombre(c.importees) !== null) parties.push(enCours ? pluriel(c.importees, 'article prévu', 'articles prévus') : pluriel(c.importees, 'article', 'articles'));
+  if (nombre(c.lignes_fournisseur) !== null && c.lignes_fournisseur > 0) {
+    parties.push(enCours ? pluriel(c.lignes_fournisseur, 'ligne fournisseur prévue', 'lignes fournisseur prévues') : pluriel(c.lignes_fournisseur, 'ligne fournisseur', 'lignes fournisseur'));
+  }
   if (nombre(c.retirees) !== null && c.retirees > 0) parties.push(pluriel(c.retirees, 'retiré', 'retirés'));
   if (nombre(c.conservees) !== null && c.conservees > 0) parties.push(pluriel(c.conservees, 'conservé', 'conservés'));
   return parties.join(' · ');

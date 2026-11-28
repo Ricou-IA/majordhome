@@ -67,7 +67,7 @@ en double à côté d'eux.
 
 ## 5. Ce que l'utilisateur fait
 
-Page `/articles/import` (bouton « Importer » de la page Articles), **administrateur seul** (écran et RPC), module de
+Page `/settings/suppliers/articles/import` (bouton « Importer » de la page Articles), **administrateur seul** (écran et RPC), module de
 la page Articles. Mêmes étapes et mêmes composants d'habillage que `/clients/import` :
 
 ```

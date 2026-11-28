@@ -8,6 +8,11 @@
 -- logique et qui ne le sont pas avec l'ancienne. Limite : la boucle de propose saute une paire dont un article vient
 -- d'être absorbé dans le même passage ; la mesure compte toutes les paires franches, sans ce chaînage.
 --
+-- Règle finale (revue finale, 20261129_4) : une ligne `catalog_item_link_source = 'import'` à `source_version`
+-- « import-articles_… » ne compte ni dans « l'article a déjà une ligne active de ce fournisseur » (requête 2) ni dans
+-- le fournisseur commun des propositions (requête 1). Avant l'application de l'import, la production n'en porte aucune
+-- (la mesure ne change donc pas) ; la clause sert à rejouer la mesure après des imports.
+--
 -- Requête 2 — catalog_items_ensure : lignes actives à prix sans article (celles que le prochain passage traitera) qui
 -- se rattacheraient avec la nouvelle étape 2 alors que l'ancienne crée un article.
 
@@ -18,7 +23,9 @@ WITH vivants AS (
 cles_brutes AS (
   -- clés des lignes actives d'un fournisseur actif (les deux versions ; la nouvelle écarte les EAN de zéros)
   SELECT v.version, i.org_id, i.id AS item, p.supplier_id, lower(p.brand) AS marque, p.model_key,
-         CASE WHEN p.code_ean ~ '^[0-9]{8,14}$' AND (v.version = 'ancien' OR p.code_ean !~ '^0+$') THEN p.code_ean END AS ean
+         CASE WHEN p.code_ean ~ '^[0-9]{8,14}$' AND (v.version = 'ancien' OR p.code_ean !~ '^0+$') THEN p.code_ean END AS ean,
+         -- ligne posée par un import de fichier et pas encore reprise par un relevé (règle finale de 20261129_4)
+         COALESCE(p.catalog_item_link_source = 'import' AND starts_with(p.specs ->> 'source_version', 'import-articles_'), false) AS importee
     FROM vivants i
     JOIN majordhome.supplier_products p ON p.catalog_item_id = i.id AND p.is_active
     JOIN majordhome.suppliers s ON s.id = p.supplier_id AND s.is_active
@@ -26,7 +33,7 @@ cles_brutes AS (
   UNION ALL
   -- nouvelle version seulement : clés propres de l'article (supplier_id NULL)
   SELECT 'nouveau', i.org_id, i.id, NULL::uuid, lower(i.brand), i.model_key,
-         CASE WHEN i.code_ean ~ '^[0-9]{8,14}$' AND i.code_ean !~ '^0+$' THEN i.code_ean END
+         CASE WHEN i.code_ean ~ '^[0-9]{8,14}$' AND i.code_ean !~ '^0+$' THEN i.code_ean END, false
     FROM vivants i
    WHERE (i.brand IS NOT NULL AND i.model_key IS NOT NULL) OR (i.code_ean ~ '^[0-9]{8,14}$' AND i.code_ean !~ '^0+$')
 ),
@@ -38,14 +45,16 @@ ean_trop_partages AS (
   SELECT version, org_id, ean FROM cles_brutes WHERE ean IS NOT NULL GROUP BY 1, 2, 3 HAVING count(DISTINCT item) > 10
 ),
 cles AS (
-  SELECT c.version, c.org_id, c.item, c.supplier_id, c.marque,
+  SELECT c.version, c.org_id, c.item, c.supplier_id, c.marque, c.importee,
          CASE WHEN k.model_key IS NULL THEN c.model_key END AS model_key,
          CASE WHEN e.ean IS NULL THEN c.ean END AS ean
     FROM cles_brutes c
     LEFT JOIN cles_trop_partagees k ON k.version = c.version AND k.org_id = c.org_id AND k.marque = c.marque AND k.model_key = c.model_key
     LEFT JOIN ean_trop_partages e ON e.version = c.version AND e.org_id = c.org_id AND e.ean = c.ean
 ),
-four AS (SELECT DISTINCT version, item, supplier_id FROM cles WHERE supplier_id IS NOT NULL),
+-- t_four : les lignes d'import non encore reprises ne comptent pas comme « fournisseur commun » (version nouvelle seulement)
+four AS (SELECT DISTINCT version, item, supplier_id FROM cles
+          WHERE supplier_id IS NOT NULL AND NOT (version = 'nouveau' AND importee)),
 prix AS (
   SELECT p.catalog_item_id AS item, min(p.purchase_price_ht) FILTER (WHERE p.purchase_price_ht > 0) AS prix
     FROM majordhome.supplier_products p WHERE p.is_active AND p.catalog_item_id IS NOT NULL GROUP BY 1
@@ -147,7 +156,8 @@ nouveau AS (
    CROSS JOIN LATERAL (
      SELECT count(*) AS nb,
             count(*) FILTER (WHERE i.product_kind = COALESCE(r.product_kind, 'main')
-              AND NOT EXISTS (SELECT 1 FROM majordhome.supplier_products q WHERE q.catalog_item_id = i.id AND q.supplier_id = r.supplier_id AND q.is_active)
+              AND NOT EXISTS (SELECT 1 FROM majordhome.supplier_products q WHERE q.catalog_item_id = i.id AND q.supplier_id = r.supplier_id AND q.is_active
+                              AND (q.catalog_item_link_source = 'import' AND starts_with(q.specs ->> 'source_version', 'import-articles_')) IS NOT TRUE)
               AND CASE WHEN m.prix IS NOT NULL THEN greatest(r.purchase_price_ht, m.prix) <= 2 * least(r.purchase_price_ht, m.prix)
                        ELSE COALESCE(i.selling_price_ht, 0) <= 0 OR r.purchase_price_ht <= i.selling_price_ht END) AS n
        FROM majordhome.catalog_items i
