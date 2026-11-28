@@ -1,18 +1,30 @@
 // src/apps/artisan/components/devis/metre/useMetreDraft.js
-// Saisie en cours du métré, par utilisateur ET par lead (réseau garanti : ce n'est qu'un filet
-// anti-perte). Sans lead dans la clé, le brouillon d'un chantier ressortait sur le devis d'un autre.
+// Saisie en cours du métré, par utilisateur ET par dossier (filet anti-perte, pas un enregistrement).
+// Dossier = lead, sinon carte SAV, sinon devis modifié (CreateDevisModal). Sans dossier, pas de brouillon :
+// une clé commune « sans-lead » faisait ressortir le relevé d'un dossier sur le devis d'un autre.
+// Le brouillon survit à l'injection ; il est effacé quand le métré est enregistré avec le devis.
 import { useCallback, useEffect, useState } from 'react';
 import { logger } from '@lib/logger';
 
-const key = (userId, leadId) => `fum-metre-draft:${userId || 'anon'}:${leadId || 'sans-lead'}`;
+const key = (userId, dossier) => `fum-metre-draft:${userId || 'anon'}:${dossier}`;
 
-export function useMetreDraft(userId, leadId) {
-  const [draft, setDraft] = useState(() => {
-    try { const raw = localStorage.getItem(key(userId, leadId)); return raw ? JSON.parse(raw) : null; } catch (e) { logger.warn('[useMetreDraft] lecture', e); return null; }
-  });
+function lire(userId, dossier) {
+  if (!dossier) return null;
+  try { const raw = localStorage.getItem(key(userId, dossier)); return raw ? JSON.parse(raw) : null; } catch (e) { logger.warn('[useMetreDraft] lecture', e); return null; }
+}
+
+/** Efface le brouillon d'un dossier (après l'enregistrement du métré). */
+export function effacerBrouillonMetre(userId, dossier) {
+  if (!dossier) return;
+  try { localStorage.removeItem(key(userId, dossier)); } catch (e) { logger.warn('[useMetreDraft] effacement', e); }
+}
+
+export function useMetreDraft(userId, dossier) {
+  const [draft, setDraft] = useState(() => lire(userId, dossier));
   useEffect(() => {
-    try { if (draft) localStorage.setItem(key(userId, leadId), JSON.stringify(draft)); else localStorage.removeItem(key(userId, leadId)); } catch (e) { logger.warn('[useMetreDraft] écriture', e); }
-  }, [draft, userId, leadId]);
+    if (!dossier) return;
+    try { if (draft) localStorage.setItem(key(userId, dossier), JSON.stringify(draft)); else localStorage.removeItem(key(userId, dossier)); } catch (e) { logger.warn('[useMetreDraft] écriture', e); }
+  }, [draft, userId, dossier]);
   const clear = useCallback(() => setDraft(null), []);
   return { draft, setDraft, clear };
 }

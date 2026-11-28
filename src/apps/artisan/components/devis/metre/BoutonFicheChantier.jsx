@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useFumMetreByQuote } from '@hooks/useFumisterie';
 import { downloadBlob } from '@/lib/utils';
 import { genererPlanConduit } from './planConduitExport';
+import { ENGINE_VERSION } from '@/lib/fumisterie/index.js';
 
 export default function BoutonFicheChantier({ orgId, quote, settings }) {
   const { data: metre } = useFumMetreByQuote(orgId, quote?.id);
@@ -25,6 +26,20 @@ export default function BoutonFicheChantier({ orgId, quote, settings }) {
       {enCours ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <HardHat className="w-4 h-4 mr-1" />}
       Fiche chantier
     </button>
+  );
+}
+
+/**
+ * Métré figé avec des règles antérieures au moteur actuel : le plan et la fiche chantier reprennent ce calcul
+ * (voulu : c'est ce qui a été chiffré), mais on le dit. Refaire le métré remplace ses lignes (remplacerLignesMetre).
+ */
+export function MentionMoteurAnterieur({ orgId, quoteId }) {
+  const { data: metre } = useFumMetreByQuote(orgId, quoteId);
+  if (!metre?.engine_version || metre.engine_version === ENGINE_VERSION) return null;
+  return (
+    <div className="px-6 py-2 border-t bg-secondary-50 text-xs text-secondary-700">
+      Métré calculé avec des règles antérieures : le plan et la fiche chantier reprennent ce calcul. Pour l’actualiser, « Modifier » puis refaites le métré.
+    </div>
   );
 }
 

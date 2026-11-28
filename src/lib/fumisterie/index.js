@@ -19,7 +19,7 @@ import { bilanConduitExistant, justificationDimensionnement } from './bilanExist
 // référence au tarif sans ambiguïté, rigide composé dans les longueurs du fabricant.
 // fab-2026.11c : supports au plancher et de toiture (NF DTU 24.1 § 5.4.3), coquille isolante en option (+ fourreau
 // écart au feu), rosaces décoratives retirées, motifs {=D+n} et {D:a|b}, option absente du relevé = « non ».
-export const ENGINE_VERSION = 'fab-2026.11c';
+export const ENGINE_VERSION = 'fab-2026.11d'; // d : justification absente = « Non renseignée » (plus « Notice »)
 
 const GABARITS = {
   G1: { geometrie: geometrieG1, controles: controlesG1, sortieMinimale: hauteurSortieMinimale },

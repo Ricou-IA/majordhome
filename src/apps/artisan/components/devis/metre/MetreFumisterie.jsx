@@ -32,11 +32,11 @@ function Blocage({ titre, message }) {
   );
 }
 
-export default function MetreFumisterie({ orgId, leadId, family, onClose, onValidate }) {
+export default function MetreFumisterie({ orgId, leadId, dossier = null, family, onClose, onValidate }) {
   const { user } = useAuth();
   const { settings } = useOrgSettings();
   const reglages = useMemo(() => buildFumisterieConfig(settings), [settings]);
-  const { draft, setDraft, clear } = useMetreDraft(user?.id, leadId);
+  const { draft, setDraft, clear } = useMetreDraft(user?.id, dossier);
   const [etape, setEtape] = useState(draft?.etape ?? 0);
   // Brouillon en cours ⇒ ses critères ; sinon appareil + combustible viennent de la famille du devis.
   const [criteres, setCriteres] = useState(draft?.criteres ?? criteresDepuisFamille(family));
@@ -90,7 +90,7 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
     allerAuReleve();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versReleve, bundle, configurationId, etape]);
-  const fermer = () => { if (draft || releve) toast.info('Métré mis de côté : la saisie reste en brouillon sur ce lead.'); onClose(); };
+  const fermer = () => { if (dossier && (draft || releve)) toast.info('Métré mis de côté : la saisie reste en brouillon.'); onClose(); };
   // Alertes de contrôle (zone, dévoiement, buse…) : on demande confirmation dans une modale de l'app,
   // pas dans le dialogue système du navigateur. Les lignes « à chiffrer » ne bloquent pas.
   const [confirmationAlertes, setConfirmationAlertes] = useState(false);
@@ -103,7 +103,8 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
       metre: { configurationId, gabaritCode: bundle.gabarit.code, diametre: releve.diametre, finition: releve.finition, releve, resultat, engineVersion: resultat.engine_version, leadId,
         supplierId: fab.avecVue ? colonne.supplierId : null },
     });
-    clear();
+    // Le brouillon n'est PAS effacé ici : le devis n'est pas encore enregistré (CreateDevisModal l'efface
+    // après saveMetre). Abandonner le devis laisse donc le relevé à reprendre.
   };
   const valider = () => {
     if (!resultat || resultat.erreur) {
@@ -127,7 +128,7 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
           <div role="status" className={`flex items-center justify-between gap-3 mb-4 px-4 py-2.5 rounded-lg border text-sm ${brouillonContradictoire ? 'border-primary-300 bg-primary-50 text-primary-900' : 'border-secondary-200 bg-white text-secondary-700'}`}>
             <span>
               {brouillonContradictoire ? <AlertTriangle className="w-4 h-4 inline mr-1.5 -mt-0.5" /> : null}
-              Saisie précédente restaurée pour ce lead{bundle?.configuration ? ` : ${bundle.configuration.code} · ${bundle.configuration.titre}` : ''}.
+              Saisie précédente restaurée{bundle?.configuration ? ` : ${bundle.configuration.code} · ${bundle.configuration.titre}` : ''}.
               {brouillonContradictoire && ` Ce métré est « ${draft.criteres.combustible === 'pellets' ? 'pellets' : 'bois bûches'} » alors que le devis est « ${family} ».`}
             </span>
             <button type="button" onClick={repartirDeZero} className="btn-secondary shrink-0">Repartir de zéro</button>

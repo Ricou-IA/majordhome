@@ -61,12 +61,14 @@ export function bilanConduitExistant(releve, gabaritCode, configuration) {
 const JUSTIFICATIONS = { notice: 'Notice de l\'appareil', couplage: 'Essai de couplage', abaque: 'Abaque', logiciel: 'Logiciel', non_justifie: 'Non justifié' };
 
 /**
- * Justification du dimensionnement, en clair (absente = notice de l'appareil).
+ * Justification du dimensionnement, en clair. Absente = « Non renseignée » : la fiche chantier n'écrit jamais une
+ * justification que personne n'a choisie (avant fab-2026.11d, l'absence valait « Notice de l'appareil »).
  * @param {Record<string, unknown>} releve
- * @returns {{ mode: string, texte: string }}
+ * @returns {{ mode: string|null, texte: string }}
  */
 export function justificationDimensionnement(releve) {
-  const mode = lireComplement(releve, 'justification') || 'notice';
+  const mode = lireComplement(releve, 'justification') || null;
+  if (!mode || !JUSTIFICATIONS[mode]) return { mode: null, texte: 'Non renseignée' };
   const ref = lireComplement(releve, 'justificationReference');
   return { mode, texte: ref && mode !== 'non_justifie' ? `${JUSTIFICATIONS[mode]} : ${ref}` : JUSTIFICATIONS[mode] };
 }

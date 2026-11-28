@@ -92,6 +92,45 @@ export function releveInitial(gabarit, reglages, criteres = null) {
  * Le repère de la coupe cotée reste sur le dessin : il n'est pas repris dans la description
  * (la description s'imprime sur le devis client — Eric, 2026-10-27).
  */
+/** Index juste après le dernier enfant du chapitre `indexChapitre` (avant le chapitre suivant). */
+export function finDuChapitre(lines, indexChapitre) {
+  let fin = indexChapitre + 1;
+  for (let i = indexChapitre + 1; i < lines.length; i++) {
+    if (lines[i].line_type === 'section_title') break;
+    fin = i + 1;
+  }
+  return fin;
+}
+
+// Même clé pour une ligne du moteur et pour la ligne de devis qu'elle a produite (versLignesDevis) :
+// article, désignation, référence — jamais la quantité ni le prix, que l'on retouche à la main.
+const cleMoteur = (l) => `${l.article_id || ''}|${(l.libelle || '').trim()}|${(l.reference || '').trim()}`;
+const cleDevis = (l) => `${l.supplier_product_id || ''}|${(l.designation || '').trim()}|${(l.reference || '').trim()}`;
+
+/**
+ * Réinjection d'un métré : retire du chapitre les lignes produites par le métré PRÉCÉDENT (lignes du moteur
+ * `lignesPrecedentes`, une fois chacune), puis pose les nouvelles en fin de chapitre. Les lignes ajoutées à la
+ * main (main d'œuvre, ligne libre, désignation retouchée) restent. Sans métré précédent, on ajoute seulement.
+ * @returns {{ lines: object[], retirees: number }}
+ */
+export function remplacerLignesMetre(lines, indexChapitre, lignesPrecedentes, nouvelles) {
+  const aRetirer = new Map();
+  for (const l of lignesPrecedentes || []) { const k = cleMoteur(l); aRetirer.set(k, (aRetirer.get(k) || 0) + 1); }
+  const fin = finDuChapitre(lines, indexChapitre);
+  let retirees = 0;
+  const gardees = lines.filter((l, i) => {
+    if (i <= indexChapitre || i >= fin || l.line_type === 'section_title') return true;
+    const k = cleDevis(l);
+    if (!aRetirer.get(k)) return true;
+    aRetirer.set(k, aRetirer.get(k) - 1);
+    retirees += 1;
+    return false;
+  });
+  const result = [...gardees];
+  result.splice(finDuChapitre(gardees, indexChapitre), 0, ...nouvelles);
+  return { lines: result, retirees };
+}
+
 export function versLignesDevis(lignes, supplierId, supplierName) {
   return lignes.map((l) => ({
     line_type: 'product', supplier_product_id: l.article_id, supplier_id: l.article_id ? supplierId : null, supplier_name: l.article_id ? supplierName : null,

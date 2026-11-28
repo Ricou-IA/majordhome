@@ -14,7 +14,8 @@ import { buildDevisConfig, famillesActives, familleDuLead, familleDe, typeChapit
 import { useLeadMutations } from '@hooks/useLeads';
 import { reclasserDansSections } from '@/lib/devisOrdre.js';
 import { useDevisMutations } from '@hooks/useDevis';
-import { useFumMetreMutations } from '@hooks/useFumisterie';
+import { useFumMetreMutations, useFumMetreByQuote } from '@hooks/useFumisterie';
+import { effacerBrouillonMetre } from './metre/useMetreDraft';
 import { useCatalogItemsSpecs } from '@hooks/useCatalogItems';
 import { figerCaracteristiques, lignesNonResolues } from '@/lib/devisCaracteristiques.js';
 import { canonicalFieldsForCategory } from '@/shared/specs';
@@ -65,6 +66,20 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
     : (Array.isArray(initialLines) ? initialLines : [])));
   // Métré fumisterie validé (relevé + résultat figé), enregistré APRÈS création du devis
   const [metre, setMetre] = useState(null);
+  // Métré déjà enregistré (édition) : une réinjection remplace SES lignes au lieu de les doubler.
+  const metreEnregistreQ = useFumMetreByQuote(orgId, edition ? devisAModifier.quote.id : null);
+  const metrePrecedent = metre ? metre.resultat?.lignes ?? null
+    : !edition ? null
+    : metreEnregistreQ.isSuccess ? metreEnregistreQ.data?.resultat?.lignes ?? null
+    : undefined; // pas encore lu, ou lecture en échec : on ne devine pas
+  // Brouillon du métré rangé par dossier : lead, sinon carte SAV, sinon devis modifié ; aucun ⇒ pas de brouillon.
+  const dossierMetre = lead?.id || (interventionId ? `intervention-${interventionId}` : null) || (edition ? `devis-${devisAModifier.quote.id}` : null);
+  const enregistrerMetre = async (quoteId, message) => {
+    try {
+      await saveMetre({ ...metre, quoteId, createdBy: user?.id });
+      effacerBrouillonMetre(user?.id, dossierMetre);
+    } catch (err) { logger.error('[CreateDevisModal] saveMetre', err); toast.warning(message); }
+  };
   const [form, setForm] = useState(() => (edition ? {
     subject: devisAModifier.quote.subject || '', validityDays: String(devisAModifier.quote.validity_days || 30),
     conditions: devisAModifier.quote.conditions || '', commentaire: devisAModifier.quote.commentaire || '',
@@ -193,10 +208,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
         globalDiscountPercent: parseFloat(form.globalDiscountPercent) || 0,
       });
       await upsertLines(q.id, lignes, parseFloat(form.globalDiscountPercent) || 0);
-      if (metre) {
-        try { await saveMetre({ ...metre, quoteId: q.id, createdBy: user?.id }); }
-        catch (err) { logger.error('[CreateDevisModal] saveMetre', err); toast.warning('Devis enregistré, mais le relevé de métré n\x27a pas pu être enregistré'); }
-      }
+      if (metre) await enregistrerMetre(q.id, 'Devis enregistré, mais le relevé de métré n\x27a pas pu être enregistré');
       toast.success('Devis modifié');
       if (q.pennylane_quote_id) toast.info('Le devis Pennylane n\x27est pas encore à jour : cliquez « Renvoyer dans Pennylane » sur la fiche du devis');
       onCreated?.(q);
@@ -234,10 +246,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
         createdBy: user?.id,
       });
       // Le devis existe quoi qu'il arrive : l'échec du métré est signalé, jamais avalé
-      if (metre) {
-        try { await saveMetre({ ...metre, quoteId: created.id, createdBy: user?.id }); }
-        catch (err) { logger.error('[CreateDevisModal] saveMetre', err); toast.warning('Devis créé, mais le relevé de métré n\'a pas pu être enregistré'); }
-      }
+      if (metre) await enregistrerMetre(created.id, 'Devis créé, mais le relevé de métré n\'a pas pu être enregistré');
       // Lead sans « Projet » : la famille du devis le renseigne (les anciens leads se remplissent au fil des devis)
       const cleProjet = familleDe(devisConfig, selectedFamily)?.key;
       if (lead?.id && !lead.project_family_key && cleProjet) {
@@ -267,7 +276,8 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
             templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={(t) => { setTouche(true); handleSelectTemplate(t); }}
             erreurObjet={erreurObjet} onObjetQuitte={() => setObjetQuitte(true)} familles={famillesActives(devisConfig).map((f) => f.label)} onImportOffre={() => setImportOffre(true)} />
           <div id="devis-lignes" className="scroll-mt-4">
-            <DevisStepLines orgId={orgId} lines={lines} setLines={setLinesSaisie} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} articles={articles} />
+            <DevisStepLines orgId={orgId} lines={lines} setLines={setLinesSaisie} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre}
+              metrePrecedent={metrePrecedent} dossierMetre={dossierMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} articles={articles} />
           </div>
           {nbLignes > 0 && <DevisConditions form={form} setField={setFieldSaisie} lines={lines} devisConfig={devisConfig} />}
         </div>

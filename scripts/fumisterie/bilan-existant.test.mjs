@@ -56,8 +56,9 @@ test('étanche granulés : section minimale du conduit existant selon le Ø (Cah
   assert.deepEqual(codes(bilanConduitExistant(r, 'G4', TRAD)), []);
 });
 
-test('justification : notice par défaut, référence ajoutée, « non justifié » dit tel quel', () => {
-  assert.deepEqual(justificationDimensionnement({}), { mode: 'notice', texte: 'Notice de l\'appareil' });
+test('justification : non renseignée par défaut, référence ajoutée, « non justifié » dit tel quel', () => {
+  assert.deepEqual(justificationDimensionnement({}), { mode: null, texte: 'Non renseignée' });
+  assert.equal(justificationDimensionnement({ justification: 'notice' }).texte, 'Notice de l\'appareil');
   assert.equal(justificationDimensionnement({ justification: 'logiciel', justificationReference: 'Cat-Draw 3.2' }).texte, 'Logiciel : Cat-Draw 3.2');
   assert.equal(justificationDimensionnement({ justification: 'non_justifie', justificationReference: 'x' }).texte, 'Non justifié');
 });

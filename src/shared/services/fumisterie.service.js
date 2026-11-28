@@ -106,11 +106,25 @@ export const fumisterieService = {
   saveMetre: ({ orgId, quoteId = null, leadId = null, configurationId, gabaritCode, diametre, finition, releve, resultat, engineVersion, createdBy, supplierId = null }) =>
     withErrorHandling(async () => {
       if (!orgId || !configurationId) throw new Error('[fumisterieService] orgId et configurationId requis');
-      // supplier_id n'est envoyé que s'il est connu (la colonne n'existe qu'après la migration 20261128_1).
+      const champs = {
+        lead_id: leadId, configuration_id: configurationId, gabarit_code: gabaritCode,
+        diametre, finition, releve, resultat, engine_version: engineVersion, supplier_id: supplierId || null,
+      };
+      // Un devis = un métré : refaire le métré d'un devis REMPLACE celui qui est enregistré (même ligne, celle que
+      // lit getMetreByQuote). Avant, chaque enregistrement en ajoutait un (un devis en portait deux en prod).
+      if (quoteId) {
+        const { data: existant, error: eLecture } = await supabase.from('majordhome_fum_metres').select('id')
+          .eq('org_id', orgId).eq('quote_id', quoteId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (eLecture) throw eLecture;
+        if (existant) {
+          const { data, error } = await supabase.from('majordhome_fum_metres').update({ ...champs, updated_at: new Date().toISOString() })
+            .eq('id', existant.id).eq('org_id', orgId).select().single();
+          if (error) throw error;
+          return data;
+        }
+      }
       const { data, error } = await supabase.from('majordhome_fum_metres').insert({
-        org_id: orgId, quote_id: quoteId, lead_id: leadId, configuration_id: configurationId, gabarit_code: gabaritCode,
-        diametre, finition, releve, resultat, engine_version: engineVersion, created_by: createdBy || null,
-        ...(supplierId ? { supplier_id: supplierId } : {}),
+        ...champs, org_id: orgId, quote_id: quoteId, created_by: createdBy || null,
       }).select().single();
       if (error) throw error;
       return data;

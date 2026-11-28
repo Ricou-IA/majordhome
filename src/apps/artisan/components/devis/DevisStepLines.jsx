@@ -39,6 +39,7 @@ import DevisProductPicker from './DevisProductPicker';
 import { SectionBlock, ListeLignes } from './DevisSectionBlock';
 import ArticleDrawer from '../../pages/settings/catalogue/ArticleDrawer';
 import MetreFumisterie from './metre/MetreFumisterie';
+import { finDuChapitre, remplacerLignesMetre } from './metre/metreModel';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { moduleActif } from '@/lib/modules';
 import ImportOffreDevisModal from './ImportOffreDevisModal';
@@ -53,7 +54,12 @@ const AUCUN_COMPTE = new Map();
 // COMPOSANT PRINCIPAL
 // =============================================================================
 
-export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig, importOffreOuvert = false, onFermerImportOffre, articles = AUCUN_ARTICLE }) {
+/**
+ * @param {Array<object>|null|undefined} [props.metrePrecedent] lignes du moteur du métré déjà posé sur ce devis (session ou
+ *   enregistré) ; null = aucun ; undefined = pas encore lu (la réinjection est alors refusée)
+ * @param {string|null} [props.dossierMetre] clé du brouillon de métré (lead, carte SAV ou devis) ; null = pas de brouillon
+ */
+export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, metrePrecedent = null, dossierMetre = null, devisConfig, importOffreOuvert = false, onFermerImportOffre, articles = AUCUN_ARTICLE }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, categories, type }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
   // Métré assisté = module Fumisterie : sans lui le chapitre reste un chapitre ordinaire (saisie et catalogue).
@@ -210,15 +216,6 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     return result;
   }, [lines]);
 
-  /** Index d'insertion : après le dernier enfant du chapitre (avant le chapitre suivant). */
-  const insertionApres = (prev, sectionGlobalIndex) => {
-    let insertAt = sectionGlobalIndex + 1;
-    for (let i = sectionGlobalIndex + 1; i < prev.length; i++) {
-      if (prev[i].line_type === 'section_title') break;
-      insertAt = i + 1;
-    }
-    return insertAt;
-  };
 
   const handleAddProductsToSection = useCallback((sectionGlobalIndex, sectionName, type) => {
     setPickerForSection({ index: sectionGlobalIndex, categories: productCategoriesForSection(sectionName, family, devisConfig), type });
@@ -229,23 +226,26 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     const sectionIdx = pickerForSection.index;
     setLines((prev) => {
       const result = [...prev];
-      result.splice(insertionApres(prev, sectionIdx), 0, ...newLines);
+      result.splice(finDuChapitre(prev, sectionIdx), 0, ...newLines);
       return result;
     });
   }, [pickerForSection, setLines]);
 
-  // Métré assisté validé → lignes insérées après le dernier enfant de la section FUMISTERIE
+  // Métré assisté validé → les lignes du métré précédent (session ou déjà enregistré) sont REMPLACÉES,
+  // les nouvelles posées en fin de section FUMISTERIE. Métré précédent inconnu (lecture en cours ou en
+  // échec) ⇒ rien n'est injecté : on doublerait le chiffrage. Le relevé reste en brouillon.
   const handleMetreValidate = useCallback(({ lignesDevis, metre }) => {
     if (metreForSection == null) return;
-    const sectionIdx = metreForSection;
-    setLines((prev) => {
-      const result = [...prev];
-      result.splice(insertionApres(prev, sectionIdx), 0, ...lignesDevis);
-      return result;
-    });
+    if (metrePrecedent === undefined) {
+      toast.error('Le métré déjà enregistré sur ce devis n\'est pas encore lu : réessayez dans un instant');
+      return;
+    }
+    const { lines: suivantes, retirees } = remplacerLignesMetre(lines, metreForSection, metrePrecedent, lignesDevis);
+    setLines(suivantes);
+    if (retirees > 0) toast.success(`Métré remplacé : ${retirees} ligne${retirees > 1 ? 's' : ''} retirée${retirees > 1 ? 's' : ''}, ${lignesDevis.length} posée${lignesDevis.length > 1 ? 's' : ''}`);
     onMetreValidated?.(metre);
     setMetreForSection(null);
-  }, [metreForSection, setLines, onMetreValidated]);
+  }, [metreForSection, metrePrecedent, lines, setLines, onMetreValidated]);
 
   const ligneVide = (extra) => ({
     catalog_item_id: null, brand: null, supplier_product_id: null, supplier_id: null, supplier_name: null,
@@ -257,7 +257,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
   const addLaborToSection = useCallback((sectionGlobalIndex) => {
     setLines((prev) => {
       const result = [...prev];
-      result.splice(insertionApres(prev, sectionGlobalIndex), 0, ligneVide({ line_type: 'labor', unit: 'forfait' }));
+      result.splice(finDuChapitre(prev, sectionGlobalIndex), 0, ligneVide({ line_type: 'labor', unit: 'forfait' }));
       return result;
     });
   }, [setLines, tvaDevis]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -266,7 +266,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
   const addFreeformToSection = useCallback((sectionGlobalIndex) => {
     setLines((prev) => {
       const result = [...prev];
-      result.splice(insertionApres(prev, sectionGlobalIndex), 0, ligneVide({ line_type: 'product', is_freeform: true, unit: 'u' }));
+      result.splice(finDuChapitre(prev, sectionGlobalIndex), 0, ligneVide({ line_type: 'product', is_freeform: true, unit: 'u' }));
       return result;
     });
   }, [setLines, tvaDevis]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -391,6 +391,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
         <MetreFumisterie
           orgId={orgId}
           leadId={leadId}
+          dossier={dossierMetre}
           family={family}
           onClose={() => setMetreForSection(null)}
           onValidate={handleMetreValidate}

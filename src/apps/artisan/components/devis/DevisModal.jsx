@@ -31,7 +31,7 @@ import { leadsService } from '@services/leads.service';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { CalqueModal } from '@/components/ui/calque-modal';
 import { MenuActions } from '@/components/ui/menu-actions';
-import BoutonFicheChantier, { MentionPlanPennylane } from './metre/BoutonFicheChantier';
+import BoutonFicheChantier, { MentionPlanPennylane, MentionMoteurAnterieur } from './metre/BoutonFicheChantier';
 
 export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, onEdit }) {
   const { organization, user } = useAuth();
@@ -495,6 +495,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
         )}
 
         {pennylaneEnabled && <MentionPlanPennylane orgId={orgId} quoteId={quoteId} />}
+        <MentionMoteurAnterieur orgId={orgId} quoteId={quoteId} />
 
         {/* Footer — Actions */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t bg-white">
