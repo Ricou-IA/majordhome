@@ -48,6 +48,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const pennylaneEnabled = usePennylaneEnabled();
 
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [confirmPdfAChiffrer, setConfirmPdfAChiffrer] = useState(false); // PDF client avec une ligne à 0 €
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [templateName, setTemplateName] = useState('');
@@ -513,7 +514,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
 
           <div className="flex flex-wrap justify-end gap-2 [&>button]:whitespace-nowrap">
             {/* PDF */}
-            <button onClick={handleGeneratePdf} disabled={pdfLoading} className="btn-secondary btn-sm">
+            <button onClick={() => (lignesAChiffrer.length ? setConfirmPdfAChiffrer(true) : handleGeneratePdf())} disabled={pdfLoading} className="btn-secondary btn-sm">
               {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <FileText className="w-4 h-4 mr-1" />}
               Générer PDF
             </button>
@@ -625,6 +626,16 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
         variant="destructive"
         onConfirm={handleDelete}
         loading={isDeleting}
+      />
+      <ConfirmDialog
+        open={confirmPdfAChiffrer}
+        onOpenChange={setConfirmPdfAChiffrer}
+        variant="default"
+        title={lignesAChiffrer.length > 1 ? `${lignesAChiffrer.length} lignes ne sont pas chiffrées` : 'Une ligne n’est pas chiffrée'}
+        description={`${lignesAChiffrer.map((l) => l.designation).join(', ')} : à 0 € sur le PDF. Générer quand même ?`}
+        confirmLabel="Générer quand même"
+        cancelLabel="Revenir"
+        onConfirm={() => { setConfirmPdfAChiffrer(false); handleGeneratePdf(); }}
       />
     </CalqueModal>
   );

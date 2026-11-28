@@ -18,12 +18,16 @@ import { logger } from '@lib/logger';
 import QualificationStep from './QualificationStep';
 import ReleveStep from './ReleveStep';
 import { useMetreDraft } from './useMetreDraft';
-import { releveInitial, versLignesDevis, resultatDeColonne, criteresDepuisFamille, LIBELLES_COURTS } from './metreModel';
+import { releveInitial, versLignesDevis, resultatDeColonne, criteresDepuisFamille, LIBELLES_COURTS, aConfirmerAvantAjout } from './metreModel';
+import RecapMetre from './RecapMetre';
 import { nouveauBrouillon, clesModifiees, ajouterModifies, resumeBrouillon, titreReprise, contradictionFamille } from '@/lib/fumisterie/brouillon.js';
 import { MenuActions } from '@/components/ui/menu-actions';
 import { useFabricantPrefere } from './useFabricantPrefere';
 
 const EMPTY = [];
+/** « 2 pièces seront ajoutées à 0 € », sinon « Des contrôles sont en alerte ». */
+const titreConfirmationAjout = ({ sansPrix }) => (!sansPrix.length ? 'Des contrôles sont en alerte'
+  : sansPrix.length > 1 ? `${sansPrix.length} pièces seront ajoutées à 0 €` : '1 pièce sera ajoutée à 0 €');
 const Chargement = ({ libelle }) => <LignesSquelette nombre={4} libelle={libelle} className="max-w-2xl" />;
 
 /** Blocage explicite (erreur de requête, fournisseur absent) : jamais un écran vide, jamais le texte technique. */
@@ -39,7 +43,9 @@ function Blocage({ titre, message, action }) {
   );
 }
 
-export default function MetreFumisterie({ orgId, leadId, dossier = null, family, onClose, onValidate }) {
+// Étapes : 0 = solution, 1 = relevé, 2 = récapitulatif (seule étape qui écrit dans le devis). `tvaDevis` : taux du devis,
+// posé sur les lignes ajoutées.
+export default function MetreFumisterie({ orgId, leadId, dossier = null, family, tvaDevis = null, onClose, onValidate }) {
   const { user } = useAuth();
   const { settings } = useOrgSettings();
   const reglages = useMemo(() => buildFumisterieConfig(settings), [settings]);
@@ -83,7 +89,7 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
 
   // Calcul UNIQUE, chez chaque fabricant : ce qui s'affiche (colonne choisie) est ce qui sera injecté.
   const comparaison = useMemo(
-    () => (etape === 1 && bundle && releve && !fab.isLoading ? comparerFabricants({ ...bundle, reglages, releve }, fab.fabricants) : null),
+    () => (etape >= 1 && bundle && releve && !fab.isLoading ? comparerFabricants({ ...bundle, reglages, releve }, fab.fabricants) : null),
     [etape, bundle, reglages, releve, fab.isLoading, fab.fabricants],
   );
   const [fabricantChoisi, setFabricantChoisi] = useFabricantPrefere(orgId);
@@ -117,14 +123,14 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
   // Fermer sans rien avoir saisi : fermeture directe, rien n'est annoncé. Avec une saisie pas encore ajoutée au devis : on demande.
   const fermer = () => { if (modifies.length) setConfirmationFermeture(true); else onClose(); };
   const supprimerBrouillon = () => { repartirDeZero(); toast.success('Brouillon supprimé.'); };
-  // Alertes de contrôle (zone, dévoiement, buse…) : on demande confirmation dans une modale de l'app,
-  // pas dans le dialogue système du navigateur. Les lignes « à chiffrer » ne bloquent pas.
-  const [confirmationAlertes, setConfirmationAlertes] = useState(false);
-  const alertesBloquantes = resultat ? resultat.alertes.filter((a) => a.niveau === 'warn' && a.code !== 'article_manquant' && a.code !== 'article_ambigu') : [];
+  // Pièces sans prix et alertes de contrôle : acceptées en UNE confirmation, dans une modale de l'app. Elles ne
+  // bloquent pas l'ajout (la pièce part à 0 €, l'envoi Pennylane reste fermé tant qu'elle n'a pas de prix).
+  const [confirmationAjout, setConfirmationAjout] = useState(false);
+  const aConfirmer = useMemo(() => aConfirmerAvantAjout(resultat), [resultat]);
   const injecter = () => {
-    setConfirmationAlertes(false);
+    setConfirmationAjout(false);
     onValidate({
-      lignesDevis: versLignesDevis(resultat.lignes, colonne.supplierId, colonne.nom),
+      lignesDevis: versLignesDevis(resultat.lignes, colonne.supplierId, colonne.nom, tvaDevis),
       // supplier_id n'existe en base qu'après la migration 20261128_1 (vue des fabricants présente).
       metre: { configurationId, gabaritCode: bundle.gabarit.code, diametre: releve.diametre, finition: releve.finition, releve, resultat, engineVersion: resultat.engine_version, leadId,
         supplierId: fab.avecVue ? colonne.supplierId : null },
@@ -134,14 +140,14 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
   };
   const valider = () => {
     if (!injectable) return;
-    if (alertesBloquantes.length) { setConfirmationAlertes(true); return; }
+    if (!aConfirmer.vide) { setConfirmationAjout(true); return; }
     injecter();
   };
 
   return (
     <CalqueModal onClose={fermer} titreId="metre-titre" fermerAuFond={false} className="bg-secondary-100 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-secondary-200">
-        <div><p className="text-xs uppercase tracking-wide text-secondary-500">Métré assisté · fumisterie</p><h2 id="metre-titre" className="text-lg font-semibold text-secondary-900">{etape === 0 ? 'Qualifier le projet' : bundle?.configuration?.titre}</h2></div>
+        <div><p className="text-xs uppercase tracking-wide text-secondary-500">Métré assisté · fumisterie</p><h2 id="metre-titre" className="text-lg font-semibold text-secondary-900">{etape === 0 ? 'Qualifier le projet' : etape === 2 ? 'Récapitulatif' : bundle?.configuration?.titre}</h2></div>
         <div className="flex items-center gap-1">
           {dossier && (draft || modifies.length > 0) && (
             <MenuActions actions={[{ label: 'Supprimer le brouillon', icon: Trash2, onClick: supprimerBrouillon, danger: true }]} />
@@ -155,7 +161,9 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
           : sansFournisseur ? <Blocage titre="Aucun fabricant de fumisterie configuré : importer un tarif et ses attributs" />
           : etape === 0 ? (confsQ.isLoading ? <Chargement libelle="Chargement des configurations" /> : <QualificationStep configurations={configurations} criteres={criteres} setCriteres={setCriteres} selectedId={configurationId} onContinue={choisirEtContinuer} />)
           : (!bundle || !releve || fab.isLoading || !resultat) ? <Chargement libelle="Calcul du métré" />
-          : (
+          : etape === 2 ? (
+            <RecapMetre configLibelle={configLibelle} releve={releve} fabricant={colonne?.nom} resultat={resultat} tvaDevis={tvaDevis} aConfirmer={aConfirmer} />
+          ) : (
             <div className="space-y-4">
               {/* Relevé incomplet / hors plage : dit sous chaque champ et compté dans le bandeau de ReleveStep. Une autre
                   erreur du calcul (gabarit non pris en charge) reste dite ici, sans le texte technique. */}
@@ -166,16 +174,24 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
           )}
       </main>
       {/* À la qualification, la carte cliquée est l'action : pas de pied, une seule sortie (la croix). */}
+      {/* Relevé : « Continuer » mène au récapitulatif, qui n'écrit rien. Seul le récapitulatif ajoute au devis. */}
       {etape === 1 && (
         <footer className="flex items-center justify-between px-4 py-3 bg-white border-t border-secondary-200">
           <Button variant="secondary" onClick={changerDeSolution}><ArrowLeft className="w-4 h-4" />Changer de solution</Button>
-          <button type="button" disabled={!injectable} title={raisonBouton} onClick={valider} className="btn-primary"><Check className="w-4 h-4 mr-1" /> Injecter dans le devis</button>
+          <Button variant="primary" disabled={!injectable} title={raisonBouton} onClick={() => setEtape(2)}>Continuer</Button>
         </footer>
       )}
-      <ConfirmDialog open={confirmationAlertes} onOpenChange={setConfirmationAlertes} variant="default" title="Des contrôles sont en alerte"
-        description="Vous pouvez injecter les lignes quand même : les alertes restent visibles dans le métré enregistré." confirmLabel="Injecter quand même" cancelLabel="Revenir au relevé" onConfirm={injecter}>
+      {etape === 2 && (
+        <footer className="flex items-center justify-between px-4 py-3 bg-white border-t border-secondary-200">
+          <Button variant="secondary" onClick={() => setEtape(1)}><ArrowLeft className="w-4 h-4" />Retour au relevé</Button>
+          <Button variant="primary" disabled={!injectable} onClick={valider}><Check className="w-4 h-4" />Ajouter au devis</Button>
+        </footer>
+      )}
+      <ConfirmDialog open={confirmationAjout} onOpenChange={setConfirmationAjout} variant="default" title={titreConfirmationAjout(aConfirmer)}
+        description="Les alertes restent dans le métré enregistré ; le prix d’une pièce se saisit dans le devis." confirmLabel="Ajouter quand même" cancelLabel="Revenir" onConfirm={injecter}>
         <ul className="mt-3 space-y-1.5 text-sm text-secondary-800">
-          {alertesBloquantes.map((a, i) => <li key={`${a.code}-${i}`} className="flex gap-2"><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-primary-700" /><span>{a.message}</span></li>)}
+          {aConfirmer.sansPrix.map((t, i) => <li key={`p-${i}`}>{t}</li>)}
+          {aConfirmer.alertes.map((a, i) => <li key={`${a.code}-${i}`} className="flex gap-2"><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-st-attente" /><span>{a.message}</span></li>)}
         </ul>
       </ConfirmDialog>
       {/* Brouillon trouvé à l'ouverture : on le reprend sur demande. Échap = reprendre (rien n'est perdu). */}

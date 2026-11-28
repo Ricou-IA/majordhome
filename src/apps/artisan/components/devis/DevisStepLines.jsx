@@ -393,6 +393,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
           leadId={leadId}
           dossier={dossierMetre}
           family={family}
+          tvaDevis={tvaDevis}
           onClose={() => setMetreForSection(null)}
           onValidate={handleMetreValidate}
         />

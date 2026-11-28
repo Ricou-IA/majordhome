@@ -2,7 +2,7 @@
 // les lignes du métré précédent sont remplacées, jamais doublées ; les lignes posées à la main restent.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { remplacerLignesMetre, versLignesDevis, finDuChapitre } from '../../src/apps/artisan/components/devis/metre/metreModel.js';
+import { remplacerLignesMetre, versLignesDevis, finDuChapitre, aConfirmerAvantAjout } from '../../src/apps/artisan/components/devis/metre/metreModel.js';
 
 const moteur = [
   { article_id: 'a1', libelle: 'Élément droit 1000', reference: 'PTR1000', quantite: 4, prix_vente_ht: 100 },
@@ -53,4 +53,27 @@ test('fin de chapitre : avant le chapitre suivant, ou en fin de devis', () => {
   const lines = [chapitre('A'), mo, chapitre('B'), mo, mo];
   assert.equal(finDuChapitre(lines, 0), 2);
   assert.equal(finDuChapitre(lines, 2), 5);
+});
+
+test('versLignesDevis : rien d’interne dans la description (elle s’imprime sur le devis client)', () => {
+  const lignes = versLignesDevis([...moteur, { article_id: 'a3', libelle: 'Support', reference: 'S', quantite: 1, prix_vente_ht: 10, statut: 'provisoire', sous_libelle: '1 par plancher' }], 's', 'X');
+  for (const l of lignes) assert.doesNotMatch(l.description, /CHIFFRER|provisoire/i);
+  assert.equal(lignes[2].unit_price_ht, 0); // pièce sans article : 0 €, « à chiffrer » se lit sur le prix
+  assert.equal(lignes[3].description, '1 par plancher');
+});
+test('versLignesDevis : la TVA du devis l’emporte sur celle du moteur', () => {
+  const avecTva = moteur.map((l) => ({ ...l, tva: 20 }));
+  assert.deepEqual(versLignesDevis(avecTva, 's', 'X', 5.5).map((l) => l.tva_rate), [5.5, 5.5, 5.5]);
+  assert.deepEqual(versLignesDevis(avecTva, 's', 'X', 20).map((l) => l.tva_rate), [20, 20, 20]);
+  assert.deepEqual(versLignesDevis(avecTva, 's', 'X').map((l) => l.tva_rate), [20, 20, 20]);
+});
+test('aConfirmerAvantAjout : pièces sans prix et alertes à accepter', () => {
+  const resultat = { lignes: [...moteur, { article_id: 'a4', libelle: 'Té', quantite: 1, prix_vente_ht: 30, statut: 'provisoire' }],
+    alertes: [{ niveau: 'warn', code: 'zone', message: 'Zone 1 non tenue' }, { niveau: 'warn', code: 'article_manquant', message: 'x' }, { niveau: 'info', code: 'i', message: 'y' }] };
+  const c = aConfirmerAvantAjout(resultat);
+  assert.deepEqual(c.sansPrix, ['Solin']);
+  assert.deepEqual(c.aValider, ['Té']);
+  assert.deepEqual(c.alertes.map((a) => a.code), ['zone']);
+  assert.equal(c.vide, false);
+  assert.equal(aConfirmerAvantAjout({ lignes: moteur.slice(0, 2), alertes: [] }).vide, true);
 });

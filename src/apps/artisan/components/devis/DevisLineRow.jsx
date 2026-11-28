@@ -18,6 +18,7 @@ import { TVA_RATES, computeLineTotals } from '@services/devis.service';
 import { formatEuro } from '@/lib/utils';
 import { GripVertical, Trash2, BookmarkPlus, Loader2, AlignLeft, Pencil } from 'lucide-react';
 import { MenuActions } from '@/components/ui/menu-actions';
+import { StatusPill } from '@/components/ui/status-pill';
 
 /**
  * @param {{ line: object, index: number, onUpdate: Function, onRemove: Function, poignee?: object,
@@ -93,6 +94,8 @@ export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee,
           </div>
         )}
       </div>
+      {/* Pièce sans prix (métré, offre importée) : dit sur la ligne ; le devis ne part pas dans Pennylane tant qu'elle est à 0 €. */}
+      {line.line_type === 'product' && !(Number(line.unit_price_ht) > 0) && <StatusPill tone="attente" taille="compacte" className="shrink-0">À chiffrer</StatusPill>}
       {/* Qté */}
       <input
         type="number"

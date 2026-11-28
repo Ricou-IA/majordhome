@@ -28,7 +28,7 @@ export default function ComparaisonFabricants({ comparaison, choisi, onChoisir }
               className={`text-left rounded-lg border p-3 ${actif ? 'border-primary-600 ring-2 ring-primary-200 bg-primary-50' : 'border-secondary-200 hover:border-secondary-400 bg-white'}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold text-secondary-900">{c.nom}</span>
-                {actif && <span className="inline-flex items-center gap-1 text-xs text-primary-800"><Check className="w-3.5 h-3.5" />Injecté</span>}
+                {actif && <span className="inline-flex items-center gap-1 text-xs text-primary-800"><Check className="w-3.5 h-3.5" />Sélectionné</span>}
               </div>
               {c.totaux ? (
                 <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-0.5 text-sm">

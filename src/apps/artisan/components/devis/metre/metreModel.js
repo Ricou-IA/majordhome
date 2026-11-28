@@ -87,12 +87,6 @@ export function releveInitial(gabarit, reglages, criteres = null) {
   return r;
 }
 
-/**
- * Lignes de devis (shape de DevisStepLines) depuis les lignes du moteur. Une ligne sans article
- * est injectée à 0 € avec « À CHIFFRER » dans la description — jamais écartée.
- * Le repère de la coupe cotée reste sur le dessin : il n'est pas repris dans la description
- * (la description s'imprime sur le devis client — Eric, 2026-10-27).
- */
 /** Index juste après le dernier enfant du chapitre `indexChapitre` (avant le chapitre suivant). */
 export function finDuChapitre(lines, indexChapitre) {
   let fin = indexChapitre + 1;
@@ -132,11 +126,32 @@ export function remplacerLignesMetre(lines, indexChapitre, lignesPrecedentes, no
   return { lines: result, retirees };
 }
 
-export function versLignesDevis(lignes, supplierId, supplierName) {
+/**
+ * La description s'imprime sur le devis client : seulement la précision de la pièce (« Lg 1000 mm »), jamais
+ * « À CHIFFRER » ni « quantité provisoire » (recette du 2026-11-28 : ces mots partaient au client). Une pièce sans
+ * article arrive à 0 € : « à chiffrer » se lit sur le prix (pastille de l'éditeur, envoi Pennylane refusé).
+ * Le repère de la coupe cotée reste sur le dessin (Eric, 2026-10-27). Une ligne sans article n'est jamais écartée.
+ * La TVA est celle du devis (`tvaDevis`) ; celle du moteur (réglage d'org) ne sert qu'à défaut — sinon 27 lignes
+ * à 20 % faisaient basculer un devis à 5,5 %, la TVA du devis étant le taux majoritaire de ses lignes.
+ */
+export function versLignesDevis(lignes, supplierId, supplierName, tvaDevis = null) {
   return lignes.map((l) => ({
     line_type: 'product', supplier_product_id: l.article_id, supplier_id: l.article_id ? supplierId : null, supplier_name: l.article_id ? supplierName : null,
-    designation: l.libelle, description: [l.sous_libelle, l.statut === 'provisoire' ? 'quantité provisoire' : null, l.article_id ? null : 'À CHIFFRER'].filter(Boolean).join(' · '),
+    designation: l.libelle, description: l.sous_libelle || '',
     reference: l.reference || '', quantity: l.quantite, unit: l.unite || 'pièce',
-    purchase_price_ht: l.prix_achat_ht, unit_price_ht: l.prix_vente_ht ?? 0, tva_rate: l.tva,
+    purchase_price_ht: l.prix_achat_ht, unit_price_ht: l.prix_vente_ht ?? 0, tva_rate: tvaDevis ?? l.tva,
   }));
+}
+
+/**
+ * Ce qu'il faut accepter avant « Ajouter au devis », réuni dans UNE confirmation : pièces sans prix (posées à 0 €),
+ * quantités à valider, alertes de contrôle (hors pièces à chiffrer, déjà dans la liste).
+ * @param {{ lignes: any[], alertes: any[] }} resultat
+ * @returns {{ sansPrix: string[], aValider: string[], alertes: any[], vide: boolean }}
+ */
+export function aConfirmerAvantAjout(resultat) {
+  const sansPrix = (resultat?.lignes || []).filter((l) => l.prix_vente_ht == null).map((l) => l.libelle);
+  const aValider = (resultat?.lignes || []).filter((l) => l.statut === 'provisoire').map((l) => l.libelle);
+  const alertes = (resultat?.alertes || []).filter((a) => a.niveau === 'warn' && a.code !== 'article_manquant' && a.code !== 'article_ambigu');
+  return { sansPrix, aValider, alertes, vide: !sansPrix.length && !alertes.length };
 }
