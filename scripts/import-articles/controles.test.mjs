@@ -53,6 +53,16 @@ test('ligne fournisseur : oui / sans_prix / sans_reference / sans_fournisseur', 
   assert.deepEqual(ok.fiche.fournisseur, { nom: 'Invicta', reference: 'R1', purchase_price_ht: 10, tarif_public: 15, purchase_price_at: '2026-03-15' });
   assert.equal(controlerArticle({ ...base, prix_achat: '0' }, o).ligneFournisseur, 'sans_prix');
   assert.equal(controlerArticle({ ...base, prix_achat: '0' }, o).fiche.name, 'A');
+  // Sous 0,005 : arrondi à 0,00 en base ⇒ traité comme absent, l'article reste importable sans ligne fournisseur
+  const minuscule = controlerArticle({ ...base, prix_achat: '0,004' }, o);
+  assert.equal(minuscule.ligneFournisseur, 'sans_prix');
+  assert.equal(minuscule.fiche.fournisseur, null);
+  assert.equal(minuscule.fiche.name, 'A');
+  assert.equal(controlerArticle({ ...base, prix_achat: '0,005' }, o).ligneFournisseur, 'oui');
+  // Prix d'achat hors plafond : illisible (compté), donc sans ligne fournisseur
+  const enorme = controlerArticle({ ...base, prix_achat: '100000000' }, o);
+  assert.equal(enorme.ligneFournisseur, 'sans_prix');
+  assert.ok(enorme.corrections.includes('prix_achat'));
   assert.equal(controlerArticle({ ...base, ref_fournisseur: '' }, o).ligneFournisseur, 'sans_reference');
   assert.equal(controlerArticle({ ...base, fournisseur: '' }, o).ligneFournisseur, 'sans_fournisseur');
   assert.equal(controlerArticle({ ...base, date_prix: '' }, o).fiche.fournisseur.purchase_price_at, null);

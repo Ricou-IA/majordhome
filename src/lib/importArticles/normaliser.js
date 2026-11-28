@@ -26,9 +26,12 @@ function lireNombre(texte, avecPourcent = false) {
   return /^\d+(\.\d+)?$/.test(s) ? Number(s) : null;
 }
 
+// Plafond d'un prix : la ligne fournisseur est en numeric(10,2) (99 999 999,99 au plus) ; au-delà, illisible.
+const PRIX_MAX = 100000000;
+
 function lirePrix(texte) {
   const n = lireNombre(texte);
-  return n === null ? ILLISIBLE : ok(n);
+  return n === null || n >= PRIX_MAX ? ILLISIBLE : ok(n);
 }
 
 // 0,2 et 20 désignent le même taux : une valeur inférieure à 1 est une fraction.

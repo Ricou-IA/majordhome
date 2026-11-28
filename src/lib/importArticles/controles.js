@@ -19,6 +19,8 @@ export const CLES_ROW_ARTICLE = [
   'product_kind', 'unit', 'default_tva_rate', 'selling_price_ht', 'description', 'ancien_numero', 'fournisseur',
 ];
 
+// Plus petit prix d'achat qui ne s'arrondit pas à 0,00 en numeric(10,2) (même borne que lots.js et la RPC).
+const ACHAT_MIN = 0.005;
 const texte = (v) => { const t = String(v ?? '').trim(); return t || null; };
 const cle = (v) => (v === null || v === undefined ? '' : String(v).trim().toLowerCase());
 const cleMarque = (v) => cle(v).replace(/\s+/g, ' ');
@@ -91,7 +93,8 @@ export function controlerArticle(valeurs, options = {}) {
   if (avecFournisseur) {
     if (!fournisseurNom) ligneFournisseur = 'sans_fournisseur';
     else if (!reference) ligneFournisseur = 'sans_reference';
-    else if (!(prixAchat > 0)) ligneFournisseur = 'sans_prix';
+    // Sous 0,005, le prix s'arrondirait à 0,00 en base : traité comme absent (l'article reste importable).
+    else if (!(prixAchat >= ACHAT_MIN)) ligneFournisseur = 'sans_prix';
     else {
       ligneFournisseur = 'oui';
       fiche.fournisseur = { nom: fournisseurNom, reference, purchase_price_ht: prixAchat, tarif_public: tarifPublic ?? null, purchase_price_at: datePrix ?? null };

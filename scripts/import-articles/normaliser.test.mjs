@@ -8,6 +8,14 @@ const ok = (valeur) => ({ valeur, illisible: false });
 const KO = { valeur: null, illisible: true };
 const VIDE = { valeur: null, illisible: false };
 
+test('prix au-delà de 99 999 999,99 : illisible (numeric(10,2) en base)', () => {
+  for (const champ of ['prix_vente', 'prix_achat', 'prix_public']) {
+    assert.deepEqual(lire(champ, '100000000'), KO, champ);
+    assert.deepEqual(lire(champ, '150 000 000,00 €'), KO, champ);
+    assert.deepEqual(lire(champ, '99 999 999,99'), ok(99999999.99), champ);
+  }
+});
+
 test('prix', () => {
   assert.deepEqual(lire('prix_vente', '1 234,50 €'), ok(1234.5));
   assert.deepEqual(lire('prix_vente', '1.234,50'), ok(1234.5));
