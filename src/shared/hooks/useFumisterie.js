@@ -48,8 +48,8 @@ export function useFumFabricantsDuMetre(orgId, bundle, diametre) {
       return {
         supplierId: f.id, nom: f.name, mapping: mapQs[i]?.data || [], articles: artQs[i]?.data || [],
         equivalences: equivalences.filter((e) => e.supplier_id === f.id), historique,
-        // Base de prix d'un fabricant ajouté : non vérifiée tant qu'Eric n'a pas confirmé achat = net, vente = public.
-        prixVerifies: historique,
+        // Achat = prix net négocié, vente = prix public : confirmé par Eric pour DINAK le 2026-11-28 (mis à jour à l'usage).
+        prixVerifies: true,
       };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
