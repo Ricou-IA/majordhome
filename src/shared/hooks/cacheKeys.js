@@ -294,6 +294,14 @@ export const certificatKeys = {
   rdvTechniciens: (orgId, interventionId) => [...certificatKeys.all(orgId), 'rdv-techniciens', interventionId],
 };
 
+// --- Aspirateur de sites fournisseurs ---
+export const aspirateurKeys = {
+  all: (orgId) => ['aspirateur', orgId],
+  etat: (orgId, supplierId, siteUrl) => [...aspirateurKeys.all(orgId), 'etat', supplierId, siteUrl || null],
+  travail: (orgId, supplierId) => [...aspirateurKeys.all(orgId), 'travail', supplierId],
+  propositions: (orgId, supplierId) => [...aspirateurKeys.all(orgId), 'propositions', supplierId],
+};
+
 // --- Suppliers ---
 export const supplierKeys = {
   all: (orgId) => ['suppliers', orgId],

@@ -45,6 +45,7 @@ import CatalogConnectorPanel from './suppliers/CatalogConnectorPanel';
 import CataloguePiecesPublicFields from './suppliers/CataloguePiecesPublicFields';
 import ImportOffreCatalogueModal from './suppliers/ImportOffreCatalogueModal';
 import AccesCompteFournisseur from './suppliers/AccesCompteFournisseur';
+import AspirateurFournisseur from './suppliers/AspirateurFournisseur';
 import { useCatalogItemsResume } from '@hooks/useCatalogItems';
 import { photoDeLigne, autresFournisseurs } from '@/lib/catalogue/articleLigne.js';
 import { logger } from '@lib/logger';
@@ -752,6 +753,7 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
       </div>
 
       {supplier.connector && <CatalogConnectorPanel supplier={supplier} orgId={orgId} />}
+      {supplier.site_url && <AspirateurFournisseur supplier={supplier} orgId={orgId} />}
       {importOffre && <ImportOffreCatalogueModal supplier={supplier} orgId={orgId} onClose={() => { setImportOffre(false); refetch(); }} />}
 
       {/* Import info + template download */}
