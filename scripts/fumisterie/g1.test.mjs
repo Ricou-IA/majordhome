@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { geometrieG1, hauteurSortieMinimale } from '../../src/lib/fumisterie/gabarits/g1.js';
 import { controlesG1 } from '../../src/lib/fumisterie/controles.js';
 import { buildFumisterieConfig } from '../../src/lib/fumisterie/config.js';
+import { explicationSortie, textesSortie } from '../../src/lib/fumisterie/explicationSortie.js';
 
 const cfg = buildFumisterieConfig(null);
 const RELEVE = { diametre: 150, finition: 'noir', hBuse: 1.05, hsp1: 2.5, epPl: 0.25, nbEtages: 1, hsp2: 2.5,
@@ -55,4 +56,20 @@ test('sans dévoiement ni étage', () => {
   const r = { ...RELEVE, angle: 0, decal: 0, nbEtages: 0 };
   const g = geometrieG1(r, cfg);
   assert.equal(g.planchers, 1); pres(g.yC, 2.75); assert.equal(g.vg, 0); assert.equal(g.devOK, true);
+});
+
+test('explication du minimum de sortie (maquette) : 1,52 réglementaire, 0,19 déjà gagnés, 1,35 à viser, 1,94 réels', () => {
+  const g = geometrieG1(RELEVE, cfg);
+  const h = hauteurSortieMinimale(RELEVE, cfg);
+  const e = explicationSortie('G1', g, h, RELEVE.hSortie);
+  pres(e.minReglementaire, 1.5203); pres(e.dejaCouvert, 0.193); pres(e.elementsStandard, 0.15); pres(e.hauteurReelle, 1.943);
+  assert.equal(e.aViser, 1.35);
+  assert.ok(e.aViser >= e.minReglementaire - e.dejaCouvert);
+  pres(e.saisie + e.elementsStandard + e.dejaCouvert, e.hauteurReelle);
+  const t = textesSortie(e);
+  assert.equal(t.bouton, 'Mettre à 1,35 m');
+  assert.equal(t.aViser, 'À viser : 1,35 m. Hauteur réglementaire 1,52 m, moins 0,19 m déjà gagnés par le conduit intérieur, arrondie aux 5 cm au-dessus.');
+  assert.equal(t.hauteur, 'Hauteur réelle au-dessus du toit : 1,94 m (1,60 m saisis + 0,15 m d’éléments standard + 0,19 m de conduit intérieur).');
+  assert.equal(explicationSortie('G4', g, h, 1.6), null);
+  assert.equal(textesSortie(explicationSortie('G1', g, NaN, 1.6)).bouton, 'Ajuster la sortie au minimum');
 });

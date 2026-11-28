@@ -2,7 +2,9 @@
 // Étape 2 du métré : coupe cotée + formulaire de relevé + contrôles + liste de pièces,
 // recalculés en direct par le moteur pur (src/lib/fumisterie). Le résultat est calculé UNE fois
 // par l'orchestrateur (comparerFabricants, colonne du fabricant choisi) : ce qui s'affiche est ce qui sera injecté.
+import { useMemo } from 'react';
 import { sortieMinimale } from '@/lib/fumisterie/index.js';
+import { explicationSortie, textesSortie } from '@/lib/fumisterie/explicationSortie.js';
 import CoupeCotee from './CoupeCotee';
 import ReleveForm from './ReleveForm';
 import ComplementsForm from './ComplementsForm';
@@ -12,10 +14,13 @@ import { messageChamp, titreChampsAcorriger } from '@/lib/fumisterie/messagesRel
 
 // `erreurs` : refus du relevé par clé (champsAcorriger), écrits sous chaque champ.
 export default function ReleveStep({ bundle, reglages, releve, setReleve, resultat, erreurs, aCorriger = [], comparaison, fabricantChoisi, onChoisirFabricant }) {
-  const minSortie = resultat.geometrie ? resultat.geometrie.minSortie : null;
+  // Valeur que « Ajuster » écrit (relevé incomplet ailleurs ⇒ incalculable, rien n'est écrit) et son explication.
+  const appliquee = useMemo(() => (resultat.geometrie ? sortieMinimale({ ...bundle, reglages, releve }) : null), [resultat.geometrie, bundle, reglages, releve]);
+  const explication = explicationSortie(bundle.gabarit?.code, resultat.geometrie, appliquee, releve.hSortie);
+  const sortie = explication ? textesSortie(explication) : null;
   const focusChamp = (cle) => { const el = document.getElementById(`fum-${cle}`); if (el) { el.focus(); el.select?.(); } };
   // Relevé incomplet ailleurs → minimum incalculable (NaN) : on ne l'écrit pas dans le champ.
-  const ajuster = () => { const h = sortieMinimale({ ...bundle, reglages, releve }); if (Number.isFinite(h)) setReleve({ ...releve, hSortie: h }); };
+  const ajuster = () => { if (Number.isFinite(appliquee)) setReleve({ ...releve, hSortie: appliquee }); };
   return (
     <div className="space-y-5">
       {aCorriger.length > 0 && (
@@ -36,7 +41,7 @@ export default function ReleveStep({ bundle, reglages, releve, setReleve, result
             : <p className="p-3 text-sm text-secondary-600">{resultat.erreur ? 'La coupe s’affiche quand le relevé est complet.' : `Pas de coupe dessinée pour le gabarit ${bundle.gabarit?.code}.`}</p>}
         </div>
         <div className="border border-secondary-200 rounded-xl bg-white p-4">
-          <ReleveForm gabarit={bundle.gabarit} releve={releve} onChange={setReleve} onAjuster={ajuster} minSortie={minSortie} erreurs={erreurs} />
+          <ReleveForm gabarit={bundle.gabarit} releve={releve} onChange={setReleve} onAjuster={ajuster} sortie={sortie} erreurs={erreurs} />
           <ComplementsForm gabaritCode={bundle.gabarit?.code} releve={releve} onChange={setReleve} />
         </div>
       </div>

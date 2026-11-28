@@ -7,6 +7,7 @@ import { geometrieG6 } from '../../src/lib/fumisterie/gabarits/g6.js';
 import { controlesG3, controlesG6 } from '../../src/lib/fumisterie/controles.js';
 import { validerReleve, sortieMinimale, calculerMetre } from '../../src/lib/fumisterie/index.js';
 import { buildFumisterieConfig } from '../../src/lib/fumisterie/config.js';
+import { explicationSortie, textesSortie } from '../../src/lib/fumisterie/explicationSortie.js';
 
 const cfg = buildFumisterieConfig(null);
 const lire = (f) => JSON.parse(readFileSync(new URL(`./data/${f}`, import.meta.url), 'utf8'));
@@ -74,4 +75,13 @@ test('G4P : le bas de conduit pilote l\'entrée (mur → hEntree exigé) et le f
   assert.equal(foyer.geometrie.Lsp, 0);
   assert.ok(!foyer.lignes.some((l) => l.composant_code.startsWith('tuyau_')));
   assert.ok(!foyer.alertes.some((a) => a.code === 'buse'));
+});
+
+test('G3 : explication du minimum de sortie, sans conduit intérieur', () => {
+  const g = geometrieG3(R3, cfg);
+  const e = explicationSortie('G3', g, hauteurSortieMinimaleG3(R3, cfg), R3.hSortie);
+  assert.equal(e.repere, 'gouttiere');
+  assert.equal(e.dejaCouvert, 0);
+  assert.ok(Math.abs(e.saisie + e.elementsStandard - e.hauteurReelle) < 1e-6);
+  assert.match(textesSortie(e).aViser, /au-dessus de la gouttière, arrondie aux 5 cm au-dessus\.$/);
 });

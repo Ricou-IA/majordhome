@@ -6,9 +6,11 @@ import { parametreVisible as visible } from '@/lib/fumisterie/index.js';
 import { libelleChoix } from '@/lib/fumisterie/planModel.js';
 import { messageChamp } from '@/lib/fumisterie/messagesReleve.js';
 import ChampMesure from './ChampMesure';
+import { Button } from '@/components/ui/button';
 
 // `erreurs` : refus du relevé par clé (champsAcorriger), écrits sous le champ fautif.
-export default function ReleveForm({ gabarit, releve, onChange, onAjuster, minSortie, erreurs = {} }) {
+// `sortie` : textes du bloc « Ajuster » (textesSortie) — d'où vient la valeur appliquée et la hauteur réelle. null = rien à expliquer.
+export default function ReleveForm({ gabarit, releve, onChange, onAjuster, sortie = null, erreurs = {} }) {
   const set = (cle, v) => onChange({ ...releve, [cle]: v });
   const idErreur = (cle) => (erreurs[cle] ? `fum-${cle}-erreur` : null);
   return (
@@ -37,8 +39,9 @@ export default function ReleveForm({ gabarit, releve, onChange, onAjuster, minSo
             ))}
             {t.type === 'sortie_toit' && (
               <div className="col-span-2">
-                <button type="button" onClick={onAjuster} className="w-full text-left px-3 py-2 rounded-md border border-secondary-400 bg-secondary-50 text-sm font-medium text-secondary-800 hover:bg-secondary-700 hover:text-white">↥ Ajuster la sortie au minimum de zone 1</button>
-                {minSortie != null && <p className="text-xs text-secondary-500 mt-1">Minimum réglementaire calculé : {Number(minSortie).toFixed(2).replace('.', ',')} m au-dessus du toit.</p>}
+                <Button type="button" variant="secondary" size="sm" onClick={onAjuster}>{sortie?.bouton || 'Ajuster la sortie au minimum'}</Button>
+                {sortie?.aViser && <p className="text-caption text-secondary-700 mt-1.5">{sortie.aViser}</p>}
+                {sortie?.hauteur && <p className="text-caption text-secondary-600 mt-0.5">{sortie.hauteur}</p>}
               </div>
             )}
           </div>
