@@ -12,7 +12,7 @@ import { ListeChoix } from '@/components/ui/liste-choix';
 import { formatEuro } from '@/lib/utils';
 import { NATURES_ARTICLE } from '@/lib/catalogue/natures.js';
 import { champArticle } from '@/lib/importArticles/champs';
-import { NATURE_ECARTER } from '@/lib/importArticles/valeurs';
+import { optionsDuChamp } from '@/lib/importArticles/envoi';
 import { aImporter } from '@/lib/importArticles/controles';
 import { raisonAfficheeArticle } from '@/lib/importArticles/fichierType';
 import { Repliable } from '@/apps/artisan/components/clients/import/ListeLignes';
@@ -20,16 +20,8 @@ import { CHAMPS_A_INTERPRETER, OPTIONS_VALEURS } from './useParcoursImportArticl
 
 const LIBELLE_NATURE = Object.fromEntries(NATURES_ARTICLE.map((n) => [n.value, n.label]));
 
-// Choix « par défaut » de chaque champ : ce que l'import écrit quand la valeur du fichier n'est pas reconnue.
-const OPTIONS_PAR_CHAMP = {
-  nature: [
-    { value: '', label: 'Équipement (par défaut)' },
-    ...OPTIONS_VALEURS.nature,
-    { value: NATURE_ECARTER, label: 'Ne pas importer (ouvrage, composant)' },
-  ],
-  categorie: [{ value: '', label: 'Sans catégorie' }, ...OPTIONS_VALEURS.categorie],
-  unite: [{ value: '', label: 'Pièce (par défaut)' }, ...OPTIONS_VALEURS.unite],
-};
+// Choix proposés : la valeur par défaut est une option réelle (la choisir rend la valeur reconnue).
+const OPTIONS_PAR_CHAMP = Object.fromEntries(CHAMPS_A_INTERPRETER.map((c) => [c, optionsDuChamp(c, OPTIONS_VALEURS[c])]));
 
 /** Fournisseurs nommés dans le fichier : reconnus, ou à créer (coche « Créer », cochée par défaut). */
 export function FournisseursDuFichier({ fournisseurs, enCours, onCreation }) {
@@ -76,7 +68,7 @@ export function ValeursAInterpreter({ valeurs, enCours, onValeur }) {
     <Card as="section" aria-labelledby="apercu-valeurs">
       <CardHeader
         title={<span id="apercu-valeurs">Valeurs à interpréter</span>}
-        subtitle="Vérifiez ce que devient chaque valeur de votre fichier. Une valeur non reconnue prend la valeur par défaut."
+        subtitle="Vérifiez ce que devient chaque valeur de votre fichier. Une valeur non reconnue prend la valeur par défaut et se compte « illisible »."
       />
       <div className="px-5 pb-5 space-y-5">
         {champs.map((champ) => (
@@ -92,11 +84,12 @@ export function ValeursAInterpreter({ valeurs, enCours, onValeur }) {
               <tbody>
                 {valeurs[champ].distinctes.map((brute) => {
                   const cible = valeurs[champ].table[brute] || '';
+                  const nonReconnue = !cible && !valeurs[champ].explicites.has(brute);
                   return (
-                    <tr key={brute} className={`border-b border-secondary-100 ${cible ? '' : 'bg-st-attente-bg'}`}>
+                    <tr key={brute} className={`border-b border-secondary-100 ${nonReconnue ? 'bg-st-attente-bg' : ''}`}>
                       <th scope="row" className="py-1.5 pr-4 font-medium text-secondary-900 text-left">
                         {brute}
-                        {!cible && <span className="block text-xs font-normal text-st-attente">Non reconnue</span>}
+                        {nonReconnue && <span className="block text-xs font-normal text-st-attente">Non reconnue</span>}
                       </th>
                       <td className="py-1.5">
                         <ListeChoix

@@ -25,12 +25,15 @@ import { champArticle } from '@/lib/importArticles/champs';
 import {
   proposerCorrespondanceArticles, validerCorrespondanceArticles, appliquerCorrespondanceArticles,
 } from '@/lib/importArticles/correspondance';
-import { proposerValeurs, valeursDistinctes } from '@/lib/importArticles/valeurs';
+import { NATURE_ECARTER, proposerValeurs, valeursDistinctes } from '@/lib/importArticles/valeurs';
 import { rapprocherFournisseurs } from '@/lib/importArticles/fournisseurs';
 import {
-  controlerArticle, classerArticles, aImporter, choixPourTousLesDoublons, bilan as bilanArticles, lignesPourEcriture,
+  controlerArticle, classerArticles, aImporter, choixPourTousLesDoublons, bilan as bilanArticles,
 } from '@/lib/importArticles/controles';
-import { verifierLigneArticle } from '@/lib/importArticles/lots';
+import {
+  preparerEcriture, resolusPrevus, resolusApresOuverture, resumeCorrections, resumeSansLigne, tableDesValeurs,
+  appliquerUniteCategorie,
+} from '@/lib/importArticles/envoi';
 
 /** Champs dont les valeurs du fichier se rapprochent de celles de Majord'home, à l'aperçu. */
 export const CHAMPS_A_INTERPRETER = ['nature', 'categorie', 'unite'];
@@ -43,38 +46,11 @@ export const OPTIONS_VALEURS = {
   unite: UNITES_ARTICLE.map((u) => ({ value: u, label: LIBELLE_UNITE[u] || u })),
 };
 
-// Identifiant provisoire d'un fournisseur « à créer » pour contrôler les lignes avant l'ouverture de l'import :
-// le vrai identifiant n'existe qu'après `catalog_items_import_start`. Jamais envoyé à la base.
-const FOURNISSEUR_PROVISOIRE = '00000000-0000-4000-8000-000000000000';
-
-// Clé de ligne refusée (verifierLigneArticle) → champ du catalogue dont on affiche le libellé.
-const CHAMP_DE_CLE = {
-  name: 'designation', code: 'code', brand: 'marque', model_key: 'modele', modele_brut: 'modele', code_ean: 'ean',
-  category: 'categorie', gamme: 'gamme', product_kind: 'nature', unit: 'unite', default_tva_rate: 'tva',
-  selling_price_ht: 'prix_vente', description: 'description', ancien_numero: 'ancien_numero',
-};
-function raisonRefus(cle) {
-  if (cle === 'fournisseur') return 'Ligne fournisseur refusée au contrôle avant envoi';
-  if (cle === 'import_line') return 'Numéro de ligne refusé au contrôle avant envoi';
-  const libelle = champArticle(CHAMP_DE_CLE[cle])?.libelle || cle;
-  return `Valeur « ${libelle} » refusée au contrôle avant envoi`;
-}
-
-/**
- * Lignes à écrire, chacune passée par `verifierLigneArticle` : une ligne refusée devient une ligne écartée (avec sa
- * raison), jamais envoyée. Rend aussi le classement corrigé, pour que bilan et lignes écartées en tiennent compte.
- */
-function preparerEcriture(classees, choix, resolus) {
-  const lignes = [];
-  const refus = new Map();
-  for (const l of lignesPourEcriture(classees, choix, resolus)) {
-    const cle = verifierLigneArticle(l);
-    if (cle) refus.set(l.import_line, cle); else lignes.push(l);
-  }
-  const classeesFinales = refus.size === 0 ? classees : classees.map((c) => (refus.has(c.numero)
-    ? { ...c, fiche: null, raison: raisonRefus(refus.get(c.numero)), doublon: null, recochable: false }
-    : c));
-  return { classeesFinales, lignes };
+/** Valeurs distinctes d'un champ interprété, table brute → Majord'home et valeurs choisies à la main. */
+function valeursDuChamp(champ, candidats, champsChoisis, choisies) {
+  const distinctes = candidats && champsChoisis.has(champ) ? valeursDistinctes(candidats, champ) : [];
+  const proposees = proposerValeurs(champ, distinctes, OPTIONS_VALEURS[champ]);
+  return { distinctes, ...tableDesValeurs(distinctes, proposees, choisies) };
 }
 
 const VALEURS_VIDES = () => ({ nature: {}, categorie: {}, unite: {} });
@@ -169,28 +145,6 @@ function reducteur(etat, action) {
   }
 }
 
-/** Nombre de lignes par clé de valeur corrigée, sur les lignes importées. */
-function resumeCorrections(classees, choix) {
-  const compte = new Map();
-  for (const c of classees) {
-    if (!aImporter(c, choix)) continue;
-    for (const cle of c.corrections) compte.set(cle, (compte.get(cle) || 0) + 1);
-  }
-  return [...compte].map(([cle, nombre]) => ({ cle, nombre }));
-}
-
-/** Articles importés sans ligne fournisseur, par raison. */
-function resumeSansLigne(classees, choix, lignes) {
-  const avecLigne = new Set(lignes.filter((l) => l.fournisseur).map((l) => l.import_line));
-  const r = { sans_prix: 0, sans_reference: 0, sans_fournisseur: 0, existante: 0, non_creee: 0 };
-  for (const c of classees) {
-    if (!aImporter(c, choix) || avecLigne.has(c.numero)) continue;
-    if (c.ligneFournisseur === 'oui') r[c.ligneExistante ? 'existante' : 'non_creee'] += 1;
-    else if (c.ligneFournisseur in r) r[c.ligneFournisseur] += 1;
-  }
-  return r;
-}
-
 /**
  * @param {string} orgId
  */
@@ -214,35 +168,35 @@ export function useParcoursImportArticles(orgId) {
   );
 
   // Valeurs du fichier à interpréter (nature, catégorie, unité) : proposition, puis choix de l'utilisateur.
-  const valeurs = useMemo(() => {
-    const champsChoisis = new Set(correspondance.map((c) => c.cible));
-    const resultat = {};
-    for (const champ of CHAMPS_A_INTERPRETER) {
-      const distinctes = candidats && champsChoisis.has(champ) ? valeursDistinctes(candidats, champ) : [];
-      const proposees = proposerValeurs(champ, distinctes, OPTIONS_VALEURS[champ]);
-      const choisies = valeursChoisies[champ] || {};
-      const table = {};
-      for (const brute of distinctes) table[brute] = brute in choisies ? choisies[brute] : proposees[brute];
-      resultat[champ] = { distinctes, table };
-    }
-    return resultat;
-  }, [candidats, correspondance, valeursChoisies]);
+  // Une table par champ, mémorisée à part : changer une unité ne recalcule ni les fournisseurs ni le classement.
+  const champsChoisis = useMemo(() => new Set(correspondance.map((c) => c.cible)), [correspondance]);
+  const nature = useMemo(() => valeursDuChamp('nature', candidats, champsChoisis, valeursChoisies.nature), [candidats, champsChoisis, valeursChoisies.nature]);
+  const categorie = useMemo(() => valeursDuChamp('categorie', candidats, champsChoisis, valeursChoisies.categorie), [candidats, champsChoisis, valeursChoisies.categorie]);
+  const unite = useMemo(() => valeursDuChamp('unite', candidats, champsChoisis, valeursChoisies.unite), [candidats, champsChoisis, valeursChoisies.unite]);
+  const valeurs = useMemo(() => ({ nature, categorie, unite }), [nature, categorie, unite]);
   const valeursInterpretees = useMemo(
-    () => ({ nature: valeurs.nature.table, categorie: valeurs.categorie.table, unite: valeurs.unite.table }),
-    [valeurs],
+    () => ({ nature: nature.table, categorie: categorie.table, unite: unite.table }),
+    [nature, categorie, unite],
   );
 
   // Fournisseurs nommés par les lignes qui auront une ligne fournisseur, rapprochés de ceux de l'entreprise.
   const fournisseursOrg = useCatalogImportSuppliers(orgId);
+  // Seules les natures « Ne pas importer » changent la liste des noms : la passe (≈ 0,15 s sur 50 000 lignes) ne se
+  // refait que quand elles changent.
+  const naturesEcartees = useMemo(
+    () => Object.keys(nature.table).filter((k) => nature.table[k] === NATURE_ECARTER).sort().join('\u0000'),
+    [nature.table],
+  );
   const nomsFournisseurs = useMemo(() => {
     if (!candidats || !avecFournisseur) return [];
+    const tableEcartees = Object.fromEntries((naturesEcartees ? naturesEcartees.split('\u0000') : []).map((k) => [k, NATURE_ECARTER]));
     const noms = [];
     for (const c of candidats) {
-      const r = controlerArticle(c.valeurs, { valeursInterpretees: { nature: valeursInterpretees.nature }, avecFournisseur: true });
+      const r = controlerArticle(c.valeurs, { valeursInterpretees: { nature: tableEcartees }, avecFournisseur: true });
       if (r.ligneFournisseur === 'oui') noms.push(r.fiche.fournisseur.nom);
     }
     return noms;
-  }, [candidats, avecFournisseur, valeursInterpretees.nature]);
+  }, [candidats, avecFournisseur, naturesEcartees]);
   // undefined = inconnu (fournisseurs de l'entreprise en chargement ou en échec) : import fermé.
   const rapprochement = useMemo(() => {
     if (nomsFournisseurs.length === 0) return [];
@@ -262,10 +216,18 @@ export function useParcoursImportArticles(orgId) {
   // Articles et lignes fournisseur existants : demandés à l'aperçu seulement, une fois les fournisseurs connus.
   const existants = useExistantArticles(orgId, idsExistants, { enabled: !!candidats && rapprochement !== undefined });
 
-  const classees = useMemo(() => {
+  // Classement (≈ 0,4 s sur 50 000 lignes) refait seulement quand la nature change : unité et catégorie, qui ne jouent
+  // pas sur les doublons, sont réappliquées à part (appliquerUniteCategorie, même règle, testée équivalente).
+  const classeesSansValeurs = useMemo(() => {
     if (!candidats || rapprochement === undefined || !existants.existant) return null;
-    return classerArticles(candidats, existants.existant, { valeursInterpretees, avecFournisseur, fournisseursResolus: resolusExistants });
-  }, [candidats, rapprochement, existants.existant, valeursInterpretees, avecFournisseur, resolusExistants]);
+    return classerArticles(candidats, existants.existant, {
+      valeursInterpretees: { nature: nature.table }, avecFournisseur, fournisseursResolus: resolusExistants,
+    });
+  }, [candidats, rapprochement, existants.existant, nature.table, avecFournisseur, resolusExistants]);
+  const classees = useMemo(
+    () => (classeesSansValeurs ? appliquerUniteCategorie(classeesSansValeurs, candidats, { unite: unite.table, categorie: categorie.table }) : null),
+    [classeesSansValeurs, candidats, unite.table, categorie.table],
+  );
 
   // Fournisseurs « à créer » cochés : un identifiant provisoire pour contrôler leurs lignes avant l'ouverture.
   const fournisseursAEnvoyer = useMemo(
@@ -274,9 +236,9 @@ export function useParcoursImportArticles(orgId) {
   );
   const apercu = useMemo(() => {
     if (!classees) return null;
-    const resolusPrevus = { ...resolusExistants };
-    for (const r of fournisseursAEnvoyer) if (r.aCreer) resolusPrevus[r.cle] = FOURNISSEUR_PROVISOIRE;
-    const { classeesFinales, lignes } = preparerEcriture(classees, choix, resolusPrevus);
+    // Un identifiant provisoire DISTINCT par fournisseur à créer : deux fournisseurs nouveaux qui ont une même
+    // référence gardent chacun leur ligne fournisseur, à l'aperçu comme à l'envoi.
+    const { classeesFinales, lignes } = preparerEcriture(classees, choix, resolusPrevus(fournisseursAEnvoyer, resolusExistants));
     // Lignes fournisseur comptées sur ce qui partira vraiment (un fournisseur décoché envoie ses lignes sans lui).
     const avecLigne = lignes.filter((l) => l.fournisseur);
     return {
@@ -314,11 +276,7 @@ export function useParcoursImportArticles(orgId) {
       lignes: prevues,
       // Après l'ouverture : vrais identifiants des fournisseurs, puis mêmes lignes qu'à l'aperçu, sinon rien ne part.
       preparer: (rendus) => {
-        if (!Array.isArray(rendus) || rendus.length !== aEnvoyer.length || rendus.some((f) => typeof f?.supplier_id !== 'string')) {
-          throw new Error("La base n'a pas rendu tous les fournisseurs : aucun article n'a été envoyé. Revenez à l'aperçu.");
-        }
-        const resolus = { ...resolusExistants };
-        aEnvoyer.forEach((r, i) => { resolus[r.cle] = rendus[i].supplier_id; });
+        const resolus = resolusApresOuverture(aEnvoyer, rendus, resolusExistants);
         const { lignes } = preparerEcriture(classees, choix, resolus);
         const avec = (liste) => liste.filter((l) => l.fournisseur).length;
         if (lignes.length !== prevues.length || avec(lignes) !== avec(prevues)) {

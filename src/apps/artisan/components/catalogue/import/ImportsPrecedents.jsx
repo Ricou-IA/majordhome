@@ -75,6 +75,7 @@ function RetraitDialog({ orgId, imp, onClose }) {
       variant="destructive"
       onConfirm={confirmer}
       loading={retrait.isPending}
+      texteASaisir={imp.file_name}
       /* Fermé seulement quand des articles restent et qu'aucun ne peut partir ; un import vide se retire de la liste. */
       confirmDisabled={apercu.isFetching || !apercu.data || (apercu.data.retirables <= 0 && apercu.data.conservees > 0)}
     />

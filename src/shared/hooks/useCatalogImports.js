@@ -108,7 +108,8 @@ export function useRetirerImportArticles(orgId) {
  * déjà contrôlées (clés de CLES_ROW_ARTICLE), `depuis` = premier lot à envoyer (0 par défaut).
  * `preparer(fournisseursRendus)` (facultatif) rend les lignes DÉFINITIVES une fois l'import ouvert : un fournisseur
  * créé à l'ouverture n'a d'identifiant qu'à ce moment. `lignes` sert alors au contrôle « rien à importer » d'avant
- * l'ouverture ; si `preparer` lève, l'import ouvert reste « en cours » sans article (retirable de la liste).
+ * l'ouverture ; si `preparer` lève, l'import ouvert reste « en cours » sans article (retirable de la liste) et les
+ * listes (imports, fournisseurs créés) se relisent.
  * Lignes et comptes sont gardés pour `reprendre()` (reprise au lot refusé, la base ignore les lignes déjà écrites).
  * Au départ, l'import reçoit le bilan PRÉVU ; seule la clôture écrit `importees` (articles réellement créés).
  * `abandonner()` quitte un import interrompu sans le reprendre (les articles créés restent, retirables).
@@ -181,6 +182,7 @@ export function useExecuterImportArticles(orgId) {
     setErreur(null);
     setBilan(null);
     let plan = null;
+    let ouvertSansPlan = false; // import ouvert (fournisseurs créés) mais lignes non préparées
     try {
       if (!lignes || lignes.length === 0) {
         setErreur('Aucun article à importer.');
@@ -197,6 +199,7 @@ export function useExecuterImportArticles(orgId) {
       }));
       if (!ouvert?.import_id) throw new Error("La base n'a pas rendu d'identifiant d'import.");
       setFournisseurs(ouvert.fournisseurs ?? []);
+      ouvertSansPlan = true;
       const definitives = preparer ? preparer(ouvert.fournisseurs ?? []) : lignes;
       setProgression({ faits: 0, total: definitives.length });
       plan = {
@@ -211,6 +214,8 @@ export function useExecuterImportArticles(orgId) {
       else {
         setErreur(messageErreurImportArticles(e));
         changerEtat('repos');
+        // `preparer` a levé après l'ouverture : des fournisseurs ont pu être créés, l'import reste dans la liste.
+        if (ouvertSansPlan) invaliderFamilles(queryClient, orgId);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
