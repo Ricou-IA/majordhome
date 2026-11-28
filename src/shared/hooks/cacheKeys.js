@@ -614,3 +614,13 @@ export const clientImportKeys = {
   existants: (orgId) => [...clientImportKeys.all(orgId), 'existants'],
   apercuRetrait: (orgId, importId) => [...clientImportKeys.all(orgId), 'retrait', importId],
 };
+
+// --- Imports d'articles (fichier d'un autre logiciel) ---
+export const catalogImportKeys = {
+  all: (orgId) => ['catalog-imports', orgId],
+  list: (orgId) => [...catalogImportKeys.all(orgId), 'list'],
+  // supplierIds : triés par l'appelant, la clé ne dépend pas de l'ordre de choix
+  existant: (orgId, supplierIds) => [...catalogImportKeys.all(orgId), 'existant', ...(supplierIds || [])],
+  fournisseurs: (orgId) => [...catalogImportKeys.all(orgId), 'fournisseurs'],
+  apercuRetrait: (orgId, importId) => [...catalogImportKeys.all(orgId), 'retrait', importId],
+};
