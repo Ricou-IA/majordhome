@@ -104,8 +104,11 @@ export function useRetirerImportArticles(orgId) {
 
 /**
  * Exécute un import : ouvre l'import, envoie les lots l'un après l'autre, le clôt avec son bilan.
- * `lancer({ import, lignes, depuis })` : `import` = `{ fileName, mapping, counts, fournisseurs }`, `lignes` = lignes
+ * `lancer({ import, lignes, preparer, depuis })` : `import` = `{ fileName, mapping, counts, fournisseurs }`, `lignes` = lignes
  * déjà contrôlées (clés de CLES_ROW_ARTICLE), `depuis` = premier lot à envoyer (0 par défaut).
+ * `preparer(fournisseursRendus)` (facultatif) rend les lignes DÉFINITIVES une fois l'import ouvert : un fournisseur
+ * créé à l'ouverture n'a d'identifiant qu'à ce moment. `lignes` sert alors au contrôle « rien à importer » d'avant
+ * l'ouverture ; si `preparer` lève, l'import ouvert reste « en cours » sans article (retirable de la liste).
  * Lignes et comptes sont gardés pour `reprendre()` (reprise au lot refusé, la base ignore les lignes déjà écrites).
  * Au départ, l'import reçoit le bilan PRÉVU ; seule la clôture écrit `importees` (articles réellement créés).
  * `abandonner()` quitte un import interrompu sans le reprendre (les articles créés restent, retirables).
@@ -172,7 +175,7 @@ export function useExecuterImportArticles(orgId) {
     invaliderFamilles(queryClient, plan.orgId);
   };
 
-  const lancer = useCallback(async ({ import: ouverture, lignes, depuis = 0 }) => {
+  const lancer = useCallback(async ({ import: ouverture, lignes, preparer, depuis = 0 }) => {
     if (etatRef.current === 'en_cours' || etatRef.current === 'interrompu') return;
     changerEtat('en_cours');
     setErreur(null);
@@ -194,9 +197,11 @@ export function useExecuterImportArticles(orgId) {
       }));
       if (!ouvert?.import_id) throw new Error("La base n'a pas rendu d'identifiant d'import.");
       setFournisseurs(ouvert.fournisseurs ?? []);
+      const definitives = preparer ? preparer(ouvert.fournisseurs ?? []) : lignes;
+      setProgression({ faits: 0, total: definitives.length });
       plan = {
-        orgId, importId: ouvert.import_id, counts: ouverture.counts, total: lignes.length,
-        lots: decouperEnLots(lignes), prochain: depuis, created: 0, skipped: 0, lignesFournisseur: 0, lotsEnvoyes: false,
+        orgId, importId: ouvert.import_id, counts: ouverture.counts, total: definitives.length,
+        lots: decouperEnLots(definitives), prochain: depuis, created: 0, skipped: 0, lignesFournisseur: 0, lotsEnvoyes: false,
       };
       planRef.current = plan;
       await executer(plan);
