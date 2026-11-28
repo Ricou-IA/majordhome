@@ -86,3 +86,13 @@ test('provenance et source reportées sur chaque proposition', () => {
   assert.equal(r.propositions[0].provenance, 'public');
   assert.equal(r.propositions[0].source_url, 'https://pro.invicta-group.fr/p/1');
 });
+
+test('types de document ↔ libellés des documents d’article', async () => {
+  const { libelleDocument, typeDocument } = await import('../../src/lib/aspirateur/propositions.js');
+  assert.equal(libelleDocument('fiche_technique'), 'Fiche technique');
+  assert.equal(libelleDocument('declaration_performance'), 'Déclaration de performance');
+  assert.equal(typeDocument('Fiche technique'), 'fiche_technique');
+  assert.equal(typeDocument('fiche TECHNIQUE'), 'fiche_technique');
+  assert.equal(typeDocument('Notice'), 'notice');
+  assert.equal(typeDocument('Photo'), null);
+});

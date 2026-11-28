@@ -17,8 +17,30 @@
  *   valeur: unknown, ancienne_valeur: unknown, cochee: boolean, source_url: string, provenance: 'public' | 'compte' }} Proposition
  */
 
+// Types de document de l'aspirateur ↔ libellés des documents d'article (product_documents.document_type).
+const LIBELLES_DOCUMENT = Object.freeze({
+  fiche_technique: 'Fiche technique',
+  notice: 'Notice',
+  declaration_performance: 'Déclaration de performance',
+  etiquette_energie: 'Étiquette énergie',
+});
+
+/** Libellé d'un type de document. @param {string} type @returns {string} */
+export function libelleDocument(type) {
+  return LIBELLES_DOCUMENT[/** @type {keyof typeof LIBELLES_DOCUMENT} */ (type)] || 'Document';
+}
+
+/** Type de document d'un libellé de document d'article (sans casse ni accents), null s'il n'en est pas un. @param {unknown} libelle */
+export function typeDocument(libelle) {
+  const l = cle(libelle);
+  const trouve = Object.entries(LIBELLES_DOCUMENT).find(([, v]) => cle(v) === l);
+  return trouve ? trouve[0] : null;
+}
+
 /** @param {unknown} s */
-const cle = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '');
+function cle(s) { return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ''); }
+
+/** @param {unknown} s */
 const centime = (/** @type {number} */ n) => Math.round(n * 100) / 100;
 
 /**

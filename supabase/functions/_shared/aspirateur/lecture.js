@@ -12,7 +12,7 @@ const TEXTE_MAX = 30_000;
 /** @typedef {{ key: string, label?: string, unit?: string | null, type?: string, options?: Array<string | { value: string, label?: string }> }} Champ */
 
 /** @param {unknown} s */
-const sansAccents = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const sansAccents = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
 /** @param {Champ} champ @returns {Array<{ value: string, label: string }>} */
 function optionsDe(champ) {
