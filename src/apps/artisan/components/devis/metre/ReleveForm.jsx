@@ -4,8 +4,7 @@
 // pour le focus depuis la coupe cotée. Visibilité = même règle que la validation du moteur.
 import { parametreVisible as visible } from '@/lib/fumisterie/index.js';
 import { libelleChoix } from '@/lib/fumisterie/planModel.js';
-
-const INPUT = 'w-full px-2 py-1.5 border border-secondary-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500';
+import ChampMesure from './ChampMesure';
 
 export default function ReleveForm({ gabarit, releve, onChange, onAjuster, minSortie }) {
   const set = (cle, v) => onChange({ ...releve, [cle]: v });
@@ -28,10 +27,7 @@ export default function ReleveForm({ gabarit, releve, onChange, onAjuster, minSo
                     ))}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1">
-                    <input id={`fum-${p.cle}`} type="number" step={p.pas} min={p.min} max={p.max} value={releve[p.cle] ?? ''} onChange={(e) => set(p.cle, e.target.value === '' ? '' : Number(e.target.value))} className={INPUT} />
-                    <span className="text-xs text-secondary-500 w-6">{p.unite}</span>
-                  </div>
+                  <ChampMesure id={`fum-${p.cle}`} valeur={releve[p.cle]} unite={p.unite} onChange={(v) => set(p.cle, v)} />
                 )}
               </div>
             ))}

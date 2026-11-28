@@ -4,8 +4,9 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { complementsDuGabarit } from '@/lib/fumisterie/complements.js';
+import ChampMesure from './ChampMesure';
+import { inputClass } from '../../FormFields';
 
-const INPUT = 'w-full px-2 py-1.5 border border-secondary-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500';
 const GROUPES = { debouche: 'Débouché', raccordement: 'Raccordement', ventouse: 'Ventouse', dimensionnement: 'Dimensionnement', existant: 'Conduit existant' };
 
 export default function ComplementsForm({ gabaritCode, releve, onChange }) {
@@ -41,12 +42,9 @@ export default function ComplementsForm({ gabaritCode, releve, onChange }) {
                         ))}
                       </div>
                     ) : c.type === 'texte' ? (
-                      <input id={`fum-${c.cle}`} type="text" value={releve[c.cle] ?? ''} onChange={(e) => set(c.cle, e.target.value)} className={INPUT} />
+                      <input id={`fum-${c.cle}`} type="text" value={releve[c.cle] ?? ''} onChange={(e) => set(c.cle, e.target.value)} className={inputClass} />
                     ) : (
-                      <div className="flex items-center gap-1">
-                        <input id={`fum-${c.cle}`} type="number" step={c.pas} min={c.min} max={c.max} value={releve[c.cle] ?? ''} onChange={(e) => set(c.cle, e.target.value === '' ? '' : Number(e.target.value))} className={INPUT} />
-                        <span className="text-xs text-secondary-500 w-6">{c.unite}</span>
-                      </div>
+                      <ChampMesure id={`fum-${c.cle}`} valeur={releve[c.cle]} unite={c.unite} onChange={(v) => set(c.cle, v)} />
                     )}
                     {c.aide && <p className="text-xs text-secondary-500 mt-0.5">{c.aide}</p>}
                   </div>
