@@ -29,6 +29,10 @@ import { FormField, TextInput, SelectInput, TextArea } from '../../components/Fo
 import { formatEuro } from '@/lib/utils';
 
 import ProductSpecsForm from './product-detail/ProductSpecsForm';
+
+// Le combustible d'une ligne fournisseur est sa colonne `fuel_type` (onglet principal) : le champ canonique du même nom
+// (groupe CEE, porté par l'article) n'est pas reproposé ici, sinon deux « Combustible » se contrediraient.
+const CHAMPS_MASQUES_LIGNE = ['fuel_type'];
 import ProductImageSection from './product-detail/ProductImageSection';
 import ProductVariantsSection from './product-detail/ProductVariantsSection';
 import ProductCompatibilitySection from './product-detail/ProductCompatibilitySection';
@@ -394,6 +398,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
               <ProductSpecsForm
                 category={form.category}
                 fuelType={form.fuelType}
+                masquer={CHAMPS_MASQUES_LIGNE}
                 value={specs}
                 onChange={onSpecsChange}
               />

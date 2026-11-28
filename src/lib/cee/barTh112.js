@@ -13,6 +13,9 @@ export const SEUILS_BAR_TH_112 = Object.freeze({
   granules: Object.freeze({ etas_min: 80, pm_max: 20, cog_max: 60, co_max: 300, nox_max: 200 }),
 });
 
+// Normes citées par la fiche (poêles, foyers et inserts, cuisinières).
+const NORMES_FICHE = ['EN 13240', 'EN 14785', 'EN 15250', 'EN 13229', 'EN 12815'];
+
 const EMISSIONS = [
   ['pm_mg_nm3', 'pm_max'],
   ['cog_mgc_nm3', 'cog_max'],
@@ -56,6 +59,7 @@ export function verdictBarTh112(canonical) {
   const norme = typeof c.norme_mesure === 'string' ? c.norme_mesure.trim() : '';
   if (!norme) manquants.push('norme_mesure');
   else if (norme === 'EN 16510-1') remarques.push('norme EN 16510-1 : à faire accepter par l\'obligé');
+  else if (!NORMES_FICHE.includes(norme)) remarques.push('norme non citée par la fiche : à faire accepter par l’obligé');
 
   const statut = depassements.length ? 'hors_seuil' : manquants.length ? 'incomplet' : 'conforme';
   return { statut, manquants, depassements, remarques };

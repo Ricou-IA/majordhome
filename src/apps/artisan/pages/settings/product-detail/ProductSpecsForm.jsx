@@ -12,6 +12,7 @@
  *  - fuelType        : 'bois' | 'granules' | 'hybride'
  *  - value           : { canonical: {...}, extras: [{label, value, unit?}] }
  *  - onChange(next)  : appelé avec le nouvel objet specs complet
+ *  - masquer         : clés canoniques à ne pas proposer (ex. fuel_type sur une ligne fournisseur, qui a sa colonne)
  * ============================================================================
  */
 
@@ -21,17 +22,17 @@ import { getSchemaForCategory } from '@/shared/specs';
 import { FormField, TextInput, SelectInput } from '../../../components/FormFields';
 import { inputClass } from '../../../components/FormFields';
 
-export default function ProductSpecsForm({ category, fuelType, value, onChange }) {
+export default function ProductSpecsForm({ category, fuelType, value, onChange, masquer }) {
   const schema = getSchemaForCategory(category);
   const canonical = useMemo(() => value?.canonical || {}, [value]);
   const extras = useMemo(() => value?.extras || [], [value]);
 
   const { groupedFields } = useMemo(() => {
     if (!schema) return { groupedFields: [], filterByFuelType: null, groupFields: null };
-    const fields = schema.filterByFuelType(fuelType);
+    const fields = schema.filterByFuelType(fuelType).filter((f) => !masquer?.includes(f.key));
     const groups = schema.groupFields(fields);
     return { groupedFields: groups, filterByFuelType: schema.filterByFuelType, groupFields: schema.groupFields };
-  }, [schema, fuelType]);
+  }, [schema, fuelType, masquer]);
 
   const setCanonical = useCallback((key, newValue) => {
     onChange?.({

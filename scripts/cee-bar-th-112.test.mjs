@@ -71,3 +71,8 @@ test('valeur non numérique traitée comme manquante', () => {
 test('EN 16510-1 : remarque obligé', () => {
   assert.deepEqual(verdictBarTh112({ ...toron, norme_mesure: 'EN 16510-1' }).remarques, ['norme EN 16510-1 : à faire accepter par l\'obligé']);
 });
+
+test('norme « Autre » : non citée par la fiche, remarque obligé (jamais un conforme sans réserve)', () => {
+  const v = verdictBarTh112({ ...toron, norme_mesure: 'Autre' });
+  assert.deepEqual(v.remarques, ['norme non citée par la fiche : à faire accepter par l’obligé']);
+});

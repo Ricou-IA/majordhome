@@ -92,7 +92,7 @@ export const POELE_CANONICAL_SPECS = [
     required: true,
     applies_to: ALL_FUELS,
     group: 'cee',
-    aliases: ['combustible', 'type de combustible', 'fuel', 'fuel type', 'energie', 'énergie'],
+    aliases: ['type de combustible', 'fuel type'],
   },
   {
     key: 'etas_pct',
@@ -115,7 +115,7 @@ export const POELE_CANONICAL_SPECS = [
     type: 'number',
     applies_to: ALL_FUELS,
     group: 'cee',
-    aliases: ['particules', 'poussieres', 'poussières', 'pm', 'particulate matter', 'emissions de particules'],
+    aliases: ['particules', 'pm', 'particulate matter', 'emissions de particules'],
   },
   {
     key: 'cog_mgc_nm3',
@@ -133,7 +133,7 @@ export const POELE_CANONICAL_SPECS = [
     type: 'number',
     applies_to: ALL_FUELS,
     group: 'cee',
-    aliases: ['co a 13', 'co à 13', 'monoxyde de carbone mg', 'co mg/nm3', 'co mg nm3'],
+    aliases: ['monoxyde de carbone mg', 'co mg/nm3', 'co mg nm3'],
   },
   {
     key: 'nox_mg_nm3',

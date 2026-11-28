@@ -64,3 +64,12 @@ test('poêle CEE : Etas et émissions imprimés en tête, unités en toutes lett
   assert.ok(lignes.includes('Sortie des fumées : Dessus'));
   assert.ok(lignes.indexOf('Sortie des fumées : Dessus') > lignes.indexOf('Puissance nominale : 8 kW'));
 });
+
+test('poêle : alias CEE trop larges retirés (relecture 2026-11-28)', async () => {
+  const { matchLabelToCanonicalKey } = await import('../src/shared/specs/poele.schema.js');
+  assert.notEqual(matchLabelToCanonicalKey('CO à 13 % O2'), 'co_mg_nm3'); // souvent donné en %
+  assert.notEqual(matchLabelToCanonicalKey('Émissions de poussières fines'), 'pm_mg_nm3'); // référence d'O2 inconnue
+  assert.notEqual(matchLabelToCanonicalKey('Énergie'), 'fuel_type');
+  assert.equal(matchLabelToCanonicalKey('Etas'), 'etas_pct');
+  assert.equal(matchLabelToCanonicalKey('NOx'), 'nox_mg_nm3');
+});

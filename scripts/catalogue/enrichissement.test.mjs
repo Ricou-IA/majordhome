@@ -111,3 +111,8 @@ test("adresseIpPrivee : bouclage, privées, link-local, CGNAT, multicast, IPv6 l
     assert.equal(adresseIpPrivee(ip), false, ip);
   }
 });
+
+test('champsDuSchema : options { value, label } réduites à leur valeur (jamais « [object Object] ») — relecture 2026-11-28', () => {
+  const [c] = champsDuSchema([{ key: 'fuel_type', label: 'Combustible', type: 'enum', options: [{ value: 'bois', label: 'Bois' }, { value: 'granules', label: 'Granulés' }] }]);
+  assert.deepEqual(c.options, ['bois', 'granules']);
+});

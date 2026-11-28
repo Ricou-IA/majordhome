@@ -67,13 +67,14 @@ export function adresseIpPrivee(ip) {
 /**
  * Champs à demander à l'IA depuis le schéma de la catégorie (src/shared/specs). Le groupe « documents » est écarté :
  * la fiche technique devient un document de l'article, pas un lien dans les caractéristiques.
- * @param {Array<{ key: string, label?: string, unit?: string, type?: string, options?: string[], group?: string }>} fields
+ * Une option `{ value, label }` est réduite à sa valeur (sinon « [object Object] » partirait dans la consigne).
+ * @param {Array<{ key: string, label?: string, unit?: string, type?: string, options?: Array<string | { value: string, label?: string }>, group?: string }>} fields
  * @returns {Array<{ key: string, label: string, unit: string | null, type: string, options?: string[] }>}
  */
 export function champsDuSchema(fields) {
   return (fields || []).filter((f) => f && f.key && f.group !== 'documents').map((f) => {
     const c = { key: f.key, label: f.label || f.key, unit: f.unit || null, type: f.type || 'text' };
-    if (Array.isArray(f.options) && f.options.length) c.options = f.options.map(String);
+    if (Array.isArray(f.options) && f.options.length) c.options = f.options.map((o) => String(o && typeof o === 'object' ? o.value : o));
     return c;
   });
 }
