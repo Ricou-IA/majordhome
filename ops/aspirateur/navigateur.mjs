@@ -18,6 +18,7 @@ const CHAMPS_MAX = 60;
 // Une application JavaScript (Angular chez Invicta) dessine le formulaire après le chargement de la page.
 const ATTENTE_FORMULAIRE_MS = 10_000;
 const APAISEMENT_MS = 8_000;
+const ATTENTE_PREUVE_MS = 6_000;
 const PDF_MAX = 20 * 1024 * 1024;
 const DELAI_PAGE_MS = 30_000;
 const REDIRECTIONS_MAX = 3;
@@ -231,7 +232,9 @@ async function creer(navigateur, cfg, avecSession, proprietaire, horloge) {
       await page.fill(c.champ_identifiant, acces.identifiant, { timeout: 10_000 });
       await page.fill(c.champ_mot_de_passe, acces.motDePasse, { timeout: 10_000 });
       await nav.cliquer(c.bouton);
-      return (await nav.texte(c.preuve)) ? 'connecte' : 'refuse';
+      // une application dessine son en-tête « connecté » après coup : la preuve est attendue, bornée
+      const vue = await page.waitForSelector(c.preuve, { state: 'attached', timeout: ATTENTE_PREUVE_MS }).catch(() => null);
+      return vue && (await nav.texte(c.preuve)) ? 'connecte' : 'refuse';
     },
 
     /** @param {string} url @returns {Promise<{ octets: Buffer, type: string }>} */

@@ -46,7 +46,8 @@ export async function demarrerSite() {
       fetch('/api/lent').then(() => { document.getElementById('app').innerHTML = '<form novalidate action="/login" method="post"><label for="email">Adresse e-mail</label><input type="email" id="email" name="email" formcontrolname="email" value="valeur-prerempli"><input id="password" name="password" formcontrolname="password" type="password"><button type="button">Voir</button><button type="submit">Se connecter</button></form>'; });
     </script>`));
     if (u.pathname === '/login') return envoyer(200, 'text/html', page('Connexion', '<form method="post" action="/login"><input id="email" name="email"><input id="password" name="password" type="password"><button type="submit">Se connecter</button></form>'));
-    if (u.pathname === '/compte') return envoyer(200, 'text/html', page('Compte', connecte ? '<div class="mon-compte">Bonjour</div>' : '<p>Non connecté</p>'));
+    // Une application dessine son en-tête « connecté » un peu après l'arrivée sur la page.
+    if (u.pathname === '/compte') return envoyer(200, 'text/html', page('Compte', connecte ? '<div class="mon-compte">Bonjour</div><div id="entete"></div><script>setTimeout(() => { document.getElementById("entete").innerHTML = \'<span class="bienvenue-tardif">Mon compte</span>\'; }, 1500);</script>' : '<p>Non connecté</p>'));
     if (u.pathname === '/robots.txt') return envoyer(200, 'text/plain', 'User-agent: *\nDisallow: /prive/\n');
     if (u.pathname === '/liste') {
       const n = u.searchParams.get('page') || '1';

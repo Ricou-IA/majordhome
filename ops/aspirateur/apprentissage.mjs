@@ -145,12 +145,27 @@ export async function apprendre({ hoteSite, urlDepart, acces, compteClient = nul
             }, acces);
             if (await nav.estProtege()) throw new CodeErreur('site_protege');
             contenu = { etat: etatConnexion };
+            // Refus : le formulaire disparu veut dire que la connexion a eu lieu et que la PREUVE est mal choisie (vécu
+            // Invicta 2026-11-28). Seule la présence du champ est dite, jamais rien de ce qui y a été tapé.
+            if (etatConnexion !== 'connecte') {
+              contenu.formulaire_encore_visible = (await nav.attributs(String(entree.champ_mot_de_passe), 'type')).length > 0;
+            }
             break;
           }
           case 'essayer_recette': {
             const erreurs = controler(entree.recette);
             if (erreurs.length) { contenu = { erreurs }; erreur = true; break; }
-            const produits = await essayer(entree.recette);
+            let produits;
+            try {
+              produits = await essayer(entree.recette);
+            } catch (e) {
+              // À l'essai, une connexion qui n'aboutit pas se corrige dans la recette : elle est rendue à l'agent au lieu
+              // d'arrêter l'apprentissage (vécu Invicta 2026-11-28 : travail arrêté en « accès refusés »).
+              if (!(e instanceof CodeErreur && e.code === 'acces_refuses')) throw e;
+              contenu = { erreur: `connexion de la recette sans preuve : « ${entree.recette?.connexion?.preuve ?? ''} » n’apparaît pas après connexion ; choisis un élément visible juste après s’être connecté` };
+              erreur = true;
+              break;
+            }
             contenu = { produits: produits.map(resumeProduit) };
             break;
           }

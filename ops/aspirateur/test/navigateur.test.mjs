@@ -134,6 +134,14 @@ test('seConnecter attend un formulaire dessiné après le chargement (applicatio
   } finally { await nav.fermer(); }
 });
 
+test('seConnecter attend que la preuve de connexion soit dessinée', async () => {
+  const nav = await ouvrir();
+  try {
+    await nav.aller(`${site.url}/login`);
+    assert.equal(await nav.seConnecter({ ...CHAMPS_CONNEXION, preuve: '.bienvenue-tardif' }, ACCES), 'connecte');
+  } finally { await nav.fermer(); }
+});
+
 test('relecture C1 : aucun accès tapé dans un formulaire qui envoie ailleurs, sans champ mot de passe, ou éclaté', async () => {
   for (const chemin of ['/login-piege', '/login-texte', '/login-deux-formulaires']) {
     const nav = await ouvrir();

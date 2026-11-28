@@ -111,6 +111,23 @@ test('l’essai se rejoue sans la session de l’agent : une recette qui oublie 
   assert.deepEqual(essai.map((p) => [p.reference_fabricant, p.provenance]), [['C07768-06', 'compte']]);
 });
 
+test('une connexion de recette qui n’aboutit pas à l’essai est rendue à l’agent, qui peut corriger', async () => {
+  const mauvaisePreuve = { ...recetteBonne(), connexion: { ...recetteBonne().connexion, preuve: '.inexistant' } };
+  const modele = modeleScenario([
+    tour(outil('t1', 'aller', { url: `${site.url}/login` })),
+    tour(outil('t2', 'se_connecter', { champ_identifiant: '#email', champ_mot_de_passe: '#password', bouton: 'button[type=submit]', preuve: '.inexistant' })),
+    tour(outil('t3', 'essayer_recette', { recette: mauvaisePreuve })),
+    tour(outil('t4', 'proposer_recette', { recette: recetteBonne() })),
+  ]);
+  const { recette } = await lancer(modele);
+  assert.equal(recette.connexion.preuve, '.mon-compte');
+  // l'agent apprend que le formulaire a disparu : la connexion a eu lieu, c'est la preuve qui est fausse
+  assert.match(modele.recu.find((r) => r.includes('"tool_use_id":"t2"')), /formulaire_encore_visible\\?":false/);
+  const t3 = modele.recu.find((r) => r.includes('"tool_use_id":"t3"'));
+  assert.match(t3, /preuve/);
+  assert.match(t3, /"is_error":true/);
+});
+
 test('les prix lus à l’essai ne sont pas montrés au modèle', async () => {
   const modele = modeleScenario([
     tour(outil('t1', 'essayer_recette', { recette: recetteBonne() })),
