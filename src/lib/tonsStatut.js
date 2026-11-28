@@ -71,7 +71,16 @@ const ENTRETIEN = Object.freeze({
   facture: 'ok',
 });
 
+// Verdict CEE BAR-TH-112 d'un poêle (`verdictBarTh112().statut`, src/lib/cee/barTh112.js).
+const CEE = Object.freeze({
+  conforme: 'ok',
+  hors_seuil: 'alerte',
+  incomplet: 'attente',
+  inconnu: 'neutre',
+});
+
 const TABLES = Object.freeze({
+  cee: CEE,
   lead: LEAD,
   devis: DEVIS,
   chantier: CHANTIER,

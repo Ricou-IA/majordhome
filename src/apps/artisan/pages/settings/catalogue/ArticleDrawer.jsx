@@ -18,6 +18,7 @@ import ArticleDocuments from './ArticleDocuments';
 import ArticleOffersTable from './ArticleOffersTable';
 import ArticleAttachModal from './ArticleAttachModal';
 import ArticleEnrichModal from './ArticleEnrichModal';
+import RepereCee from './RepereCee';
 import { NATURES_FICHE } from '@/lib/catalogue/natures.js';
 
 function formDepuis(item) {
@@ -207,8 +208,9 @@ export default function ArticleDrawer({ orgId, itemId, onClose, enrichirDOffice 
               <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary-500">
                 {supportsEnrichment(form.category) ? 'Caractéristiques harmonisées' : 'Caractéristiques'}
               </h4>
+              {form.category === 'poele' && <RepereCee canonical={specs.canonical} />}
               <fieldset disabled={!canEdit}>
-                <ProductSpecsForm category={form.category} value={specs} onChange={(v) => { setSpecs(v); setDirty(true); }} />
+                <ProductSpecsForm category={form.category} fuelType={specs.canonical?.fuel_type || undefined} value={specs} onChange={(v) => { setSpecs(v); setDirty(true); }} />
               </fieldset>
             </section>
 

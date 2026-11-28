@@ -72,3 +72,10 @@ test('ne lève jamais : inconnu, vide, null, mauvais type', () => {
   assert.equal(toneFor('constructor', 'toString'), 'neutre');
   assert.equal(toneFor('lead', '__proto__'), 'neutre');
 });
+
+test('cee : verdict BAR-TH-112 d’un poêle (src/lib/cee/barTh112.js)', () => {
+  assert.equal(toneFor('cee', 'conforme'), 'ok');
+  assert.equal(toneFor('cee', 'hors_seuil'), 'alerte');
+  assert.equal(toneFor('cee', 'incomplet'), 'attente');
+  assert.equal(toneFor('cee', 'inconnu'), 'neutre');
+});
