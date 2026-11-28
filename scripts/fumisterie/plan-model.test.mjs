@@ -99,3 +99,11 @@ test('fiche chantier : points « à vérifier sur place » repris du résultat f
   assert.deepEqual(m.chantier.aVerifier, ['Plaque signalétique à poser et fiche d\'identification à remettre au client.']);
   assert.deepEqual(m.chantier.alertes, ['Sortie trop basse']);
 });
+
+test('fiche chantier : compléments facultatifs renseignés repris dans le relevé saisi', () => {
+  const m = buildPlanModel({ ...base, variante: 'chantier', metre: { ...metre, releve: { ...metre.releve, obstacleDistance: 5, obstacleHauteur: '', sortieBuse: 'arriere' } } });
+  const saisi = Object.fromEntries(m.chantier.releveSaisi.map((l) => [l.libelle, l.valeur]));
+  assert.equal(saisi['Obstacle plus haut : distance horizontale'], '5,00 m');
+  assert.equal(saisi['Sortie de la buse'], 'Arrière ou côté');
+  assert.ok(!('Obstacle : hauteur au-dessus de la sortie de toit' in saisi), 'un complément vide n\'est pas imprimé');
+});

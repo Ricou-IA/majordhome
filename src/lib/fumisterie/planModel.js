@@ -5,6 +5,7 @@
 // reste la seule pièce contractuelle des quantités et des montants. Textes rendus PDF-safe (Helvetica).
 import { parametreVisible } from './index.js';
 import { pdfSafe } from '../rapportSavModel.js';
+import { complementsDuGabarit, lireComplement } from './complements.js';
 
 const num = (v, d = 2) => Number(v).toFixed(d).replace('.', ',');
 const quantite = (q) => (Number.isInteger(Number(q)) ? String(Number(q)) : String(Number(q)).replace('.', ','));
@@ -57,10 +58,10 @@ function valeurSaisie(p, v) {
  *   company: { name?:string, address?:string, postalCode?:string, city?:string, phone?:string, email?:string, rgeCertifications?:string[], logoUrl?:string },
  *   devis: { quote_number?:string, client_display_name?:string, client_address?:string, client_postal_code?:string, client_city?:string } | null,
  *   auteurNom?: string|null, fournisseurNom?: string|null, variante: 'offre'|'chantier',
- *   aVerifier?: string[], justification?: string|null, bilan?: object|null,
+ *   aVerifier?: string[],
  * }} p
  */
-export function buildPlanModel({ metre, configuration, gabarit, company, devis, auteurNom = null, fournisseurNom = null, variante, aVerifier = [], justification = null, bilan = null }) {
+export function buildPlanModel({ metre, configuration, gabarit, company, devis, auteurNom = null, fournisseurNom = null, variante, aVerifier = [] }) {
   const chantier = variante === 'chantier';
   const res = metre?.resultat || {};
   const releve = metre?.releve || {};
@@ -101,13 +102,24 @@ export function buildPlanModel({ metre, configuration, gabarit, company, devis, 
   if (chantier) {
     const params = (gabarit?.troncons || []).flatMap((t) => t.parametres || []).filter((pp) => parametreVisible(pp, releve));
     detailChantier = {
-      releveSaisi: params.map((pp) => ({ libelle: texteSurPdf(pp.libelle), valeur: texteSurPdf(valeurSaisie(pp, releve[pp.cle])) })),
+      releveSaisi: [
+        ...params.map((pp) => ({ libelle: texteSurPdf(pp.libelle), valeur: texteSurPdf(valeurSaisie(pp, releve[pp.cle])) })),
+        // Compléments facultatifs renseignés (ceux du bilan et de la justification ont leur propre section).
+        ...complementsDuGabarit(metre?.gabarit_code).filter((c) => c.groupe !== 'existant' && c.groupe !== 'dimensionnement' && lireComplement(releve, c.cle) != null)
+          .map((c) => ({ libelle: texteSurPdf(c.libelle), valeur: texteSurPdf(c.type === 'choix' ? (c.libelles?.[releve[c.cle]] ?? releve[c.cle]) : valeurSaisie(c, lireComplement(releve, c.cle))) })),
+      ],
       // Les alertes « à vérifier » présentes à l'injection : le résultat est figé à ce moment-là.
-      alertes: (res.alertes || []).filter((a) => a.niveau === 'warn' && a.code !== 'article_manquant' && a.code !== 'article_ambigu').map((a) => texteSurPdf(a.message)),
+      // (les non-conformités du conduit existant sont imprimées dans le bilan, pas deux fois)
+      alertes: (res.alertes || []).filter((a) => a.niveau === 'warn' && a.code !== 'article_manquant' && a.code !== 'article_ambigu' && !String(a.code).startsWith('existant_')).map((a) => texteSurPdf(a.message)),
       // Points « à vérifier sur place » du résultat figé (moteur dtu-2026.11 et suivants), plus ceux fournis par l'appelant.
       aVerifier: [...(res.alertes || []).filter((a) => a.niveau === 'verifier').map((a) => a.message), ...(aVerifier || [])].map(texteSurPdf),
-      justification: justification ? texteSurPdf(justification) : null,
-      bilan: bilan || null,
+      // Justification et bilan : figés dans le résultat depuis le moteur fab-2026.11 ; absents d'un métré plus ancien (section omise).
+      justification: res.justification ? texteSurPdf(res.justification) : null,
+      bilan: res.bilan ? {
+        constats: (res.bilan.constats || []).map(texteSurPdf),
+        nonConformites: (res.bilan.nonConformites || []).map((n) => ({ texte: texteSurPdf(n.texte), source: texteSurPdf(n.source) })),
+        aVerifier: (res.bilan.aVerifier || []).map(texteSurPdf),
+      } : null,
     };
   }
 

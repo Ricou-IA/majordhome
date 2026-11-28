@@ -9,10 +9,13 @@ import { geometrieG6 } from './gabarits/g6.js';
 import { controlesG1, controlesG3, controlesG4, controlesG5, controlesG6, controlesNomenclature, pointsAVerifier, natureInstallation } from './controles.js';
 import { construireNomenclature, totaliser } from './nomenclature.js';
 import { reglagesDuFabricant } from './config.js';
+import { bilanConduitExistant, justificationDimensionnement } from './bilanExistant.js';
 
 // dtu-2026.11 : hauteur de sortie selon l'arrêté de 1969 (8 m, acrotère, obstacle, toit plat < 15°), règles
 // du NF DTU 24.1 / Cahier CSTB 3708 en alertes non bloquantes, points « à vérifier sur place ».
-export const ENGINE_VERSION = 'dtu-2026.11';
+// fab-2026.11 : longueurs propres au fabricant, réglable choisi par sa plage, bilan du conduit existant et
+// justification du dimensionnement figés dans le résultat.
+export const ENGINE_VERSION = 'fab-2026.11';
 
 const GABARITS = {
   G1: { geometrie: geometrieG1, controles: controlesG1, sortieMinimale: hauteurSortieMinimale },
@@ -90,9 +93,16 @@ export function calculerMetre({ configuration, gabarit, composants, mapping, art
   const alertes = moteur.controles(geometrie, releve, reglages, configuration);
   const nomenclature = construireNomenclature({ composants, mapping, articles, geometrie, releve, reglages });
   const lignes = nomenclature.lignes;
+  // Bilan du conduit existant et justification : figés avec le résultat (la fiche chantier les relit).
+  const bilan = bilanConduitExistant(releve, code, configuration);
+  const justification = justificationDimensionnement(releve);
+  const alertesBilan = (bilan?.nonConformites || []).map((n) => ({ niveau: 'warn', code: n.code, message: n.texte, source: n.source }));
+  const alerteJustification = justification.mode === 'non_justifie'
+    ? [{ niveau: 'info', code: 'dimensionnement_non_justifie', source: 'NF DTU 24.1 § 5.5', message: 'Dimensionnement non justifié (notice, essai de couplage, abaque ou logiciel) : il sera écrit tel quel sur la fiche chantier.' }]
+    : [];
   return { engine_version: ENGINE_VERSION, geometrie, lignes,
-    alertes: [...alertes, ...nomenclature.alertes, ...controlesNomenclature(code, lignes, releve), ...pointsAVerifier(code, configuration)],
-    totaux: totaliser(lignes) };
+    alertes: [...alertes, ...alertesBilan, ...alerteJustification, ...nomenclature.alertes, ...controlesNomenclature(code, lignes, releve), ...pointsAVerifier(code, configuration)],
+    totaux: totaliser(lignes), bilan, justification: justification.texte };
 }
 
 /**
