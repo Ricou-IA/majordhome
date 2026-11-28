@@ -25,10 +25,17 @@
 --    candidat par ses clés. Mesure avant / après : scripts/catalogue/mesure-rattachement-sans-offre.sql.
 --    Nouvel index supplier_products (org_id, code_ean) : la recherche par l'EAN des lignes se fait une fois par ligne
 --    relevée sans rattachement (sans index : un parcours complet de supplier_products à chaque fois).
+--    - (revue finale) la ligne posée par un import de fichier et pas encore reprise par un relevé
+--      (`catalog_item_link_source = 'import'` ET `source_version` « import-articles_… ») ne compte pas dans « l'article
+--      a déjà une ligne active de ce fournisseur » : un relevé PARTIEL (`desactiver_absents = false` : factures
+--      Pennylane, offre PDF, prix publics) du même fournisseur sous une autre référence laisse la ligne importée active ;
+--      sans cette exception, l'article importé était doublé en silence. Dès qu'un relevé la met à jour en place
+--      (même référence), sa `source_version` change et elle compte comme toute ligne.
 -- 2. catalog_item_proposals_propose : t_cles reçoit aussi, pour chaque article vivant qui porte une clé, sa propre
 --    ligne (supplier_id NULL). Le test « fournisseur commun » ignore ces lignes (t_four ne garde que les vrais
---    fournisseurs). Garde-fous de 20261027_5 conservés : clé partagée par plus de 10 articles écartée, index + ANALYZE
---    sur chaque table temporaire. Un article sans ligne à prix n'est jamais fusionné d'office (pas de prix à comparer) :
+--    fournisseurs), ni la ligne d'import pas encore reprise par un relevé (même règle que l'étape 2 d'ensure).
+--    Garde-fous de 20261027_5 conservés : clé partagée par plus de 10 articles écartée, index + ANALYZE sur chaque
+--    table temporaire. Un article sans ligne à prix n'est jamais fusionné d'office (pas de prix à comparer) :
 --    il est proposé.
 --
 -- Répétée sur scripts/migration-rehearsal/ (fixture-catalog-harmonisation-prod.sql → 20261028_4 → 20261124_2 →
@@ -43,6 +50,10 @@
 --
 -- Retour arrière : rejouer les définitions de catalog_items_ensure (20261027_4, § 1a) et de
 -- catalog_item_proposals_propose (20261027_5), puis DROP INDEX majordhome.supplier_products_org_ean_idx.
+
+-- Base partagée : la création d'index verrouille supplier_products en écriture ; échouer et rejouer plutôt que faire
+-- attendre les relevés de l'instance.
+SET lock_timeout = '3s';
 
 CREATE INDEX IF NOT EXISTS supplier_products_org_ean_idx
   ON majordhome.supplier_products USING btree (org_id, code_ean) WHERE code_ean IS NOT NULL;
@@ -133,8 +144,13 @@ BEGIN
         WHERE i.id = ANY (v_ids)
           AND i.org_id = p_org_id AND i.is_active AND i.merged_into IS NULL
           AND i.product_kind = COALESCE(r.product_kind, 'main')
+          -- la ligne posée par un import de fichier, que nul relevé n'a encore reprise (source_version de l'import),
+          -- ne compte pas : un relevé PARTIEL (factures, offre, prix publics) du même fournisseur sous une autre
+          -- référence doit retrouver l'article importé, pas en créer un second (revue finale)
           AND NOT EXISTS (SELECT 1 FROM majordhome.supplier_products q
-                          WHERE q.catalog_item_id = i.id AND q.supplier_id = r.supplier_id AND q.is_active)
+                          WHERE q.catalog_item_id = i.id AND q.supplier_id = r.supplier_id AND q.is_active
+                            AND (q.catalog_item_link_source = 'import'
+                                 AND starts_with(q.specs ->> 'source_version', 'import-articles_')) IS NOT TRUE)
           AND CASE WHEN m.prix IS NOT NULL
                    THEN greatest(r.purchase_price_ht, m.prix) <= 2 * least(r.purchase_price_ht, m.prix)
                    ELSE COALESCE(i.selling_price_ht, 0) <= 0 OR r.purchase_price_ht <= i.selling_price_ht
@@ -190,13 +206,16 @@ BEGIN
   -- (supplier_id NULL) — un article importé d'un fichier n'a souvent aucune ligne (20261129_4).
   IF to_regclass('pg_temp.t_cles') IS NOT NULL THEN DROP TABLE pg_temp.t_cles; END IF;
   CREATE TEMP TABLE t_cles ON COMMIT DROP AS
-    SELECT i.id AS item, i.product_kind, i.created_at, p.supplier_id, lower(p.brand) AS marque, p.model_key, (CASE WHEN p.code_ean ~ '^[0-9]{8,14}$' AND p.code_ean !~ '^0+$' THEN p.code_ean END) AS ean
+    SELECT i.id AS item, i.product_kind, i.created_at, p.supplier_id, lower(p.brand) AS marque, p.model_key, (CASE WHEN p.code_ean ~ '^[0-9]{8,14}$' AND p.code_ean !~ '^0+$' THEN p.code_ean END) AS ean,
+           -- ligne posée par un import de fichier, pas encore reprise par un relevé (cf. t_four)
+           COALESCE(p.catalog_item_link_source = 'import' AND starts_with(p.specs ->> 'source_version', 'import-articles_'), false) AS importee
     FROM majordhome.catalog_items i
     JOIN majordhome.supplier_products p ON p.catalog_item_id = i.id AND p.is_active
     JOIN majordhome.suppliers s ON s.id = p.supplier_id AND s.is_active
     WHERE i.org_id = p_org_id AND i.is_active AND i.merged_into IS NULL
     UNION ALL
-    SELECT i.id, i.product_kind, i.created_at, NULL::uuid, lower(i.brand), i.model_key, (CASE WHEN i.code_ean ~ '^[0-9]{8,14}$' AND i.code_ean !~ '^0+$' THEN i.code_ean END)
+    SELECT i.id, i.product_kind, i.created_at, NULL::uuid, lower(i.brand), i.model_key, (CASE WHEN i.code_ean ~ '^[0-9]{8,14}$' AND i.code_ean !~ '^0+$' THEN i.code_ean END),
+           false
     FROM majordhome.catalog_items i
     WHERE i.org_id = p_org_id AND i.is_active AND i.merged_into IS NULL
       AND ((i.brand IS NOT NULL AND i.model_key IS NOT NULL) OR (i.code_ean ~ '^[0-9]{8,14}$' AND i.code_ean !~ '^0+$'));
@@ -211,11 +230,13 @@ BEGIN
   -- Statistiques et index sur les tables temporaires : sans eux, le planificateur joignait toutes les lignes d'un même
   -- fournisseur entre elles pour le test « fournisseur commun » (DINAK 12 000², Modinox 11 800²) — espace temporaire
   -- de la base partagée saturé le 2026-10-25. t_four = fournisseurs distincts de chaque article, indexée par article ;
-  -- les clés propres d'un article (supplier_id NULL) n'y entrent pas : ce ne sont pas des fournisseurs.
+  -- les clés propres d'un article (supplier_id NULL) n'y entrent pas : ce ne sont pas des fournisseurs ; la ligne d'un
+  -- import de fichier pas encore reprise par un relevé non plus (revue finale : sinon l'article importé et l'article
+  -- d'un relevé partiel du même fournisseur sous une autre référence ne seraient jamais proposés).
   CREATE INDEX ON t_cles (item);
   ANALYZE t_cles;
   IF to_regclass('pg_temp.t_four') IS NOT NULL THEN DROP TABLE pg_temp.t_four; END IF;
-  CREATE TEMP TABLE t_four ON COMMIT DROP AS SELECT DISTINCT item, supplier_id FROM t_cles WHERE supplier_id IS NOT NULL;
+  CREATE TEMP TABLE t_four ON COMMIT DROP AS SELECT DISTINCT item, supplier_id FROM t_cles WHERE supplier_id IS NOT NULL AND NOT importee;
   CREATE INDEX ON t_four (item, supplier_id);
   ANALYZE t_four;
 
@@ -312,3 +333,7 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.catalog_item_proposals_propose(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.catalog_item_proposals_propose(uuid) TO service_role;
+
+RESET lock_timeout;
+
+NOTIFY pgrst, 'reload schema';

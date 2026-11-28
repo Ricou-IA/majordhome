@@ -405,7 +405,8 @@ BEGIN
   RAISE NOTICE '§5 tout retirable ⇒ retire : OK';
 END $$;
 
--- ── Mesure : retrait de 100 articles d'un import de 20 000 (10 000 avec ligne fournisseur), base au volume de la prod ──
+-- ── Mesure : retrait de 300 articles (TAILLE_LOT_RETRAIT_ARTICLES) d'un import de 20 000 (10 000 avec ligne
+--    fournisseur), base au volume de la prod ──
 DO $$
 DECLARE
   v_a     uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
@@ -438,21 +439,21 @@ BEGIN
   ap := public.catalog_items_import_removal_preview(v_imp);
   d_ap := round(extract(epoch FROM clock_timestamp() - t0) * 1000, 1);
   t0 := clock_timestamp();
-  r := public.catalog_items_import_remove(v_imp, 100);
+  r := public.catalog_items_import_remove(v_imp, 300);
   d1 := round(extract(epoch FROM clock_timestamp() - t0) * 1000, 1);
   t0 := clock_timestamp();
-  r2 := public.catalog_items_import_remove(v_imp, 100);
+  r2 := public.catalog_items_import_remove(v_imp, 300);
   d2 := round(extract(epoch FROM clock_timestamp() - t0) * 1000, 1);
   SET LOCAL ROLE postgres;
   IF ap IS DISTINCT FROM '{"retirables": 20000, "conservees": 0}'::jsonb THEN RAISE EXCEPTION 'mesure aperçu : %', ap; END IF;
-  IF r IS DISTINCT FROM '{"retirees": 100, "conservees": 0, "restantes": 19900}'::jsonb THEN RAISE EXCEPTION 'mesure retrait : %', r; END IF;
-  IF r2 IS DISTINCT FROM '{"retirees": 100, "conservees": 0, "restantes": 19800}'::jsonb THEN RAISE EXCEPTION 'mesure retrait 2 : %', r2; END IF;
+  IF r IS DISTINCT FROM '{"retirees": 300, "conservees": 0, "restantes": 19700}'::jsonb THEN RAISE EXCEPTION 'mesure retrait : %', r; END IF;
+  IF r2 IS DISTINCT FROM '{"retirees": 300, "conservees": 0, "restantes": 19400}'::jsonb THEN RAISE EXCEPTION 'mesure retrait 2 : %', r2; END IF;
   IF (SELECT count(*) FROM majordhome.supplier_products WHERE supplier_id = v_sup)
      <> (SELECT count(*) FROM majordhome.catalog_items WHERE import_id = v_imp AND import_line % 2 = 0) THEN
     RAISE EXCEPTION 'mesure : les lignes fournisseur ne suivent pas leurs articles';
   END IF;
-  IF (SELECT count(*) FROM majordhome.catalog_items WHERE import_id = v_imp) <> 19800 THEN RAISE EXCEPTION 'mesure : 19 800 articles attendus'; END IF;
-  RAISE NOTICE 'MESURE duree_ms import de 20 000 : aperçu = % ; remove(…, 100) = % puis % (déclencheur recherche actif : %)', d_ap, d1, d2,
+  IF (SELECT count(*) FROM majordhome.catalog_items WHERE import_id = v_imp) <> 19400 THEN RAISE EXCEPTION 'mesure : 19 400 articles attendus'; END IF;
+  RAISE NOTICE 'MESURE duree_ms import de 20 000 : aperçu = % ; remove(…, 300) = % puis % (déclencheur recherche actif : %)', d_ap, d1, d2,
     EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'majordhome.supplier_products'::regclass AND tgname = 'trg_supplier_products_recherche_del');
   IF d1 > 2000 OR d2 > 2000 THEN RAISE EXCEPTION 'mesure au-dessus de 2 000 ms : % / %', d1, d2; END IF;
 END $$;

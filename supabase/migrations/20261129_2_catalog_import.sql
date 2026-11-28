@@ -10,7 +10,7 @@
 --    La vue `majordhome_catalog_items` n'est PAS modifiée (droits par colonne de 20261028_4 intacts ; `authenticated`
 --    n'a aucun droit UPDATE sur les nouvelles colonnes).
 -- 3. `supplier_catalog_upsert` (écrivain unique) recréée depuis la définition de PRODUCTION (lue le 2026-11-28, égale
---    à 20261111_2) avec deux clés FACULTATIVES, sans effet quand elles manquent (les relevés ne changent pas) :
+--    à 20261111_2) avec trois clés FACULTATIVES, sans effet quand elles manquent (les relevés ne changent pas) :
 --      - ligne `catalog_item_id` : posée À L'INSERTION SEULEMENT, si l'article est de la même org, actif et non
 --        fusionné ; la ligne naît alors rattachée (`catalog_item_link_source = 'import'`), donc `catalog_items_ensure`
 --        (appelé en fin d'upsert, qui ne traite que les lignes sans article) ne la voit jamais et ne crée pas de second
@@ -19,6 +19,8 @@
 --      - `p_meta.prix_sans_date` : si vraie, une `purchase_price_at` absente reste NULL À L'INSERTION au lieu de now()
 --        (« date inconnue », décision d'Eric 2026-11-28, option B). La mise à jour d'une ligne existante garde la
 --        règle d'avant (date absente ⇒ now()) : le relevé suivant date la ligne importée.
+--      - `p_meta.conserver_erreur_releve` : si vraie, `suppliers.catalog_sync_error` n'est pas remise à NULL (un lot
+--        d'import n'est pas un relevé : l'erreur du dernier relevé reste affichée). Absente ⇒ effacée comme avant.
 --    CHECK `supplier_products_catalog_item_link_source_check` : ajout de `import`.
 -- 4. RPC `catalog_items_import_start` / `_batch` / `_finish` (SECURITY DEFINER, org_admin ACTIF, même condition que
 --    update_member_role) ; l'organisation de batch / finish est dérivée de l'IMPORT ; aucune clé `org_id` d'une ligne
@@ -31,7 +33,8 @@
 -- la ligne existante n'est jamais envoyée à l'écrivain). Article créé `origin = 'manuel'`, `specs.canonical` =
 -- { modele_import, ancien_numero } non vides. Puis UN appel à `supplier_catalog_upsert` par fournisseur du lot,
 -- `source_version = 'import-articles_<import_id>'` (la ligne entre dans l'index unique des lignes relevées : le relevé
--- suivant la met à jour EN PLACE), `desactiver_absents = false`, `prix_sans_date = true`. Contrôlé après coup : autant
+-- suivant la met à jour EN PLACE), `desactiver_absents = false`, `prix_sans_date = true`, `conserver_erreur_releve =
+-- true`. Contrôlé après coup : autant
 -- de lignes insérées que de lignes envoyées, chacune rattachée à son article — sinon tout est annulé.
 -- Une ligne fournisseur d'un article de nature `stock` ou `main_oeuvre` prend la nature `main` (le CHECK de
 -- supplier_products ne connaît que main / accessory / consumable) ; l'article garde la sienne.
@@ -150,6 +153,8 @@ DECLARE
   v_desactiver boolean := COALESCE((p_meta ->> 'desactiver_absents')::boolean, true);
   -- 20261129_2 : import d'articles — une date absente reste NULL à l'insertion (« date inconnue »)
   v_sans_date boolean := COALESCE((p_meta ->> 'prix_sans_date')::boolean, false);
+  -- 20261129_2 : import d'articles — `catalog_sync_error` n'est pas effacée (ce n'est pas un relevé)
+  v_garder_erreur boolean := COALESCE((p_meta ->> 'conserver_erreur_releve')::boolean, false);
 BEGIN
   IF p_rows IS NULL OR jsonb_typeof(p_rows) <> 'array' OR jsonb_array_length(p_rows) = 0 THEN
     RAISE EXCEPTION 'rows_empty' USING ERRCODE = '22023';
@@ -262,7 +267,9 @@ BEGIN
                               'categories_vues', COALESCE(p_meta -> 'categories_vues', '[]'::jsonb),
                               'desactiver_absents', v_desactiver,
                               'articles', v_art);
-  UPDATE majordhome.suppliers SET catalog_sync_at = now(), catalog_sync_result = v_res, catalog_sync_error = NULL, updated_at = now()
+  -- 20261129_2 : un lot d'import n'est pas un relevé — l'erreur du dernier relevé du fournisseur reste affichée.
+  UPDATE majordhome.suppliers SET catalog_sync_at = now(), catalog_sync_result = v_res,
+         catalog_sync_error = CASE WHEN v_garder_erreur THEN catalog_sync_error END, updated_at = now()
   WHERE id = p_supplier_id AND org_id = p_org_id;
   RETURN v_res;
 END;
@@ -545,7 +552,7 @@ BEGIN
 
   FOR v_row IN SELECT value FROM jsonb_array_elements(p_rows) LOOP
 
-    -- Contrôles de verifierLigneArticle (src/lib/importArticles/lots.js), dans le même ordre.
+    -- Contrôles de verifierLigneArticle (src/lib/importArticles/lots.js, miroir clé par clé), dans le même ordre.
     IF jsonb_typeof(v_row -> 'import_line') IS DISTINCT FROM 'number'
        OR ((v_row ->> 'import_line') ~ '^[1-9][0-9]{0,8}$') IS NOT TRUE THEN
       RAISE EXCEPTION 'row_invalid' USING ERRCODE = '22023', DETAIL = 'import_line';
@@ -596,7 +603,7 @@ BEGIN
          OR ((v_four ->> 'purchase_price_ht')::numeric >= 0.005 AND (v_four ->> 'purchase_price_ht')::numeric < 100000000) IS NOT TRUE THEN
         RAISE EXCEPTION 'row_invalid' USING ERRCODE = '22023', DETAIL = format('ligne %s : fournisseur', v_line);
       END IF;
-      -- Prix public : absent, null ou nombre de 0 à 100 millions (plus strict que lots.js, qui ne le contrôle pas)
+      -- Prix public : absent, null ou nombre de 0 à 100 millions (même règle que lots.js)
       IF jsonb_typeof(v_four -> 'tarif_public') IS NOT NULL AND jsonb_typeof(v_four -> 'tarif_public') <> 'null'
          AND (jsonb_typeof(v_four -> 'tarif_public') <> 'number'
               OR ((v_four ->> 'tarif_public')::numeric >= 0 AND (v_four ->> 'tarif_public')::numeric < 100000000) IS NOT TRUE) THEN
@@ -617,7 +624,7 @@ BEGIN
       v_public := (v_four ->> 'tarif_public')::numeric;
     END IF;
 
-    -- Textes : chaîne ou nombre (contrôle du type, absent de lots.js)
+    -- Textes : chaîne ou nombre (même contrôle du type que `texteAdmis` de lots.js)
     v_code := majordhome.catalog_import_texte(v_row, 'code', v_line, 'code');
 
     -- Ligne déjà écrite (lot renvoyé) : rien n'est recréé. Avant les contrôles de la base : au rejeu, la référence
@@ -693,7 +700,7 @@ BEGIN
   -- son article (sinon une écriture concurrente l'a créée entre-temps, ou l'article a été refusé : tout est annulé).
   FOR v_cle, v_envoi IN SELECT key, value FROM jsonb_each(v_lignes) LOOP
     v_res := public.supplier_catalog_upsert(v_org, v_cle::uuid, v_version, v_envoi,
-                                            '{"desactiver_absents": false, "prix_sans_date": true}'::jsonb);
+                                            '{"desactiver_absents": false, "prix_sans_date": true, "conserver_erreur_releve": true}'::jsonb);
     IF (v_res ->> 'inseres')::integer IS DISTINCT FROM jsonb_array_length(v_envoi) THEN
       RAISE EXCEPTION 'ligne_fournisseur_existante' USING ERRCODE = '23505',
         DETAIL = format('fournisseur %s : %s lignes insérées sur %s', v_cle, v_res ->> 'inseres', jsonb_array_length(v_envoi));
@@ -747,3 +754,7 @@ REVOKE ALL ON FUNCTION public.catalog_items_import_finish(uuid, jsonb) FROM PUBL
 GRANT EXECUTE ON FUNCTION public.catalog_items_import_start(uuid, text, jsonb, jsonb, jsonb) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.catalog_items_import_batch(uuid, jsonb) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.catalog_items_import_finish(uuid, jsonb) TO authenticated;
+
+RESET lock_timeout;
+
+NOTIFY pgrst, 'reload schema';

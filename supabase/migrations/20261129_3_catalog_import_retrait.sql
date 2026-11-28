@@ -38,8 +38,9 @@
 -- Mesuré sur le harnais le 2026-11-28 (assert-catalog-import-retrait.sql, chaîne 20261028_4 → 20261124_2 →
 -- 20261129_2 → 20261129_3, déclencheurs `recherche` actifs, index et clés étrangères de production recréés, 47 000
 -- articles et 41 000 lignes fournisseur dans l'org, import de 20 000 articles dont 10 000 avec ligne) : aperçu 116 à
--- 181 ms ; remove(…, 100) 149 à 215 ms (sans les index du § 0 : 0,9 à 2,2 s). Plafond PostgREST : 8 s ; cible : < 2 s —
--- TAILLE_LOT_RETRAIT = 100 (src/lib/importClients/lots.js) tient la marge.
+-- 181 ms ; remove(…, 100) 149 à 215 ms (sans les index du § 0 : 0,9 à 2,2 s). Plafond PostgREST : 8 s ; cible : < 2 s.
+-- Revue finale, même jeu : aperçu 300 ms, remove(…, 300) 397 à 411 ms ⇒ l'écran retire par lots de
+-- TAILLE_LOT_RETRAIT_ARTICLES = 300 (src/lib/importArticles/lots.js ; le retrait des clients garde ses lots de 100).
 --
 -- Retour arrière : DROP INDEX majordhome.catalog_items_merged_into_idx, majordhome.catalog_items_source_product_idx,
 -- majordhome.supplier_products_variant_of_idx ; DROP FUNCTION public.catalog_items_import_remove(uuid, integer),

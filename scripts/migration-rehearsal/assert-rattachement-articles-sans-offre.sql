@@ -14,6 +14,7 @@ DECLARE
   v_i1 uuid; v_i2 uuid; v_i3 uuid; v_i4 uuid; v_i5 uuid; v_i6 uuid; v_i7 uuid;
   v_n2 uuid; v_n4 uuid;
   v_s5 uuid; v_a6 uuid; v_b6 uuid; v_n6 uuid; v_z uuid; v_nz uuid; v_i9 uuid; v_x11 uuid; v_tous uuid[];
+  v_s6 uuid; v_i12 uuid; v_i13 uuid; v_n13 uuid; v_imp_version text := 'import-articles_' || gen_random_uuid();
   v_res jsonb;
   v_p record;
   v_n int;
@@ -246,17 +247,77 @@ BEGIN
     RAISE EXCEPTION '(11) M11 non rattachée au seul article vivant X11 : % % (%)', v_p.catalog_item_id, v_p.catalog_item_link_source, v_res;
   END IF;
 
+  -- (12) revue finale — un article importé porte sa ligne d'import chez S6 (link_source 'import', source_version de
+  --      l'import) ; un relevé PARTIEL de S6 (desactiver_absents = false : factures, offre, prix publics) sous une
+  --      AUTRE référence, même marque et même modèle ⇒ la nouvelle ligne se rattache à l'article importé (aucun
+  --      article créé), la ligne d'import reste active
+  INSERT INTO majordhome.suppliers (org_id, name, is_active, category_mapping) VALUES (v_mayer, 'TEST SANS OFFRE S6', true, '{}'::jsonb) RETURNING id INTO v_s6;
+  INSERT INTO majordhome.catalog_items (org_id, name, brand, model_key, product_kind, selling_price_ht, origin)
+  VALUES (v_mayer, 'Importé X12', 'BAYWA', 'X12', 'main', 500, 'manuel') RETURNING id INTO v_i12;
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, model_key, purchase_price_ht, category,
+                                            catalog_item_id, catalog_item_link_source, catalog_item_linked_at, specs)
+  VALUES (v_s6, v_mayer, 'ANCIEN-12', 'Importé X12', 'BAYWA', 'X12', 300, 'photovoltaique',
+          v_i12, 'import', now(), jsonb_build_object('source_version', v_imp_version));
+  SET LOCAL ROLE service_role;
+  v_res := public.supplier_catalog_upsert(v_mayer, v_s6, 'facture-12', jsonb_build_array(
+    v_ligne || '{"reference":"SITE-12","model_key":"X12","purchase_price_ht":310}'::jsonb), '{"desactiver_absents": false}'::jsonb);
+  RESET ROLE;
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_s6 AND reference = 'SITE-12';
+  IF v_p.catalog_item_id IS DISTINCT FROM v_i12 OR v_p.catalog_item_link_source IS DISTINCT FROM 'cle' THEN
+    RAISE EXCEPTION '(12) SITE-12 non rattachée à l''article importé (ligne d''import du même fournisseur) : % % (%)', v_p.catalog_item_id, v_p.catalog_item_link_source, v_res->'articles';
+  END IF;
+  IF (v_res->'articles'->>'crees')::int <> 0 THEN RAISE EXCEPTION '(12) relevé partiel : article créé (%)', v_res->'articles'; END IF;
+  IF (SELECT is_active FROM majordhome.supplier_products WHERE supplier_id = v_s6 AND reference = 'ANCIEN-12') IS NOT TRUE THEN
+    RAISE EXCEPTION '(12) la ligne d''import a été éteinte par un relevé partiel';
+  END IF;
+  SELECT count(*) INTO v_n FROM majordhome.catalog_items WHERE org_id = v_mayer AND brand = 'BAYWA' AND model_key = 'X12';
+  IF v_n <> 1 THEN RAISE EXCEPTION '(12) X12 : % articles au lieu d''un', v_n; END IF;
+  -- … une ligne de S6 issue d'un relevé compte toujours : X12 porte maintenant SITE-12, une troisième référence de S6
+  --    ne s'y rattache pas (règle d'avant)
+  SET LOCAL ROLE service_role;
+  v_res := public.supplier_catalog_upsert(v_mayer, v_s6, 'facture-12b', jsonb_build_array(
+    v_ligne || '{"reference":"SITE-12B","model_key":"X12","purchase_price_ht":320}'::jsonb), '{"desactiver_absents": false}'::jsonb);
+  RESET ROLE;
+  IF (SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id = v_s6 AND reference = 'SITE-12B') = v_i12 THEN
+    RAISE EXCEPTION '(12) SITE-12B rattachée alors que l''article a déjà une ligne relevée de S6';
+  END IF;
+
+  -- (13) même situation, prix trop éloigné (ensure crée un article) : la proposition de fusion n'est pas bloquée par le
+  --      « fournisseur commun » que serait la seule ligne d'import
+  INSERT INTO majordhome.catalog_items (org_id, name, brand, model_key, product_kind, selling_price_ht, origin)
+  VALUES (v_mayer, 'Importé X13', 'BAYWA', 'X13', 'main', 500, 'manuel') RETURNING id INTO v_i13;
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, model_key, purchase_price_ht, category,
+                                            catalog_item_id, catalog_item_link_source, catalog_item_linked_at, specs)
+  VALUES (v_s6, v_mayer, 'ANCIEN-13', 'Importé X13', 'BAYWA', 'X13', 100, 'photovoltaique',
+          v_i13, 'import', now(), jsonb_build_object('source_version', v_imp_version));
+  SET LOCAL ROLE service_role;
+  v_res := public.supplier_catalog_upsert(v_mayer, v_s6, 'facture-13', jsonb_build_array(
+    v_ligne || '{"reference":"SITE-13","model_key":"X13","purchase_price_ht":350}'::jsonb), '{"desactiver_absents": false}'::jsonb);
+  RESET ROLE;
+  SELECT catalog_item_id INTO v_n13 FROM majordhome.supplier_products WHERE supplier_id = v_s6 AND reference = 'SITE-13';
+  IF v_n13 IS NULL OR v_n13 = v_i13 THEN RAISE EXCEPTION '(13) fixture : SITE-13 (achat 350 contre 100) rattachée à l''article importé'; END IF;
+  SET LOCAL ROLE service_role;
+  v_res := public.catalog_item_proposals_propose(v_mayer);
+  RESET ROLE;
+  SELECT * INTO v_p FROM majordhome.catalog_item_proposals WHERE item_a_id = least(v_i13, v_n13) AND item_b_id = greatest(v_i13, v_n13);
+  IF v_p.statut IS DISTINCT FROM 'propose' THEN
+    RAISE EXCEPTION '(13) X13 : article importé ↔ article du relevé partiel non proposés (%) : %', v_p.statut, v_res;
+  END IF;
+  IF EXISTS (SELECT 1 FROM majordhome.catalog_items WHERE id IN (v_i12, v_i13, v_n13) AND merged_into IS NOT NULL) THEN
+    RAISE EXCEPTION '(13) fusion d''office d''un article importé';
+  END IF;
+
   -- index de la recherche par l'EAN des lignes (sinon un parcours complet par ligne relevée)
   IF to_regclass('majordhome.supplier_products_org_ean_idx') IS NULL THEN RAISE EXCEPTION 'index supplier_products_org_ean_idx absent'; END IF;
 
   -- nettoyage (tous les articles de la fixture : ceux de ses lignes, plus les importés)
-  v_tous := ARRAY[v_i1, v_i2, v_i3, v_i4, v_i5, v_i6, v_i7, v_n2, v_n4, v_a6, v_b6, v_n6, v_z, v_nz, v_i9]
-            || ARRAY(SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id IN (v_s1, v_s2, v_s3, v_s4, v_s5) AND catalog_item_id IS NOT NULL)
-            || ARRAY(SELECT id FROM majordhome.catalog_items WHERE org_id = v_mayer AND brand = 'BAYWA' AND model_key IN ('X10', 'X11'));
+  v_tous := ARRAY[v_i1, v_i2, v_i3, v_i4, v_i5, v_i6, v_i7, v_n2, v_n4, v_a6, v_b6, v_n6, v_z, v_nz, v_i9, v_i12, v_i13, v_n13]
+            || ARRAY(SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id IN (v_s1, v_s2, v_s3, v_s4, v_s5, v_s6) AND catalog_item_id IS NOT NULL)
+            || ARRAY(SELECT id FROM majordhome.catalog_items WHERE org_id = v_mayer AND brand = 'BAYWA' AND model_key IN ('X10', 'X11', 'X12', 'X13'));
   DELETE FROM majordhome.catalog_item_proposals WHERE item_a_id = ANY (v_tous) OR item_b_id = ANY (v_tous);
-  DELETE FROM majordhome.supplier_products WHERE supplier_id IN (v_s1, v_s2, v_s3, v_s4, v_s5);
+  DELETE FROM majordhome.supplier_products WHERE supplier_id IN (v_s1, v_s2, v_s3, v_s4, v_s5, v_s6);
   DELETE FROM majordhome.catalog_items WHERE id = ANY (v_tous);
-  DELETE FROM majordhome.suppliers WHERE id IN (v_s1, v_s2, v_s3, v_s4, v_s5);
+  DELETE FROM majordhome.suppliers WHERE id IN (v_s1, v_s2, v_s3, v_s4, v_s5, v_s6);
 
   RAISE NOTICE 'assert-rattachement-articles-sans-offre : OK';
 END $$;

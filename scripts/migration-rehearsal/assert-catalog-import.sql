@@ -137,7 +137,9 @@ DECLARE
   v_b uuid := '62cd2073-96e0-4300-adae-4c1bb8934546';
   v_sa uuid; v_sb uuid; v_item uuid; v_ib uuid;
 BEGIN
-  INSERT INTO majordhome.suppliers (org_id, name, is_active) VALUES (v_a, 'ZZ FOURNISSEUR EXISTANT', true) RETURNING id INTO v_sa;
+  -- Son dernier relevé a échoué : un lot d'import ne doit pas effacer l'erreur (revue finale)
+  INSERT INTO majordhome.suppliers (org_id, name, is_active, catalog_sync_error)
+  VALUES (v_a, 'ZZ FOURNISSEUR EXISTANT', true, '{"ok": false, "code": "test"}'::jsonb) RETURNING id INTO v_sa;
   INSERT INTO majordhome.suppliers (org_id, name, is_active) VALUES (v_b, 'ZZ FOURNISSEUR DE B', true) RETURNING id INTO v_sb;
   INSERT INTO majordhome.catalog_items (org_id, name, code, origin) VALUES (v_a, 'Article qui a déjà le code', 'CODE-PRIS', 'manuel') RETURNING id INTO v_item;
   INSERT INTO majordhome.catalog_items (org_id, name, origin) VALUES (v_b, 'Article de B', 'manuel') RETURNING id INTO v_ib;
@@ -257,6 +259,13 @@ BEGIN
   IF n <> current_setting('test.nb_articles_a')::int + 4 THEN RAISE EXCEPTION 'articles de A : % au lieu de % + 4 (ensure a doublé ?)', n, current_setting('test.nb_articles_a'); END IF;
   IF EXISTS (SELECT 1 FROM majordhome.catalog_items WHERE source_product_id IN (SELECT id FROM majordhome.supplier_products WHERE specs ->> 'source_version' = 'import-articles_' || v_imp)) THEN
     RAISE EXCEPTION 'un article a été créé par ensure depuis une ligne de l''import';
+  END IF;
+  -- Erreur du dernier relevé du fournisseur conservée par le lot (catalog_sync_result, lui, est remplacé)
+  IF (SELECT catalog_sync_error FROM majordhome.suppliers WHERE id = v_sa) IS DISTINCT FROM '{"ok": false, "code": "test"}'::jsonb THEN
+    RAISE EXCEPTION 'le lot d''import a effacé l''erreur de relevé du fournisseur : %', (SELECT catalog_sync_error FROM majordhome.suppliers WHERE id = v_sa);
+  END IF;
+  IF (SELECT catalog_sync_result ->> 'version' FROM majordhome.suppliers WHERE id = v_sa) IS DISTINCT FROM 'import-articles_' || v_imp THEN
+    RAISE EXCEPTION 'catalog_sync_result du fournisseur non écrit par le lot';
   END IF;
   -- Ligne existante intacte
   IF (SELECT purchase_price_ht = 50 AND purchase_price_at = '2026-01-01T00:00:00Z' AND NOT is_active AND catalog_item_id IS NULL
@@ -503,6 +512,10 @@ BEGIN
   SELECT * INTO l FROM majordhome.supplier_products WHERE supplier_id = v_sa AND reference = 'RELEVE-2';
   IF l.catalog_item_id IS NULL OR l.catalog_item_id = v_ib OR l.catalog_item_link_source <> 'auto' THEN RAISE EXCEPTION 'relevé RELEVE-2 : article d''une autre org accepté : %', row_to_json(l); END IF;
   IF (SELECT count(*) FROM majordhome.catalog_items WHERE org_id = v_a) <> n_a + 2 THEN RAISE EXCEPTION 'relevé : 2 articles attendus'; END IF;
+  -- Un vrai relevé (sans conserver_erreur_releve) efface l'erreur du relevé précédent, comme avant
+  IF (SELECT catalog_sync_error FROM majordhome.suppliers WHERE id = v_sa) IS NOT NULL THEN
+    RAISE EXCEPTION 'relevé : catalog_sync_error non effacée (%)', (SELECT catalog_sync_error FROM majordhome.suppliers WHERE id = v_sa);
+  END IF;
 
   -- 8. Relevé de la même référence que l'import : mise à jour en place
   SELECT * INTO avant FROM majordhome.supplier_products WHERE supplier_id = v_sa AND reference = 'REF-A1';
