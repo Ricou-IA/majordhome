@@ -90,6 +90,13 @@ test('une marque affichée en logo est lue sur son texte alternatif (sélecteur 
   }
 });
 
+test('motif de marque : la marque est découpée dans le texte lu ; sans prise, jamais le texte entier', async () => {
+  const lire = async (marque_motif) => (await lancer({ recette: recette({ listes: { departs: [`${site.url}/liste-titre`], lien_produit: 'a.p' }, produit: { ...recette().produit, marque: 'title', marque_motif } }) })).produits[0].marque;
+  assert.equal(await lire(':\\s*([^|]+?)\\s*\\|'), 'Deville');
+  // motif sans prise : repli sur la marque lue par le modèle (factice : « Invicta (lue) »), comme sans sélecteur
+  assert.equal(await lire('Marque : (\\w+)'), 'Invicta (lue)');
+});
+
 test('essai : s’arrête au nombre demandé', async () => {
   const { r, produits } = await lancer({ essai: 2 });
   assert.equal(produits.length, 2);

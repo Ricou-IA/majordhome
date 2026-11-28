@@ -28,6 +28,15 @@ test('recette avec connexion et documents valide', () => {
   assert.deepEqual(validerRecette(r), { ok: true, erreurs: [] });
 });
 
+test('motif de marque : expression régulière courte, valide, à un seul groupe', () => {
+  const avec = (marque_motif) => validerRecette({ ...ok, produit: { ...ok.produit, marque: 'title', marque_motif } });
+  assert.deepEqual(avec(':\\s*([^|]+?)\\s*\\|'), { ok: true, erreurs: [] });
+  assert.equal(avec('([').ok, false);
+  assert.equal(avec(':\\s*[^|]+').ok, false);
+  assert.equal(avec('(a)(b)').ok, false);
+  assert.equal(avec(`(${'a'.repeat(120)})`).ok, false);
+});
+
 test('URL hors du domaine refusée', () => {
   assert.equal(validerRecette({ ...ok, listes: { ...ok.listes, departs: ['https://autre.fr/'] } }).ok, false);
   assert.equal(validerRecette({ ...ok, connexion: { url: 'https://evil.example/login', champ_identifiant: '#a', champ_mot_de_passe: '#b', bouton: 'button', preuve: '.x' } }).ok, false);

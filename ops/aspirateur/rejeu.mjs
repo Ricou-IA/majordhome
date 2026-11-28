@@ -8,8 +8,17 @@ import { createHash } from 'node:crypto';
 import { CodeErreur } from './erreurs.mjs';
 import { texteDe } from './modele.mjs';
 import { construirePromptLecture, lireReponse, fusionnerLectures } from './lib/lecture.js';
+import { motifMarque } from './lib/recette.js';
 
 const LOT = 20;
+
+/** Marque découpée par le motif de la recette (un seul groupe) ; sans motif, le texte lu ; motif sans prise ⇒ null. */
+function decouperMarque(texte, motif) {
+  if (!texte || motif === undefined) return texte || null;
+  const re = motifMarque(motif);
+  const m = re ? texte.slice(0, 300).match(re) : null;
+  return m?.[1]?.trim() || null;
+}
 // Un nombre : groupes de trois chiffres séparés par une espace (« 5 016,90 »), sinon chiffres, points et virgules.
 const NOMBRE = String.raw`\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d[\d.,]*`;
 
@@ -167,7 +176,7 @@ export async function rejouer({ recette, acces, champs, modele, navigateur: nav,
         }
         lot.push({
           url, reference_fabricant: ref, nom: (p.nom && await nav.texte(p.nom)) || titre,
-          marque: (p.marque ? await marqueLue(p.marque) : null) || lecturePage.marque || null, ean: p.ean ? await nav.texte(p.ean) : null,
+          marque: (p.marque ? decouperMarque(await marqueLue(p.marque), p.marque_motif) : null) || lecturePage.marque || null, ean: p.ean ? await nav.texte(p.ean) : null,
           prix: p.prix ? prixDepuisTexte(await nav.texte(p.prix)) : null,
           photo_url: p.photo ? (await nav.attributs(p.photo, 'src'))[0] || null : null,
           documents, valeurs, provenance, lu_le: new Date().toISOString(),

@@ -36,12 +36,13 @@ function consigne({ hoteSite, urlDepart, champs }) {
     'Une recette ne contient que des adresses du site et des sélecteurs CSS ; jamais d’identifiant, de mot de passe ni de numéro de client.',
     `Forme : {"schema":${SCHEMA_RECETTE},"domaine":"${hoteSite}","connexion":{"url","champ_identifiant","champ_mot_de_passe","bouton","preuve"} (si le catalogue exige d’être connecté),`
       + ' "listes":{"departs":[adresses des listes de produits],"lien_produit":sélecteur des liens vers une fiche,"suivant":sélecteur du lien page suivante (facultatif)},'
-      + ' "produit":{"nom","reference" (référence fabricant),"marque","ean","prix","photo","zone_caracteristiques" (tous facultatifs sauf nom et reference),'
+      + ' "produit":{"nom","reference" (référence fabricant),"marque","marque_motif" (facultatif),"ean","prix","photo","zone_caracteristiques" (tous facultatifs sauf nom et reference),'
       + ' "documents":[{"type":"fiche_technique"|"notice"|"declaration_performance"|"etiquette_energie","selecteur"}]},"politesse":{"delai_ms":1000}}.',
     'Méthode : trouve les listes de produits, ouvre quelques fiches, repère les sélecteurs, essaie la recette avec essayer_recette, corrige, puis propose-la avec proposer_recette.',
     'essayer_recette rejoue la recette dans un navigateur NEUF, sans ta session : si les fiches exigent d’être connecté, la recette doit contenir le bloc connexion, sinon l’essai ne lit rien.',
     'Sur chaque fiche, vise des éléments présents sans clic : la marque, chaque lien vers un PDF (fiche technique, notice, déclaration de performance) et la zone des caractéristiques techniques (rendement, émissions, puissance, sortie des fumées).',
     'La marque est souvent un LOGO : vise l’image du logo de la marque (son texte alternatif est lu) ou son cadre. Un essai où la marque reste vide est à corriger : l’entreprise filtre ses produits par marque.',
+    'Si la marque n’est qu’un morceau d’un texte (titre « Nom - Réf : Marque | Site »), ajoute "marque_motif" dans produit : expression régulière JavaScript à UN seul groupe qui capture la marque seule (100 caractères au plus). L’essai doit montrer la marque seule, jamais le texte entier.',
     'Un lien de document peut ne pas finir par .pdf (bouton de téléchargement, fichier sur un serveur du même site) : vise tous les liens de la zone des documents, le programme ne garde que les vrais PDF. La photo vise l’image du produit, jamais un logo.',
     'Le sélecteur du prix vise l’élément qui ne contient QUE le prix, jamais un bloc qui porte aussi la référence ou d’autres nombres. Un produit vu deux fois à l’essai signale un sélecteur de liens trop large.',
   ].join('\n');

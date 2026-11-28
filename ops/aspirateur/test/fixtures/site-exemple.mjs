@@ -64,6 +64,9 @@ export async function demarrerSite() {
     // Catalogue réservé au compte (comme Invicta) ; chaque fiche y est liée deux fois (photo et titre).
     // Marque affichée en logo (image), comme sur le site pro d'Invicta.
     if (u.pathname === '/produit/7') return envoyer(200, 'text/html', page('Toron', '<h1>Toron</h1><span class="ref">P707070</span><div class="fabricant"><img src="/img/deville.jpg" alt="Deville"></div><span class="prix">1 690,00 €</span><div class="caracs">Etas 70 %.</div>'));
+    // Marque seulement dans le titre de la page, comme sur le site pro d'Invicta.
+    if (u.pathname === '/produit/8') return envoyer(200, 'text/html', page('POELE TORON 50 - P808080 : Deville | Invicta', '<h1>Toron</h1><span class="ref">P808080</span><span class="prix">1 690,00 €</span>'));
+    if (u.pathname === '/liste-titre') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/8">8</a>'));
     if (u.pathname === '/liste-logo') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/7">7</a>'));
     if (u.pathname === '/liste-compte') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/3">photo</a><a class="p" href="/produit/3">Toron</a>'));
     if (u.pathname === '/liste-double') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/1">photo</a><a class="p" href="/produit/1">Châtel</a><a class="p" href="/produit/2#avis">Pierre</a><a class="p" href="/produit/2">Pierre</a>'));

@@ -16,6 +16,24 @@ const DELAI_MIN_MS = 1000;
 // session de celle qui l'a apprise (relecture I5).
 const SESSION = /;jsessionid=|[?&](sid|sessionid|session|phpsessid|jsessionid|token|access_token|auth|key|apikey|api_key|signature)=/i;
 
+const MOTIF_MAX = 100;
+
+/**
+ * Motif qui découpe la marque dans le texte lu par `produit.marque` (vécu Invicta 2026-11-28 : la marque n'est que dans
+ * le titre « Nom - Réf : Deville | Invicta »). Expression régulière de 100 caractères au plus, à UN seul groupe : la
+ * marque. Rendue compilée, ou null si absente ou invalide. Appliquée à 300 caractères au plus.
+ * @param {unknown} m
+ * @returns {RegExp | null}
+ */
+export function motifMarque(m) {
+  if (typeof m !== 'string' || !m || m.length > MOTIF_MAX) return null;
+  try {
+    const re = new RegExp(m);
+    // nombre de groupes de capture : une alternative vide fait toujours correspondre
+    return /** @type {RegExpExecArray} */ (new RegExp(`${m}|`).exec('')).length === 2 ? re : null;
+  } catch { return null; }
+}
+
 /** @param {unknown} v */
 const estObjet = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -72,6 +90,7 @@ export function validerRecette(r) {
     selecteur(p.nom, 'produit.nom', erreurs);
     selecteur(p.reference, 'produit.reference', erreurs);
     for (const k of ['marque', 'ean', 'prix', 'photo', 'zone_caracteristiques']) selecteur(p[k], `produit.${k}`, erreurs, false);
+    if (p.marque_motif !== undefined && !motifMarque(p.marque_motif)) erreurs.push(`produit.marque_motif : expression régulière à un seul groupe, ${MOTIF_MAX} caractères au plus`);
     if (p.documents !== undefined) {
       if (!Array.isArray(p.documents)) erreurs.push('produit.documents : liste attendue');
       else p.documents.forEach((/** @type {any} */ d, /** @type {number} */ i) => {
