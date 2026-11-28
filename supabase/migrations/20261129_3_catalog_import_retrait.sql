@@ -17,10 +17,10 @@
 -- public.catalog_items_import_remove(p_import_id, p_limit DEFAULT 100) → { retirees, conservees, restantes }
 --   (mêmes clés que le retrait des clients : `lireReponseRetrait` de src/lib/importClients/lots.js). Par lots (1 à 500),
 --   à rappeler tant que restantes > 0 ; chaque suppression doit toucher exactement ce qui est visé, sinon tout est
---   annulé (`removal_incomplete`, DETAIL). `counts` reçoit `retirees` (cumul) et `conservees`. À restantes = 0 :
---   status = 'retire', removed_at, removed_by (tâche 6 du plan ; voir le rapport : le retrait des clients, lui, ne
---   passe à « retire » que quand il ne reste AUCUNE fiche). Un import « retire » reste rappelable : un article
---   conservé qui se libère plus tard pourra encore partir.
+--   annulé (`removal_incomplete`, DETAIL). `counts` reçoit `retirees` (cumul) et `conservees`. status = 'retire',
+--   removed_at, removed_by seulement quand il ne reste AUCUN article de l'import (spec § 6.6, comme les clients après
+--   20261122_1) ; un import qui garde des articles conservés reste `termine` (ou `en_cours`) et reste rappelable : un
+--   article conservé qui se libère plus tard pourra encore partir.
 --
 -- Garde : auth.uid() NULL refusé en premier, puis majordhome.catalog_import_org_admin (org_admin ACTIF de
 -- l'organisation de l'IMPORT, 20261129_2). Codes : `unauthenticated` / `org_admin_required` (42501),
@@ -227,14 +227,15 @@ BEGIN
   END IF;
   SELECT count(*) INTO v_total FROM majordhome.catalog_items WHERE import_id = p_import_id AND org_id = v_org;
 
-  -- Bilan du retrait dans counts (cumul des appels) ; « retire » quand il ne reste plus rien à retirer.
+  -- Bilan du retrait dans counts (cumul des appels) ; « retire » seulement quand il ne reste AUCUN article de l'import
+  -- (comme les clients après 20261122_1) : un import qui garde des articles conservés reste dans son statut.
   SELECT CASE WHEN jsonb_typeof(counts -> 'retirees') = 'number' THEN (counts ->> 'retirees')::numeric ELSE 0 END
     INTO v_cumul FROM majordhome.catalog_imports WHERE id = p_import_id;
   UPDATE majordhome.catalog_imports
      SET counts     = counts || jsonb_build_object('retirees', coalesce(v_cumul, 0) + v_vises, 'conservees', v_total - v_restantes),
-         status     = CASE WHEN v_restantes = 0 THEN 'retire' ELSE status END,
-         removed_at = CASE WHEN v_restantes = 0 THEN coalesce(removed_at, now()) ELSE removed_at END,
-         removed_by = CASE WHEN v_restantes = 0 THEN coalesce(removed_by, v_uid) ELSE removed_by END
+         status     = CASE WHEN v_total = 0 THEN 'retire' ELSE status END,
+         removed_at = CASE WHEN v_total = 0 THEN coalesce(removed_at, now()) ELSE removed_at END,
+         removed_by = CASE WHEN v_total = 0 THEN coalesce(removed_by, v_uid) ELSE removed_by END
    WHERE id = p_import_id AND org_id = v_org;
 
   RETURN jsonb_build_object('retirees', v_vises, 'conservees', v_total - v_restantes, 'restantes', v_restantes);
@@ -247,7 +248,7 @@ GRANT EXECUTE ON FUNCTION public.catalog_items_import_removal_preview(uuid) TO a
 GRANT EXECUTE ON FUNCTION public.catalog_items_import_remove(uuid, integer) TO authenticated;
 
 COMMENT ON COLUMN majordhome.catalog_imports.status IS
-  'en_cours → termine (catalog_items_import_finish) ; retire quand il ne reste plus aucun article retirable (catalog_items_import_remove).';
+  'en_cours → termine (catalog_items_import_finish) ; retire quand il ne reste plus aucun article de l''import (catalog_items_import_remove).';
 COMMENT ON COLUMN majordhome.catalog_imports.counts IS
   'Bilan de l''import (lues, importées, doublons, écartées…), écrit au départ puis à la fin ; après un retrait retirees (cumul) et conservees.';
 

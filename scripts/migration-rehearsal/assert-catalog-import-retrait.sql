@@ -216,8 +216,9 @@ BEGIN
   IF r3 IS DISTINCT FROM '{"retirees": 0, "conservees": 2, "restantes": 0}'::jsonb THEN RAISE EXCEPTION 'retrait 3 (rien à retirer) : %', r3; END IF;
 
   SELECT * INTO i FROM majordhome.catalog_imports WHERE id = v_imp;
-  IF i.status <> 'retire' OR i.removed_at IS NULL OR i.removed_by IS DISTINCT FROM v_admin THEN
-    RAISE EXCEPTION 'import non passé à retire : %', row_to_json(i);
+  -- Deux articles conservés : l'import reste « termine », sans removed_at / removed_by
+  IF i.status <> 'termine' OR i.removed_at IS NOT NULL OR i.removed_by IS NOT NULL THEN
+    RAISE EXCEPTION 'import à articles conservés : statut « termine » sans removed_* attendu : %', row_to_json(i);
   END IF;
   IF (i.counts ->> 'retirees')::int <> 3 OR (i.counts ->> 'conservees')::int <> 2 OR (i.counts ->> 'importees')::int <> 5 THEN
     RAISE EXCEPTION 'counts : %', i.counts;
@@ -284,13 +285,55 @@ BEGIN
   SET LOCAL ROLE postgres;
   IF r IS DISTINCT FROM '{"retirees": 1, "conservees": 1, "restantes": 1}'::jsonb THEN RAISE EXCEPTION 'fusion retrait 1 : %', r; END IF;
   IF r2 IS DISTINCT FROM '{"retirees": 1, "conservees": 1, "restantes": 0}'::jsonb THEN RAISE EXCEPTION 'fusion retrait 2 : %', r2; END IF;
-  IF (SELECT status FROM majordhome.catalog_imports WHERE id = v_imp) <> 'retire' THEN RAISE EXCEPTION 'import fusion non retiré'; END IF;
+  IF (SELECT status FROM majordhome.catalog_imports WHERE id = v_imp) <> 'en_cours' THEN RAISE EXCEPTION 'import fusion (un article conservé) : statut changé'; END IF;
   IF (SELECT string_agg(name, ',') FROM majordhome.catalog_items WHERE import_id = v_imp) IS DISTINCT FROM 'Ligne citée' THEN RAISE EXCEPTION 'article à ligne citée retiré'; END IF;
   IF NOT EXISTS (SELECT 1 FROM majordhome.supplier_products WHERE supplier_id = v_sa AND reference = 'R-LIGNE-CITEE' AND catalog_item_id IS NOT NULL) THEN
     RAISE EXCEPTION 'ligne citée par un devis supprimée ou détachée';
   END IF;
   IF (SELECT supplier_product_id FROM majordhome.quote_lines WHERE designation = 'Ligne citant la ligne fournisseur') IS NULL THEN RAISE EXCEPTION 'devis détaché de la ligne'; END IF;
   RAISE NOTICE '§4 fusion et ligne citée : OK';
+END $$;
+
+-- ── 5. Tout est retirable : l'import passe à « retire » ───────────────────────
+DO $$
+DECLARE
+  v_a     uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+  v_admin uuid := '8a4907a3-f382-4707-bc38-2ff4832f873a';
+  v_sa    uuid := current_setting('test.sa')::uuid;
+  v_imp   uuid; r jsonb; r2 jsonb; i record;
+BEGIN
+  PERFORM public.zz_identite(v_admin);
+  SET LOCAL ROLE authenticated;
+  r := public.catalog_items_import_start(v_a, 'retrait-3.csv', '{}', '{"lues": 3}', '[]');
+  v_imp := (r ->> 'import_id')::uuid;
+  r := public.catalog_items_import_batch(v_imp, jsonb_build_array(
+    jsonb_build_object('import_line', 2, 'name', 'Tout part 1', 'product_kind', 'main', 'default_tva_rate', 20, 'selling_price_ht', 1,
+      'fournisseur', jsonb_build_object('supplier_id', v_sa, 'reference', 'R-TOUT-1', 'purchase_price_ht', 1, 'tarif_public', NULL, 'purchase_price_at', NULL)),
+    jsonb_build_object('import_line', 3, 'name', 'Tout part 2', 'product_kind', 'main', 'default_tva_rate', 20, 'selling_price_ht', 1),
+    jsonb_build_object('import_line', 4, 'name', 'Tout part 3', 'product_kind', 'accessory', 'default_tva_rate', 20, 'selling_price_ht', 1)));
+  PERFORM public.catalog_items_import_finish(v_imp, '{"lues": 3, "importees": 3}');
+  r := public.catalog_items_import_removal_preview(v_imp);
+  IF r IS DISTINCT FROM '{"retirables": 3, "conservees": 0}'::jsonb THEN RAISE EXCEPTION 'aperçu tout retirable : %', r; END IF;
+  r := public.catalog_items_import_remove(v_imp, 2);
+  SET LOCAL ROLE postgres;
+  IF r IS DISTINCT FROM '{"retirees": 2, "conservees": 0, "restantes": 1}'::jsonb THEN RAISE EXCEPTION 'tout retirable 1 : %', r; END IF;
+  SELECT * INTO i FROM majordhome.catalog_imports WHERE id = v_imp;
+  IF i.status <> 'termine' OR i.removed_at IS NOT NULL THEN RAISE EXCEPTION 'retire posé avant la fin : %', row_to_json(i); END IF;
+  PERFORM public.zz_identite(v_admin);
+  SET LOCAL ROLE authenticated;
+  r2 := public.catalog_items_import_remove(v_imp, 2);
+  SET LOCAL ROLE postgres;
+  IF r2 IS DISTINCT FROM '{"retirees": 1, "conservees": 0, "restantes": 0}'::jsonb THEN RAISE EXCEPTION 'tout retirable 2 : %', r2; END IF;
+  SELECT * INTO i FROM majordhome.catalog_imports WHERE id = v_imp;
+  IF i.status <> 'retire' OR i.removed_at IS NULL OR i.removed_by IS DISTINCT FROM v_admin
+     OR (i.counts ->> 'retirees')::int <> 3 OR (i.counts ->> 'conservees')::int <> 0 THEN
+    RAISE EXCEPTION 'import vide non passé à retire : %', row_to_json(i);
+  END IF;
+  IF EXISTS (SELECT 1 FROM majordhome.catalog_items WHERE import_id = v_imp)
+     OR EXISTS (SELECT 1 FROM majordhome.supplier_products WHERE supplier_id = v_sa AND reference = 'R-TOUT-1') THEN
+    RAISE EXCEPTION 'article ou ligne restés';
+  END IF;
+  RAISE NOTICE '§5 tout retirable ⇒ retire : OK';
 END $$;
 
 -- ── Mesure : retrait de 100 articles d'un import de 20 000 (10 000 avec ligne fournisseur), base au volume de la prod ──
