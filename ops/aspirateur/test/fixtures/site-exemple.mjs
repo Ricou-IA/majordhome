@@ -42,7 +42,8 @@ export async function demarrerSite() {
     if (u.pathname === '/produit/1') return envoyer(200, 'text/html', produit(1, 'P613744', 'Châtel', '1 200,00 €'));
     if (u.pathname === '/produit/2') return envoyer(200, 'text/html', produit(2, 'P700100', 'Pierre', '980,50 €'));
     if (u.pathname === '/produit/3') return connecte ? envoyer(200, 'text/html', produit(3, 'C07768-06', 'Toron', '1 450,00 €')) : envoyer(302, 'text/plain', '', { location: '/login' });
-    if (u.pathname === '/produit/4') return envoyer(200, 'text/html', page('Sans ref', '<h1>Sans référence</h1>'));
+    if (u.pathname === '/produit/4' || u.pathname === '/produit/5') return envoyer(200, 'text/html', page('Sans ref', '<h1>Sans référence</h1>'));
+    if (u.pathname === '/liste-sans-ref') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/4">4</a><a class="p" href="/produit/5">5</a><a class="p" href="/produit/1">1</a>'));
     if (u.pathname.startsWith('/docs/')) return envoyer(200, 'application/pdf', PDF);
     if (u.pathname.startsWith('/img/')) return envoyer(200, 'image/jpeg', Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
     if (u.pathname === '/captcha') return envoyer(200, 'text/html', page('Vérification', '<p>Vérifiez que vous êtes humain</p><iframe src="https://challenges.cloudflare.com/x"></iframe>'));
