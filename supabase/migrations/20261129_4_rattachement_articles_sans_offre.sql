@@ -17,7 +17,7 @@
 --    - contrôle du prix : article AVEC une ligne active à prix ⇒ règle d'avant (rapport ≤ 2 avec la meilleure offre) ;
 --      article SANS ligne active à prix ⇒ achat de la ligne ≤ prix de vente de l'article quand celui-ci est > 0, aucun
 --      contrôle quand il vaut 0. Source du lien : `cle` / `ean` comme avant.
---    - garde-fous (revue 1) : plus de 10 articles candidats ⇒ ambigu (création) ; les clés des lignes d'un fournisseur
+--    - garde-fous (revues 1-2) : plus de 10 articles vivants portant la clé ⇒ ambigu (création) ; les clés des lignes d'un fournisseur
 --      INACTIF ne comptent pas (comme dans les propositions) ; un EAN fait de zéros est écarté (ensure et propositions ;
 --      il n'est plus recopié sur un article créé).
 --    Effet des propositions sur la production mesuré AVANT livraison : scripts/catalogue/mesure-effet-rattachement-sans-offre.sql.
@@ -102,22 +102,28 @@ BEGIN
       FROM (
         SELECT i2.id AS item, false AS par_ean FROM majordhome.catalog_items i2
          WHERE v_cle_r AND i2.org_id = p_org_id AND lower(i2.brand) = lower(r.brand) AND i2.model_key = r.model_key
+           AND i2.is_active AND i2.merged_into IS NULL
         UNION ALL
         SELECT i2.id, true FROM majordhome.catalog_items i2
          WHERE v_ean_r IS NOT NULL AND i2.org_id = p_org_id AND i2.code_ean = v_ean_r
+           AND i2.is_active AND i2.merged_into IS NULL
         UNION ALL
         SELECT q.catalog_item_id, false FROM majordhome.supplier_products q
           JOIN majordhome.suppliers s ON s.id = q.supplier_id AND s.is_active
+          JOIN majordhome.catalog_items ci ON ci.id = q.catalog_item_id AND ci.is_active AND ci.merged_into IS NULL
          WHERE v_cle_r AND q.org_id = p_org_id AND lower(q.brand) = lower(r.brand) AND q.model_key = r.model_key
            AND q.is_active AND q.catalog_item_id IS NOT NULL
         UNION ALL
         SELECT q.catalog_item_id, true FROM majordhome.supplier_products q
           JOIN majordhome.suppliers s ON s.id = q.supplier_id AND s.is_active
+          JOIN majordhome.catalog_items ci ON ci.id = q.catalog_item_id AND ci.is_active AND ci.merged_into IS NULL
          WHERE v_ean_r IS NOT NULL AND q.org_id = p_org_id AND q.code_ean = v_ean_r
            AND q.is_active AND q.catalog_item_id IS NOT NULL
       ) x;
 
-      -- plus de 10 articles portent la clé : elle ne distingue rien (même seuil que les propositions) ⇒ ambigu, création
+      -- plus de 10 articles VIVANTS (actifs, non absorbés) portent la clé, par eux-mêmes ou par une ligne active d'un
+      -- fournisseur actif : elle ne distingue rien (même seuil, sur le même ensemble, que les propositions) ⇒ ambigu,
+      -- création. Les quatre branches de 2a ne retiennent que des articles vivants (revue 2).
       IF v_ids IS NOT NULL AND cardinality(v_ids) <= 10 THEN
         SELECT count(*), (array_agg(i.id))[1], bool_or(i.id = ANY (COALESCE(v_ids_ean, '{}'::uuid[])))
           INTO v_n, v_item, v_ean

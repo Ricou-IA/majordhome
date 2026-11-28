@@ -141,21 +141,28 @@ WITH a_traiter AS (
                       AND q.id <> p.id AND q.catalog_item_id IS NOT NULL)
 ),
 nouveau AS (
-  SELECT r.id, (SELECT count(*) FROM majordhome.catalog_items i
-                  JOIN LATERAL (SELECT min(q.purchase_price_ht) AS prix FROM majordhome.supplier_products q
-                                WHERE q.catalog_item_id = i.id AND q.is_active AND q.purchase_price_ht > 0) m ON true
-                 WHERE i.id IN (
-                         SELECT i2.id FROM majordhome.catalog_items i2 WHERE r.cle AND i2.org_id = r.org_id AND lower(i2.brand) = lower(r.brand) AND i2.model_key = r.model_key
-                         UNION SELECT i2.id FROM majordhome.catalog_items i2 WHERE r.ean_n IS NOT NULL AND i2.org_id = r.org_id AND i2.code_ean = r.ean_n
-                         UNION SELECT q.catalog_item_id FROM majordhome.supplier_products q JOIN majordhome.suppliers s ON s.id = q.supplier_id AND s.is_active
-                                WHERE r.cle AND q.org_id = r.org_id AND lower(q.brand) = lower(r.brand) AND q.model_key = r.model_key AND q.is_active AND q.catalog_item_id IS NOT NULL
-                         UNION SELECT q.catalog_item_id FROM majordhome.supplier_products q JOIN majordhome.suppliers s ON s.id = q.supplier_id AND s.is_active
-                                WHERE r.ean_n IS NOT NULL AND q.org_id = r.org_id AND q.code_ean = r.ean_n AND q.is_active AND q.catalog_item_id IS NOT NULL)
-                   AND i.org_id = r.org_id AND i.is_active AND i.merged_into IS NULL AND i.product_kind = COALESCE(r.product_kind, 'main')
-                   AND NOT EXISTS (SELECT 1 FROM majordhome.supplier_products q WHERE q.catalog_item_id = i.id AND q.supplier_id = r.supplier_id AND q.is_active)
-                   AND CASE WHEN m.prix IS NOT NULL THEN greatest(r.purchase_price_ht, m.prix) <= 2 * least(r.purchase_price_ht, m.prix)
-                            ELSE COALESCE(i.selling_price_ht, 0) <= 0 OR r.purchase_price_ht <= i.selling_price_ht END) AS n
-    FROM a_traiter r WHERE r.cle OR r.ean_n IS NOT NULL
+  -- nb = articles VIVANTS qui portent une clé de la ligne (seuil de 10 de ensure, revue 2) ; n = candidats retenus
+  SELECT r.id, c.nb, c.n
+    FROM a_traiter r
+   CROSS JOIN LATERAL (
+     SELECT count(*) AS nb,
+            count(*) FILTER (WHERE i.product_kind = COALESCE(r.product_kind, 'main')
+              AND NOT EXISTS (SELECT 1 FROM majordhome.supplier_products q WHERE q.catalog_item_id = i.id AND q.supplier_id = r.supplier_id AND q.is_active)
+              AND CASE WHEN m.prix IS NOT NULL THEN greatest(r.purchase_price_ht, m.prix) <= 2 * least(r.purchase_price_ht, m.prix)
+                       ELSE COALESCE(i.selling_price_ht, 0) <= 0 OR r.purchase_price_ht <= i.selling_price_ht END) AS n
+       FROM majordhome.catalog_items i
+       JOIN LATERAL (SELECT min(q.purchase_price_ht) AS prix FROM majordhome.supplier_products q
+                     WHERE q.catalog_item_id = i.id AND q.is_active AND q.purchase_price_ht > 0) m ON true
+      WHERE i.id IN (
+              SELECT i2.id FROM majordhome.catalog_items i2 WHERE r.cle AND i2.org_id = r.org_id AND lower(i2.brand) = lower(r.brand) AND i2.model_key = r.model_key
+              UNION SELECT i2.id FROM majordhome.catalog_items i2 WHERE r.ean_n IS NOT NULL AND i2.org_id = r.org_id AND i2.code_ean = r.ean_n
+              UNION SELECT q.catalog_item_id FROM majordhome.supplier_products q JOIN majordhome.suppliers s ON s.id = q.supplier_id AND s.is_active
+                     WHERE r.cle AND q.org_id = r.org_id AND lower(q.brand) = lower(r.brand) AND q.model_key = r.model_key AND q.is_active AND q.catalog_item_id IS NOT NULL
+              UNION SELECT q.catalog_item_id FROM majordhome.supplier_products q JOIN majordhome.suppliers s ON s.id = q.supplier_id AND s.is_active
+                     WHERE r.ean_n IS NOT NULL AND q.org_id = r.org_id AND q.code_ean = r.ean_n AND q.is_active AND q.catalog_item_id IS NOT NULL)
+        AND i.org_id = r.org_id AND i.is_active AND i.merged_into IS NULL
+   ) c
+   WHERE r.cle OR r.ean_n IS NOT NULL
 ),
 ancien AS (
   SELECT r.id, (SELECT count(*) FROM majordhome.catalog_items i
@@ -171,8 +178,9 @@ SELECT org.name AS organisation,
        count(*) AS lignes_a_traiter,
        count(*) FILTER (WHERE r.cle OR r.ean_n IS NOT NULL OR r.ean_a IS NOT NULL) AS dont_avec_cle,
        count(*) FILTER (WHERE a.n = 1) AS rattachees_avant,
-       count(*) FILTER (WHERE n.n = 1) AS rattachees_apres,
-       count(*) FILTER (WHERE n.n = 1 AND a.n IS DISTINCT FROM 1) AS nouvelles_rattachees
+       count(*) FILTER (WHERE n.n = 1 AND n.nb <= 10) AS rattachees_apres,
+       count(*) FILTER (WHERE n.n = 1 AND n.nb <= 10 AND a.n IS DISTINCT FROM 1) AS nouvelles_rattachees,
+       count(*) FILTER (WHERE n.nb > 10) AS ambigues_plus_de_10
   FROM a_traiter r
   JOIN core.organizations org ON org.id = r.org_id
   LEFT JOIN nouveau n ON n.id = r.id

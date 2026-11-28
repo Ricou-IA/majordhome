@@ -13,7 +13,7 @@ DECLARE
   v_s1 uuid; v_s2 uuid; v_s3 uuid; v_s4 uuid;
   v_i1 uuid; v_i2 uuid; v_i3 uuid; v_i4 uuid; v_i5 uuid; v_i6 uuid; v_i7 uuid;
   v_n2 uuid; v_n4 uuid;
-  v_s5 uuid; v_a6 uuid; v_b6 uuid; v_n6 uuid; v_z uuid; v_nz uuid; v_i9 uuid; v_tous uuid[];
+  v_s5 uuid; v_a6 uuid; v_b6 uuid; v_n6 uuid; v_z uuid; v_nz uuid; v_i9 uuid; v_x11 uuid; v_tous uuid[];
   v_res jsonb;
   v_p record;
   v_n int;
@@ -226,13 +226,33 @@ BEGIN
     RAISE EXCEPTION '(7) X6 : fusion d''office';
   END IF;
 
+  -- (11) revue 2 — le seuil de 10 ne compte que des articles VIVANTS : une clé portée par 11 articles dont 10
+  --      inactifs ou absorbés et 1 vivant ⇒ la ligne se rattache au vivant
+  INSERT INTO majordhome.catalog_items (org_id, name, brand, model_key, product_kind, selling_price_ht, origin)
+  VALUES (v_mayer, 'Vivant X11', 'BAYWA', 'X11', 'main', 0, 'manuel') RETURNING id INTO v_x11;
+  INSERT INTO majordhome.catalog_items (org_id, name, brand, model_key, product_kind, selling_price_ht, origin, is_active)
+  SELECT v_mayer, 'Inactif X11 n°' || k, 'BAYWA', 'X11', 'main', 0, 'manuel', false FROM generate_series(1, 5) k;
+  INSERT INTO majordhome.catalog_items (org_id, name, brand, model_key, product_kind, selling_price_ht, origin, is_active, merged_into)
+  SELECT v_mayer, 'Absorbé X11 n°' || k, 'BAYWA', 'X11', 'main', 0, 'manuel', false, v_x11 FROM generate_series(1, 5) k;
+  SELECT count(*) INTO v_n FROM majordhome.catalog_items WHERE org_id = v_mayer AND brand = 'BAYWA' AND model_key = 'X11';
+  IF v_n <> 11 THEN RAISE EXCEPTION '(11) fixture : % articles X11', v_n; END IF;
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, model_key, purchase_price_ht, category)
+  VALUES (v_s4, v_mayer, 'M11', 'Ligne X11', 'BAYWA', 'X11', 30, 'photovoltaique');
+  SET LOCAL ROLE service_role;
+  v_res := public.catalog_items_ensure(v_mayer);
+  RESET ROLE;
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_s4 AND reference = 'M11';
+  IF v_p.catalog_item_id IS DISTINCT FROM v_x11 OR v_p.catalog_item_link_source IS DISTINCT FROM 'cle' THEN
+    RAISE EXCEPTION '(11) M11 non rattachée au seul article vivant X11 : % % (%)', v_p.catalog_item_id, v_p.catalog_item_link_source, v_res;
+  END IF;
+
   -- index de la recherche par l'EAN des lignes (sinon un parcours complet par ligne relevée)
   IF to_regclass('majordhome.supplier_products_org_ean_idx') IS NULL THEN RAISE EXCEPTION 'index supplier_products_org_ean_idx absent'; END IF;
 
   -- nettoyage (tous les articles de la fixture : ceux de ses lignes, plus les importés)
   v_tous := ARRAY[v_i1, v_i2, v_i3, v_i4, v_i5, v_i6, v_i7, v_n2, v_n4, v_a6, v_b6, v_n6, v_z, v_nz, v_i9]
             || ARRAY(SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id IN (v_s1, v_s2, v_s3, v_s4, v_s5) AND catalog_item_id IS NOT NULL)
-            || ARRAY(SELECT id FROM majordhome.catalog_items WHERE org_id = v_mayer AND brand = 'BAYWA' AND model_key = 'X10');
+            || ARRAY(SELECT id FROM majordhome.catalog_items WHERE org_id = v_mayer AND brand = 'BAYWA' AND model_key IN ('X10', 'X11'));
   DELETE FROM majordhome.catalog_item_proposals WHERE item_a_id = ANY (v_tous) OR item_b_id = ANY (v_tous);
   DELETE FROM majordhome.supplier_products WHERE supplier_id IN (v_s1, v_s2, v_s3, v_s4, v_s5);
   DELETE FROM majordhome.catalog_items WHERE id = ANY (v_tous);
