@@ -54,7 +54,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const edition = !!devisAModifier?.quote;
   const [enregistrement, setEnregistrement] = useState(false);
   const [importOffre, setImportOffre] = useState(false); // fenêtre « Importer une offre fournisseur » (bouton de l'en-tête)
-  const { saveMetre } = useFumMetreMutations(orgId);
+  const { saveMetre, removeMetre } = useFumMetreMutations(orgId);
   const { updateLead } = useLeadMutations();
   // Familles, chapitres, conditions et validité par défaut : Settings → Socle → Devis
   const { settings, isLoading: settingsLoading } = useOrgSettings();
@@ -66,12 +66,18 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
     : (Array.isArray(initialLines) ? initialLines : [])));
   // Métré fumisterie validé (relevé + résultat figé), enregistré APRÈS création du devis
   const [metre, setMetre] = useState(null);
+  // « Retirer le métré » : ses lignes sont retirées tout de suite, le métré enregistré l'est à l'enregistrement du devis.
+  const [metreRetire, setMetreRetire] = useState(false);
   // Métré déjà enregistré (édition) : une réinjection remplace SES lignes au lieu de les doubler.
   const metreEnregistreQ = useFumMetreByQuote(orgId, edition ? devisAModifier.quote.id : null);
   const metrePrecedent = metre ? metre.resultat?.lignes ?? null
-    : !edition ? null
+    : !edition || metreRetire ? null
     : metreEnregistreQ.isSuccess ? metreEnregistreQ.data?.resultat?.lignes ?? null
     : undefined; // pas encore lu, ou lecture en échec : on ne devine pas
+  // Métré du devis à reprendre (« Reprendre le relevé ») : celui de la session, sinon celui qui est enregistré.
+  const metreActuel = metre ? { configurationId: metre.configurationId, releve: metre.releve }
+    : edition && !metreRetire && metreEnregistreQ.data ? { configurationId: metreEnregistreQ.data.configuration_id, releve: metreEnregistreQ.data.releve }
+    : null;
   // Brouillon du métré rangé par dossier : devis modifié, sinon lead, sinon carte SAV ; aucun ⇒ pas de brouillon.
   // Le devis d'abord : un nouveau devis du même lead ne reprend pas le relevé d'un autre devis.
   const dossierMetre = (edition ? `devis-${devisAModifier.quote.id}` : null) || lead?.id || (interventionId ? `intervention-${interventionId}` : null);
@@ -210,6 +216,9 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
       });
       await upsertLines(q.id, lignes, parseFloat(form.globalDiscountPercent) || 0);
       if (metre) await enregistrerMetre(q.id, 'Devis enregistré, mais le relevé de métré n\x27a pas pu être enregistré');
+      else if (metreRetire) {
+        try { await removeMetre(q.id); } catch (err) { logger.error('[CreateDevisModal] removeMetre', err); toast.warning('Devis enregistré, mais le métré n\x27a pas pu être retiré'); }
+      }
       toast.success('Devis modifié');
       if (q.pennylane_quote_id) toast.info('Le devis Pennylane n\x27est pas encore à jour : cliquez « Renvoyer dans Pennylane » sur la fiche du devis');
       onCreated?.(q);
@@ -277,8 +286,8 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
             templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={(t) => { setTouche(true); handleSelectTemplate(t); }}
             erreurObjet={erreurObjet} onObjetQuitte={() => setObjetQuitte(true)} familles={famillesActives(devisConfig).map((f) => f.label)} onImportOffre={() => setImportOffre(true)} />
           <div id="devis-lignes" className="scroll-mt-4">
-            <DevisStepLines orgId={orgId} lines={lines} setLines={setLinesSaisie} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre}
-              metrePrecedent={metrePrecedent} dossierMetre={dossierMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} articles={articles} />
+            <DevisStepLines orgId={orgId} lines={lines} setLines={setLinesSaisie} leadId={lead?.id} family={selectedFamily} onMetreValidated={(m) => { setMetre(m); setMetreRetire(false); }}
+              metrePrecedent={metrePrecedent} metreActuel={metreActuel} onRetirerMetre={() => { setMetre(null); setMetreRetire(true); }} dossierMetre={dossierMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} articles={articles} />
           </div>
           {nbLignes > 0 && <DevisConditions form={form} setField={setFieldSaisie} lines={lines} devisConfig={devisConfig} />}
         </div>

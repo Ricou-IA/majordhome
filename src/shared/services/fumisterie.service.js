@@ -130,6 +130,14 @@ export const fumisterieService = {
       return data;
     }, 'fumisterie.saveMetre'),
 
+  /** Retire le métré d'un devis (« Retirer le métré » puis enregistrement du devis). Rend le nombre de lignes supprimées. */
+  deleteMetre: (orgId, quoteId) => withErrorHandling(async () => {
+    if (!orgId || !quoteId) throw new Error('[fumisterieService] orgId et quoteId requis');
+    const { data, error } = await supabase.from('majordhome_fum_metres').delete().eq('org_id', orgId).eq('quote_id', quoteId).select('id');
+    if (error) throw error;
+    return (data || []).length;
+  }, 'fumisterie.deleteMetre'),
+
   getMetreByQuote: (orgId, quoteId) => withErrorHandling(async () => {
     const { data, error } = await supabase.from('majordhome_fum_metres').select('*').eq('org_id', orgId).eq('quote_id', quoteId)
       .order('created_at', { ascending: false }).limit(1).maybeSingle();

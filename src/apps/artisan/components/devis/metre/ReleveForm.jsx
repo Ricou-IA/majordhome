@@ -8,10 +8,14 @@ import { messageChamp } from '@/lib/fumisterie/messagesReleve.js';
 import ChampMesure from './ChampMesure';
 import { Button } from '@/components/ui/button';
 import { ChoixValeur } from './Puce';
+import { Tag } from '@/components/ui/tag';
+import { InfoTip } from '@/components/ui/info-tip';
 
 // `erreurs` : refus du relevé par clé (champsAcorriger), écrits sous le champ fautif.
 // `sortie` : textes du bloc « Ajuster » (textesSortie) — d'où vient la valeur appliquée et la hauteur réelle. null = rien à expliquer.
-export default function ReleveForm({ gabarit, releve, onChange, onAjuster, sortie = null, erreurs = {} }) {
+// `parDefaut` : paramètres jamais touchés, encore à leur valeur par défaut (« Par défaut » à côté du libellé).
+// `p.aide` (facultatif, dans fum_gabarits) : où mesurer, en info-bulle.
+export default function ReleveForm({ gabarit, releve, onChange, onAjuster, sortie = null, erreurs = {}, parDefaut = [] }) {
   const set = (cle, v) => onChange({ ...releve, [cle]: v });
   const idErreur = (cle) => (erreurs[cle] ? `fum-${cle}-erreur` : null);
   return (
@@ -22,9 +26,13 @@ export default function ReleveForm({ gabarit, releve, onChange, onAjuster, sorti
           <div className="grid grid-cols-2 gap-3 mt-2">
             {t.parametres.filter((p) => visible(p, releve)).map((p) => (
               <div key={p.cle} className={p.choix && p.choix.length > 2 ? 'col-span-2' : ''}>
-                {p.choix
-                  ? <p className="block text-sm text-secondary-700 mb-1">{p.libelle}</p>
-                  : <label htmlFor={`fum-${p.cle}`} className="block text-sm text-secondary-700 mb-1">{p.libelle}</label>}
+                <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                  {p.choix
+                    ? <p className="text-sm text-secondary-700">{p.libelle}</p>
+                    : <label htmlFor={`fum-${p.cle}`} className="text-sm text-secondary-700">{p.libelle}</label>}
+                  {p.aide && <InfoTip>{p.aide}</InfoTip>}
+                  {parDefaut.some((d) => d.cle === p.cle) && <Tag>Par défaut</Tag>}
+                </div>
                 {p.choix ? (
                   <ChoixValeur id={`fum-${p.cle}`} libelle={p.libelle} choix={p.choix} valeur={releve[p.cle]} libelleDe={(c) => libelleChoix(p, c)}
                     onChange={(v) => set(p.cle, v)} decritPar={idErreur(p.cle) || undefined} />

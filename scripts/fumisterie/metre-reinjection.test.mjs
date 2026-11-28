@@ -77,3 +77,13 @@ test('aConfirmerAvantAjout : pièces sans prix et alertes à accepter', () => {
   assert.equal(c.vide, false);
   assert.equal(aConfirmerAvantAjout({ lignes: moteur.slice(0, 2), alertes: [] }).vide, true);
 });
+
+test('retirer le métré : seules ses lignes partent, une ligne retouchée à la main reste', () => {
+  const metre = versLignesDevis(moteur, 's', 'X');
+  const retouchee = { ...metre[1], designation: 'Collier (modifié)' };
+  const main = { line_type: 'labor', designation: 'Pose', quantity: 1, unit_price_ht: 300 };
+  const lines = [chapitre('FUMISTERIE'), metre[0], retouchee, metre[2], main, chapitre('OPTIONS')];
+  const { lines: r, retirees } = remplacerLignesMetre(lines, 0, moteur, []);
+  assert.equal(retirees, 2);
+  assert.deepEqual(r.map((l) => l.designation), ['FUMISTERIE', 'Collier (modifié)', 'Pose', 'OPTIONS']);
+});

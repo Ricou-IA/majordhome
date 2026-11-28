@@ -10,7 +10,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useFumConfigurations, useFumBundle, useFumFabricantsDuMetre } from '@hooks/useFumisterie';
 import { buildFumisterieConfig } from '@/lib/fumisterie/config.js';
-import { comparerFabricants, choisirColonne, champsAcorriger } from '@/lib/fumisterie/index.js';
+import { comparerFabricants, choisirColonne, champsAcorriger, parametreVisible } from '@/lib/fumisterie/index.js';
 import { LignesSquelette } from '@/components/ui/squelette';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
@@ -47,24 +47,26 @@ function Blocage({ titre, message, action }) {
 }
 
 // Étapes : 0 = solution, 1 = relevé, 2 = récapitulatif (seule étape qui écrit dans le devis). `tvaDevis` : taux du devis,
-// posé sur les lignes ajoutées.
-export default function MetreFumisterie({ orgId, leadId, dossier = null, family, tvaDevis = null, onClose, onValidate }) {
+// posé sur les lignes ajoutées. `depart` : { configurationId, releve } du métré du devis (« Reprendre le relevé ») — ouvre son
+// relevé, recalculé avec les règles actuelles ; rien n'est écrit avant « Ajouter au devis ».
+export default function MetreFumisterie({ orgId, leadId, dossier = null, family, tvaDevis = null, depart = null, onClose, onValidate }) {
   const { user } = useAuth();
   const { settings } = useOrgSettings();
   const reglages = useMemo(() => buildFumisterieConfig(settings), [settings]);
   const { draft, setDraft, clear } = useMetreDraft(user?.id, dossier);
-  const [etape, setEtape] = useState(draft?.etape ?? 0);
+  const [init] = useState(() => (depart ? { etape: 1, criteres: criteresDepuisFamille(family), configurationId: depart.configurationId, releve: depart.releve } : draft));
+  const [etape, setEtape] = useState(init?.etape ?? 0);
   // Brouillon en cours ⇒ ses critères ; sinon appareil + combustible viennent de la famille du devis.
-  const [criteres, setCriteres] = useState(draft?.criteres ?? criteresDepuisFamille(family));
-  const [configurationId, setConfigurationId] = useState(draft?.configurationId ?? null);
-  const [releve, setReleveState] = useState(draft?.releve ?? null);
+  const [criteres, setCriteres] = useState(init?.criteres ?? criteresDepuisFamille(family));
+  const [configurationId, setConfigurationId] = useState(init?.configurationId ?? null);
+  const [releve, setReleveState] = useState(init?.releve ?? null);
   // Champs touchés par l'utilisateur : le brouillon n'existe qu'après une première saisie (cliquer une carte ne
   // l'écrit plus). Un brouillon d'avant ce format n'a pas la liste : il compte comme saisi.
-  const [modifies, setModifies] = useState(() => draft?.modifies ?? (draft ? ['*'] : []));
+  const [modifies, setModifies] = useState(() => (depart ? [] : draft?.modifies ?? (draft ? ['*'] : [])));
   const familleCriteres = criteresDepuisFamille(family);
   // Un brouillon trouvé à l'ouverture se reprend sur demande (date, solution en clair, contradiction avec le devis).
   const [brouillonInitial] = useState(draft);
-  const [reprise, setReprise] = useState(!!draft);
+  const [reprise, setReprise] = useState(!depart && !!draft);
   const [confirmationFermeture, setConfirmationFermeture] = useState(false);
   const repartirDeZero = () => {
     clear(); setModifies([]); setEtape(0); setCriteres(familleCriteres); setConfigurationId(null); setReleveState(null);
@@ -103,6 +105,12 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
   // Refus du relevé, un par champ : écrits sous le champ, comptés dans un seul bandeau (jamais répétés ailleurs).
   const aCorriger = useMemo(() => (etape === 1 && bundle?.gabarit && releve ? champsAcorriger(bundle.gabarit, releve) : EMPTY), [etape, bundle, releve]);
   const erreursParCle = useMemo(() => Object.fromEntries(aCorriger.map((e) => [e.cle, e])), [aCorriger]);
+  // Valeurs du gabarit jamais touchées (défaut du gabarit) : dites « Par défaut » sous le champ et listées au récapitulatif.
+  const parDefaut = useMemo(() => {
+    if (!bundle?.gabarit || !releve || modifies.includes('*')) return EMPTY;
+    return bundle.gabarit.troncons.flatMap((t) => t.parametres || [])
+      .filter((p) => p.defaut != null && parametreVisible(p, releve) && !modifies.includes(p.cle) && releve[p.cle] === p.defaut);
+  }, [bundle, releve, modifies]);
   const raisonBouton = aCorriger.length ? `Corrigez ${aCorriger.length > 1 ? `les ${aCorriger.length} champs signalés` : 'le champ signalé'}` : undefined;
 
   const allerAuReleve = () => {
@@ -170,13 +178,14 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
           : (!bundle || !releve || fab.isLoading || !resultat) ? <Chargement libelle="Calcul du métré" />
           : etape === 2 ? (
             <RecapMetre configLibelle={configLibelle} releve={releve} fabricant={colonne?.nom} resultat={resultat} tvaDevis={tvaDevis} aConfirmer={aConfirmer}
-              releveLignes={releveSaisi(bundle.gabarit, releve, bundle.gabarit?.code)} onModifierReleve={() => setEtape(1)} />
+              releveLignes={releveSaisi(bundle.gabarit, releve, bundle.gabarit?.code)} onModifierReleve={() => setEtape(1)}
+              parDefaut={parDefaut.map((p) => p.libelle)} />
           ) : (
             <div className="space-y-4">
               {/* Relevé incomplet / hors plage : dit sous chaque champ et compté dans le bandeau de ReleveStep. Une autre
                   erreur du calcul (gabarit non pris en charge) reste dite ici, sans le texte technique. */}
               {resultat.erreur && !aCorriger.length && <Blocage titre="Le métré n’a pas pu être calculé pour cette solution." message="Choisissez une autre solution ou prévenez l’administrateur." />}
-              <ReleveStep bundle={bundle} reglages={reglages} releve={releve} setReleve={setReleve} resultat={resultat} erreurs={erreursParCle} aCorriger={aCorriger}
+              <ReleveStep bundle={bundle} reglages={reglages} releve={releve} setReleve={setReleve} resultat={resultat} erreurs={erreursParCle} aCorriger={aCorriger} parDefaut={parDefaut}
                 comparaison={comparaison} fabricantChoisi={colonne?.supplierId} onChoisirFabricant={setFabricantChoisi} />
             </div>
           )}

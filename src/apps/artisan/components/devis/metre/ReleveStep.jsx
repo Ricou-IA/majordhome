@@ -13,7 +13,7 @@ import ComparaisonFabricants from './ComparaisonFabricants';
 import { messageChamp, titreChampsAcorriger } from '@/lib/fumisterie/messagesReleve.js';
 
 // `erreurs` : refus du relevé par clé (champsAcorriger), écrits sous chaque champ.
-export default function ReleveStep({ bundle, reglages, releve, setReleve, resultat, erreurs, aCorriger = [], comparaison, fabricantChoisi, onChoisirFabricant }) {
+export default function ReleveStep({ bundle, reglages, releve, setReleve, resultat, erreurs, aCorriger = [], parDefaut = [], comparaison, fabricantChoisi, onChoisirFabricant }) {
   // Valeur que « Ajuster » écrit (relevé incomplet ailleurs ⇒ incalculable, rien n'est écrit) et son explication.
   const appliquee = useMemo(() => (resultat.geometrie ? sortieMinimale({ ...bundle, reglages, releve }) : null), [resultat.geometrie, bundle, reglages, releve]);
   const explication = explicationSortie(bundle.gabarit?.code, resultat.geometrie, appliquee, releve.hSortie);
@@ -41,7 +41,7 @@ export default function ReleveStep({ bundle, reglages, releve, setReleve, result
             : <p className="p-3 text-sm text-secondary-600">{resultat.erreur ? 'La coupe s’affiche quand le relevé est complet.' : `Pas de coupe dessinée pour le gabarit ${bundle.gabarit?.code}.`}</p>}
         </div>
         <div className="border border-secondary-200 rounded-xl bg-white p-4">
-          <ReleveForm gabarit={bundle.gabarit} releve={releve} onChange={setReleve} onAjuster={ajuster} sortie={sortie} erreurs={erreurs} />
+          <ReleveForm gabarit={bundle.gabarit} releve={releve} onChange={setReleve} onAjuster={ajuster} sortie={sortie} erreurs={erreurs} parDefaut={parDefaut} />
           <ComplementsForm gabaritCode={bundle.gabarit?.code} releve={releve} onChange={setReleve} />
         </div>
       </div>

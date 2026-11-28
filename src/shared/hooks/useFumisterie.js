@@ -73,5 +73,9 @@ export function useFumMetreMutations(orgId) {
     mutationFn: (payload) => unwrapResult(fumisterieService.saveMetre({ orgId, ...payload })),
     onSuccess: (data) => { if (data?.quote_id) qc.invalidateQueries({ queryKey: fumisterieKeys.metreByQuote(orgId, data.quote_id) }); },
   });
-  return { saveMetre: save.mutateAsync, isSaving: save.isPending };
+  const remove = useMutation({
+    mutationFn: (quoteId) => unwrapResult(fumisterieService.deleteMetre(orgId, quoteId)),
+    onSuccess: (_n, quoteId) => qc.invalidateQueries({ queryKey: fumisterieKeys.metreByQuote(orgId, quoteId) }),
+  });
+  return { saveMetre: save.mutateAsync, removeMetre: remove.mutateAsync, isSaving: save.isPending || remove.isPending };
 }

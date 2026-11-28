@@ -19,7 +19,8 @@ function Liste({ titre, pill, items }) {
 }
 
 // `releveLignes` : le relevé saisi en clair (releveSaisi de planModel, le même que la fiche chantier).
-export default function RecapMetre({ configLibelle, releve, fabricant, resultat, tvaDevis, aConfirmer, releveLignes = [], onModifierReleve }) {
+// `parDefaut` : libellés des valeurs gardées par défaut, à confirmer ou corriger.
+export default function RecapMetre({ configLibelle, releve, fabricant, resultat, tvaDevis, aConfirmer, releveLignes = [], onModifierReleve, parDefaut = [] }) {
   const { sansPrix, aValider, alertes } = aConfirmer;
   return (
     <div className="space-y-4 max-w-3xl">
@@ -44,6 +45,7 @@ export default function RecapMetre({ configLibelle, releve, fabricant, resultat,
           </dl>
         </section>
       )}
+      <Liste titre="Valeurs gardées par défaut" pill={<StatusPill tone="neutre">{String(parDefaut.length)}</StatusPill>} items={parDefaut} />
       <Liste titre="Pièces sans prix" pill={<StatusPill tone="attente">{`Ajoutées à 0 € : ${sansPrix.length}`}</StatusPill>} items={sansPrix} />
       <Liste titre="Quantités à valider" pill={<StatusPill tone="attente">{String(aValider.length)}</StatusPill>} items={aValider} />
       {alertes.length > 0 && (

@@ -10,8 +10,9 @@ import { computeLineTotals } from '@services/devis.service';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import DevisLineRow from './DevisLineRow';
 import { formatEuro } from '@/lib/utils';
-import { Ruler, PenLine, BookOpen, GripVertical } from 'lucide-react';
+import { Ruler, PenLine, BookOpen, GripVertical, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MenuActions } from '@/components/ui/menu-actions';
 
 const TYPE_LABELS = {
   equipement: 'Équipement', option: 'Options', stock: 'Matériel stocké', main_oeuvre: 'Main d’œuvre', libre: 'Libre', fumisterie: 'Fumisterie',
@@ -21,7 +22,8 @@ const TYPE_LABELS = {
 // BLOC CHAPITRE (titre + lignes enfants + boutons d'ajout)
 // =============================================================================
 
-export function SectionBlock({ blocIndex, sectionIndex, section, type, childLines, poigneeChapitre, onUpdate, onRemove, onAddProducts, onAddLabor, onAddFreeform, onMetre, marquesParItem, nbParItem, onMarque, onCreerArticle, creationIndex, onEditerArticle }) {
+// `actionsMetre` : { onReprendre, onRetirer } quand le devis porte un métré (« Reprendre le relevé », « Retirer le métré »).
+export function SectionBlock({ blocIndex, sectionIndex, section, type, childLines, poigneeChapitre, onUpdate, onRemove, onAddProducts, onAddLabor, onAddFreeform, onMetre, actionsMetre = null, marquesParItem, nbParItem, onMarque, onCreerArticle, creationIndex, onEditerArticle }) {
   const productCount = childLines.length;
   const sectionTotalTtc = childLines.reduce((sum, { line }) => sum + (computeLineTotals(line).total_ttc || 0), 0);
   const btn = 'flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border transition-colors';
@@ -64,6 +66,13 @@ export function SectionBlock({ blocIndex, sectionIndex, section, type, childLine
           )}
           {type === 'fumisterie' && onMetre && (
             <Button type="button" variant="secondary" size="sm" onClick={() => onMetre(sectionIndex)} title="Métré assisté sur coupe cotée"><Ruler className="w-4 h-4" />Métré assisté</Button>
+          )}
+          {type === 'fumisterie' && actionsMetre && (
+            <MenuActions libelle="Actions du métré" actions={[
+              actionsMetre.onReprendre && { label: 'Reprendre le relevé', icon: RotateCcw, onClick: () => actionsMetre.onReprendre(sectionIndex) },
+              actionsMetre.onRetirer && { separateur: true },
+              actionsMetre.onRetirer && { label: 'Retirer le métré', icon: Trash2, danger: true, onClick: () => actionsMetre.onRetirer(sectionIndex) },
+            ]} />
           )}
         </div>
       </div>

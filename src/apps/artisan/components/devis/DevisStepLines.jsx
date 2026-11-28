@@ -27,6 +27,7 @@ import { realignerLigne } from '@/lib/devisLigneArticle.js';
 import { canonicalFieldsForCategory } from '@/shared/specs';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { logger } from '@lib/logger';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useCatalogItemOffers, useCatalogItemMutations } from '@hooks/useCatalogItems';
@@ -59,9 +60,11 @@ const AUCUN_COMPTE = new Map();
  *   enregistré) ; null = aucun ; undefined = pas encore lu (la réinjection est alors refusée)
  * @param {string|null} [props.dossierMetre] clé du brouillon de métré (lead, carte SAV ou devis) ; null = pas de brouillon
  */
-export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, metrePrecedent = null, dossierMetre = null, devisConfig, importOffreOuvert = false, onFermerImportOffre, articles = AUCUN_ARTICLE }) {
+export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, metrePrecedent = null, metreActuel = null, onRetirerMetre, dossierMetre = null, devisConfig, importOffreOuvert = false, onFermerImportOffre, articles = AUCUN_ARTICLE }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, categories, type }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
+  const [metreDepart, setMetreDepart] = useState(null); // relevé du métré du devis, rouvert par « Reprendre le relevé »
+  const [retraitMetre, setRetraitMetre] = useState(null); // { index, retirees } : confirmation de « Retirer le métré »
   // Métré assisté = module Fumisterie : sans lui le chapitre reste un chapitre ordinaire (saisie et catalogue).
   const { settings: orgSettings } = useOrgSettings();
   const metreOuvert = moduleActif(orgSettings, 'fumisterie');
@@ -247,6 +250,20 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     setMetreForSection(null);
   }, [metreForSection, metrePrecedent, lines, setLines, onMetreValidated]);
 
+  // « Retirer le métré » : retire exactement les lignes produites par le métré (même règle que la réinjection) ;
+  // les lignes posées ou retouchées à la main restent. Métré enregistré pas encore lu ⇒ on ne devine pas.
+  const demanderRetraitMetre = (index) => {
+    if (metrePrecedent === undefined) { toast.error('Le métré enregistré sur ce devis n\'est pas encore lu : réessayez dans un instant'); return; }
+    setRetraitMetre({ index, retirees: remplacerLignesMetre(lines, index, metrePrecedent, []).retirees });
+  };
+  const retirerMetre = () => {
+    const { lines: suivantes, retirees } = remplacerLignesMetre(lines, retraitMetre.index, metrePrecedent, []);
+    setLines(suivantes);
+    onRetirerMetre?.();
+    setRetraitMetre(null);
+    toast.success(`Métré retiré : ${retirees} ligne${retirees > 1 ? 's' : ''} en moins. Il sera supprimé à l'enregistrement du devis.`);
+  };
+
   const ligneVide = (extra) => ({
     catalog_item_id: null, brand: null, supplier_product_id: null, supplier_id: null, supplier_name: null,
     designation: '', description: '', reference: '', quantity: 1, purchase_price_ht: null, unit_price_ht: 0, tva_rate: tvaDevis,
@@ -341,7 +358,11 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
                               onAddProducts={handleAddProductsToSection}
                               onAddLabor={addLaborToSection}
                               onAddFreeform={addFreeformToSection}
-                              onMetre={metreOuvert ? setMetreForSection : undefined}
+                              onMetre={metreOuvert ? (i) => { setMetreDepart(null); setMetreForSection(i); } : undefined}
+                              actionsMetre={metreOuvert && (metreActuel || metrePrecedent?.length) ? {
+                                onReprendre: metreActuel ? (i) => { setMetreDepart(metreActuel); setMetreForSection(i); } : null,
+                                onRetirer: metrePrecedent?.length ? demanderRetraitMetre : null,
+                              } : null}
                               marquesParItem={marquesParItem}
                               nbParItem={nbParItem}
                               onMarque={changerMarque}
@@ -394,10 +415,15 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
           dossier={dossierMetre}
           family={family}
           tvaDevis={tvaDevis}
-          onClose={() => setMetreForSection(null)}
+          depart={metreDepart}
+          onClose={() => { setMetreForSection(null); setMetreDepart(null); }}
           onValidate={handleMetreValidate}
         />
       )}
+      <ConfirmDialog open={!!retraitMetre} onOpenChange={(o) => { if (!o) setRetraitMetre(null); }} variant="destructive"
+        title="Retirer le métré ?"
+        description={`${retraitMetre?.retirees ?? 0} ligne${(retraitMetre?.retirees ?? 0) > 1 ? 's' : ''} issue${(retraitMetre?.retirees ?? 0) > 1 ? 's' : ''} du métré ${(retraitMetre?.retirees ?? 0) > 1 ? 'seront retirées' : 'sera retirée'} du devis ; les lignes retouchées à la main restent. Le relevé sera supprimé à l’enregistrement du devis.`}
+        confirmLabel="Retirer le métré" onConfirm={retirerMetre} />
     </div>
   );
 }
