@@ -21,7 +21,7 @@ export default function ComparaisonFabricants({ comparaison, choisi, onChoisir }
           const reserves = [
             !c.validee && 'Équivalence de gamme non validée',
             !c.prixVerifies && `Base de prix ${c.nom} non vérifiée`,
-            c.erreur && `Calcul impossible : ${c.erreur}`,
+            c.erreur && 'Relevé à corriger',
           ].filter(Boolean);
           return (
             <button key={c.supplierId} type="button" onClick={() => onChoisir(c.supplierId)} aria-pressed={actif}

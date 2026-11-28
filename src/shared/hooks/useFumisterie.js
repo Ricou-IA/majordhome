@@ -19,7 +19,7 @@ export function useFumBundle(orgId, configurationId) {
  * mapping des composants de la configuration, équivalences de gamme, articles au Ø du relevé. Un fabricant sans
  * mapping pour la configuration est écarté par le moteur (comparerFabricants), pas ici.
  * @returns {{ fabricants: Array<{ supplierId, nom, mapping, articles, equivalences, historique }>, avecVue: boolean,
- *   isLoading: boolean, isPlaceholder: boolean, error: Error|null }}
+ *   isLoading: boolean, isPlaceholder: boolean, error: Error|null, reessayer: () => void }}
  */
 export function useFumFabricantsDuMetre(orgId, bundle, diametre) {
   const fabQ = useQuery({ queryKey: fumisterieKeys.fabricants(orgId), queryFn: () => unwrapResult(fumisterieService.getFabricants(orgId)), enabled: !!orgId, staleTime: 30 * 60 * 1000 });
@@ -60,6 +60,7 @@ export function useFumFabricantsDuMetre(orgId, bundle, diametre) {
     isLoading: fabQ.isLoading || eqQ.isLoading || mapQs.some((q) => q.isLoading) || artQs.some((q) => q.isLoading && q.fetchStatus !== 'idle'),
     isPlaceholder: artQs.some((q) => q.isPlaceholderData),
     error: requetes.find((q) => q.isError)?.error || null,
+    reessayer: () => requetes.filter((q) => q.isError).forEach((q) => q.refetch()),
   };
 }
 /** Dernier métré enregistré d'un devis (null si le devis n'en a pas). */

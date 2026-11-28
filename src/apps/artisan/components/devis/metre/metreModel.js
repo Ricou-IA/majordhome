@@ -2,9 +2,10 @@
 // Helpers PURS de l'écran de métré (hors composants, pour le fast refresh) : critères de
 // qualification, filtrage des configurations, relevé initial, conversion en lignes de devis.
 
-const resultatEnErreur = (message) => ({ erreur: message, lignes: [], alertes: [{ niveau: 'warn', code: 'moteur', message, source: 'moteur' }], totaux: { vente_ht: 0, achat_ht: 0, marge_ht: 0, lignes_a_chiffrer: 0 }, geometrie: null });
+const resultatEnErreur = (message) => ({ erreur: message, lignes: [], alertes: [], totaux: { vente_ht: 0, achat_ht: 0, marge_ht: 0, lignes_a_chiffrer: 0 }, geometrie: null });
 
-/** Résultat affiché pour une colonne de la comparaison des fabricants (une erreur du moteur reste visible). */
+/** Résultat affiché pour une colonne de la comparaison des fabricants. L'erreur reste dans `erreur` : elle est dite sous les
+ * champs du relevé (champsAcorriger), pas répétée en alerte. */
 export function resultatDeColonne(colonne) {
   return colonne.erreur ? resultatEnErreur(colonne.erreur) : colonne.resultat;
 }

@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import { inputClass } from '../../FormFields';
 import { parseNombre, formaterSaisie } from '@/lib/fumisterie/saisie.js';
 
-export default function ChampMesure({ id, valeur, unite, onChange, invalide = false, erreurId = null }) {
+// `message` : refus du relevé pour ce champ (écrit dessous) ; une frappe illisible le remplace par sa propre consigne.
+export default function ChampMesure({ id, valeur, unite, onChange, message = null }) {
   const [texte, setTexte] = useState(() => formaterSaisie(valeur));
   const [refuse, setRefuse] = useState(false);
   // Dernière valeur rendue au relevé : une valeur qui change d'ailleurs (« Ajuster », brouillon) réécrit le champ,
@@ -33,18 +34,18 @@ export default function ChampMesure({ id, valeur, unite, onChange, invalide = fa
     if (fin.etat === 'ok') { emettre(fin.valeur); setTexte(formaterSaisie(fin.valeur)); } else { emettre(''); setTexte(''); }
   };
 
-  const idRefus = `${id}-saisie`;
-  const decrit = [refuse ? idRefus : null, erreurId].filter(Boolean).join(' ') || undefined;
+  const texteErreur = refuse ? 'Saisissez un nombre, par exemple 1,05.' : message;
+  const idErreur = `${id}-erreur`;
   return (
     <div>
       <div className="flex items-center gap-2">
         <input id={id} type="text" inputMode="decimal" enterKeyHint="next" autoComplete="off" spellCheck={false}
           value={texte} onChange={(e) => saisir(e.target.value)} onBlur={quitter}
-          aria-invalid={refuse || invalide ? 'true' : undefined} aria-describedby={decrit}
-          className={`${inputClass} tabular-nums ${refuse || invalide ? 'border-st-alerte' : ''}`} />
+          aria-invalid={texteErreur ? 'true' : undefined} aria-describedby={texteErreur ? idErreur : undefined}
+          className={`${inputClass} tabular-nums ${texteErreur ? 'border-st-alerte' : ''}`} />
         {unite && <span className="shrink-0 text-caption text-secondary-600">{unite}</span>}
       </div>
-      {refuse && <p id={idRefus} className="mt-1 text-caption text-st-alerte">Saisissez un nombre, par exemple 1,05.</p>}
+      {texteErreur && <p id={idErreur} className="mt-1 text-caption text-st-alerte">{texteErreur}</p>}
     </div>
   );
 }

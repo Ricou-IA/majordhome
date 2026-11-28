@@ -63,27 +63,42 @@ const fmt = (v) => String(v).replace('.', ',');
  */
 export function validerReleve(gabarit, releve) {
   if (!gabarit?.troncons?.length) return { ok: false, erreurs: ['gabarit de métré absent'] };
+  const erreurs = champsAcorriger(gabarit, releve).map((e) => {
+    if (e.code === 'choix') return `${e.libelle} (valeur attendue parmi ${e.choix.map(fmt).join(', ')})`;
+    if (e.code === 'vide') return `${e.libelle} (non renseigné)`;
+    const u = e.unite ? ` ${e.unite}` : '';
+    return `${e.libelle} (${fmt(e.valeur)}${u} hors plage ${fmt(e.min ?? '−∞')}–${fmt(e.max ?? '+∞')}${u})`;
+  });
+  return { ok: erreurs.length === 0, erreurs };
+}
+
+/**
+ * Les mêmes refus que validerReleve, un par champ, pour les écrire SOUS le champ fautif (recette du 2026-11-28 :
+ * une seule chaîne répétée trois fois, sans dire quel champ). Gabarit absent ⇒ liste vide (validerReleve le dit).
+ * @param {{ troncons?: Array<{ type?: string, parametres: Array<object> }> } | null | undefined} gabarit
+ * @param {Record<string, unknown> | null | undefined} releve
+ * @returns {Array<{ cle: string, libelle: string, code: 'vide'|'hors_plage'|'choix', min?: number|null, max?: number|null, valeur?: unknown, unite?: string|null, choix?: unknown[] }>}
+ */
+export function champsAcorriger(gabarit, releve) {
   const r = releve || {};
-  const erreurs = [];
-  for (const t of gabarit.troncons) {
+  const liste = [];
+  for (const t of gabarit?.troncons || []) {
     for (const p of t.parametres || []) {
       if (!parametreVisible(p, r)) continue;
       const v = r[p.cle];
       // Une option (tronçon « options » : kit d'air, coquille isolante) n'est jamais obligatoire : absente, elle
       // vaut « non » (brouillon ou métré antérieur à l'option) et la nomenclature ne retient pas ses pièces.
       if (t.type === 'options' && v == null) continue;
+      const champ = { cle: p.cle, libelle: p.libelle, unite: p.unite ?? null };
       if (p.choix) {
-        if (!p.choix.includes(v)) erreurs.push(`${p.libelle} (valeur attendue parmi ${p.choix.map(fmt).join(', ')})`);
+        if (!p.choix.includes(v)) liste.push({ ...champ, code: 'choix', choix: p.choix, valeur: v });
         continue;
       }
-      if (v === '' || v == null || typeof v !== 'number' || !Number.isFinite(v)) { erreurs.push(`${p.libelle} (non renseigné)`); continue; }
-      const u = p.unite ? ` ${p.unite}` : '';
-      if ((p.min != null && v < p.min) || (p.max != null && v > p.max)) {
-        erreurs.push(`${p.libelle} (${fmt(v)}${u} hors plage ${fmt(p.min ?? '−∞')}–${fmt(p.max ?? '+∞')}${u})`);
-      }
+      if (v === '' || v == null || typeof v !== 'number' || !Number.isFinite(v)) { liste.push({ ...champ, code: 'vide' }); continue; }
+      if ((p.min != null && v < p.min) || (p.max != null && v > p.max)) liste.push({ ...champ, code: 'hors_plage', min: p.min ?? null, max: p.max ?? null, valeur: v });
     }
   }
-  return { ok: erreurs.length === 0, erreurs };
+  return liste;
 }
 
 /**

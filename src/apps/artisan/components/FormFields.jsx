@@ -2,7 +2,7 @@
  * FormFields.jsx - Composants formulaire partagés
  * ============================================================================
  * Utilisé par ClientDetail, LeadModal, EventModal, CreateContractModal
- * Tokens projet : secondary-* (gris), primary-* (bleu)
+ * Tokens projet : secondary-* (pierre), primary-* (cuivre), erreur = st-alerte
  * ============================================================================
  */
 
@@ -33,11 +33,11 @@ export function FormField({ label, required = false, error = null, className = '
     <div className={`space-y-1 ${className}`}>
       <label className="block text-sm font-medium text-secondary-700">
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-st-alerte ml-1">*</span>}
       </label>
       {children}
       {error && (
-        <p className="text-sm text-red-600 flex items-center gap-1">
+        <p className="text-sm text-st-alerte flex items-center gap-1">
           <AlertTriangle className="w-3.5 h-3.5" />
           {error}
         </p>
