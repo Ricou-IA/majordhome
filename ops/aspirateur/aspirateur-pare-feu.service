@@ -1,0 +1,14 @@
+# Unité SYSTÈME : rejoue le filtrage sortant de l'utilisateur « aspirateur » au démarrage (ops/aspirateur/pare-feu.sh).
+# Emplacement : /etc/systemd/system/aspirateur-pare-feu.service ; script copié dans /usr/local/sbin/aspirateur-pare-feu.sh.
+[Unit]
+Description=Filtrage sortant de l'aspirateur (Majordhome)
+After=network-pre.target
+Before=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/aspirateur-pare-feu.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

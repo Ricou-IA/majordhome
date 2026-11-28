@@ -1,0 +1,10 @@
+# Profil AppArmor : autorise les espaces de noms au seul Chromium de Playwright de l'utilisateur « aspirateur », pour
+# que son bac à sable fonctionne sous Ubuntu 24.04 (kernel.apparmor_restrict_unprivileged_userns = 1). Même principe
+# que les profils livrés par Ubuntu pour Chrome. Emplacement : /etc/apparmor.d/chromium-aspirateur.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile chromium-aspirateur /home/aspirateur/.cache/ms-playwright/*/chrome-*/** flags=(unconfined) {
+  userns,
+  include if exists <local/chromium-aspirateur>
+}
