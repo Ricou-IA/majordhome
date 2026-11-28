@@ -103,6 +103,7 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/aspirateur/recette.js',
   'src/lib/aspirateur/lecture.js',
   'src/lib/aspirateur/domaine.js',
+  'src/lib/aspirateur/propositions.js',
   'src/lib/agentTelephonique.js', // consommé par l'edge agent-verifier-client via sa copie _shared/ (sync-tournee-engine), jamais importé depuis src/
   'src/lib/catalogue/enrichissementAppareil.js', // consommé par l'edge equipment-model-enrich via sa copie _shared/catalogue (sync-tournee-engine), jamais importé depuis src/
   'src/lib/catalogue/ressourcesPage.js', // idem (photo et documents lus dans la page du fabricant)
