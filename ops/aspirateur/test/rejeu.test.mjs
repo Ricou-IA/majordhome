@@ -83,6 +83,13 @@ test('une fiche liée plusieurs fois dans une liste (photo, titre, ancre) n’es
   assert.deepEqual(produits.map((p) => p.reference_fabricant).sort(), ['P613744', 'P700100']);
 });
 
+test('une marque affichée en logo est lue sur son texte alternatif (sélecteur sur l’image ou son cadre)', async () => {
+  for (const marque of ['.fabricant img', '.fabricant']) {
+    const { produits } = await lancer({ recette: recette({ listes: { departs: [`${site.url}/liste-logo`], lien_produit: 'a.p' }, produit: { ...recette().produit, marque } }) });
+    assert.equal(produits[0].marque, 'Deville', marque);
+  }
+});
+
 test('essai : s’arrête au nombre demandé', async () => {
   const { r, produits } = await lancer({ essai: 2 });
   assert.equal(produits.length, 2);

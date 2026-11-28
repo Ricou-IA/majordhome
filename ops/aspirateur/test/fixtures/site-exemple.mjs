@@ -62,6 +62,9 @@ export async function demarrerSite() {
     // Fiche servie en 200 sans session, mais qui n'est qu'une invitation à se connecter (pas la fiche) : provenance « compte ».
     if (u.pathname === '/produit/6') return connecte ? envoyer(200, 'text/html', produit(6, 'P606060', 'Bûcheron', '700,00 €')) : envoyer(200, 'text/html', page('Connexion requise', '<p>Connectez-vous</p>'));
     // Catalogue réservé au compte (comme Invicta) ; chaque fiche y est liée deux fois (photo et titre).
+    // Marque affichée en logo (image), comme sur le site pro d'Invicta.
+    if (u.pathname === '/produit/7') return envoyer(200, 'text/html', page('Toron', '<h1>Toron</h1><span class="ref">P707070</span><div class="fabricant"><img src="/img/deville.jpg" alt="Deville"></div><span class="prix">1 690,00 €</span><div class="caracs">Etas 70 %.</div>'));
+    if (u.pathname === '/liste-logo') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/7">7</a>'));
     if (u.pathname === '/liste-compte') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/3">photo</a><a class="p" href="/produit/3">Toron</a>'));
     if (u.pathname === '/liste-double') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/1">photo</a><a class="p" href="/produit/1">Châtel</a><a class="p" href="/produit/2#avis">Pierre</a><a class="p" href="/produit/2">Pierre</a>'));
     if (u.pathname === '/liste-6') return envoyer(200, 'text/html', page('Liste', '<a class="p" href="/produit/6">6</a><a class="p" href="/produit/1">1</a>'));

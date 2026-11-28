@@ -55,6 +55,12 @@ export async function texteDuPdf(octets) {
  */
 export async function rejouer({ recette, acces, champs, modele, navigateur: nav, journal, surLot, limitePages = 2000, essai, lirePdf = texteDuPdf }) {
   const protege = async () => { if (await nav.estProtege()) throw new CodeErreur('site_protege'); };
+  // La marque est souvent un logo (vécu Invicta 2026-11-28 : lue sur 1 fiche sur 5) : texte, sinon texte alternatif de
+  // l'image visée ou de la première image du cadre visé.
+  const marqueLue = async (sel) => {
+    const alt = async (s) => { try { return (await nav.attributs(s, 'alt')).map((v) => v.trim()).find(Boolean) || null; } catch { return null; } };
+    return (await nav.texte(sel)) || (await alt(sel)) || (await alt(`${sel} img`));
+  };
 
   // 1. Connexion
   if (recette.connexion) {
@@ -161,7 +167,7 @@ export async function rejouer({ recette, acces, champs, modele, navigateur: nav,
         }
         lot.push({
           url, reference_fabricant: ref, nom: (p.nom && await nav.texte(p.nom)) || titre,
-          marque: (p.marque ? await nav.texte(p.marque) : null) || lecturePage.marque || null, ean: p.ean ? await nav.texte(p.ean) : null,
+          marque: (p.marque ? await marqueLue(p.marque) : null) || lecturePage.marque || null, ean: p.ean ? await nav.texte(p.ean) : null,
           prix: p.prix ? prixDepuisTexte(await nav.texte(p.prix)) : null,
           photo_url: p.photo ? (await nav.attributs(p.photo, 'src'))[0] || null : null,
           documents, valeurs, provenance, lu_le: new Date().toISOString(),
