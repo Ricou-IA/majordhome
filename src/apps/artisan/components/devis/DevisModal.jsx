@@ -31,6 +31,7 @@ import { leadsService } from '@services/leads.service';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { CalqueModal } from '@/components/ui/calque-modal';
 import { MenuActions } from '@/components/ui/menu-actions';
+import BoutonFicheChantier, { MentionPlanPennylane } from './metre/BoutonFicheChantier';
 
 export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, onEdit }) {
   const { organization, user } = useAuth();
@@ -227,7 +228,13 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
       const { data: documents, error: errDocs } = await catalogItemsService.getDocumentsArticles(orgId, articlesEquipement(lines, typeDe));
       if (errDocs) toast.info('Fiches techniques introuvables : le devis part sans elles');
       const annexes = annexesDevis({ lines, typeDe, documents: documents || [], brochure: devisConfig.brochure });
-      const { blob, ignorees } = await joindreAnnexes(await generateDevisPdfBlob(model), annexes);
+      // plan du conduit (métré de fumisterie enregistré) : juste après le devis, avant les fiches techniques
+      const { genererPlanConduit } = await import('./metre/planConduitExport');
+      const plan = await genererPlanConduit({ orgId, quote, settings, variante: 'offre' });
+      if (plan.raison === 'erreur') toast.info(`Plan du conduit non joint : ${plan.message}`);
+      if (plan.logoManquant) toast.info('Logo de l’entreprise illisible : le plan du conduit part sans logo');
+      const insertions = plan.blob ? [{ label: 'Plan du conduit', blob: plan.blob }] : [];
+      const { blob, ignorees } = await joindreAnnexes(await generateDevisPdfBlob(model), annexes, insertions);
       if (ignorees.length) toast.info(`Annexe${ignorees.length > 1 ? 's' : ''} non jointe${ignorees.length > 1 ? 's' : ''} : ${ignorees.join(', ')}`);
       const result = await devisService.uploadQuotePdf(quoteId, blob, orgId);
       if (result?.error) throw result.error;
@@ -487,6 +494,8 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
           </div>
         )}
 
+        {pennylaneEnabled && <MentionPlanPennylane orgId={orgId} quoteId={quoteId} />}
+
         {/* Footer — Actions */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t bg-white">
           {/* Supprimer : menu « … », jamais à côté de « Générer PDF » (brief UX, règle 2). */}
@@ -507,6 +516,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
               {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <FileText className="w-4 h-4 mr-1" />}
               Générer PDF
             </button>
+            <BoutonFicheChantier orgId={orgId} quote={quote} settings={settings} />
             {quote.quote_pdf_path && (
               <button onClick={handleDownloadPdf} className="btn-secondary btn-sm">
                 <Download className="w-4 h-4 mr-1" /> PDF

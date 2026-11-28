@@ -11,14 +11,27 @@ const BUCKET = 'product-documents';
 /**
  * @param {Blob} devisBlob PDF du devis
  * @param {Array<{ label: string, storage_path: string }>} annexes
+ * @param {Array<{ label: string, blob: Blob }>} [insertions] PDF produits à la volée (plan du conduit), placés
+ *   juste après le devis, avant les fiches techniques
  * @returns {Promise<{ blob: Blob, jointes: string[], ignorees: string[] }>}
  */
-export async function joindreAnnexes(devisBlob, annexes = []) {
-  if (!annexes.length) return { blob: devisBlob, jointes: [], ignorees: [] };
+export async function joindreAnnexes(devisBlob, annexes = [], insertions = []) {
+  if (!annexes.length && !insertions.length) return { blob: devisBlob, jointes: [], ignorees: [] };
   const jointes = [];
   const ignorees = [];
   try {
     const merged = await PDFDocument.load(await devisBlob.arrayBuffer());
+    for (const ins of insertions) {
+      try {
+        const src = await PDFDocument.load(await ins.blob.arrayBuffer());
+        const pages = await merged.copyPages(src, src.getPageIndices());
+        pages.forEach((p) => merged.addPage(p));
+        jointes.push(ins.label);
+      } catch (err) {
+        logger.warn(`[devis] « ${ins.label} » ignoré`, err);
+        ignorees.push(ins.label);
+      }
+    }
     for (const a of annexes) {
       try {
         const { url, error } = await storageService.getSignedUrl(BUCKET, a.storage_path, 300);
@@ -38,6 +51,6 @@ export async function joindreAnnexes(devisBlob, annexes = []) {
     return { blob: new Blob([bytes], { type: 'application/pdf' }), jointes, ignorees };
   } catch (err) {
     logger.error('[devis] fusion des annexes impossible, devis livré seul', err);
-    return { blob: devisBlob, jointes: [], ignorees: annexes.map((a) => a.label) };
+    return { blob: devisBlob, jointes: [], ignorees: [...insertions.map((i) => i.label), ...annexes.map((a) => a.label)] };
   }
 }

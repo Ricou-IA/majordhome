@@ -3,6 +3,7 @@
 // Le moteur (src/lib/fumisterie) ne lit rien lui-même : ce service charge tout d'un coup.
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
+import { logger } from '@lib/logger';
 
 const NOM_FOURNISSEUR = 'MODINOX / ALTEMA';
 
@@ -99,4 +100,32 @@ export const fumisterieService = {
     if (error) throw error;
     return data;
   }, 'fumisterie.getMetreByQuote'),
+
+  /**
+   * Ce que le plan du conduit lit en plus du métré : configuration et gabarit (relevé saisi), nom du
+   * fabricant et de l'auteur du relevé. Fabricant = celui du métré s'il est enregistré, sinon le
+   * fournisseur de fumisterie de l'org (métrés antérieurs au choix du fabricant). Un nom d'auteur
+   * illisible n'empêche pas le plan : « — » dans le cartouche.
+   */
+  getPlanContexte: (orgId, metre) => withErrorHandling(async () => {
+    if (!orgId || !metre?.configuration_id) throw new Error('[fumisterieService] orgId et métré requis');
+    const { data: configuration, error: e1 } = await supabase.from('majordhome_fum_configurations').select('*')
+      .eq('org_id', orgId).eq('id', metre.configuration_id).single();
+    if (e1) throw e1;
+    const { data: gabarit, error: e2 } = configuration.gabarit_id
+      ? await supabase.from('majordhome_fum_gabarits').select('*').eq('org_id', orgId).eq('id', configuration.gabarit_id).maybeSingle()
+      : { data: null, error: null };
+    if (e2) throw e2;
+    const fournisseur = metre.supplier_id
+      ? await supabase.from('majordhome_suppliers').select('id, name').eq('org_id', orgId).eq('id', metre.supplier_id).maybeSingle()
+      : await supabase.from('majordhome_suppliers').select('id, name').eq('org_id', orgId).eq('name', NOM_FOURNISSEUR).maybeSingle();
+    if (fournisseur.error) throw fournisseur.error;
+    let auteurNom = null;
+    if (metre.created_by) {
+      const { data: profil, error: e3 } = await supabase.from('profiles').select('full_name').eq('id', metre.created_by).maybeSingle();
+      if (e3) logger.warn('[fumisterieService] auteur du métré illisible', e3);
+      auteurNom = profil?.full_name || null;
+    }
+    return { configuration, gabarit: gabarit || null, fournisseurNom: fournisseur.data?.name || null, auteurNom };
+  }, 'fumisterie.getPlanContexte'),
 };

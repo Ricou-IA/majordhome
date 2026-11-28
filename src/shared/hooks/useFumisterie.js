@@ -24,6 +24,10 @@ export function useFumArticles(orgId, supplierId, gammesTarif, diametre, gammesS
     placeholderData: keepPreviousData,
   });
 }
+/** Dernier métré enregistré d'un devis (null si le devis n'en a pas). */
+export function useFumMetreByQuote(orgId, quoteId) {
+  return useQuery({ queryKey: fumisterieKeys.metreByQuote(orgId, quoteId), queryFn: () => unwrapResult(fumisterieService.getMetreByQuote(orgId, quoteId)), enabled: !!orgId && !!quoteId, staleTime: 5 * 60 * 1000 });
+}
 export function useFumMetreMutations(orgId) {
   const qc = useQueryClient();
   const save = useMutation({

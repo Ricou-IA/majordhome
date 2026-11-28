@@ -3,18 +3,9 @@
 // paramètre conditionnel ({ nbEtages: 1 } ou { angle: '>0' }). Les inputs portent id=`fum-${cle}`
 // pour le focus depuis la coupe cotée. Visibilité = même règle que la validation du moteur.
 import { parametreVisible as visible } from '@/lib/fumisterie/index.js';
+import { libelleChoix } from '@/lib/fumisterie/planModel.js';
 
 const INPUT = 'w-full px-2 py-1.5 border border-secondary-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500';
-
-function libelleChoix(p, c) {
-  if (p.libelles && p.libelles[String(c)] != null) return p.libelles[String(c)];
-  if (typeof c === 'number' && p.unite === '°') return c === 0 ? 'Aucun' : `${c}°`;
-  if (typeof c === 'number' && p.cle === 'nbEtages') return c === 0 ? 'Aucun' : '1 étage';
-  if (typeof c === 'number') return `Ø ${c}`;
-  if (c === 'noir') return 'Noir';
-  if (c === 'inox') return 'Inox';
-  return String(c);
-}
 
 export default function ReleveForm({ gabarit, releve, onChange, onAjuster, minSortie }) {
   const set = (cle, v) => onChange({ ...releve, [cle]: v });
