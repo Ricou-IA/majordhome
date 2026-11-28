@@ -43,7 +43,14 @@ DECLARE
   ]'::jsonb;
 BEGIN
   SELECT user_id INTO v_admin FROM core.organization_members WHERE org_id = v_mayer AND role = 'org_admin' LIMIT 1;
-  SELECT user_id INTO v_membre FROM core.organization_members WHERE org_id = v_mayer AND role <> 'org_admin' LIMIT 1;
+  -- membre SANS le droit articles.edit, choisi de façon déterministe : depuis 20261028_3/_4 le team_leader l'a, et
+  -- « role <> 'org_admin' LIMIT 1 » pouvait tomber sur lui (étape 7 rouge sans rapport avec la migration répétée)
+  FOR v_i IN SELECT m.user_id FROM core.organization_members m WHERE m.org_id = v_mayer AND m.role <> 'org_admin' ORDER BY m.user_id LOOP
+    PERFORM set_config('request.jwt.claim.sub', v_i.user_id::text, true);
+    IF majordhome.role_can(v_mayer, 'articles', 'edit') IS NOT TRUE THEN v_membre := v_i.user_id; EXIT; END IF;
+  END LOOP;
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  IF v_membre IS NULL THEN RAISE EXCEPTION 'aucun membre de Mayer sans articles.edit dans le snapshot'; END IF;
 
   -- (0) droits et structure
   IF has_function_privilege('authenticated', 'public.catalog_items_ensure(uuid, int)', 'EXECUTE') THEN RAISE EXCEPTION 'authenticated exécute catalog_items_ensure'; END IF;
