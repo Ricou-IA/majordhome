@@ -122,3 +122,10 @@ test('revue 1 : file_name_required et rattachement_incomplet traduits', () => {
   }
   assert.match(messageErreurImportArticles({ message: 'row_invalid', details: 'ligne 4 : modele_brut' }), /Ligne 4 .*Modèle/);
 });
+
+test('retrait : removal_incomplete traduit, même avec son DETAIL', () => {
+  const m = messageErreurImportArticles({ message: 'removal_incomplete', details: 'articles : 99 supprimés sur 100' });
+  assert.notEqual(m, 'removal_incomplete');
+  assert.ok(!m.includes('_'), m);
+  assert.match(m, /retrait/i);
+});

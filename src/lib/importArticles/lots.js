@@ -77,6 +77,7 @@ const MESSAGES = {
   supplier_not_in_org: "Un fournisseur du fichier n'appartient pas à votre entreprise. Aucun article de ce lot n'a été créé.",
   file_name_required: 'Le nom du fichier est manquant : déposez à nouveau le fichier.',
   rattachement_incomplet: "Une ligne fournisseur n'a pas pu être rattachée à son article : aucun article de ce lot n'a été créé. Réessayez.",
+  removal_incomplete: "Le retrait n'a pas pu aller au bout : rien n'a été retiré par cet appel. Réessayez.",
 };
 
 const DELAI = 'La base a mis trop de temps à répondre. Réessayez dans un instant.';
