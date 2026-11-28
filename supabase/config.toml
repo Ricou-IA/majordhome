@@ -263,3 +263,6 @@ verify_jwt = true
 # mailing-rediger : rédaction assistée d'un e-mail (appel au modèle de langage). JWT user + org_admin + module Communication, plafond par utilisateur et par jour. 2026-11-22.
 [functions.mailing-rediger]
 verify_jwt = true
+
+[functions.fournisseur-aspirer-modele]
+verify_jwt = false

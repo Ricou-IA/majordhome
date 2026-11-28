@@ -44,6 +44,10 @@ const CATALOGUE = ['suitecommerce', 'woocommerce', 'woocommercePieces', 'catalog
 // Copiés dans _shared/organisation/ : liaisonHesiasun.js importe './identite.js' (même dossier).
 const ORGANISATION = ['identite', 'liaisonHesiasun'];
 
+// Aspirateur de sites fournisseurs → edges fournisseur-aspirer, -modele, -retour. Copiés dans _shared/aspirateur/
+// (recette.js importe './domaine.js', même dossier). Le service VPS a sa propre copie (scripts/sync-aspirateur.mjs).
+const ASPIRATEUR = ['codes', 'domaine', 'recette', 'lecture', 'propositions', 'relais'];
+
 export const FICHIERS = [
   ...ORGANISATION.map((n) => ({
     source: path.join(racine, 'src', 'lib', 'organisation', `${n}.js`),
@@ -57,6 +61,10 @@ export const FICHIERS = [
   ...WEBSHOP.map((n) => ({
     source: path.join(racine, 'src', 'lib', 'webshop', `${n}.js`),
     cible: path.join(racine, 'supabase', 'functions', '_shared', 'webshop', `${n}.js`),
+  })),
+  ...ASPIRATEUR.map((n) => ({
+    source: path.join(racine, 'src', 'lib', 'aspirateur', `${n}.js`),
+    cible: path.join(racine, 'supabase', 'functions', '_shared', 'aspirateur', `${n}.js`),
   })),
   ...CATALOGUE.map((n) => ({
     source: path.join(racine, 'src', 'lib', 'catalogue', `${n}.js`),
