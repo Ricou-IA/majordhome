@@ -33,3 +33,11 @@ test('écran et retour (quand ils existent) : authentification, codes connus', (
     for (const code of codesRendus(src)) assert.ok(Object.hasOwn(CODES_ASPIRATEUR, code), `${nom} : code inconnu ${code}`);
   }
 });
+
+test('copies du service VPS identiques à leur source (node scripts/sync-aspirateur.mjs)', async () => {
+  const { FICHIERS_ASPIRATEUR } = await import('../sync-aspirateur.mjs');
+  for (const { source, cible } of FICHIERS_ASPIRATEUR) {
+    const norm = (p) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+    assert.equal(norm(cible), norm(source), `${cible} diverge : relancer node scripts/sync-aspirateur.mjs`);
+  }
+});

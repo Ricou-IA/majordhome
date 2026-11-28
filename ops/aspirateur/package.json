@@ -1,0 +1,15 @@
+{
+  "name": "majordhome-aspirateur",
+  "private": true,
+  "type": "module",
+  "description": "Service de l'aspirateur de sites fournisseurs (VPS KVM 2) — navigateur borné au site, rejeu de recettes, apprentissage. Spec docs/superpowers/specs/2026-11-28-aspirateur-sites-fournisseurs-recettes-communes-design.md",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node serveur.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "pdfjs-dist": "4.10.38",
+    "playwright": "1.65.1"
+  }
+}
