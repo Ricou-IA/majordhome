@@ -98,6 +98,11 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/tournee/secteurs.js',
   'src/lib/tournee/populations.js',
   'src/lib/maintenance/digestModel.js', // consommé par l'edge maintenance-digest via sa copie _shared/maintenance (sync-tournee-engine), jamais importé depuis src/
+  // Aspirateur de sites fournisseurs : consommés par les edges fournisseur-aspirer* (copies _shared/aspirateur) et le
+  // service VPS ops/aspirateur (copies lib/) ; recette.js et lecture.js ne sont jamais importés depuis src/.
+  'src/lib/aspirateur/recette.js',
+  'src/lib/aspirateur/lecture.js',
+  'src/lib/aspirateur/domaine.js',
   'src/lib/agentTelephonique.js', // consommé par l'edge agent-verifier-client via sa copie _shared/ (sync-tournee-engine), jamais importé depuis src/
   'src/lib/catalogue/enrichissementAppareil.js', // consommé par l'edge equipment-model-enrich via sa copie _shared/catalogue (sync-tournee-engine), jamais importé depuis src/
   'src/lib/catalogue/ressourcesPage.js', // idem (photo et documents lus dans la page du fabricant)
