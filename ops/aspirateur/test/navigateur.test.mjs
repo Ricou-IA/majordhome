@@ -111,6 +111,29 @@ test('relecture C1 : seConnecter remplit un vrai formulaire de connexion du site
   } finally { await nav.fermer(); }
 });
 
+test('lirePage rend les champs de formulaire (id, type, libellé, sélecteur) sans jamais leur valeur', async () => {
+  const nav = await ouvrir();
+  try {
+    await nav.aller(`${site.url}/login-js`);
+    await new Promise((r) => setTimeout(r, 2000));
+    const p = await nav.lirePage();
+    const email = p.champs.find((c) => c.id === 'email');
+    assert.deepEqual({ type: email.type, selecteur: email.selecteur, libelle: email.libelle, formulaire: email.formulaire },
+      { type: 'email', selecteur: '#email', libelle: 'Adresse e-mail', formulaire: 0 });
+    assert.equal(p.champs.find((c) => c.id === 'password').type, 'password');
+    assert.ok(p.champs.some((c) => c.balise === 'button' && c.type === 'submit' && c.texte === 'Se connecter'));
+    assert.ok(!JSON.stringify(p).includes('valeur-prerempli'), 'valeur d’un champ rendue');
+  } finally { await nav.fermer(); }
+});
+
+test('seConnecter attend un formulaire dessiné après le chargement (application JavaScript)', async () => {
+  const nav = await ouvrir();
+  try {
+    await nav.aller(`${site.url}/login-js`);
+    assert.equal(await nav.seConnecter(CHAMPS_CONNEXION, ACCES), 'connecte');
+  } finally { await nav.fermer(); }
+});
+
 test('relecture C1 : aucun accès tapé dans un formulaire qui envoie ailleurs, sans champ mot de passe, ou éclaté', async () => {
   for (const chemin of ['/login-piege', '/login-texte', '/login-deux-formulaires']) {
     const nav = await ouvrir();

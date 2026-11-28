@@ -21,7 +21,7 @@ const recetteSchema = { type: 'object', description: `Recette au format du sché
 /** Les six outils de l'agent (mêmes noms que OUTILS_AGENT du relais). */
 export const OUTILS = [
   { name: 'aller', description: 'Ouvre une adresse du site du fournisseur (aucune autre adresse n’est permise).', input_schema: objet({ url: chaine }, ['url']) },
-  { name: 'lire_page', description: 'Rend le titre, le texte visible (tronqué) et les liens de la page ouverte.', input_schema: objet({}) },
+  { name: 'lire_page', description: 'Rend le titre, le texte visible (tronqué), les liens et les champs de formulaire (balise, type, id, name, libellé, sélecteur CSS conseillé — jamais leur valeur) de la page ouverte. Prends les sélecteurs de se_connecter dans ces champs.', input_schema: objet({}) },
   { name: 'cliquer', description: 'Clique sur le premier élément du sélecteur CSS.', input_schema: objet({ selecteur: chaine }, ['selecteur']) },
   { name: 'se_connecter', description: 'Remplit le formulaire de connexion ouvert avec les accès du compte (tu ne les vois pas) et clique. Rend seulement l’état : connecte, refuse ou inconnu.', input_schema: objet({ champ_identifiant: chaine, champ_mot_de_passe: chaine, bouton: chaine, preuve: chaine }, ['champ_identifiant', 'champ_mot_de_passe', 'bouton', 'preuve']) },
   { name: 'essayer_recette', description: 'Rejoue une recette sur 5 produits et rend ce qui a été lu.', input_schema: objet({ recette: recetteSchema }, ['recette']) },
@@ -119,7 +119,7 @@ export async function apprendre({ hoteSite, urlDepart, acces, compteClient = nul
           }
           case 'lire_page': {
             const p = await nav.lirePage();
-            contenu = { titre: p.titre, texte: p.texte.slice(0, TEXTE_AGENT_MAX), liens: p.liens.slice(0, 150) };
+            contenu = { titre: p.titre, texte: p.texte.slice(0, TEXTE_AGENT_MAX), liens: p.liens.slice(0, 150), champs: p.champs || [] };
             break;
           }
           case 'cliquer': {

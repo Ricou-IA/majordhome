@@ -82,6 +82,17 @@ test('scénario nominal : connexion, essai, proposition ⇒ recette valide et 5 
   }
 });
 
+test('lire_page montre à l’agent les champs du formulaire de connexion', async () => {
+  const modele = modeleScenario([
+    tour(outil('t1', 'aller', { url: `${site.url}/login` })),
+    tour(outil('t2', 'lire_page', {})),
+    tour(outil('t3', 'proposer_recette', { recette: recetteBonne() })),
+  ]);
+  await lancer(modele);
+  const res = modele.recu.find((r) => r.includes('"tool_use_id":"t2"'));
+  assert.match(res, /#password/);
+});
+
 test('les prix lus à l’essai ne sont pas montrés au modèle', async () => {
   const modele = modeleScenario([
     tour(outil('t1', 'essayer_recette', { recette: recetteBonne() })),

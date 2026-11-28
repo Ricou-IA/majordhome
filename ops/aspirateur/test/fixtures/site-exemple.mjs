@@ -38,6 +38,11 @@ export async function demarrerSite() {
     if (u.pathname === '/redir') return envoyer(302, 'text/plain', '', { location: 'https://evil.example/' });
     if (u.pathname === '/docs/redir.pdf') return envoyer(302, 'text/plain', '', { location: 'https://evil.example/x.pdf' });
     if (u.pathname.startsWith('/prive/')) return envoyer(200, 'text/html', page('Privé', '<p>privé</p>'));
+    // Comme une application Angular (site pro d'Invicta) : le formulaire n'est dessiné qu'après le chargement, sans
+    // attribut name ; une valeur préremplie ne doit jamais sortir du navigateur.
+    if (u.pathname === '/login-js') return envoyer(200, 'text/html', page('Connexion', `<main id="app"></main><script>
+      setTimeout(() => { document.getElementById('app').innerHTML = '<form novalidate action="/login" method="post"><label for="email">Adresse e-mail</label><input type="email" id="email" name="email" formcontrolname="email" value="valeur-prerempli"><input id="password" name="password" formcontrolname="password" type="password"><button type="button">Voir</button><button type="submit">Se connecter</button></form>'; }, 1500);
+    </script>`));
     if (u.pathname === '/login') return envoyer(200, 'text/html', page('Connexion', '<form method="post" action="/login"><input id="email" name="email"><input id="password" name="password" type="password"><button type="submit">Se connecter</button></form>'));
     if (u.pathname === '/compte') return envoyer(200, 'text/html', page('Compte', connecte ? '<div class="mon-compte">Bonjour</div>' : '<p>Non connecté</p>'));
     if (u.pathname === '/robots.txt') return envoyer(200, 'text/plain', 'User-agent: *\nDisallow: /prive/\n');

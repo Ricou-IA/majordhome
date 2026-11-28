@@ -68,7 +68,9 @@ export function parametresModele(usage, demande, surcharges) {
   const model = (surcharges && surcharges[usage]) || MODELES_DEFAUT[usage];
   const max = Number.isFinite(demande.max_tokens) && demande.max_tokens > 0 ? Math.min(demande.max_tokens, MAX_TOKENS) : MAX_TOKENS;
   /** @type {Record<string, unknown>} */
-  const p = { model, max_tokens: max, system: demande.system, messages: demande.messages, output_config: { effort: EFFORT[usage] } };
+  // cache_control au niveau de la requête : le point de cache se pose seul sur le dernier bloc, l'historique de l'agent
+  // (pages lues comprises) est relu au tarif du cache au tour suivant (sans lui : 2,88 $ pour un apprentissage raté).
+  const p = { model, max_tokens: max, system: demande.system, messages: demande.messages, output_config: { effort: EFFORT[usage] }, cache_control: { type: 'ephemeral' } };
   if (Array.isArray(demande.tools) && demande.tools.length) p.tools = demande.tools;
   if (model.startsWith('claude-sonnet-5-5') || model.startsWith('claude-opus-5-5')) {
     p.betas = ['server-side-fallback-2026-07-01'];

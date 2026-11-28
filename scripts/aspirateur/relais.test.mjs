@@ -41,6 +41,8 @@ test('paramètres : modèle fixé par l’usage, effort, plafond de tokens, repl
   assert.equal(l.fallbacks, undefined);
   assert.equal(parametresModele('apprendre', { system: 's', messages: [] }, { apprendre: 'claude-opus-5-5' }).model, 'claude-opus-5-5');
   assert.equal(parametresModele('autre', { system: 's', messages: [] }, {}), null);
+  // cache de prompt automatique : l'historique de l'agent est relu au tarif du cache, pas renvoyé au tarif plein
+  assert.deepEqual(p.cache_control, { type: 'ephemeral' });
 });
 
 test('relecture I6 : coût maximal réservé avant un appel (entrée estimée + max_tokens en sortie)', async () => {

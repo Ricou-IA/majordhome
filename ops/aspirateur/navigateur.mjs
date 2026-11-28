@@ -14,6 +14,9 @@ import { masquerSecrets } from './journal.mjs';
 
 const TEXTE_MAX = 60_000;
 const LIENS_MAX = 300;
+const CHAMPS_MAX = 60;
+// Une application JavaScript (Angular chez Invicta) dessine le formulaire après le chargement de la page.
+const ATTENTE_FORMULAIRE_MS = 10_000;
 const PDF_MAX = 20 * 1024 * 1024;
 const DELAI_PAGE_MS = 30_000;
 const REDIRECTIONS_MAX = 3;
@@ -120,17 +123,49 @@ async function creer(navigateur, cfg, avecSession, proprietaire, horloge) {
       return { statut: r ? r.status() : 0, url: page.url() };
     },
 
-    /** @returns {Promise<{ titre: string, texte: string, liens: Array<{ texte: string, url: string }> }>} */
+    /**
+     * Titre, texte visible, liens et CHAMPS de formulaire de la page ouverte. Sans les champs, l'agent devinait les
+     * sélecteurs du formulaire de connexion à l'aveugle (vécu le 2026-11-28 sur Invicta : 8 refus, 2,88 $). Un champ
+     * est décrit par sa structure seulement — jamais sa valeur.
+     * @returns {Promise<{ titre: string, texte: string, liens: Array<{ texte: string, url: string }>, champs: Array<Record<string, string | number | null>> }>}
+     */
     async lirePage() {
-      const brut = await page.evaluate((max) => ({
-        titre: document.title || '',
-        texte: (document.body?.innerText || '').slice(0, 2_000_000),
-        liens: [...document.querySelectorAll('a[href]')].slice(0, max).map((a) => ({ texte: (a.textContent || '').trim().slice(0, 2_000), url: a.href })),
-      }), LIENS_MAX);
+      const brut = await page.evaluate(({ max, maxChamps }) => {
+        const formulaires = [...document.forms];
+        const attr = (el, a) => (el.getAttribute(a) || '').trim().slice(0, 120) || null;
+        const libelle = (el) => {
+          const pour = el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null;
+          const l = pour || el.closest('label');
+          return ((l?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120)) || attr(el, 'aria-label');
+        };
+        const selecteur = (el) => {
+          const t = el.tagName.toLowerCase();
+          if (el.id) return `#${CSS.escape(el.id)}`;
+          for (const a of ['name', 'formcontrolname']) { const v = el.getAttribute(a); if (v) return `${t}[${a}="${v.replace(/"/g, '\\"')}"]`; }
+          return null;
+        };
+        const champs = [...document.querySelectorAll('input, select, textarea, button')]
+          .filter((el) => !(el.tagName === 'INPUT' && el.type === 'hidden'))
+          .slice(0, maxChamps)
+          .map((el) => ({
+            balise: el.tagName.toLowerCase(), type: el.getAttribute('type') || (el.tagName === 'BUTTON' ? 'submit' : null),
+            id: el.id || null, name: attr(el, 'name'), formcontrolname: attr(el, 'formcontrolname'),
+            placeholder: attr(el, 'placeholder'), autocomplete: attr(el, 'autocomplete'), libelle: libelle(el),
+            texte: el.tagName === 'BUTTON' ? ((el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) || null) : null,
+            formulaire: el.form ? formulaires.indexOf(el.form) : -1, selecteur: selecteur(el),
+          }));
+        return {
+          titre: document.title || '',
+          texte: (document.body?.innerText || '').slice(0, 2_000_000),
+          liens: [...document.querySelectorAll('a[href]')].slice(0, max).map((a) => ({ texte: (a.textContent || '').trim().slice(0, 2_000), url: a.href })),
+          champs,
+        };
+      }, { max: LIENS_MAX, maxChamps: CHAMPS_MAX });
       // masquer AVANT de tronquer : un secret coupé à la limite garderait une partie visible (relecture I4)
       const plein = masquer(brut.texte);
       const texte = plein.length > TEXTE_MAX ? `${plein.slice(0, TEXTE_MAX)}\n[… page tronquée]` : plein;
-      return { titre: masquer(brut.titre), texte, liens: brut.liens.map((l) => ({ texte: masquer(l.texte).slice(0, 200), url: masquer(l.url) })) };
+      const champs = brut.champs.map((c) => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, typeof v === 'string' ? masquer(v) : v])));
+      return { titre: masquer(brut.titre), texte, liens: brut.liens.map((l) => ({ texte: masquer(l.texte).slice(0, 200), url: masquer(l.url) })), champs };
     },
 
     /** Texte du premier élément du sélecteur, null s'il n'y en a pas. @param {string} selecteur */
@@ -169,6 +204,8 @@ async function creer(navigateur, cfg, avecSession, proprietaire, horloge) {
     async seConnecter(c, acces) {
       const refus = (raison) => new Error(`formulaire de connexion refusé : ${raison}`);
       if (!hoteExact(page.url())) throw refus('la page n’est pas sur le site du fournisseur');
+      // attendre que le formulaire soit dessiné ; un sélecteur qui n'apparaît pas finit en « champs introuvables »
+      await Promise.all([c.champ_identifiant, c.champ_mot_de_passe].map((s) => page.waitForSelector(s, { state: 'attached', timeout: ATTENTE_FORMULAIRE_MS }).catch(() => null)));
       const verdict = await page.evaluate(({ id, mdp, bouton, preuve }) => {
         const a = document.querySelector(id);
         const b = document.querySelector(mdp);
