@@ -4,6 +4,7 @@
 /** @type {{
  *   finition_defaut: string,
  *   longueurs_elements_mm: number[],
+ *   longueurs_raccordement_mm: number[]|null,
  *   reglable: { min: number, max: number },
  *   reglable_interieur: boolean,
  *   reglable_exterieur: boolean,
@@ -23,6 +24,7 @@
 export const DEFAULTS_FUMISTERIE = Object.freeze({
   finition_defaut: 'noir',              // finition extérieure proposée (noir | inox)
   longueurs_elements_mm: Object.freeze([1000, 500, 250]), // éléments droits, du plus long au plus court
+  longueurs_raccordement_mm: null,     // tuyaux du raccordement simple paroi ; null = mêmes longueurs que les éléments
   reglable: Object.freeze({ min: 320, max: 500 }),       // plage de l'élément réglable
   reglable_interieur: true,             // utiliser un réglable pour la partie intérieure
   reglable_exterieur: true,             // idem au-dessus du toit
@@ -53,7 +55,27 @@ export function buildFumisterieConfig(settings) {
   out.zone1 = { ...DEFAULTS_FUMISTERIE.zone1, ...(s.zone1 || {}) };
   out.reglable = { ...DEFAULTS_FUMISTERIE.reglable, ...(s.reglable || {}) };
   out.longueurs_elements_mm = [...(s.longueurs_elements_mm || DEFAULTS_FUMISTERIE.longueurs_elements_mm)].sort((a, b) => b - a);
+  out.longueurs_raccordement_mm = [...(s.longueurs_raccordement_mm || out.longueurs_elements_mm)].sort((a, b) => b - a);
   out.longueurs_prh_mm = [...(s.longueurs_prh_mm || DEFAULTS_FUMISTERIE.longueurs_prh_mm)].sort((a, b) => b - a);
   out.longueurs_prh_5_10_mm = [...(s.longueurs_prh_5_10_mm || DEFAULTS_FUMISTERIE.longueurs_prh_5_10_mm)].sort((a, b) => b - a);
+  return out;
+}
+
+/**
+ * Réglages appliqués au calcul chez UN fabricant : longueurs d'éléments, plage du réglable et longueurs des
+ * tuyaux de raccordement viennent de l'équivalence de gamme (fum_gamme_equivalences) quand elle les porte,
+ * sinon des réglages de l'organisation. Sans équivalence (fabricant historique), rien ne change.
+ * @param {ReturnType<typeof buildFumisterieConfig>} reglages
+ * @param {{ longueurs_elements_mm?: number[]|null, longueurs_raccordement_mm?: number[]|null, reglable_min_mm?: number|null, reglable_max_mm?: number|null } | null | undefined} equivalence
+ * @returns {ReturnType<typeof buildFumisterieConfig>}
+ */
+export function reglagesDuFabricant(reglages, equivalence) {
+  if (!equivalence) return reglages;
+  const tri = (l) => [...l].sort((a, b) => b - a);
+  const out = { ...reglages };
+  if (equivalence.longueurs_elements_mm?.length) out.longueurs_elements_mm = tri(equivalence.longueurs_elements_mm);
+  out.longueurs_raccordement_mm = equivalence.longueurs_raccordement_mm?.length ? tri(equivalence.longueurs_raccordement_mm)
+    : equivalence.longueurs_elements_mm?.length ? out.longueurs_elements_mm : reglages.longueurs_raccordement_mm;
+  if (equivalence.reglable_min_mm != null && equivalence.reglable_max_mm != null) out.reglable = { min: equivalence.reglable_min_mm, max: equivalence.reglable_max_mm };
   return out;
 }

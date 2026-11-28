@@ -5,7 +5,11 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { logger } from '@lib/logger';
 
+// Fabricant historique, lu PAR SON NOM seulement quand la vue des fabricants n'existe pas encore (migration
+// 20261128_1 pas encore appliquée) : partout ailleurs, est fabricant tout fournisseur qui a des attributs.
 const NOM_FOURNISSEUR = 'MODINOX / ALTEMA';
+/** Vue ou colonne absente de la base (migration pas encore appliquée), à distinguer de toute autre erreur. */
+const objetAbsent = (error) => ['PGRST205', '42P01', 'PGRST204', '42703'].includes(error?.code);
 
 export const fumisterieService = {
   getConfigurations: (orgId) => withErrorHandling(async () => {
@@ -33,16 +37,6 @@ export const fumisterieService = {
     if (comps.error) throw comps.error;
     if (regleLinks.error) throw regleLinks.error;
     const composants = comps.data || [];
-    const codes = [...new Set(composants.map((c) => c.composant_code))];
-    // Le mapping est propre à UN fournisseur (motifs de références) : ne jamais mélanger ceux
-    // d'un autre fournisseur de l'org. Fournisseur absent → aucun mapping (l'écran bloque déjà).
-    const { data: supplier, error: eSup } = await supabase.from('majordhome_suppliers').select('id')
-      .eq('org_id', orgId).eq('name', NOM_FOURNISSEUR).maybeSingle();
-    if (eSup) throw eSup;
-    const { data: mapping, error: e4 } = codes.length && supplier
-      ? await supabase.from('majordhome_fum_composant_mapping').select('*').eq('org_id', orgId).eq('supplier_id', supplier.id).in('composant_code', codes)
-      : { data: [], error: null };
-    if (e4) throw e4;
     // PostgREST ne peut pas détecter de FK entre deux VUES (majordhome_fum_config_regles →
     // majordhome_fum_regles) : embedded select impossible. Deux requêtes à la place.
     const regleIds = [...new Set((regleLinks.data || []).map((r) => r.regle_id).filter(Boolean))];
@@ -54,16 +48,42 @@ export const fumisterieService = {
       configuration: { ...configuration, gabarit_code: gab.data?.code || null },
       gabarit: gab.data,
       composants,
-      mapping: mapping || [],
       regles: regles || [],
     };
   }, 'fumisterie.getBundle'),
 
-  getSupplier: (orgId) => withErrorHandling(async () => {
-    const { data, error } = await supabase.from('majordhome_suppliers').select('id, name').eq('org_id', orgId).eq('name', NOM_FOURNISSEUR).maybeSingle();
+  /**
+   * Fabricants de fumisterie de l'organisation (fournisseurs qui ont des articles avec attributs).
+   * `avecVue: false` = base sans la migration 20261128_1 : seul le fabricant historique est connu, et le
+   * fabricant retenu n'est pas enregistré sur le métré (colonne absente).
+   */
+  getFabricants: (orgId) => withErrorHandling(async () => {
+    if (!orgId) throw new Error('[fumisterieService] orgId requis');
+    const { data, error } = await supabase.from('majordhome_fum_fabricants').select('id, name').eq('org_id', orgId).order('name');
+    if (!error) return { fabricants: data || [], avecVue: true };
+    if (!objetAbsent(error)) throw error;
+    logger.warn('[fumisterieService] vue des fabricants absente (migration 20261128_1 non appliquée) : fabricant historique seul');
+    const { data: legacy, error: e2 } = await supabase.from('majordhome_suppliers').select('id, name').eq('org_id', orgId).eq('name', NOM_FOURNISSEUR).maybeSingle();
+    if (e2) throw e2;
+    return { fabricants: legacy ? [legacy] : [], avecVue: false };
+  }, 'fumisterie.getFabricants'),
+
+  /** Mapping des composants d'une configuration chez UN fabricant (jamais mélangé avec un autre). */
+  getMapping: (orgId, supplierId, composantCodes) => withErrorHandling(async () => {
+    if (!orgId || !supplierId || !composantCodes?.length) return [];
+    const { data, error } = await supabase.from('majordhome_fum_composant_mapping').select('*').eq('org_id', orgId).eq('supplier_id', supplierId).in('composant_code', composantCodes);
     if (error) throw error;
-    return data;
-  }, 'fumisterie.getSupplier'),
+    return data || [];
+  }, 'fumisterie.getMapping'),
+
+  /** Équivalences de gamme d'une configuration, tous fabricants. Table absente (migration non appliquée) ⇒ aucune. */
+  getEquivalences: (orgId, configurationCode) => withErrorHandling(async () => {
+    if (!orgId || !configurationCode) return [];
+    const { data, error } = await supabase.from('majordhome_fum_gamme_equivalences').select('*').eq('org_id', orgId).eq('configuration_code', configurationCode);
+    if (!error) return data || [];
+    if (objetAbsent(error)) return [];
+    throw error;
+  }, 'fumisterie.getEquivalences'),
 
   /**
    * Articles candidats : toutes les gammes tarif du mapping, au diamètre du relevé — plus, entières,
@@ -83,12 +103,14 @@ export const fumisterieService = {
     return [...(data || []), ...(sansD || [])];
   }, 'fumisterie.getArticles'),
 
-  saveMetre: ({ orgId, quoteId = null, leadId = null, configurationId, gabaritCode, diametre, finition, releve, resultat, engineVersion, createdBy }) =>
+  saveMetre: ({ orgId, quoteId = null, leadId = null, configurationId, gabaritCode, diametre, finition, releve, resultat, engineVersion, createdBy, supplierId = null }) =>
     withErrorHandling(async () => {
       if (!orgId || !configurationId) throw new Error('[fumisterieService] orgId et configurationId requis');
+      // supplier_id n'est envoyé que s'il est connu (la colonne n'existe qu'après la migration 20261128_1).
       const { data, error } = await supabase.from('majordhome_fum_metres').insert({
         org_id: orgId, quote_id: quoteId, lead_id: leadId, configuration_id: configurationId, gabarit_code: gabaritCode,
         diametre, finition, releve, resultat, engine_version: engineVersion, created_by: createdBy || null,
+        ...(supplierId ? { supplier_id: supplierId } : {}),
       }).select().single();
       if (error) throw error;
       return data;

@@ -16,7 +16,8 @@
 // émaillé : Ø150 → femelle 148), {LG} longueur, {A} angle, {BOI} indice de section de boisseau
 // (1..6, même numérotation MODINOX pour les kits de couronnement et les plaques ventilées), {BOI4}
 // la même section en 4 chiffres (références PLA « 2020 », « 3050 »), {ML} longueur entière en mètres
-// d'un kit (gaine isolée vendue par kit de N ml). Valeur inconnue → `\d+`.
+// d'un kit (gaine isolée vendue par kit de N ml), {D2} le diamètre en deux chiffres (Ø/10 : 150 → « 15 »,
+// 80 → « 08 », codage des références DINAK). Valeur inconnue → `\d+`.
 
 /**
  * Compile un motif de code en RegExp pour les critères donnés.
@@ -29,6 +30,7 @@ function compilerMotif(motif, c) {
   const src = String(motif)
     .replace(/\{D([+-])(\d+)\}/g, (_, s, n) => (c.diametre == null ? '\\d+' : String(c.diametre + (s === '+' ? 1 : -1) * Number(n))))
     .replace(/\{D\}/g, val(c.diametre))
+    .replace(/\{D2\}/g, c.diametre == null ? '\\d{2}' : String(Math.round(c.diametre / 10)).padStart(2, '0'))
     .replace(/\{LG\}/g, val(c.longueur))
     .replace(/\{A\}/g, val(c.angle))
     .replace(/\{BOI\}/g, val(c.boisseau))
@@ -47,7 +49,7 @@ const BOISSEAU_4CHIFFRES = Object.freeze({ 1: '2020', 2: '2525', 3: '3030', 4: '
  * filtrent alors pas sur le Ø ; le motif fait le tri.
  */
 export function motifDependDuDiametre(motif) {
-  return /\{D\}/.test(String(motif || ''));
+  return /\{D2?\}/.test(String(motif || ''));
 }
 
 /**
@@ -68,7 +70,7 @@ function departager(liste, c) {
 /**
  * @param {Array<object>} articles
  * @param {Array<object>} mappings
- * @param {{composant_code:string, gamme_catalogue:string, diametre:number, finition?:string|null, longueur?:number|null, angle?:number|null, pente?:number|null, type_piece?:string|null}} c
+ * @param {{composant_code:string, gamme_catalogue:string, diametre:number, finition?:string|null, longueur?:number|null, angle?:number|null, pente?:number|null, type_piece?:string|null, reglage?:number|null}} c
  * @returns {{ article: object|null, mapping: object|null, via: 'attributs'|'motif'|null, ambigus: string[]|null }}
  */
 export function resoudreArticle(articles, mappings, c) {
@@ -87,6 +89,9 @@ export function resoudreArticle(articles, mappings, c) {
     const criteresOk = (a) => a.is_active !== false && !a.sur_mesure && !a.hors_perimetre
       && (c.longueur == null || a.longueur_mm === c.longueur)
       && (c.angle == null || a.angle === c.angle)
+      // Élément réglable : la longueur réglée doit tomber dans la plage de l'article quand il en porte une
+      // (DINAK vend deux ajustables par Ø : 350-530 et 530-880).
+      && (c.reglage == null || a.longueur_max_mm == null || a.longueur_mm == null || (c.reglage >= a.longueur_mm && c.reglage <= a.longueur_max_mm))
       // Une pièce sans plage de pente (collerette PLA) n'est pas écartée par la pente : la plage ne
       // départage que les articles qui en ont une (solins inox, souches).
       && (c.pente == null || a.pente_min == null || a.pente_max == null || (c.pente >= a.pente_min && c.pente <= a.pente_max))

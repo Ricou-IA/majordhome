@@ -31,7 +31,7 @@ export function geometrieG1(r, cfg) {
   const Lint = (yRoofTop - r.hsp1) - vg + obl;
   const base = { longueurs: cfg.longueurs_elements_mm, reglable: cfg.reglable };
   const troncons = {
-    raccordement_sp: { longueur_mm: Math.round(Lsp * 1000), composition: composer(Lsp * 1000, { ...base, avecReglable: false }) },
+    raccordement_sp: { longueur_mm: Math.round(Lsp * 1000), composition: composer(Lsp * 1000, { ...base, longueurs: cfg.longueurs_raccordement_mm || cfg.longueurs_elements_mm, avecReglable: false }) },
     conduit_interieur: { longueur_mm: Math.round(Lint * 1000), composition: composer(Lint * 1000, { ...base, avecReglable: cfg.reglable_interieur }) },
     sortie_toit: { longueur_mm: Math.round(r.hSortie * 1000), composition: composer(r.hSortie * 1000, { ...base, avecReglable: cfg.reglable_exterieur }) },
   };

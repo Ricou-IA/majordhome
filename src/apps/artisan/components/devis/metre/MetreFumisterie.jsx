@@ -8,15 +8,16 @@ import { CalqueModal } from '@/components/ui/calque-modal';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { useFumConfigurations, useFumBundle, useFumSupplier, useFumArticles } from '@hooks/useFumisterie';
+import { useFumConfigurations, useFumBundle, useFumFabricantsDuMetre } from '@hooks/useFumisterie';
 import { buildFumisterieConfig } from '@/lib/fumisterie/config.js';
-import { motifDependDuDiametre } from '@/lib/fumisterie/articles.js';
+import { comparerFabricants, choisirColonne } from '@/lib/fumisterie/index.js';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { logger } from '@lib/logger';
 import QualificationStep from './QualificationStep';
 import ReleveStep from './ReleveStep';
 import { useMetreDraft } from './useMetreDraft';
-import { releveInitial, versLignesDevis, calculerMetreSurEcran, criteresDepuisFamille } from './metreModel';
+import { releveInitial, versLignesDevis, resultatDeColonne, criteresDepuisFamille } from './metreModel';
+import { useFabricantPrefere } from './useFabricantPrefere';
 
 const EMPTY = [];
 const Spinner = () => <Loader2 className="w-6 h-6 animate-spin text-secondary-500" />;
@@ -53,27 +54,25 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
 
   const confsQ = useFumConfigurations(orgId);
   const bundleQ = useFumBundle(orgId, configurationId);
-  const supplierQ = useFumSupplier(orgId);
   const configurations = confsQ.data ?? EMPTY;
   const bundle = bundleQ.data;
-  const supplier = supplierQ.data;
-  const gammes = useMemo(() => [...new Set((bundle?.mapping || []).map((m) => m.gamme_tarif))], [bundle]);
-  // Gammes dont le mapping ne cite pas le Ø (kit d'entrée d'air…) : chargées entières, pas au Ø du relevé.
-  const gammesSansDiametre = useMemo(() => [...new Set((bundle?.mapping || []).filter((m) => !motifDependDuDiametre(m.motif_code)).map((m) => m.gamme_tarif))], [bundle]);
-  const articlesQ = useFumArticles(orgId, supplier?.id, gammes, releve?.diametre, gammesSansDiametre);
-  const articles = articlesQ.data ?? EMPTY;
+  // Chaque fabricant de fumisterie de l'org : mapping, équivalences, articles au Ø du relevé.
+  const fab = useFumFabricantsDuMetre(orgId, bundle, releve?.diametre);
 
   // Une requête en erreur n'est JAMAIS présentée comme un catalogue vide.
-  const erreurRequete = [confsQ, bundleQ, supplierQ, articlesQ].find((q) => q.isError)?.error;
-  const sansFournisseur = supplierQ.isSuccess && !supplier;
+  const erreurRequete = [confsQ, bundleQ].find((q) => q.isError)?.error || fab.error;
+  const sansFournisseur = !fab.isLoading && !fab.error && fab.fabricants.length === 0 && !!orgId;
 
-  // Calcul UNIQUE : ce qui s'affiche est ce qui sera injecté.
-  const resultat = useMemo(
-    () => (etape === 1 && bundle && releve ? calculerMetreSurEcran({ ...bundle, articles, reglages, releve }) : null),
-    [etape, bundle, articles, reglages, releve],
+  // Calcul UNIQUE, chez chaque fabricant : ce qui s'affiche (colonne choisie) est ce qui sera injecté.
+  const comparaison = useMemo(
+    () => (etape === 1 && bundle && releve && !fab.isLoading ? comparerFabricants({ ...bundle, reglages, releve }, fab.fabricants) : null),
+    [etape, bundle, reglages, releve, fab.isLoading, fab.fabricants],
   );
+  const [fabricantChoisi, setFabricantChoisi] = useFabricantPrefere(orgId);
+  const colonne = choisirColonne(comparaison, fabricantChoisi, fab.fabricants);
+  const resultat = useMemo(() => (colonne ? resultatDeColonne(colonne) : null), [colonne]);
   // Articles d'un autre Ø affichés le temps du fetch (placeholder) : on n'injecte pas ça.
-  const injectable = !!resultat && !resultat.erreur && !articlesQ.isPlaceholderData && !sansFournisseur && !erreurRequete;
+  const injectable = !!resultat && !resultat.erreur && !fab.isPlaceholder && !sansFournisseur && !erreurRequete;
 
   const allerAuReleve = () => {
     if (!bundle?.gabarit) { toast.error('Cette configuration n\'a pas encore de gabarit de métré'); return; }
@@ -99,8 +98,10 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
   const injecter = () => {
     setConfirmationAlertes(false);
     onValidate({
-      lignesDevis: versLignesDevis(resultat.lignes, supplier?.id, supplier?.name),
-      metre: { configurationId, gabaritCode: bundle.gabarit.code, diametre: releve.diametre, finition: releve.finition, releve, resultat, engineVersion: resultat.engine_version, leadId },
+      lignesDevis: versLignesDevis(resultat.lignes, colonne.supplierId, colonne.nom),
+      // supplier_id n'existe en base qu'après la migration 20261128_1 (vue des fabricants présente).
+      metre: { configurationId, gabaritCode: bundle.gabarit.code, diametre: releve.diametre, finition: releve.finition, releve, resultat, engineVersion: resultat.engine_version, leadId,
+        supplierId: fab.avecVue ? colonne.supplierId : null },
     });
     clear();
   };
@@ -133,14 +134,15 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
           </div>
         )}
         {erreurRequete ? <Blocage titre="Chargement du catalogue fumisterie impossible" message={erreurRequete.message || String(erreurRequete)} />
-          : sansFournisseur ? <Blocage titre="Aucun fournisseur de fumisterie configuré (MODINOX / ALTEMA) — importer le tarif" />
+          : sansFournisseur ? <Blocage titre="Aucun fabricant de fumisterie configuré : importer un tarif et ses attributs" />
           : etape === 0 ? (confsQ.isLoading ? <Spinner /> : <QualificationStep configurations={configurations} criteres={criteres} setCriteres={setCriteres} selectedId={configurationId} onContinue={choisirEtContinuer} />)
-          : (!bundle || !releve || articlesQ.isLoading || !resultat) ? <Spinner />
+          : (!bundle || !releve || fab.isLoading || !resultat) ? <Spinner />
           : (
             <div className="space-y-4">
               {/* Relevé incomplet / hors plage : blocage visible au-dessus du formulaire (l'injection est désactivée). */}
               {resultat.erreur && <Blocage titre="Métré non calculable — corrigez le relevé" message={resultat.erreur} />}
-              <ReleveStep bundle={bundle} reglages={reglages} releve={releve} setReleve={setReleve} resultat={resultat} />
+              <ReleveStep bundle={bundle} reglages={reglages} releve={releve} setReleve={setReleve} resultat={resultat}
+                comparaison={comparaison} fabricantChoisi={colonne?.supplierId} onChoisirFabricant={setFabricantChoisi} />
             </div>
           )}
       </main>

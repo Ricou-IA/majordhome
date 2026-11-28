@@ -25,7 +25,7 @@ export function geometrieG3(r, cfg) {
   const Lfac = Math.max(0, yEgout + Number(r.hSortie) - yTe);
   const base = { longueurs: cfg.longueurs_elements_mm, reglable: cfg.reglable };
   const troncons = {
-    raccordement_sp: { longueur_mm: Math.round(Lsp * 1000), composition: composer(Lsp * 1000, { ...base, avecReglable: false }) },
+    raccordement_sp: { longueur_mm: Math.round(Lsp * 1000), composition: composer(Lsp * 1000, { ...base, longueurs: cfg.longueurs_raccordement_mm || cfg.longueurs_elements_mm, avecReglable: false }) },
     traversee_mur: { longueur_mm: Math.round(Ltrav * 1000), composition: composer(Ltrav * 1000, { ...base, avecReglable: false }) },
     facade: { longueur_mm: Math.round(Lfac * 1000), composition: composer(Lfac * 1000, { ...base, avecReglable: cfg.reglable_exterieur }) },
   };

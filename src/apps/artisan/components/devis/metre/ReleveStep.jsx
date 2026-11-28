@@ -1,14 +1,15 @@
 // src/apps/artisan/components/devis/metre/ReleveStep.jsx
 // Étape 2 du métré : coupe cotée + formulaire de relevé + contrôles + liste de pièces,
 // recalculés en direct par le moteur pur (src/lib/fumisterie). Le résultat est calculé UNE fois
-// par l'orchestrateur (calculerMetreSurEcran) : ce qui s'affiche est ce qui sera injecté.
+// par l'orchestrateur (comparerFabricants, colonne du fabricant choisi) : ce qui s'affiche est ce qui sera injecté.
 import { sortieMinimale } from '@/lib/fumisterie/index.js';
 import CoupeCotee from './CoupeCotee';
 import ReleveForm from './ReleveForm';
 import ComplementsForm from './ComplementsForm';
 import ListePieces, { Alertes } from './ListePieces';
+import ComparaisonFabricants from './ComparaisonFabricants';
 
-export default function ReleveStep({ bundle, reglages, releve, setReleve, resultat }) {
+export default function ReleveStep({ bundle, reglages, releve, setReleve, resultat, comparaison, fabricantChoisi, onChoisirFabricant }) {
   const minSortie = resultat.geometrie ? resultat.geometrie.minSortie : null;
   const focusChamp = (cle) => { const el = document.getElementById(`fum-${cle}`); if (el) { el.focus(); el.select?.(); } };
   // Relevé incomplet ailleurs → minimum incalculable (NaN) : on ne l'écrit pas dans le champ.
@@ -31,6 +32,7 @@ export default function ReleveStep({ bundle, reglages, releve, setReleve, result
       {resultat.alertes.some((a) => a.niveau === 'verifier') && (
         <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="text-xs uppercase tracking-wide text-secondary-500 mb-2">À vérifier sur place · imprimé sur la fiche chantier</h3><Alertes alertes={resultat.alertes.filter((a) => a.niveau === 'verifier')} /></section>
       )}
+      <ComparaisonFabricants comparaison={comparaison} choisi={fabricantChoisi} onChoisir={onChoisirFabricant} />
       <section className="border border-secondary-200 rounded-xl bg-white p-4"><h3 className="text-xs uppercase tracking-wide text-secondary-500 mb-2">Liste de pièces chiffrée · {resultat.lignes.length} lignes · Ø{releve.diametre}</h3><ListePieces lignes={resultat.lignes} totaux={resultat.totaux} /></section>
     </div>
   );

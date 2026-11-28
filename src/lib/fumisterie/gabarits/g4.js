@@ -22,7 +22,7 @@ export function geometrieG4(r, cfg) {
   // PRH 6/10 (Ø ≥ 130) se compose en 1000/500/330, PRH 5/10 (Ø 80/100, pellets) en 1000/500/250 : ce sont les
   // longueurs réellement au tarif, sinon la nomenclature sortirait un « Lg 330 Ø80 » introuvable.
   const longueursPrh = Number(r.diametre) <= 100 ? cfg.longueurs_prh_5_10_mm : cfg.longueurs_prh_mm;
-  const longueursSp = rigide ? longueursPrh : cfg.longueurs_elements_mm;
+  const longueursSp = rigide ? longueursPrh : (cfg.longueurs_raccordement_mm || cfg.longueurs_elements_mm);
   const base = { reglable: cfg.reglable, avecReglable: false };
   const raccordement_sp = { longueur_mm: Math.round(Lsp * 1000), composition: composer(Lsp * 1000, { ...base, longueurs: longueursSp }) };
   let conduit_existant;

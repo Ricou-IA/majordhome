@@ -1,15 +1,12 @@
 // src/apps/artisan/components/devis/metre/metreModel.js
 // Helpers PURS de l'écran de métré (hors composants, pour le fast refresh) : critères de
 // qualification, filtrage des configurations, relevé initial, conversion en lignes de devis.
-import { calculerMetre } from '@/lib/fumisterie/index.js';
 
-/**
- * calculerMetre sans jamais planter l'écran : une exception du moteur devient un résultat
- * vide portant `erreur` + une alerte visible (l'injection est alors refusée).
- */
-export function calculerMetreSurEcran(params) {
-  try { return calculerMetre(params); }
-  catch (e) { return { erreur: e.message, lignes: [], alertes: [{ niveau: 'warn', code: 'moteur', message: e.message, source: 'moteur' }], totaux: { vente_ht: 0, achat_ht: 0, marge_ht: 0, lignes_a_chiffrer: 0 }, geometrie: null }; }
+const resultatEnErreur = (message) => ({ erreur: message, lignes: [], alertes: [{ niveau: 'warn', code: 'moteur', message, source: 'moteur' }], totaux: { vente_ht: 0, achat_ht: 0, marge_ht: 0, lignes_a_chiffrer: 0 }, geometrie: null });
+
+/** Résultat affiché pour une colonne de la comparaison des fabricants (une erreur du moteur reste visible). */
+export function resultatDeColonne(colonne) {
+  return colonne.erreur ? resultatEnErreur(colonne.erreur) : colonne.resultat;
 }
 
 export const CRITERES = {

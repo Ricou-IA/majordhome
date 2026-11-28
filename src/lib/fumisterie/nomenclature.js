@@ -72,7 +72,7 @@ export function construireNomenclature({ composants, mapping, articles, geometri
         pousser(comp, article, qte(m, comp2.elements[l]), `Lg ${l} Ø${releve.diametre}`, { sous_libelle: `Lg ${l} mm` });
       }
       if (comp2.reglable) {
-        const { article, mapping: m } = resoudre(comp, { type_piece: 'element_reglable' });
+        const { article, mapping: m } = resoudre(comp, { type_piece: 'element_reglable', reglage: comp2.reglable.longueur });
         pousser(comp, article, qte(m, comp2.reglable.n), `réglable Ø${releve.diametre}`, { sous_libelle: `Réglé à ${comp2.reglable.longueur} mm` });
       }
     } else if (regle === 'par_longueur_ml') {

@@ -459,8 +459,10 @@ export const fumisterieKeys = {
   configurations: (orgId) => [...fumisterieKeys.all(orgId), 'configurations'],
   bundle: (orgId, configurationId) => [...fumisterieKeys.all(orgId), 'bundle', configurationId],
   articles: (orgId, supplierId, gammes, diametre) => [...fumisterieKeys.all(orgId), 'articles', supplierId, [...(gammes || [])].sort().join('|'), diametre],
-  supplier: (orgId) => [...fumisterieKeys.all(orgId), 'supplier'],
   metreByQuote: (orgId, quoteId) => [...fumisterieKeys.all(orgId), 'metre', quoteId],
+  fabricants: (orgId) => [...fumisterieKeys.all(orgId), 'fabricants'],
+  mapping: (orgId, supplierId, codes) => [...fumisterieKeys.all(orgId), 'mapping', supplierId, [...(codes || [])].sort().join('|')],
+  equivalences: (orgId, configurationCode) => [...fumisterieKeys.all(orgId), 'equivalences', configurationCode],
 };
 
 // Settings de l'organisation — convention P0.11 (orgId scoped)

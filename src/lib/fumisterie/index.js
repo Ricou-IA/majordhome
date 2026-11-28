@@ -8,6 +8,7 @@ import { geometrieG3, hauteurSortieMinimaleG3 } from './gabarits/g3.js';
 import { geometrieG6 } from './gabarits/g6.js';
 import { controlesG1, controlesG3, controlesG4, controlesG5, controlesG6, controlesNomenclature, pointsAVerifier, natureInstallation } from './controles.js';
 import { construireNomenclature, totaliser } from './nomenclature.js';
+import { reglagesDuFabricant } from './config.js';
 
 // dtu-2026.11 : hauteur de sortie selon l'arrêté de 1969 (8 m, acrotère, obstacle, toit plat < 15°), règles
 // du NF DTU 24.1 / Cahier CSTB 3708 en alertes non bloquantes, points « à vérifier sur place ».
@@ -92,6 +93,63 @@ export function calculerMetre({ configuration, gabarit, composants, mapping, art
   return { engine_version: ENGINE_VERSION, geometrie, lignes,
     alertes: [...alertes, ...nomenclature.alertes, ...controlesNomenclature(code, lignes, releve), ...pointsAVerifier(code, configuration)],
     totaux: totaliser(lignes) };
+}
+
+/**
+ * Équivalence de gamme d'un fabricant pour le relevé : celle de la finition relevée, sinon la première.
+ * @param {Array<{ finition?: string|null }>|null|undefined} equivalences
+ * @param {{ finition?: string }} releve
+ */
+export function equivalencePour(equivalences, releve) {
+  if (!equivalences?.length) return null;
+  return equivalences.find((e) => e.finition === releve?.finition) || equivalences.find((e) => !e.finition) || equivalences[0];
+}
+
+/**
+ * Le même relevé calculé chez chaque fabricant reconnu pour la configuration. Un fabricant sans mapping pour
+ * les composants de la configuration n'a pas de colonne (jamais une colonne à 0 €). « Moins cher » n'est
+ * désigné que s'il y a au moins deux colonnes, toutes complètes (aucune ligne à chiffrer ni ambiguë).
+ * @param {{ configuration: object, gabarit: object, composants: object[], reglages: object, releve: object }} base
+ * @param {Array<{ supplierId: string, nom: string, mapping: object[], articles: object[], equivalences?: object[]|null, historique?: boolean, prixVerifies?: boolean }>} fabricants
+ * @returns {{ colonnes: Array<{ supplierId:string, nom:string, resultat:object|null, totaux:object|null, aChiffrer:number, ambigus:number, validee:boolean, prixVerifies:boolean, erreur:string|null }>, complete: boolean, moinsCher: string|null }}
+ */
+export function comparerFabricants(base, fabricants) {
+  const codes = new Set((base.composants || []).map((c) => c.composant_code));
+  const colonnes = [];
+  for (const f of fabricants) {
+    if (!f.mapping?.some((m) => codes.has(m.composant_code))) continue;
+    const equivalence = equivalencePour(f.equivalences, base.releve);
+    let resultat = null; let erreur = null;
+    try {
+      resultat = calculerMetre({ ...base, mapping: f.mapping, articles: f.articles || [], reglages: reglagesDuFabricant(base.reglages, equivalence) });
+    } catch (e) { erreur = e.message; }
+    const alertes = resultat?.alertes || [];
+    colonnes.push({
+      supplierId: f.supplierId, nom: f.nom, resultat, totaux: resultat?.totaux || null, erreur,
+      aChiffrer: alertes.filter((a) => a.code === 'article_manquant').length,
+      ambigus: alertes.filter((a) => a.code === 'article_ambigu').length,
+      // Le fabricant historique (mapping écrit avec le catalogue de la configuration) fait référence.
+      validee: f.historique ? true : !!equivalence?.validee_le,
+      prixVerifies: f.prixVerifies !== false,
+    });
+  }
+  const complete = colonnes.length > 1 && colonnes.every((c) => !c.erreur && c.aChiffrer === 0 && c.ambigus === 0);
+  const moinsCher = complete ? colonnes.reduce((a, b) => (b.totaux.vente_ht < a.totaux.vente_ht ? b : a)).supplierId : null;
+  return { colonnes, complete, moinsCher };
+}
+
+/**
+ * Colonne de la comparaison dont le calcul est affiché et injecté : le fabricant choisi s'il a une colonne,
+ * sinon le fabricant historique, sinon la première.
+ * @param {ReturnType<typeof comparerFabricants>|null} comparaison
+ * @param {string|null} supplierId choix de l'utilisateur (ou dernier choix de l'organisation)
+ * @param {Array<{ supplierId: string, historique?: boolean }>} [fabricants]
+ */
+export function choisirColonne(comparaison, supplierId, fabricants = []) {
+  const cols = comparaison?.colonnes || [];
+  if (!cols.length) return null;
+  const historique = fabricants.find((f) => f.historique)?.supplierId;
+  return cols.find((c) => c.supplierId === supplierId) || cols.find((c) => c.supplierId === historique) || cols[0];
 }
 
 /** Hauteur de sortie minimale conforme pour le gabarit de la configuration (bouton « Ajuster »). null si le gabarit n'a pas de sortie de toit (tubage). */
