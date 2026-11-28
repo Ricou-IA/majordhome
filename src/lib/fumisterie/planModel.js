@@ -51,6 +51,25 @@ function valeurSaisie(p, v) {
 }
 
 /**
+ * Le relevé saisi, en clair : paramètres visibles du gabarit puis compléments facultatifs renseignés (ceux du bilan
+ * et de la justification ont leur propre section). Seule définition : la fiche chantier (PDF) et le récapitulatif
+ * de l'écran (RecapMetre) disent la même chose.
+ * @param {{ troncons?: Array<{ parametres: object[] }> } | null} gabarit
+ * @param {Record<string, unknown>} releve
+ * @param {string|null|undefined} gabaritCode
+ * @returns {Array<{ libelle: string, valeur: string }>}
+ */
+export function releveSaisi(gabarit, releve, gabaritCode) {
+  const r = releve || {};
+  const params = (gabarit?.troncons || []).flatMap((t) => t.parametres || []).filter((pp) => parametreVisible(pp, r));
+  return [
+    ...params.map((pp) => ({ libelle: pp.libelle, valeur: valeurSaisie(pp, r[pp.cle]) })),
+    ...complementsDuGabarit(gabaritCode).filter((c) => c.groupe !== 'existant' && c.groupe !== 'dimensionnement' && lireComplement(r, c.cle) != null)
+      .map((c) => ({ libelle: c.libelle, valeur: c.type === 'choix' ? String(c.libelles?.[r[c.cle]] ?? r[c.cle]) : valeurSaisie(c, lireComplement(r, c.cle)) })),
+  ];
+}
+
+/**
  * @param {{
  *   metre: { gabarit_code:string, diametre:number, finition:string, created_at:string, releve:object, resultat:{ lignes:object[], alertes?:object[], geometrie:object } },
  *   configuration: { code?:string, titre?:string } | null,
@@ -100,14 +119,8 @@ export function buildPlanModel({ metre, configuration, gabarit, company, devis, 
 
   let detailChantier = null;
   if (chantier) {
-    const params = (gabarit?.troncons || []).flatMap((t) => t.parametres || []).filter((pp) => parametreVisible(pp, releve));
     detailChantier = {
-      releveSaisi: [
-        ...params.map((pp) => ({ libelle: texteSurPdf(pp.libelle), valeur: texteSurPdf(valeurSaisie(pp, releve[pp.cle])) })),
-        // Compléments facultatifs renseignés (ceux du bilan et de la justification ont leur propre section).
-        ...complementsDuGabarit(metre?.gabarit_code).filter((c) => c.groupe !== 'existant' && c.groupe !== 'dimensionnement' && lireComplement(releve, c.cle) != null)
-          .map((c) => ({ libelle: texteSurPdf(c.libelle), valeur: texteSurPdf(c.type === 'choix' ? (c.libelles?.[releve[c.cle]] ?? releve[c.cle]) : valeurSaisie(c, lireComplement(releve, c.cle))) })),
-      ],
+      releveSaisi: releveSaisi(gabarit, releve, metre?.gabarit_code).map((l) => ({ libelle: texteSurPdf(l.libelle), valeur: texteSurPdf(l.valeur) })),
       // Les alertes « à vérifier » présentes à l'injection : le résultat est figé à ce moment-là.
       // (les non-conformités du conduit existant sont imprimées dans le bilan, pas deux fois)
       alertes: (res.alertes || []).filter((a) => a.niveau === 'warn' && a.code !== 'article_manquant' && a.code !== 'article_ambigu' && !String(a.code).startsWith('existant_')).map((a) => texteSurPdf(a.message)),

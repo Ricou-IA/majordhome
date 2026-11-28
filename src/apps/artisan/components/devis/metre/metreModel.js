@@ -189,3 +189,22 @@ export function syntheseComparaison(comparaison) {
   const ecart = max > 0 ? Math.round(((max - min.totaux.vente_ht) / max) * 100) : 0;
   return ecart > 0 ? `Le moins cher : ${min.nom} (−${ecart} %).` : 'Les fabricants sont au même prix.';
 }
+
+/**
+ * Résumé du pied du métré, visible sans défiler : « Ø80 · MODINOX · 27 pièces · 1 873,05 € HT · 2 sans prix · 1 alerte ».
+ * @param {{ diametre?: number|null, fabricant?: string|null, resultat: { lignes: any[], totaux: { vente_ht: number, lignes_a_chiffrer?: number } },
+ *   alertes: number, formatEuro: (n: number) => string }} p
+ * @returns {string[]}
+ */
+export function resumeMetre({ diametre, fabricant, resultat, alertes, formatEuro }) {
+  const n = resultat.lignes.length;
+  const sansPrix = resultat.totaux.lignes_a_chiffrer || 0;
+  return [
+    diametre ? `Ø${diametre}` : null,
+    fabricant || null,
+    `${n} pièce${n > 1 ? 's' : ''}`,
+    `${formatEuro(resultat.totaux.vente_ht)} HT`,
+    sansPrix ? `${sansPrix} sans prix` : null,
+    alertes ? `${alertes} alerte${alertes > 1 ? 's' : ''}` : null,
+  ].filter(Boolean);
+}

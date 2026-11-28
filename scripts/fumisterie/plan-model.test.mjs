@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildPlanModel, texteSurPdf } from '../../src/lib/fumisterie/planModel.js';
+import { buildPlanModel, texteSurPdf, releveSaisi } from '../../src/lib/fumisterie/planModel.js';
 
 const lire = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), 'utf8'));
 const ancien = lire('./fixtures/metre-g1-ancien.json');
@@ -106,4 +106,11 @@ test('fiche chantier : compléments facultatifs renseignés repris dans le relev
   assert.equal(saisi['Obstacle plus haut : distance horizontale'], '5,00 m');
   assert.equal(saisi['Sortie de la buse'], 'Arrière ou côté');
   assert.ok(!('Obstacle : hauteur au-dessus de la sortie de toit' in saisi), 'un complément vide n\'est pas imprimé');
+});
+
+test('relevé saisi : l’écran (releveSaisi) et la fiche chantier disent la même chose', () => {
+  const ecran = releveSaisi(gabarit, metre.releve, metre.gabarit_code);
+  const pdf = buildPlanModel({ ...base, variante: 'chantier' }).chantier.releveSaisi;
+  assert.deepEqual(ecran.map((l) => ({ libelle: texteSurPdf(l.libelle), valeur: texteSurPdf(l.valeur) })), pdf);
+  assert.ok(ecran.some((l) => l.libelle === 'Hauteur de buse' && l.valeur === '1,05 m'));
 });

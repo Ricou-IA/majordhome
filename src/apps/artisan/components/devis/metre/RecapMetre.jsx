@@ -4,6 +4,7 @@
 import { AlertTriangle } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { formatEuro } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 const taux = (t) => `${String(t).replace('.', ',')} %`;
 
@@ -17,7 +18,8 @@ function Liste({ titre, pill, items }) {
   );
 }
 
-export default function RecapMetre({ configLibelle, releve, fabricant, resultat, tvaDevis, aConfirmer }) {
+// `releveLignes` : le relevé saisi en clair (releveSaisi de planModel, le même que la fiche chantier).
+export default function RecapMetre({ configLibelle, releve, fabricant, resultat, tvaDevis, aConfirmer, releveLignes = [], onModifierReleve }) {
   const { sansPrix, aValider, alertes } = aConfirmer;
   return (
     <div className="space-y-4 max-w-3xl">
@@ -31,6 +33,17 @@ export default function RecapMetre({ configLibelle, releve, fabricant, resultat,
           {tvaDevis != null && <><dt className="text-secondary-600">TVA du devis</dt><dd className="text-secondary-900 tabular-nums">{taux(tvaDevis)}</dd></>}
         </dl>
       </section>
+      {releveLignes.length > 0 && (
+        <section className="border border-secondary-200 rounded-xl bg-white p-4">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h3 className="text-label text-secondary-900">Relevé saisi</h3>
+            {onModifierReleve && <Button type="button" variant="link" size="sm" onClick={onModifierReleve}>Modifier le relevé</Button>}
+          </div>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
+            {releveLignes.map((l, i) => <div key={`${l.libelle}-${i}`} className="contents"><dt className="text-secondary-600">{l.libelle}</dt><dd className="text-secondary-900 tabular-nums">{l.valeur}</dd></div>)}
+          </dl>
+        </section>
+      )}
       <Liste titre="Pièces sans prix" pill={<StatusPill tone="attente">{`Ajoutées à 0 € : ${sansPrix.length}`}</StatusPill>} items={sansPrix} />
       <Liste titre="Quantités à valider" pill={<StatusPill tone="attente">{String(aValider.length)}</StatusPill>} items={aValider} />
       {alertes.length > 0 && (

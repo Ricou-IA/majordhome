@@ -18,8 +18,11 @@ import { logger } from '@lib/logger';
 import QualificationStep from './QualificationStep';
 import ReleveStep from './ReleveStep';
 import { useMetreDraft } from './useMetreDraft';
-import { releveInitial, versLignesDevis, resultatDeColonne, criteresDepuisFamille, LIBELLES_COURTS, aConfirmerAvantAjout } from './metreModel';
+import { releveInitial, versLignesDevis, resultatDeColonne, criteresDepuisFamille, LIBELLES_COURTS, aConfirmerAvantAjout, resumeMetre } from './metreModel';
 import RecapMetre from './RecapMetre';
+import EtapesMetre from './EtapesMetre';
+import { releveSaisi } from '@/lib/fumisterie/planModel.js';
+import { formatEuro } from '@/lib/utils';
 import { nouveauBrouillon, clesModifiees, ajouterModifies, resumeBrouillon, titreReprise, contradictionFamille } from '@/lib/fumisterie/brouillon.js';
 import { MenuActions } from '@/components/ui/menu-actions';
 import { useFabricantPrefere } from './useFabricantPrefere';
@@ -158,6 +161,7 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
           <Button variant="ghost" size="icon" onClick={fermer} aria-label="Fermer"><X className="w-5 h-5" /></Button>
         </div>
       </header>
+      <EtapesMetre etape={etape} onAller={(i) => (i === 0 ? changerDeSolution() : setEtape(i))} />
       <main className="flex-1 overflow-y-auto p-4">
         {erreurRequete ? <Blocage titre="Le catalogue n’a pas pu être chargé." message="Vérifiez la connexion puis réessayez."
               action={<Button variant="secondary" size="sm" onClick={reessayer}><RotateCcw className="w-4 h-4" />Réessayer</Button>} />
@@ -165,7 +169,8 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
           : etape === 0 ? (confsQ.isLoading ? <Chargement libelle="Chargement des configurations" /> : <QualificationStep configurations={configurations} criteres={criteres} setCriteres={setCriteres} selectedId={configurationId} onContinue={choisirEtContinuer} />)
           : (!bundle || !releve || fab.isLoading || !resultat) ? <Chargement libelle="Calcul du métré" />
           : etape === 2 ? (
-            <RecapMetre configLibelle={configLibelle} releve={releve} fabricant={colonne?.nom} resultat={resultat} tvaDevis={tvaDevis} aConfirmer={aConfirmer} />
+            <RecapMetre configLibelle={configLibelle} releve={releve} fabricant={colonne?.nom} resultat={resultat} tvaDevis={tvaDevis} aConfirmer={aConfirmer}
+              releveLignes={releveSaisi(bundle.gabarit, releve, bundle.gabarit?.code)} onModifierReleve={() => setEtape(1)} />
           ) : (
             <div className="space-y-4">
               {/* Relevé incomplet / hors plage : dit sous chaque champ et compté dans le bandeau de ReleveStep. Une autre
@@ -177,6 +182,12 @@ export default function MetreFumisterie({ orgId, leadId, dossier = null, family,
           )}
       </main>
       {/* À la qualification, la carte cliquée est l'action : pas de pied, une seule sortie (la croix). */}
+      {/* Résumé toujours visible (sans défiler) : fabricant, pièces, total, pièces sans prix, alertes. */}
+      {etape >= 1 && resultat && !resultat.erreur && (
+        <p aria-live="polite" className="px-4 py-2 bg-secondary-25 border-t border-secondary-200 text-sm text-secondary-800 tabular-nums">
+          {resumeMetre({ diametre: releve?.diametre, fabricant: colonne?.nom, resultat, alertes: aConfirmer.alertes.length, formatEuro }).join(' · ')}
+        </p>
+      )}
       {/* Relevé : « Continuer » mène au récapitulatif, qui n'écrit rien. Seul le récapitulatif ajoute au devis. */}
       {etape === 1 && (
         <footer className="flex items-center justify-between px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white border-t border-secondary-200">
