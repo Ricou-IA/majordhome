@@ -10,6 +10,13 @@ import { CLES_ROW_ARTICLE } from './controles.js';
 // Forme d'une ligne envoyée : la liste des clés vit dans controles.js (`CLES_ROW_ARTICLE`), jamais redéfinie ici.
 export { CLES_ROW_ARTICLE };
 
+/**
+ * Articles retirés par appel de `catalog_items_import_remove` (la RPC accepte 1 à 500). Mesuré sur le harnais le
+ * 2026-11-28 au volume de la production (import de 20 000 articles, 47 000 articles dans l'org) : 397 à 411 ms par
+ * appel de 300, sous la cible de 2 s (plafond PostgREST 8 s). Le retrait des clients garde ses lots de 100.
+ */
+export const TAILLE_LOT_RETRAIT_ARTICLES = 300;
+
 const NATURES = ['main', 'accessory', 'stock', 'main_oeuvre'];
 const TAUX_TVA = [0, 5.5, 10, 20];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

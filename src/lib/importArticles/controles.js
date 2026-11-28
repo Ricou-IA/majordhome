@@ -103,9 +103,14 @@ export function controlerArticle(valeurs, options = {}) {
   return { fiche, raison: null, corrections, ligneFournisseur };
 }
 
-/** Index des articles existants : code, EAN, marque + clé modèle, désignation (articles sans marque seulement), lignes fournisseur. */
+/**
+ * Index des articles existants : code, EAN, marque + clé modèle, désignation, lignes fournisseur.
+ * Les références internes viennent aussi de `existant.codes` (articles DÉSACTIVÉS compris) : la base refuse un code pris
+ * par tout article non fusionné, actif ou non (index catalog_items_code_org_unique).
+ */
 function indexerExistants(existant) {
   const code = new Map(); const ean = new Map(); const modele = new Map(); const designation = new Map(); const lignes = new Set();
+  for (const a of existant?.codes || []) if (cle(a.code) && !code.has(cle(a.code))) code.set(cle(a.code), a.id);
   for (const a of existant?.articles || []) {
     if (!code.has(cle(a.code)) && cle(a.code)) code.set(cle(a.code), a.id);
     if (a.code_ean && !ean.has(a.code_ean)) ean.set(a.code_ean, a.id);
@@ -124,7 +129,8 @@ function indexerExistants(existant) {
  * Classe chaque candidat : prête, doublon (fichier, base forte ou faible) ou écartée. La première ligne du fichier gagne ;
  * puis les doublons avec la base : code, EAN, marque + modèle, ligne fournisseur (forts), désignation (faible).
  * @param {Array<{ numero: number, valeurs: Record<string, string> }>} candidats dans l'ordre du fichier
- * @param {{ articles: Array<{ id: string, code: string|null, code_ean: string|null, brand: string|null, model_key: string|null, name: string }>, lignes: Array<{ supplier_id: string, reference: string }> }} existant
+ * @param {{ articles: Array<{ id: string, code: string|null, code_ean: string|null, brand: string|null, model_key: string|null, name: string }>, lignes: Array<{ supplier_id: string, reference: string }>, codes?: Array<{ id: string, code: string|null }> }} existant
+ *   `articles` = articles actifs ; `codes` = références internes de TOUS les articles non fusionnés (désactivés compris).
  * @param {{ valeursInterpretees?: object, avecFournisseur?: boolean, maintenant?: Date, fournisseursResolus?: Record<string, string> }} [options]
  *   `fournisseursResolus` : `cleFournisseur(nom)` → supplier_id ; un fournisseur absent (à créer) n'a encore aucune ligne.
  * @returns {Array<{ numero: number, fiche: object|null, raison: string|null, corrections: string[], ligneFournisseur: string, doublon: null | { force: 'fort'|'faible', motif: string, articleId?: string }, recochable: boolean }>}
@@ -150,6 +156,8 @@ export function classerArticles(candidats, existant, options = {}) {
 
     // La ligne fournisseur existe-t-elle déjà en base ? Indépendant du motif de doublon retenu plus bas.
     const ligneExistante = Boolean(supplierId && f.fournisseur && index.lignes.has(`${supplierId}|${cle(f.fournisseur.reference)}`));
+    // Référence interne déjà prise en base : la base refuserait tout le lot (code_pris), quel que soit le motif retenu.
+    const codePris = Boolean(kCode && index.code.has(kCode));
 
     // Doublon dans le fichier : testé avant la base (la première ligne gagne).
     let doublon = null; let recochable = true;
@@ -171,6 +179,9 @@ export function classerArticles(candidats, existant, options = {}) {
       if (fort) doublon = { force: 'fort', motif: 'designation', articleId: fort.id };
       else if (memes.length) doublon = { force: 'faible', motif: 'designation', articleId: memes[0].id };
     }
+
+    // Un autre motif (doublon du fichier) peut masquer le code pris : la ligne n'est jamais recochable pour autant.
+    if (codePris) recochable = false;
 
     if (kDesignation) dansFichier.designation.add(`${kDesignation}|${f.product_kind}|${cleMarque(f.brand)}`);
     if (kCode) dansFichier.code.add(kCode);

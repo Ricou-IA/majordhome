@@ -22,15 +22,20 @@ const nombre = (v) => (Number.isFinite(v) ? v : null);
 
 function libelleEtat(imp) {
   if (imp.status === 'retire') return `Retiré le ${formatDateTimeFR(imp.removed_at)}`;
-  return imp.status === 'en_cours' ? 'En cours' : 'Terminé';
+  if (imp.status === 'en_cours') return 'En cours';
+  return imp.counts?.arrete ? 'Arrêté' : 'Terminé';
 }
 
-/** Compteurs d'un import : articles créés, lignes fournisseur, puis ce qu'un retrait a laissé. */
+/**
+ * Compteurs d'un import : articles créés, lignes fournisseur, puis ce qu'un retrait a laissé. Un import encore
+ * « en cours » (jamais clos) ne porte que le bilan PRÉVU à l'ouverture : il est dit tel quel.
+ */
 function resume(imp) {
   const c = imp.counts || {};
   const parties = [];
-  if (nombre(c.importees) !== null) parties.push(pluriel(c.importees, 'article', 'articles'));
-  if (nombre(c.lignes_fournisseur) !== null && c.lignes_fournisseur > 0) parties.push(pluriel(c.lignes_fournisseur, 'ligne fournisseur', 'lignes fournisseur'));
+  const prevus = imp.status === 'en_cours' ? ' prévus' : '';
+  if (nombre(c.importees) !== null) parties.push(`${pluriel(c.importees, 'article', 'articles')}${prevus}`);
+  if (nombre(c.lignes_fournisseur) !== null && c.lignes_fournisseur > 0) parties.push(`${pluriel(c.lignes_fournisseur, 'ligne fournisseur', 'lignes fournisseur')}${prevus}`);
   if (nombre(c.retirees) !== null && c.retirees > 0) parties.push(pluriel(c.retirees, 'retiré', 'retirés'));
   if (nombre(c.conservees) !== null && c.conservees > 0) parties.push(pluriel(c.conservees, 'conservé', 'conservés'));
   return parties.join(' · ');

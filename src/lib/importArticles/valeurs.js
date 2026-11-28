@@ -21,7 +21,8 @@ const NATURES_SYNONYMES = {
   main_oeuvre: ['mo', 'main d oeuvre', 'pose', 'installation', 'service', 'prestation', 'travail'],
   accessory: ['option', 'options', 'accessoire', 'accessoires'],
   stock: ['stock', 'stocke', 'materiel stocke'],
-  [NATURE_ECARTER]: ['ouvrage', 'ouvrages', 'composant', 'lot'],
+  // Seul l'ouvrage est écarté (conception) : un « lot » ou un « composant » peut être un article ordinaire, à choisir.
+  [NATURE_ECARTER]: ['ouvrage', 'ouvrages'],
 };
 
 /** Unités : forme du fichier (minuscules, sans accent ni point) → unité de Majord'home. */

@@ -43,13 +43,15 @@ function lireTva(texte) {
 }
 
 // Un tableur peut écrire un code-barres en notation scientifique (3.760123456789E12) : on en rend les chiffres.
+// Un EAN fait de zéros seuls est illisible (vidé et compté).
 function lireEan(texte) {
   let s = texte.replace(ESPACES, '');
   if (/^\d(\.\d+)?e\+?\d+$/i.test(s)) {
     const n = Number(s);
     if (Number.isSafeInteger(n)) s = String(n);
   }
-  return /^\d{8,14}$/.test(s) ? ok(s) : ILLISIBLE;
+  // Que des zéros : code de remplissage, jamais un vrai code-barres (le rattachement des articles l'écarte aussi).
+  return /^\d{8,14}$/.test(s) && !/^0+$/.test(s) ? ok(s) : ILLISIBLE;
 }
 
 const jourLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

@@ -5,7 +5,7 @@ import { proposerValeurs, valeursDistinctes, NATURE_ECARTER } from '../../src/li
 import { NATURES_ARTICLE, UNITES_ARTICLE } from '../../src/lib/catalogue/natures.js';
 
 test('nature', () => {
-  const r = proposerValeurs('nature', ['Fourniture', 'MO', 'Main d\'oeuvre', 'Main-d’œuvre', 'Option', 'Accessoire', 'Stock', 'Ouvrage', 'Truc'], NATURES_ARTICLE);
+  const r = proposerValeurs('nature', ['Fourniture', 'MO', 'Main d\'oeuvre', 'Main-d’œuvre', 'Option', 'Accessoire', 'Stock', 'Ouvrage', 'Truc', 'Lot', 'Composant'], NATURES_ARTICLE);
   assert.equal(r.Fourniture, 'main');
   assert.equal(r.MO, 'main_oeuvre');
   assert.equal(r['Main d\'oeuvre'], 'main_oeuvre');
@@ -16,6 +16,9 @@ test('nature', () => {
   assert.equal(r.Ouvrage, NATURE_ECARTER);
   assert.equal(NATURE_ECARTER, '@ecarter');
   assert.equal(r.Truc, '');
+  // Seul « ouvrage » est écarté d'office : « lot » et « composant » restent à choisir
+  assert.equal(r.Lot, '');
+  assert.equal(r.Composant, '');
 });
 
 test('catégorie', () => {

@@ -49,6 +49,10 @@ test('EAN', () => {
   assert.deepEqual(lire('ean', '-'), KO);
   assert.deepEqual(lire('ean', '12AB'), KO);
   assert.deepEqual(lire('ean', '123'), KO);
+  // Que des zéros : illisible (vidé et compté), comme le rattachement des articles l'écarte
+  assert.deepEqual(lire('ean', '0000000000000'), KO);
+  assert.deepEqual(lire('ean', '00000000'), KO);
+  assert.deepEqual(lire('ean', '0000000000017'), ok('0000000000017'));
   assert.deepEqual(lire('ean', ''), VIDE);
 });
 

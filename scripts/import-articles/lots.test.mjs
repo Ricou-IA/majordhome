@@ -1,7 +1,7 @@
 // Tests de lots.js (import des articles) : verifierLigneArticle et messageErreurImportArticles.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { verifierLigneArticle, messageErreurImportArticles } from '../../src/lib/importArticles/lots.js';
+import { verifierLigneArticle, messageErreurImportArticles, TAILLE_LOT_RETRAIT_ARTICLES } from '../../src/lib/importArticles/lots.js';
 import { CLES_ROW_ARTICLE, classerArticles, lignesPourEcriture } from '../../src/lib/importArticles/controles.js';
 import { cleFournisseur } from '../../src/lib/importArticles/fournisseurs.js';
 
@@ -128,4 +128,9 @@ test('retrait : removal_incomplete traduit, même avec son DETAIL', () => {
   assert.notEqual(m, 'removal_incomplete');
   assert.ok(!m.includes('_'), m);
   assert.match(m, /retrait/i);
+});
+
+test('taille de lot du retrait des articles : dans les bornes de la RPC (1 à 500), mesurée à 300', () => {
+  assert.equal(TAILLE_LOT_RETRAIT_ARTICLES, 300);
+  assert.ok(Number.isInteger(TAILLE_LOT_RETRAIT_ARTICLES) && TAILLE_LOT_RETRAIT_ARTICLES >= 1 && TAILLE_LOT_RETRAIT_ARTICLES <= 500);
 });

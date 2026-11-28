@@ -17,6 +17,7 @@ import { unwrapResult } from '@/lib/serviceHelpers';
 import { catalogImportKeys, catalogItemKeys, supplierKeys } from '@hooks/cacheKeys';
 import { decouperEnLots, executerLots, lireReponseRetrait } from '@/lib/importClients/lots';
 import { messageErreurImportArticles } from '@/lib/importArticles/lots';
+import { logger } from '@/lib/logger';
 
 // Un import crée des articles et des lignes fournisseur (et parfois des fournisseurs).
 function invaliderFamilles(queryClient, orgId) {
@@ -77,7 +78,7 @@ export function useCatalogRemovalPreview(orgId, importId) {
 }
 
 /**
- * Retire l'import par appels successifs (au plus TAILLE_LOT_RETRAIT articles chacun) jusqu'à `restantes === 0`.
+ * Retire l'import par appels successifs (au plus TAILLE_LOT_RETRAIT_ARTICLES articles chacun) jusqu'à `restantes === 0`.
  * Résout avec `{ retirees, conservees }` cumulés ; rejette sur refus ou si un appel n'avance plus.
  * Les caches sont invalidés aussi après un échec : des articles ont pu être retirés avant.
  */
@@ -112,7 +113,9 @@ export function useRetirerImportArticles(orgId) {
  * listes (imports, fournisseurs créés) se relisent.
  * Lignes et comptes sont gardés pour `reprendre()` (reprise au lot refusé, la base ignore les lignes déjà écrites).
  * Au départ, l'import reçoit le bilan PRÉVU ; seule la clôture écrit `importees` (articles réellement créés).
- * `abandonner()` quitte un import interrompu sans le reprendre (les articles créés restent, retirables).
+ * `abandonner()` quitte un import interrompu sans le reprendre (les articles créés restent, retirables) et le CLÔT
+ * avec ce qui a réellement été écrit (`importees` = articles créés, `arrete: true` si des lots restaient) : il ne reste pas
+ * « en cours » avec le bilan prévu. Si la clôture échoue, l'import reste « en cours » (la liste dit alors « prévus »).
  * `etat` ∈ 'repos' | 'en_cours' | 'interrompu' | 'termine'.
  * @param {string} orgId
  */
@@ -234,14 +237,28 @@ export function useExecuterImportArticles(orgId) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Arrêter sans reprendre : le plan est oublié, les listes se relisent.
-  const abandonner = useCallback(() => {
+  // Arrêter sans reprendre : le plan est oublié, l'import est clos avec ce qui a été écrit, les listes se relisent.
+  const abandonner = useCallback(async () => {
     const plan = planRef.current;
     if (etatRef.current !== 'interrompu') return;
     planRef.current = null;
     setErreur(null);
     changerEtat('repos');
-    if (plan) invaliderFamilles(queryClient, plan.orgId);
+    if (!plan) return;
+    const reels = {
+      ...plan.counts,
+      importees: plan.created + plan.skipped,
+      lignes_fournisseur: plan.lignesFournisseur,
+      // Tous les lots partis (seule la clôture avait échoué) : l'import est complet, pas « arrêté ».
+      ...(plan.lotsEnvoyes ? {} : { arrete: true }),
+    };
+    try {
+      await unwrapResult(catalogImportsService.finish({ importId: plan.importId, counts: reels }));
+    } catch (e) {
+      // L'import reste « en cours », affiché avec ses chiffres prévus ; il reste retirable.
+      logger.error("[useExecuterImportArticles] clôture de l'import arrêté refusée", e);
+    }
+    invaliderFamilles(queryClient, plan.orgId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

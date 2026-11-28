@@ -12,7 +12,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { fetchAllPages } from '@/lib/postgrestUtils';
-import { TAILLE_LOT_RETRAIT } from '@/lib/importClients/lots';
+import { TAILLE_LOT_RETRAIT_ARTICLES } from '@/lib/importArticles/lots';
 
 // Articles vivants : colonnes de la vue majordhome_catalog_items (miroir de catalog_items).
 const COLONNES_ARTICLES = 'id, code, code_ean, brand, model_key, name, product_kind';
@@ -45,7 +45,8 @@ export const catalogImportsService = {
   },
 
   /**
-   * Articles vivants + lignes fournisseur (référence) des fournisseurs donnés, lus EN ENTIER.
+   * Articles vivants + lignes fournisseur (référence) des fournisseurs donnés, lus EN ENTIER, et les références
+   * internes de TOUS les articles non fusionnés (désactivés compris) : la base refuse un code pris par l'un d'eux.
    * Rejette si une page échoue : jamais une liste partielle rendue comme complète.
    */
   async getExistant(orgId, supplierIds) {
@@ -59,6 +60,14 @@ export const catalogImportsService = {
         .is('merged_into', null)
         .order('id', { ascending: true })
         .range(from, to));
+      const codes = await fetchAllPages((from, to) => supabase
+        .from('majordhome_catalog_items')
+        .select('id, code')
+        .eq('org_id', orgId)
+        .is('merged_into', null)
+        .not('code', 'is', null)
+        .order('id', { ascending: true })
+        .range(from, to));
       const lignes = ids.length === 0
         ? []
         : await fetchAllPages((from, to) => supabase
@@ -68,7 +77,7 @@ export const catalogImportsService = {
           .in('supplier_id', ids)
           .order('id', { ascending: true })
           .range(from, to));
-      return { articles, lignes };
+      return { articles, lignes, codes };
     }, 'catalogImports.getExistant');
   },
 
@@ -114,10 +123,10 @@ export const catalogImportsService = {
     }, 'catalogImports.removalPreview');
   },
 
-  /** Retire au plus `TAILLE_LOT_RETRAIT` articles ; rend `{ retirees, conservees, restantes }`. */
+  /** Retire au plus `TAILLE_LOT_RETRAIT_ARTICLES` articles ; rend `{ retirees, conservees, restantes }`. */
   async remove(importId) {
     return withErrorHandling(async () => {
-      const { data, error } = await supabase.rpc('catalog_items_import_remove', { p_import_id: importId, p_limit: TAILLE_LOT_RETRAIT });
+      const { data, error } = await supabase.rpc('catalog_items_import_remove', { p_import_id: importId, p_limit: TAILLE_LOT_RETRAIT_ARTICLES });
       if (error) throw error;
       return data;
     }, 'catalogImports.remove');

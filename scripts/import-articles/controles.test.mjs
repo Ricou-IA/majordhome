@@ -253,3 +253,26 @@ test('même fichier deux fois : tout est doublon fort (marque + modèle, désign
   assert.ok(second.every((c) => c.doublon?.force === 'fort'), JSON.stringify(second.map((c) => c.doublon)));
   assert.equal(bilan(second, {}).importees, 0);
 });
+
+test("référence interne d'un article désactivé : doublon fort non recochable (la base la refuse)", () => {
+  // `articles` = actifs seulement ; `codes` = codes de tous les articles non fusionnés, désactivés compris.
+  const existant = { articles: [], lignes: [], codes: [{ id: 'inactif', code: 'POELE-8' }] };
+  const r = classerArticles([cand(2, { designation: 'Poêle', code: ' poele-8 ' })], existant, opt());
+  assert.deepEqual([r[0].doublon.force, r[0].doublon.motif, r[0].doublon.articleId, r[0].recochable], ['fort', 'code', 'inactif', false]);
+  assert.equal(aImporter(r[0], { 2: true }), false);
+  assert.equal(lignesPourEcriture(r, choixPourTousLesDoublons(r, {}, true)).length, 0);
+});
+
+test("code pris en base masqué par un doublon du fichier : jamais recochable", () => {
+  const existant = { articles: [{ id: 'a1', code: 'REF-1', code_ean: null, brand: null, model_key: null, name: 'Zzz', product_kind: 'main' }], lignes: [] };
+  const r = classerArticles([
+    cand(2, { designation: 'Même article', ean: '3760123456789' }),
+    // Même EAN que la ligne 2 (motif 'fichier', testé avant 'code') ET code déjà pris en base
+    cand(3, { designation: 'Autre', ean: '3760123456789', code: 'ref-1' }),
+  ], existant, opt());
+  assert.equal(r[1].doublon.motif, 'fichier');
+  assert.equal(r[1].recochable, false);
+  const tous = choixPourTousLesDoublons(r, {}, true);
+  assert.equal(aImporter(r[1], tous), false);
+  assert.deepEqual(lignesPourEcriture(r, tous).map((l) => l.import_line), [2]);
+});
