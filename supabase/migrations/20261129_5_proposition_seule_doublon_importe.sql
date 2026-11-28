@@ -13,7 +13,8 @@
 -- l'import. Règle : quand l'un des deux articles porte une ligne d'import pas encore reprise
 -- (`catalog_item_link_source = 'import'` ET `source_version` « import-articles_… », ligne active d'un fournisseur
 -- actif, même définition que t_four), la paire n'est jamais franche : elle est proposée (statut `propose`) et se
--- valide à la main. Dès qu'un relevé reprend la ligne (sa source_version change), la règle d'avant s'applique.
+-- valide à la main. Une paire déjà proposée le reste jusqu'à décision ; une fois la ligne reprise par un relevé
+-- (sa source_version change), la règle d'avant ne vaut que pour les paires nouvelles.
 --
 -- Seule différence avec 20261129_4 : table temporaire t_importes (articles qui portent une telle ligne, index +
 -- ANALYZE comme les autres) et une condition de plus dans `franche`. Le reste est inchangé : la ligne d'import reste
