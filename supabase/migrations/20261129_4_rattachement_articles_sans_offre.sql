@@ -17,6 +17,10 @@
 --    - contrôle du prix : article AVEC une ligne active à prix ⇒ règle d'avant (rapport ≤ 2 avec la meilleure offre) ;
 --      article SANS ligne active à prix ⇒ achat de la ligne ≤ prix de vente de l'article quand celui-ci est > 0, aucun
 --      contrôle quand il vaut 0. Source du lien : `cle` / `ean` comme avant.
+--    - garde-fous (revue 1) : plus de 10 articles candidats ⇒ ambigu (création) ; les clés des lignes d'un fournisseur
+--      INACTIF ne comptent pas (comme dans les propositions) ; un EAN fait de zéros est écarté (ensure et propositions ;
+--      il n'est plus recopié sur un article créé).
+--    Effet des propositions sur la production mesuré AVANT livraison : scripts/catalogue/mesure-effet-rattachement-sans-offre.sql.
 --    Effet assumé, toutes organisations : un article dont toutes les lignes ont été éteintes (ou sont à 0 €) redevient
 --    candidat par ses clés. Mesure avant / après : scripts/catalogue/mesure-rattachement-sans-offre.sql.
 --    Nouvel index supplier_products (org_id, code_ean) : la recherche par l'EAN des lignes se fait une fois par ligne
@@ -74,7 +78,8 @@ BEGIN
            LIMIT COALESCE(p_limit, 2147483647)
   LOOP
     v_item := NULL; v_src := NULL;
-    v_ean_r := CASE WHEN r.code_ean ~ '^[0-9]{8,14}$' THEN r.code_ean END;
+    -- un EAN fait de zéros (« 00000000 ») ne désigne aucun produit : écarté comme un EAN invalide
+    v_ean_r := CASE WHEN r.code_ean ~ '^[0-9]{8,14}$' AND r.code_ean !~ '^0+$' THEN r.code_ean END;
     v_cle_r := r.model_key IS NOT NULL AND r.brand IS NOT NULL;
 
     -- (1) une autre ligne du même fournisseur et même référence (doublon legacy) est déjà rattachée : même article
@@ -102,15 +107,18 @@ BEGIN
          WHERE v_ean_r IS NOT NULL AND i2.org_id = p_org_id AND i2.code_ean = v_ean_r
         UNION ALL
         SELECT q.catalog_item_id, false FROM majordhome.supplier_products q
+          JOIN majordhome.suppliers s ON s.id = q.supplier_id AND s.is_active
          WHERE v_cle_r AND q.org_id = p_org_id AND lower(q.brand) = lower(r.brand) AND q.model_key = r.model_key
            AND q.is_active AND q.catalog_item_id IS NOT NULL
         UNION ALL
         SELECT q.catalog_item_id, true FROM majordhome.supplier_products q
+          JOIN majordhome.suppliers s ON s.id = q.supplier_id AND s.is_active
          WHERE v_ean_r IS NOT NULL AND q.org_id = p_org_id AND q.code_ean = v_ean_r
            AND q.is_active AND q.catalog_item_id IS NOT NULL
       ) x;
 
-      IF v_ids IS NOT NULL THEN
+      -- plus de 10 articles portent la clé : elle ne distingue rien (même seuil que les propositions) ⇒ ambigu, création
+      IF v_ids IS NOT NULL AND cardinality(v_ids) <= 10 THEN
         SELECT count(*), (array_agg(i.id))[1], bool_or(i.id = ANY (COALESCE(v_ids_ean, '{}'::uuid[])))
           INTO v_n, v_item, v_ean
         FROM majordhome.catalog_items i
@@ -176,16 +184,16 @@ BEGIN
   -- (supplier_id NULL) — un article importé d'un fichier n'a souvent aucune ligne (20261129_4).
   IF to_regclass('pg_temp.t_cles') IS NOT NULL THEN DROP TABLE pg_temp.t_cles; END IF;
   CREATE TEMP TABLE t_cles ON COMMIT DROP AS
-    SELECT i.id AS item, i.product_kind, i.created_at, p.supplier_id, lower(p.brand) AS marque, p.model_key, (CASE WHEN p.code_ean ~ '^[0-9]{8,14}$' THEN p.code_ean END) AS ean
+    SELECT i.id AS item, i.product_kind, i.created_at, p.supplier_id, lower(p.brand) AS marque, p.model_key, (CASE WHEN p.code_ean ~ '^[0-9]{8,14}$' AND p.code_ean !~ '^0+$' THEN p.code_ean END) AS ean
     FROM majordhome.catalog_items i
     JOIN majordhome.supplier_products p ON p.catalog_item_id = i.id AND p.is_active
     JOIN majordhome.suppliers s ON s.id = p.supplier_id AND s.is_active
     WHERE i.org_id = p_org_id AND i.is_active AND i.merged_into IS NULL
     UNION ALL
-    SELECT i.id, i.product_kind, i.created_at, NULL::uuid, lower(i.brand), i.model_key, (CASE WHEN i.code_ean ~ '^[0-9]{8,14}$' THEN i.code_ean END)
+    SELECT i.id, i.product_kind, i.created_at, NULL::uuid, lower(i.brand), i.model_key, (CASE WHEN i.code_ean ~ '^[0-9]{8,14}$' AND i.code_ean !~ '^0+$' THEN i.code_ean END)
     FROM majordhome.catalog_items i
     WHERE i.org_id = p_org_id AND i.is_active AND i.merged_into IS NULL
-      AND ((i.brand IS NOT NULL AND i.model_key IS NOT NULL) OR i.code_ean ~ '^[0-9]{8,14}$');
+      AND ((i.brand IS NOT NULL AND i.model_key IS NOT NULL) OR (i.code_ean ~ '^[0-9]{8,14}$' AND i.code_ean !~ '^0+$'));
 
   -- une clé partagée par plus de 10 articles ne distingue rien (faux EAN « - » sur 1 540 articles, référence générique) :
   -- l'écarter évite une jointure quadratique qui a saturé l'espace temporaire de la base partagée le 2026-10-25

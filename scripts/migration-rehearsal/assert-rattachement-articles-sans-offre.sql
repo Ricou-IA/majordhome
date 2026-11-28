@@ -13,6 +13,7 @@ DECLARE
   v_s1 uuid; v_s2 uuid; v_s3 uuid; v_s4 uuid;
   v_i1 uuid; v_i2 uuid; v_i3 uuid; v_i4 uuid; v_i5 uuid; v_i6 uuid; v_i7 uuid;
   v_n2 uuid; v_n4 uuid;
+  v_s5 uuid; v_a6 uuid; v_b6 uuid; v_n6 uuid; v_z uuid; v_nz uuid; v_i9 uuid; v_tous uuid[];
   v_res jsonb;
   v_p record;
   v_n int;
@@ -157,15 +158,85 @@ BEGIN
   RESET ROLE;
   IF (v_res->>'crees')::int <> 0 OR (v_res->>'rattaches')::int <> 0 THEN RAISE EXCEPTION '(6) ensure non idempotent : %', v_res; END IF;
 
+  -- (7) revue 1 — nouvelle ambiguïté : un article AVEC offre (ligne S1 à 100 €) et un article importé portent la même
+  --     clé ; une ligne d'un troisième fournisseur arrive ⇒ article créé (deux candidats), puis trois propositions et
+  --     aucune fusion d'office (chaque article a deux partenaires pour la clé : pas franche)
+  INSERT INTO majordhome.suppliers (org_id, name, is_active, category_mapping) VALUES (v_mayer, 'TEST SANS OFFRE S5', true, '{}'::jsonb) RETURNING id INTO v_s5;
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, model_key, purchase_price_ht, category)
+  VALUES (v_s1, v_mayer, 'A6', 'Avec offre X6', 'BAYWA', 'X6', 100, 'photovoltaique');
+  SET LOCAL ROLE service_role;
+  PERFORM public.catalog_items_ensure(v_mayer);
+  RESET ROLE;
+  SELECT catalog_item_id INTO v_a6 FROM majordhome.supplier_products WHERE supplier_id = v_s1 AND reference = 'A6';
+  INSERT INTO majordhome.catalog_items (org_id, name, brand, model_key, product_kind, selling_price_ht, origin)
+  VALUES (v_mayer, 'Importé X6', 'BAYWA', 'X6', 'main', 200, 'manuel') RETURNING id INTO v_b6;
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, model_key, purchase_price_ht, category)
+  VALUES (v_s4, v_mayer, 'C6', 'Troisième X6', 'BAYWA', 'X6', 110, 'photovoltaique');
+  SET LOCAL ROLE service_role;
+  PERFORM public.catalog_items_ensure(v_mayer);
+  RESET ROLE;
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_s4 AND reference = 'C6';
+  IF v_p.catalog_item_id IN (v_a6, v_b6) OR v_p.catalog_item_link_source IS DISTINCT FROM 'auto' THEN
+    RAISE EXCEPTION '(7) C6 rattachée malgré deux candidats (article avec offre + article importé) : % %', v_p.catalog_item_id, v_p.catalog_item_link_source;
+  END IF;
+  v_n6 := v_p.catalog_item_id;
+
+  -- (8) EAN fait de zéros : pas une clé (ni rattachement, ni recopie sur l'article créé)
+  INSERT INTO majordhome.catalog_items (org_id, name, brand, code_ean, product_kind, selling_price_ht, origin)
+  VALUES (v_mayer, 'Importé EAN zéro', 'TESTZERO', '00000000', 'main', 0, 'manuel') RETURNING id INTO v_z;
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, code_ean, purchase_price_ht, category)
+  VALUES (v_s2, v_mayer, 'Z1', 'Ligne EAN zéro', 'TESTZERO', '00000000', 10, 'photovoltaique');
+  -- (9) clé portée par la ligne d'un fournisseur INACTIF : ne compte pas
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, purchase_price_ht, category)
+  VALUES (v_s5, v_mayer, 'L9', 'Ligne fournisseur éteint', 'BAYWA', 50, 'photovoltaique');
+  SET LOCAL ROLE service_role;
+  PERFORM public.catalog_items_ensure(v_mayer);
+  RESET ROLE;
+  SELECT catalog_item_id INTO v_i9 FROM majordhome.supplier_products WHERE supplier_id = v_s5 AND reference = 'L9';
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_s2 AND reference = 'Z1';
+  IF v_p.catalog_item_id = v_z OR v_p.catalog_item_link_source IS DISTINCT FROM 'auto' THEN RAISE EXCEPTION '(8) Z1 rattachée par un EAN de zéros'; END IF;
+  v_nz := v_p.catalog_item_id;
+  IF (SELECT code_ean FROM majordhome.catalog_items WHERE id = v_nz) IS NOT NULL THEN RAISE EXCEPTION '(8) EAN de zéros recopié sur l''article créé'; END IF;
+  UPDATE majordhome.supplier_products SET model_key = 'X9', model_key_source = 'ia' WHERE supplier_id = v_s5 AND reference = 'L9';
+  UPDATE majordhome.suppliers SET is_active = false WHERE id = v_s5;
+  -- (10) plus de 10 articles portent la clé ⇒ ambigu (création)
+  INSERT INTO majordhome.catalog_items (org_id, name, brand, model_key, product_kind, selling_price_ht, origin)
+  SELECT v_mayer, 'Importé X10 n°' || k, 'BAYWA', 'X10', 'main', 0, 'manuel' FROM generate_series(1, 11) k;
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, model_key, purchase_price_ht, category)
+  VALUES (v_s4, v_mayer, 'M9', 'Ligne X9', 'BAYWA', 'X9', 55, 'photovoltaique'),
+         (v_s4, v_mayer, 'M10', 'Ligne X10', 'BAYWA', 'X10', 10, 'photovoltaique');
+  SET LOCAL ROLE service_role;
+  v_res := public.catalog_items_ensure(v_mayer);
+  RESET ROLE;
+  IF (v_res->>'crees')::int <> 2 OR (v_res->>'rattaches')::int <> 0 THEN RAISE EXCEPTION '(9-10) ensure : % (2 créés attendus)', v_res; END IF;
+  IF (SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id = v_s4 AND reference = 'M9') = v_i9 THEN
+    RAISE EXCEPTION '(9) M9 rattachée par la clé d''une ligne de fournisseur inactif';
+  END IF;
+  -- propositions : X6 trois paires, pas de fusion ; EAN zéro, X9 (fournisseur inactif), X10 (> 10 articles) : rien
+  SET LOCAL ROLE service_role;
+  v_res := public.catalog_item_proposals_propose(v_mayer);
+  RESET ROLE;
+  IF (v_res->>'fusionnes')::int <> 0 OR (v_res->>'proposes')::int <> 3 THEN
+    RAISE EXCEPTION '(7) propositions : % (0 fusion, 3 propositions attendues)', v_res;
+  END IF;
+  SELECT count(*) INTO v_n FROM majordhome.catalog_item_proposals
+   WHERE statut = 'propose' AND item_a_id = ANY (ARRAY[v_a6, v_b6, v_n6]) AND item_b_id = ANY (ARRAY[v_a6, v_b6, v_n6]);
+  IF v_n <> 3 THEN RAISE EXCEPTION '(7) X6 : % propositions au lieu de 3', v_n; END IF;
+  IF EXISTS (SELECT 1 FROM majordhome.catalog_items WHERE id IN (v_a6, v_b6, v_n6) AND merged_into IS NOT NULL) THEN
+    RAISE EXCEPTION '(7) X6 : fusion d''office';
+  END IF;
+
   -- index de la recherche par l'EAN des lignes (sinon un parcours complet par ligne relevée)
   IF to_regclass('majordhome.supplier_products_org_ean_idx') IS NULL THEN RAISE EXCEPTION 'index supplier_products_org_ean_idx absent'; END IF;
 
-  -- nettoyage
-  DELETE FROM majordhome.catalog_item_proposals WHERE item_a_id IN (v_i1, v_i2, v_i3, v_i4, v_i5, v_i6, v_i7, v_n2, v_n4)
-                                                  OR item_b_id IN (v_i1, v_i2, v_i3, v_i4, v_i5, v_i6, v_i7, v_n2, v_n4);
-  DELETE FROM majordhome.supplier_products WHERE supplier_id IN (v_s1, v_s2, v_s3, v_s4);
-  DELETE FROM majordhome.catalog_items WHERE id IN (v_i1, v_i2, v_i3, v_i4, v_i5, v_i6, v_i7, v_n2, v_n4);
-  DELETE FROM majordhome.suppliers WHERE id IN (v_s1, v_s2, v_s3, v_s4);
+  -- nettoyage (tous les articles de la fixture : ceux de ses lignes, plus les importés)
+  v_tous := ARRAY[v_i1, v_i2, v_i3, v_i4, v_i5, v_i6, v_i7, v_n2, v_n4, v_a6, v_b6, v_n6, v_z, v_nz, v_i9]
+            || ARRAY(SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id IN (v_s1, v_s2, v_s3, v_s4, v_s5) AND catalog_item_id IS NOT NULL)
+            || ARRAY(SELECT id FROM majordhome.catalog_items WHERE org_id = v_mayer AND brand = 'BAYWA' AND model_key = 'X10');
+  DELETE FROM majordhome.catalog_item_proposals WHERE item_a_id = ANY (v_tous) OR item_b_id = ANY (v_tous);
+  DELETE FROM majordhome.supplier_products WHERE supplier_id IN (v_s1, v_s2, v_s3, v_s4, v_s5);
+  DELETE FROM majordhome.catalog_items WHERE id = ANY (v_tous);
+  DELETE FROM majordhome.suppliers WHERE id IN (v_s1, v_s2, v_s3, v_s4, v_s5);
 
   RAISE NOTICE 'assert-rattachement-articles-sans-offre : OK';
 END $$;
