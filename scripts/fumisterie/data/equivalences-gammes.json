@@ -1,8 +1,4 @@
 [
-  { "configuration_code": "CFG-24", "gamme_catalogue": "PTR30", "fournisseur": "DINAK", "finition": "noir", "gamme_tarif": "DW BOIS BLACK",
-    "longueurs_elements_mm": [940, 440, 270], "longueurs_raccordement_mm": [950, 450, 285], "reglable_min_mm": 350, "reglable_max_mm": 530,
-    "validee_par": null, "validee_le": null, "notes": "Proposée le 2026-11-28 d'après le tarif DINAK : DW BOIS (double paroi isolée bois) ↔ PTR30 ; raccordement DEKO 1,2 mm ↔ émaillé." },
-  { "configuration_code": "CFG-24", "gamme_catalogue": "PTR30", "fournisseur": "DINAK", "finition": "inox", "gamme_tarif": "DW BOIS 316L / 304",
-    "longueurs_elements_mm": [940, 440, 270], "longueurs_raccordement_mm": [950, 450, 285], "reglable_min_mm": 350, "reglable_max_mm": 530,
-    "validee_par": null, "validee_le": null, "notes": "Proposée le 2026-11-28 ; intérieur 316L, extérieur 304." }
+  {"configuration_code":"CFG-24","gamme_catalogue":"PTR30","fournisseur":"DINAK","finition":"noir","gamme_tarif":"DW BOIS BLACK","longueurs_elements_mm":[940,440,270],"longueurs_raccordement_mm":[950,450,285],"reglable_min_mm":350,"reglable_max_mm":530,"validee_par":"Eric Pudebat","validee_le":"2026-11-28","notes":"Proposée le 2026-11-28 d'après le tarif DINAK : DW BOIS (double paroi isolée bois) ↔ PTR30 ; raccordement DEKO 1,2 mm ↔ émaillé."},
+  {"configuration_code":"CFG-24","gamme_catalogue":"PTR30","fournisseur":"DINAK","finition":"inox","gamme_tarif":"DW BOIS 316L / 304","longueurs_elements_mm":[940,440,270],"longueurs_raccordement_mm":[950,450,285],"reglable_min_mm":350,"reglable_max_mm":530,"validee_par":"Eric Pudebat","validee_le":"2026-11-28","notes":"Proposée le 2026-11-28 ; intérieur 316L, extérieur 304."}
 ]

@@ -1,5 +1,5 @@
 [
-  { "composant_code": "chapeau_anti_refouleur", "gamme_catalogue": "PTR30", "finition": "noir", "gamme_tarif": "DW BOIS BLACK", "type_piece": "chapeau_anti_refouleur", "motif_code": null, "notes": "Capuchon antivent DW BOIS noir — équivalence proposée, non validée" },
+  { "composant_code": "chapeau_anti_refouleur", "gamme_catalogue": "PTR30", "finition": "noir", "gamme_tarif": "DW BOIS BLACK", "type_piece": "chapeau_anti_refouleur", "motif_code": null, "notes": "Capuchon antivent DW BOIS noir" },
   { "composant_code": "chapeau_anti_refouleur", "gamme_catalogue": "PTR30", "finition": "inox", "gamme_tarif": "DW BOIS 316L / 304", "type_piece": "chapeau_anti_refouleur", "motif_code": null, "notes": "Capuchon antivent DW BOIS inox" },
   { "composant_code": "element_droit_exterieur", "gamme_catalogue": "PTR30", "finition": "noir", "gamme_tarif": "DW BOIS BLACK", "type_piece": "element_droit", "motif_code": null },
   { "composant_code": "element_droit_exterieur", "gamme_catalogue": "PTR30", "finition": "inox", "gamme_tarif": "DW BOIS 316L / 304", "type_piece": "element_droit", "motif_code": null },
@@ -9,8 +9,8 @@
   { "composant_code": "collier_sous_toiture", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "DW BOIS 316L / 304", "type_piece": "collier_sous_toiture", "statut": "provisoire", "motif_code": null, "notes": "Support au toit avec profil (le renforcé est écarté)" },
   { "composant_code": "coude_devoiement", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "DW BOIS 316L / 304", "type_piece": "coude", "motif_code": null },
   { "composant_code": "element_droit_interieur", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "DW BOIS 316L / 304", "type_piece": "element_droit", "motif_code": null },
-  { "composant_code": "plaque_proprete_rt2012", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "DW BOIS 316L / 304", "type_piece": "rosace", "motif_code": null, "notes": "Rosace de finition sous plafond — équivalence à valider (la plaque RT2012 MODINOX fait 600 × 600)" },
-  { "composant_code": "couronne_coupe_feu", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "DW BOIS 316L / 304", "type_piece": "plaque_ecart_feu_ventilee", "motif_code": null, "notes": "Plaque d'écart au feu ventilée à la traversée — équivalence à valider" },
+  { "composant_code": "plaque_proprete_rt2012", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "DW BOIS 316L / 304", "type_piece": "rosace", "motif_code": null, "notes": "Rosace de finition sous plafond — validée par Eric le 2026-11-28 (la plaque RT2012 MODINOX fait 600 × 600)" },
+  { "composant_code": "couronne_coupe_feu", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "DW BOIS 316L / 304", "type_piece": "plaque_ecart_feu_ventilee", "motif_code": null, "notes": "Plaque d'écart au feu ventilée à la traversée — validée par Eric le 2026-11-28" },
   { "composant_code": "raccord_simple_paroi", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "DW BOIS 316L / 304", "type_piece": "raccord_simple_paroi", "motif_code": null, "notes": "Raccord d'adaptation DEKO - DW court (330-400 mm)" },
   { "composant_code": "tuyau_emaille", "gamme_catalogue": "ÉMAILLÉ", "finition": null, "gamme_tarif": "DEKO BOIS 1,2 mm", "type_piece": "element_droit", "motif_code": "^039A{D2}02[045]D1N$", "notes": "Tuyau DEKO acier 1,2 mm noir, série D1N (950 / 450 / 285)" }
 ]

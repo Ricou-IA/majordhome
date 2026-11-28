@@ -40,7 +40,9 @@ test('maquette G1 Ø150 : la nomenclature DINAK est complète, en noir et en ino
     const manquants = d.resultat.alertes.filter((a) => /article_/.test(a.code)).map((a) => a.message);
     assert.deepEqual(manquants, [], `${finition} : ${manquants.join(' | ')}`);
     assert.ok(d.resultat.lignes.every((l) => l.article_id));
-    assert.equal(d.validee, false);
+    assert.equal(d.validee, true); // équivalence CFG-24 validée par Eric le 2026-11-28
+    const sansValidation = comparerFabricants(base(releve), [dinak(150)].map((f) => ({ ...f, equivalences: f.equivalences.map((e) => ({ ...e, validee_le: null })) })));
+    assert.equal(sansValidation.colonnes[0].validee, false);
     assert.equal(d.prixVerifies, false);
     // Découpage propre au fabricant : raccordement DEKO série D1N (950 mm en tête).
     assert.ok(d.resultat.lignes.some((l) => l.reference === '039A15020D1N'), d.resultat.lignes.map((l) => l.reference).join(','));
