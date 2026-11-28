@@ -17,7 +17,8 @@
 // (1..6, même numérotation MODINOX pour les kits de couronnement et les plaques ventilées), {BOI4}
 // la même section en 4 chiffres (références PLA « 2020 », « 3050 »), {ML} longueur entière en mètres
 // d'un kit (gaine isolée vendue par kit de N ml), {D2} le diamètre en deux chiffres (Ø/10 : 150 → « 15 »,
-// 80 → « 08 », codage des références DINAK). Valeur inconnue → `\d+`.
+// 80 → « 08 », codage des références DINAK), {=D} rien dans la référence mais filtre sur le Ø du relevé.
+// Valeur inconnue → `\d+`.
 
 /**
  * Compile un motif de code en RegExp pour les critères donnés.
@@ -31,6 +32,7 @@ function compilerMotif(motif, c) {
     .replace(/\{D([+-])(\d+)\}/g, (_, s, n) => (c.diametre == null ? '\\d+' : String(c.diametre + (s === '+' ? 1 : -1) * Number(n))))
     .replace(/\{D\}/g, val(c.diametre))
     .replace(/\{D2\}/g, c.diametre == null ? '\\d{2}' : String(Math.round(c.diametre / 10)).padStart(2, '0'))
+    .replace(/\{=D\}/g, '')
     .replace(/\{LG\}/g, val(c.longueur))
     .replace(/\{A\}/g, val(c.angle))
     .replace(/\{BOI\}/g, val(c.boisseau))
@@ -49,7 +51,8 @@ const BOISSEAU_4CHIFFRES = Object.freeze({ 1: '2020', 2: '2525', 3: '3030', 4: '
  * filtrent alors pas sur le Ø ; le motif fait le tri.
  */
 export function motifDependDuDiametre(motif) {
-  return /\{D2?\}/.test(String(motif || ''));
+  // {=D} : « même Ø que le relevé, mais la référence ne le porte pas » (capuchon DINAFLEX Ø150 codé 20).
+  return /\{(D2?|=D)\}/.test(String(motif || ''));
 }
 
 /**
@@ -57,8 +60,15 @@ export function motifDependDuDiametre(motif) {
  * @returns {{ article: object|null, ambigus: string[]|null }}
  */
 function departager(liste, c) {
-  if (liste.length <= 1) return { article: liste[0] || null, ambigus: null };
-  let reste = liste;
+  // Une même référence présente deux fois au tarif (doublon du fichier fabricant) n'est pas une ambiguïté.
+  const vues = new Set();
+  let reste = liste.filter((a) => {
+    const ref = String(a.reference);
+    if (vues.has(ref)) return false;
+    vues.add(ref);
+    return true;
+  });
+  if (reste.length <= 1) return { article: reste[0] || null, ambigus: null };
   if (c.pente != null && reste.every((a) => a.pente_min != null)) {
     const min = Math.min(...reste.map((a) => a.pente_min));
     reste = reste.filter((a) => a.pente_min === min);
@@ -109,7 +119,10 @@ export function resoudreArticle(articles, mappings, c) {
       return { article, mapping: m, via: article ? 'attributs' : null, ambigus };
     }
     if (re) {
-      const parMotif = articles.filter((a) => criteresOk(a) && re.test(String(a.reference)));
+      const parMotifBrut = articles.filter((a) => criteresOk(a) && re.test(String(a.reference)));
+      // Parmi les références du motif, celles du bon type de pièce d'abord (un réglable ne doit pas ramener les éléments droits).
+      const memeType = parMotifBrut.filter((a) => a.type_piece === type);
+      const parMotif = memeType.length ? memeType : parMotifBrut;
       if (parMotif.length) {
         const { article, ambigus } = departager(parMotif, c);
         return { article, mapping: m, via: article ? 'motif' : null, ambigus };

@@ -49,7 +49,8 @@ const REGLES = [
   [/^tampon/, 'tampon'],
   [/^couronne \d+ ?metres/, 'flexible'],
   [/^flexible pour raccordement/, 'flexible'],
-  [/^(couronne|tire-flex|bride|kit|silicone|spray|profiles|fixation|bavette|pied|sachet|trappe|grille)/, 'accessoire'],
+  [/^corps? de souche/, 'souche'],
+  [/^(couronne|tire-flex|bride|kit|silicone|spray|profiles|fixation|bavette|pied|sachet|trappe|grille|mitron|coiffe|finition brique|couronnement)/, 'accessoire'],
 ];
 
 /**
@@ -62,8 +63,10 @@ export function parserDinak(a) {
   const n = normaliserDesignation(a.name);
   const regle = REGLES.find(([re]) => re.test(n));
   let type = regle ? regle[1] : null;
+  // Diamètre « 80/125 » des concentriques DIFLUX : intérieur (fumées) / extérieur (air).
+  const [dInt, dExt] = String(a.diametre ?? '').split('/').map((x) => nombre(x.trim()));
   const out = {
-    type_piece: type, diametre_int: Number.isFinite(nombre(a.diametre)) ? nombre(a.diametre) : null,
+    type_piece: type, diametre_int: Number.isFinite(dInt) ? dInt : null, diametre_ext: Number.isFinite(dExt) ? dExt : null,
     longueur_mm: null, longueur_max_mm: null, angle: null, pente_min: null, pente_max: null,
     couleur: /black|deko/i.test(a.gamme) || /N(AH)?$|DWN|FLN|DEN/.test(String(a.reference)) ? 'noir' : 'inox',
     gamme_tarif: a.gamme, parse_confidence: type ? 0.9 : 0, parse_notes: null,

@@ -73,7 +73,12 @@ export function reglagesDuFabricant(reglages, equivalence) {
   if (!equivalence) return reglages;
   const tri = (l) => [...l].sort((a, b) => b - a);
   const out = { ...reglages };
-  if (equivalence.longueurs_elements_mm?.length) out.longueurs_elements_mm = tri(equivalence.longueurs_elements_mm);
+  if (equivalence.longueurs_elements_mm?.length) {
+    out.longueurs_elements_mm = tri(equivalence.longueurs_elements_mm);
+    // Tubage rigide (G4R) : les tuyaux du fabricant ont les longueurs de ses éléments, quel que soit le Ø.
+    out.longueurs_prh_mm = out.longueurs_elements_mm;
+    out.longueurs_prh_5_10_mm = out.longueurs_elements_mm;
+  }
   out.longueurs_raccordement_mm = equivalence.longueurs_raccordement_mm?.length ? tri(equivalence.longueurs_raccordement_mm)
     : equivalence.longueurs_elements_mm?.length ? out.longueurs_elements_mm : reglages.longueurs_raccordement_mm;
   if (equivalence.reglable_min_mm != null && equivalence.reglable_max_mm != null) out.reglable = { min: equivalence.reglable_min_mm, max: equivalence.reglable_max_mm };

@@ -36,6 +36,12 @@ export function construireNomenclature({ composants, mapping, articles, geometri
     return res;
   };
   const qte = (m, q) => q * Number(m?.quantite_par_unite ?? 1);
+  // Longueurs de couronne au tarif pour le flexible d'un composant (gamme et type de son mapping, Ø du relevé).
+  const longueursEnCouronnes = (comp) => {
+    const maps = mapping.filter((m) => m.composant_code === comp.composant_code && m.gamme_catalogue === gamme(comp) && (!m.finition || m.finition === releve.finition));
+    return [...new Set(articles.filter((a) => a.is_active !== false && a.longueur_mm > 0 && a.diametre_int === releve.diametre
+      && maps.some((m) => a.gamme_tarif === m.gamme_tarif && a.type_piece === m.type_piece)).map((a) => a.longueur_mm))];
+  };
 
   // Une quantité calculée ≤ 0 n'émet AUCUNE ligne (ni alerte) : createQuote ferait `|| 1` sur un 0.
   const pousser = (comp, article, quantite, criteresManquant, extra) => {
@@ -79,6 +85,16 @@ export function construireNomenclature({ composants, mapping, articles, geometri
       // Article vendu au mètre (flexible) : la quantité est la longueur déjà arrondie par la géométrie.
       if (!tr) { alertes.push({ niveau: 'warn', code: 'troncon_inconnu', source: 'gabarit', message: `${comp.libelle} : tronçon ${arg} absent de la géométrie.` }); continue; }
       if (tr.ml == null) { alertes.push({ niveau: 'warn', code: 'troncon_non_ml', source: 'gabarit', message: `${comp.libelle} : le tronçon ${arg} n'a pas de longueur au mètre.` }); continue; }
+      // Flexible vendu en COURONNES de longueur fixe (DINAFLEX : 6, 8, 10, 15 m) : la plus petite qui suffit,
+      // sinon des couronnes raccordées. Sinon (MODINOX), vendu au mètre linéaire.
+      const lgCouronnes = longueursEnCouronnes(comp);
+      if (lgCouronnes.length) {
+        for (const [lg, n] of choisirCouronnes(Math.round(tr.ml * 1000), lgCouronnes)) {
+          const { article, mapping: m } = resoudre(comp, { longueur: lg });
+          pousser(comp, article, qte(m, n), `couronne ${lg / 1000} m Ø${releve.diametre}`, { sous_libelle: `Couronne de ${String(lg / 1000).replace('.', ',')} m (${String(tr.ml).replace('.', ',')} m nécessaires)` });
+        }
+        continue;
+      }
       const { article, mapping: m } = resoudre(comp, {});
       pousser(comp, article, qte(m, tr.ml), `au ml Ø${releve.diametre}`, { sous_libelle: `${String(tr.ml).replace('.', ',')} m au mètre linéaire` });
     } else if (regle === 'kit_longueur') {
@@ -115,6 +131,25 @@ export function construireNomenclature({ composants, mapping, articles, geometri
     }
   }
   return { lignes, alertes };
+}
+
+/**
+ * Couronnes de flexible pour couvrir une longueur : la plus petite couronne qui suffit ; au-delà de la plus
+ * longue, des couronnes de la plus longue puis la plus petite qui couvre le reste.
+ * @param {number} longueurMm longueur nécessaire (mm)
+ * @param {number[]} longueurs longueurs de couronne disponibles (mm)
+ * @returns {Array<[number, number]>} [longueur, nombre]
+ */
+export function choisirCouronnes(longueurMm, longueurs) {
+  const lg = [...new Set(longueurs)].sort((a, b) => a - b);
+  if (!lg.length || !(longueurMm > 0)) return [];
+  const plusLongue = lg[lg.length - 1];
+  const out = new Map();
+  let reste = longueurMm;
+  while (reste > plusLongue) { out.set(plusLongue, (out.get(plusLongue) || 0) + 1); reste -= plusLongue; }
+  const fin = lg.find((l) => l >= reste);
+  out.set(fin, (out.get(fin) || 0) + 1);
+  return [...out.entries()].sort((a, b) => b[0] - a[0]);
 }
 
 /** Totaux (achat / vente / marge) sur les lignes chiffrées, et compteur des lignes à chiffrer. */

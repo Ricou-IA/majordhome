@@ -15,7 +15,9 @@ import { bilanConduitExistant, justificationDimensionnement } from './bilanExist
 // du NF DTU 24.1 / Cahier CSTB 3708 en alertes non bloquantes, points « à vérifier sur place ».
 // fab-2026.11 : longueurs propres au fabricant, réglable choisi par sa plage, bilan du conduit existant et
 // justification du dimensionnement figés dans le résultat.
-export const ENGINE_VERSION = 'fab-2026.11';
+// fab-2026.11b : flexible vendu en couronnes, motif {=D}, repli par motif sur le même type de pièce, doublon de
+// référence au tarif sans ambiguïté, rigide composé dans les longueurs du fabricant.
+export const ENGINE_VERSION = 'fab-2026.11b';
 
 const GABARITS = {
   G1: { geometrie: geometrieG1, controles: controlesG1, sortieMinimale: hauteurSortieMinimale },
@@ -128,6 +130,9 @@ export function comparerFabricants(base, fabricants) {
   const colonnes = [];
   for (const f of fabricants) {
     if (!f.mapping?.some((m) => codes.has(m.composant_code))) continue;
+    // Un fabricant ajouté n'a de colonne que pour une configuration qui a son équivalence de gamme : ses lignes de
+    // mapping partagées (tuyau de raccordement…) ne suffisent pas à le rendre comparable.
+    if (!f.historique && !f.equivalences?.length) continue;
     const equivalence = equivalencePour(f.equivalences, base.releve);
     let resultat = null; let erreur = null;
     try {
