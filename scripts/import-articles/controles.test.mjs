@@ -88,17 +88,27 @@ test('doublons forts avec la base', () => {
   assert.equal(lignes[1].fournisseur, null); // ligne fournisseur existante : jamais renvoyée
 });
 
-test('doublon faible : même désignation, sans marque des deux côtés', () => {
+test("désignation : fort si même marque (ou aucune), faible si marque d'un seul côté ou différente", () => {
   const existant = { articles: [
     { id: 'a1', code: null, code_ean: null, brand: null, model_key: null, name: 'Câble 3G2,5', product_kind: 'main' },
     { id: 'a2', code: null, code_ean: null, brand: 'Legrand', model_key: null, name: 'Prise', product_kind: 'main' },
+    { id: 'a3', code: null, code_ean: null, brand: null, model_key: null, name: 'Pose', product_kind: 'main_oeuvre' },
   ], lignes: [] };
-  const r = classerArticles([cand(2, { designation: 'CABLE 3G2.5' }), cand(3, { designation: 'Prise' }), cand(4, { designation: 'Prise', marque: 'Legrand' })], existant, opt());
-  assert.equal(r[0].doublon.force, 'faible'); assert.equal(r[0].doublon.motif, 'designation');
-  assert.equal(aImporter(r[0], {}), true);
-  assert.equal(aImporter(r[0], { 2: false }), false);
-  assert.equal(r[1].doublon, null);
-  assert.equal(r[2].doublon, null);
+  const r = classerArticles([
+    cand(2, { designation: 'CABLE 3G2.5' }),
+    cand(3, { designation: 'Prise', marque: 'legrand' }), // avec marque, sans modèle
+    cand(4, { designation: 'Prise' }),
+    cand(5, { designation: 'Prise', marque: 'Hager' }),
+    cand(6, { designation: 'Pose' }), // autre nature : pas un doublon
+  ], existant, opt());
+  assert.deepEqual([r[0].doublon.force, r[0].doublon.motif, r[0].recochable], ['fort', 'designation', true]);
+  assert.equal(aImporter(r[0], {}), false);
+  assert.equal(aImporter(r[0], { 2: true }), true);
+  assert.deepEqual([r[1].doublon.force, r[1].doublon.motif], ['fort', 'designation']);
+  assert.equal(aImporter(r[1], {}), false);
+  for (const k of [2, 3]) { assert.equal(r[k].doublon.force, 'faible'); assert.equal(aImporter(r[k], {}), true); }
+  assert.equal(aImporter(r[2], { 4: false }), false);
+  assert.equal(r[4].doublon, null);
 });
 
 test('doublons dans le fichier', () => {
@@ -112,6 +122,8 @@ test('doublons dans le fichier', () => {
   assert.deepEqual([r[1].doublon.motif, r[1].recochable], ['fichier_code', false]);
   assert.equal(r[2].doublon, null);
   assert.deepEqual([r[3].doublon.motif, r[3].recochable], ['fichier', true]);
+  const d = classerArticles([cand(2, { designation: 'Prise', marque: 'Legrand' }), cand(3, { designation: 'PRISE', marque: 'legrand' }), cand(4, { designation: 'Prise', marque: 'Hager' })], vide, opt());
+  assert.deepEqual([d[0].doublon, d[1].doublon.motif, d[1].doublon.force, d[1].recochable, d[2].doublon], [null, 'fichier', 'fort', true, null]);
   assert.equal(aImporter(r[1], { 3: true }), false);
   assert.equal(aImporter(r[3], { 5: true }), true);
 });
@@ -134,7 +146,7 @@ const EXISTANT = {
   articles: [
     { id: 'e1', code: 'deja', code_ean: null, brand: null, model_key: null, name: 'x', product_kind: 'main' },
     { id: 'e2', code: null, code_ean: '4006381333931', brand: null, model_key: null, name: 'y', product_kind: 'main' },
-    { id: 'e3', code: null, code_ean: null, brand: null, model_key: null, name: 'Cable', product_kind: 'main' },
+    { id: 'e3', code: null, code_ean: null, brand: 'Acme', model_key: null, name: 'Cable', product_kind: 'main' },
   ],
   lignes: [{ supplier_id: 's1', reference: 'EXI' }],
 };
@@ -177,11 +189,13 @@ test('lignesPourEcriture : clés exactes, sans org_id ; fournisseur non résolu 
   assert.deepEqual(CLES_ROW_ARTICLE.slice(0, 3), ['import_line', 'name', 'code']);
 });
 
-test('même fichier deux fois : tout est doublon fort, marque + modèle seuls compris', () => {
+test('même fichier deux fois : tout est doublon fort (marque + modèle, désignation + marque, désignation seule)', () => {
   const lignes = [
     cand(2, { designation: 'Poêle', code: 'P1' }),
     cand(3, { designation: 'Ballon', ean: '3760123456789' }),
     cand(4, { designation: 'Pompe', marque: 'Invicta', modele: 'ORA-80-X1' }),
+    cand(5, { designation: 'Vase', marque: 'Zilmet' }),
+    cand(6, { designation: 'Joint' }),
   ];
   const premier = classerArticles(lignes, vide, opt());
   assert.ok(premier.every((c) => c.doublon === null));

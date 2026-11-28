@@ -107,7 +107,11 @@ function indexerExistants(existant) {
     if (!code.has(cle(a.code)) && cle(a.code)) code.set(cle(a.code), a.id);
     if (a.code_ean && !ean.has(a.code_ean)) ean.set(a.code_ean, a.id);
     if (cle(a.brand) && a.model_key) { const k = `${cleMarque(a.brand)}|${a.model_key}`; if (!modele.has(k)) modele.set(k, a.id); }
-    if (!cle(a.brand) && cleEntete(a.name) && !designation.has(cleEntete(a.name))) designation.set(cleEntete(a.name), a.id);
+    const d = cleEntete(a.name);
+    if (d) {
+      if (!designation.has(d)) designation.set(d, []);
+      designation.get(d).push({ id: a.id, brand: cleMarque(a.brand), kind: a.product_kind });
+    }
   }
   for (const l of existant?.lignes || []) if (cle(l.reference)) lignes.add(`${l.supplier_id}|${cle(l.reference)}`);
   return { code, ean, modele, designation, lignes };
@@ -125,7 +129,7 @@ function indexerExistants(existant) {
 export function classerArticles(candidats, existant, options = {}) {
   const index = indexerExistants(existant);
   const resolus = options.fournisseursResolus || {};
-  const dansFichier = { code: new Set(), ean: new Set(), modele: new Set(), ligne: new Set() };
+  const dansFichier = { designation: new Set(), code: new Set(), ean: new Set(), modele: new Set(), ligne: new Set() };
   return candidats.map(({ numero, valeurs }) => {
     const c = controlerArticle(valeurs, options);
     const base = { numero, fiche: c.fiche, raison: c.raison, corrections: c.corrections, ligneFournisseur: c.ligneFournisseur };
@@ -133,6 +137,7 @@ export function classerArticles(candidats, existant, options = {}) {
     if (!c.fiche) return pas;
     const f = c.fiche;
     const kCode = cle(f.code);
+    const kDesignation = cleEntete(f.name);
     const kModele = cleMarque(f.brand) && f.model_key ? `${cleMarque(f.brand)}|${f.model_key}` : '';
     const supplierId = f.fournisseur ? resolus[cleFournisseur(f.fournisseur.nom)] : null;
     const kLigne = f.fournisseur ? `${supplierId || `nom:${cleFournisseur(f.fournisseur.nom)}`}|${cle(f.fournisseur.reference)}` : '';
@@ -140,7 +145,7 @@ export function classerArticles(candidats, existant, options = {}) {
     // Doublon dans le fichier : testé avant la base (la première ligne gagne).
     let doublon = null; let recochable = true;
     if (kCode && dansFichier.code.has(kCode)) { doublon = { force: 'fort', motif: 'fichier_code' }; recochable = false; }
-    else if ((f.code_ean && dansFichier.ean.has(f.code_ean)) || (kModele && dansFichier.modele.has(kModele)) || (kLigne && dansFichier.ligne.has(kLigne))) {
+    else if ((kDesignation && dansFichier.designation.has(`${kDesignation}|${f.product_kind}|${cleMarque(f.brand)}`)) || (f.code_ean && dansFichier.ean.has(f.code_ean)) || (kModele && dansFichier.modele.has(kModele)) || (kLigne && dansFichier.ligne.has(kLigne))) {
       doublon = { force: 'fort', motif: 'fichier' };
     } else if (kCode && index.code.has(kCode)) {
       doublon = { force: 'fort', motif: 'code', articleId: index.code.get(kCode) }; recochable = false;
@@ -150,10 +155,15 @@ export function classerArticles(candidats, existant, options = {}) {
       doublon = { force: 'fort', motif: 'marque_modele', articleId: index.modele.get(kModele) };
     } else if (supplierId && index.lignes.has(`${supplierId}|${cle(f.fournisseur.reference)}`)) {
       doublon = { force: 'fort', motif: 'ligne_fournisseur' };
-    } else if (!cleMarque(f.brand) && cleEntete(f.name) && index.designation.has(cleEntete(f.name))) {
-      doublon = { force: 'faible', motif: 'designation', articleId: index.designation.get(cleEntete(f.name)) };
+    } else {
+      // Même désignation et même nature : fort si la marque est identique (ou absente des deux côtés), sinon faible.
+      const memes = (index.designation.get(kDesignation) || []).filter((a) => a.kind === f.product_kind);
+      const fort = memes.find((a) => a.brand === cleMarque(f.brand));
+      if (fort) doublon = { force: 'fort', motif: 'designation', articleId: fort.id };
+      else if (memes.length) doublon = { force: 'faible', motif: 'designation', articleId: memes[0].id };
     }
 
+    if (kDesignation) dansFichier.designation.add(`${kDesignation}|${f.product_kind}|${cleMarque(f.brand)}`);
     if (kCode) dansFichier.code.add(kCode);
     if (f.code_ean) dansFichier.ean.add(f.code_ean);
     if (kModele) dansFichier.modele.add(kModele);
