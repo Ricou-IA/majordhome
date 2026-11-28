@@ -59,7 +59,8 @@ async function creer(navigateur, cfg, avecSession, proprietaire) {
     async aller(url) {
       exiger(url);
       await politesse();
-      const r = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DELAI_PAGE_MS });
+      // « load » : images et scripts de la page sont demandés (et bloqués s'ils sortent du site) avant de rendre la main
+      const r = await page.goto(url, { waitUntil: 'load', timeout: DELAI_PAGE_MS });
       etat.pagesVues += 1;
       return { statut: r ? r.status() : 0, url: page.url() };
     },
