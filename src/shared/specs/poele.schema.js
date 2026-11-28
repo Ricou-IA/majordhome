@@ -9,7 +9,8 @@
  *
  * Structure :
  *  - POELE_FUEL_TYPES : enum combustible (bois / granules / hybride)
- *  - POELE_GROUPS : regroupements pour l'UI (Puissance / Performance / ...)
+ *  - POELE_GROUPS : regroupements pour l'UI (Performances CEE / Puissance / ...)
+ *  - Performances CEE (2026-11-28) : champs exigés par la fiche BAR-TH-112, en tête (imprimés en premier sur le devis)
  *  - POELE_CANONICAL_SPECS : tableau des champs canoniques (15-25 selon fuel_type)
  *    * chaque champ a applies_to[] — filtre dynamique selon fuel_type
  *    * aliases[] alimente le mapping scraping (labels fournisseurs → key canonique)
@@ -29,6 +30,7 @@ export const POELE_FUEL_TYPES = [
 ];
 
 export const POELE_GROUPS = [
+  { key: 'cee', label: 'Performances CEE' },
   { key: 'power', label: 'Puissance' },
   { key: 'performance', label: 'Performance' },
   { key: 'emissions', label: 'Émissions' },
@@ -40,6 +42,12 @@ export const POELE_GROUPS = [
 ];
 
 export const ENERGY_CLASSES = ['A++', 'A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G'];
+
+// Normes de mesure de l'Etas et des émissions (fiche CEE BAR-TH-112 : EN 13240 / 14785 / 15250 pour les poêles,
+// 13229 foyers et inserts, 12815 cuisinières ; EN 16510-1 les remplace, à faire accepter par l'obligé).
+export const NORMES_MESURE = ['EN 13240', 'EN 14785', 'EN 15250', 'EN 13229', 'EN 12815', 'EN 16510-1', 'Autre'];
+
+export const SORTIES_FUMEES = ['Dessus', 'Arrière', 'Dessus ou arrière', 'Latérale'];
 
 export const INTERIOR_MATERIALS = [
   'Thermobéton',
@@ -72,6 +80,88 @@ const ALL_FUELS = ['bois', 'granules', 'hybride'];
  *  - hint        : aide saisie (optionnel)
  */
 export const POELE_CANONICAL_SPECS = [
+  // ================= Performances CEE (fiche BAR-TH-112 A46.3, lue le 2026-11-28) =================
+  // EN TÊTE du tableau : lignesCaracteristiques imprime dans l'ordre du tableau, donc en premier sur le devis.
+  // Ce que la preuve de réalisation doit porter : Etas, particules, COG, CO, NOx et leur norme de mesure (ou Flamme
+  // Verte pour les émissions). Valeurs en mg/Nm³ à 13 % d'O2. Verdict : src/lib/cee/barTh112.js (jamais bloquant).
+  {
+    key: 'fuel_type',
+    label: 'Combustible',
+    type: 'enum',
+    options: POELE_FUEL_TYPES,
+    required: true,
+    applies_to: ALL_FUELS,
+    group: 'cee',
+    aliases: ['combustible', 'type de combustible', 'fuel', 'fuel type', 'energie', 'énergie'],
+  },
+  {
+    key: 'etas_pct',
+    label: 'Efficacité énergétique saisonnière (Etas)',
+    unit: '%',
+    type: 'number',
+    required: true,
+    applies_to: ALL_FUELS,
+    group: 'cee',
+    aliases: [
+      'etas', 'rendement saisonnier', 'rendement energetique saisonnier',
+      'efficacite energetique saisonniere', 'efficacité énergétique saisonnière', 'seasonal efficiency',
+    ],
+    hint: 'Pas le rendement nominal : Etas est plus bas (Toron : rendement 77 %, Etas 67 %)',
+  },
+  {
+    key: 'pm_mg_nm3',
+    label: 'Particules (13 % O2)',
+    unit: 'mg/Nm³',
+    type: 'number',
+    applies_to: ALL_FUELS,
+    group: 'cee',
+    aliases: ['particules', 'poussieres', 'poussières', 'pm', 'particulate matter', 'emissions de particules'],
+  },
+  {
+    key: 'cog_mgc_nm3',
+    label: 'COG (13 % O2)',
+    unit: 'mgC/Nm³',
+    type: 'number',
+    applies_to: ALL_FUELS,
+    group: 'cee',
+    aliases: ['cog', 'ogc', 'composes organiques gazeux', 'composés organiques gazeux', 'cov'],
+  },
+  {
+    key: 'co_mg_nm3',
+    label: 'CO (13 % O2)',
+    unit: 'mg/Nm³',
+    type: 'number',
+    applies_to: ALL_FUELS,
+    group: 'cee',
+    aliases: ['co a 13', 'co à 13', 'monoxyde de carbone mg', 'co mg/nm3', 'co mg nm3'],
+  },
+  {
+    key: 'nox_mg_nm3',
+    label: 'NOx (13 % O2)',
+    unit: 'mg/Nm³',
+    type: 'number',
+    applies_to: ALL_FUELS,
+    group: 'cee',
+    aliases: ['nox', 'oxydes d azote', 'oxydes d\'azote'],
+  },
+  {
+    key: 'norme_mesure',
+    label: 'Norme de mesure',
+    type: 'enum',
+    options: NORMES_MESURE,
+    applies_to: ALL_FUELS,
+    group: 'cee',
+    aliases: ['norme', 'norme de mesure', 'normes', 'en 16510', 'en 13240', 'en 14785'],
+  },
+  {
+    key: 'flamme_verte',
+    label: 'Flamme Verte',
+    type: 'boolean',
+    applies_to: ALL_FUELS,
+    group: 'cee',
+    aliases: ['flamme verte', 'label flamme verte'],
+  },
+
   // ================= Puissance =================
   {
     key: 'power_nominal_kw',
@@ -190,6 +280,15 @@ export const POELE_CANONICAL_SPECS = [
       'raccordement fumee', 'sortie fumee', 'sortie fumée', 'buse fumee', 'buse fumée',
       'flue outlet', 'flue diameter', 'conduit de fumée sortie',
     ],
+  },
+  {
+    key: 'flue_outlet_position',
+    label: 'Sortie des fumées',
+    type: 'enum',
+    options: SORTIES_FUMEES,
+    applies_to: ALL_FUELS,
+    group: 'connections',
+    aliases: ['depart des fumees', 'départ des fumées', 'sortie des fumees position', 'position sortie fumees', 'flue outlet position'],
   },
   {
     key: 'air_intake_diameter_mm',

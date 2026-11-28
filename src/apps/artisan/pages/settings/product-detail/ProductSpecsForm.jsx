@@ -172,7 +172,7 @@ function SpecField({ field, value, onChange }) {
         <SelectInput
           value={value ?? ''}
           onChange={(v) => onChange(v || null)}
-          options={[{ value: '', label: '—' }, ...options.map((o) => ({ value: o, label: o }))]}
+          options={[{ value: '', label: '—' }, ...options.map((o) => (o && typeof o === 'object' ? { value: o.value, label: o.label ?? o.value } : { value: o, label: o }))]}
         />
       </FormField>
     );
